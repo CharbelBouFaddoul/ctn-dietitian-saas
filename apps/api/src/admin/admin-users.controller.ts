@@ -1,0 +1,54 @@
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Query, Req, UseGuards } from "@nestjs/common";
+import { ApiCookieAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
+import type { Request } from "express";
+import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { SessionGuard } from "../auth/guards/session.guard";
+import type { AuthenticatedRequestUser } from "../auth/auth.types";
+import { adminActor } from "./admin-actor";
+import { AdminUserService } from "./admin-user.service";
+import { AdminSearchQueryDto, UpdatePlatformRoleDto, UpdateUserStatusDto } from "./dto/admin.dto";
+import { PlatformRoles } from "./decorators/platform-roles.decorator";
+import { PlatformRolesGuard } from "./guards/platform-roles.guard";
+
+@ApiTags("admin")
+@ApiCookieAuth()
+@UseGuards(SessionGuard, PlatformRolesGuard)
+@Controller("api/v1/admin/users")
+export class AdminUsersController {
+  constructor(private readonly users: AdminUserService) {}
+
+  @Get()
+  @ApiOperation({ summary: "List users" })
+  list(@Query() query: AdminSearchQueryDto) {
+    return this.users.list(query.q);
+  }
+
+  @Get(":userId")
+  @ApiOperation({ summary: "Get user and organization memberships (read-only roles)" })
+  get(@Param("userId", ParseUUIDPipe) userId: string) {
+    return this.users.get(userId);
+  }
+
+  @Patch(":userId/status")
+  @ApiOperation({ summary: "Activate, suspend, or archive a user" })
+  setStatus(
+    @CurrentUser() user: AuthenticatedRequestUser,
+    @Req() req: Request,
+    @Param("userId", ParseUUIDPipe) userId: string,
+    @Body() body: UpdateUserStatusDto,
+  ) {
+    return this.users.setStatus(userId, body.status, adminActor(user, req));
+  }
+
+  @Patch(":userId/platform-role")
+  @PlatformRoles("SUPER_ADMIN")
+  @ApiOperation({ summary: "Set platform role (SUPER_ADMIN only)" })
+  setPlatformRole(
+    @CurrentUser() user: AuthenticatedRequestUser,
+    @Req() req: Request,
+    @Param("userId", ParseUUIDPipe) userId: string,
+    @Body() body: UpdatePlatformRoleDto,
+  ) {
+    return this.users.setPlatformRole(userId, body.platformRole ?? null, adminActor(user, req));
+  }
+}

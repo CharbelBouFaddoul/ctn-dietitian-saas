@@ -1,0 +1,331 @@
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import request from "supertest";
+import { FEATURE_KEYS } from "@nutrition-saas/config";
+import { CLIENT_ACCESS_DENIED } from "../src/clients/client.messages";
+import {
+  cookieValue,
+  createAuthTestApp,
+  extractEmailedToken,
+  resetAuthDatabase,
+  type AuthTestContext,
+} from "./app";
+
+const PASSWORD = "ValidPass12";
+const SETTINGS = {
+  timezone: "UTC",
+  locale: "en",
+  currency: "USD",
+  weightUnit: "kg",
+  heightUnit: "cm",
+  dateFormat: "YYYY_MM_DD",
+};
+
+describe("Phase 8 client tracking", () => {
+  let ctx: AuthTestContext;
+  let seq = 0;
+
+  beforeAll(async () => {
+    ctx = await createAuthTestApp();
+  });
+
+  beforeEach(async () => {
+    ctx.emails.messages.length = 0;
+    await resetAuthDatabase(ctx.prisma);
+  });
+
+  afterAll(async () => {
+    await ctx?.app.close();
+  });
+
+  function email(prefix = "user"): string {
+    seq += 1;
+    return `${prefix}${seq}@example.com`;
+  }
+
+  async function registerVerifyLogin(address = email()) {
+    await request(ctx.app.getHttpServer())
+      .post("/api/v1/auth/register")
+      .send({ email: address, password: PASSWORD })
+      .expect(200);
+    const token = extractEmailedToken(ctx.emails.last().text);
+    await request(ctx.app.getHttpServer()).post("/api/v1/auth/verify-email").send({ token }).expect(200);
+    const login = await request(ctx.app.getHttpServer())
+      .post("/api/v1/auth/login")
+      .send({ email: address, password: PASSWORD })
+      .expect(200);
+    return { address, cookie: `ns_session=${cookieValue(login.headers["set-cookie"])}` };
+  }
+
+  async function createOrg(cookie: string, name: string, timezone = "UTC") {
+    const created = await request(ctx.app.getHttpServer())
+      .post("/api/v1/organizations")
+      .set("Cookie", cookie)
+      .send({ name, settings: { ...SETTINGS, timezone } })
+      .expect(201);
+    const plan = await ctx.prisma.plan.findUniqueOrThrow({ where: { slug: "standard" } });
+    await ctx.prisma.subscription.create({
+      data: { organizationId: created.body.id, planId: plan.id, status: "ACTIVE" },
+    });
+    return created.body as { id: string };
+  }
+
+  async function createClient(cookie: string, organizationId: string, body: Record<string, unknown> = {}) {
+    return request(ctx.app.getHttpServer())
+      .post(`/api/v1/organizations/${organizationId}/clients`)
+      .set("Cookie", cookie)
+      .send({ firstName: "Pat", lastName: "Client", email: email("client"), ...body });
+  }
+
+  async function seedFood(name = "Chicken breast") {
+    const source = await ctx.prisma.foodSource.create({
+      data: {
+        key: `src-${seq}-${name}`,
+        name: "Test catalog",
+        provider: "Test",
+        datasetVersion: "1",
+        license: "test",
+        attribution: "test",
+        importedAt: new Date(),
+      },
+    });
+    return ctx.prisma.food.create({
+      data: {
+        foodSourceId: source.id,
+        sourceFoodId: `${name}-${seq}`,
+        name,
+        nameNormalized: name.toLowerCase(),
+        category: "Poultry",
+        referenceQuantity: 100,
+        referenceUnit: "g",
+        energyKcal: 165,
+        proteinG: 31,
+        carbohydrateG: 0,
+        fatG: 3.6,
+        fiberG: 0,
+        sugarG: 0,
+        sodiumMg: 74,
+        importedAt: new Date(),
+      },
+    });
+  }
+
+  async function portalLogin(clientEmail: string, inviteSent = true) {
+    if (inviteSent) {
+      const inviteMail = ctx.emails.messages.find(
+        (message) => message.text.includes("CLIENT_INVITE") && message.to === clientEmail,
+      );
+      const token = extractEmailedToken(inviteMail?.text ?? "");
+      await request(ctx.app.getHttpServer()).post("/api/v1/auth/invitations/accept").send({ token, password: PASSWORD }).expect(200);
+    }
+    const login = await request(ctx.app.getHttpServer())
+      .post("/api/v1/auth/login")
+      .send({ email: clientEmail, password: PASSWORD })
+      .expect(200);
+    return `ns_session=${cookieValue(login.headers["set-cookie"])}`;
+  }
+
+  it("isolates tracking between organizations and preserves food log nutrition snapshots", async () => {
+    const ownerA = await registerVerifyLogin();
+    const ownerB = await registerVerifyLogin();
+    const orgA = await createOrg(ownerA.cookie, "Clinic A");
+    const orgB = await createOrg(ownerB.cookie, "Clinic B");
+    const clientA = await createClient(ownerA.cookie, orgA.id, { invitePortal: true });
+    const clientB = await createClient(ownerB.cookie, orgB.id, { invitePortal: true });
+    const food = await seedFood();
+    const portalA = await portalLogin(clientA.body.email);
+
+    const created = await request(ctx.app.getHttpServer())
+      .post("/api/v1/portal/tracking/food-logs")
+      .set("Cookie", portalA)
+      .send({ foodId: food.id, quantity: 200, unit: "g" })
+      .expect(201);
+    expect(created.body.nutrition.energyKcal).toBe(330);
+
+    await request(ctx.app.getHttpServer())
+      .put(`/api/v1/organizations/${orgA.id}/foods/${food.id}/override`)
+      .set("Cookie", ownerA.cookie)
+      .send({ energyKcal: 180 })
+      .expect(200);
+
+    const stored = await request(ctx.app.getHttpServer())
+      .get(`/api/v1/portal/tracking/food-logs?date=${created.body.trackingDate}`)
+      .set("Cookie", portalA)
+      .expect(200);
+    expect(stored.body[0].nutrition.energyKcal).toBe(330);
+
+    const edited = await request(ctx.app.getHttpServer())
+      .patch(`/api/v1/portal/tracking/food-logs/${created.body.id}`)
+      .set("Cookie", portalA)
+      .send({ quantity: 100 })
+      .expect(200);
+    expect(edited.body.nutrition.energyKcal).toBe(180);
+
+    await request(ctx.app.getHttpServer())
+      .get(`/api/v1/organizations/${orgB.id}/clients/${clientB.body.id}/tracking/summary`)
+      .set("Cookie", ownerA.cookie)
+      .expect(403);
+
+    await request(ctx.app.getHttpServer())
+      .post("/api/v1/portal/tracking/food-logs")
+      .set("Cookie", ownerB.cookie)
+      .send({ foodId: food.id, quantity: 100, unit: "g" })
+      .expect(403);
+  });
+
+  it("enforces client access for dietitian review and blocks cross-client portal access", async () => {
+    const owner = await registerVerifyLogin();
+    const dietitian = await registerVerifyLogin();
+    const staff = await registerVerifyLogin();
+    const org = await createOrg(owner.cookie, "Practice");
+    await request(ctx.app.getHttpServer())
+      .post(`/api/v1/organizations/${org.id}/members`)
+      .set("Cookie", owner.cookie)
+      .send({ email: dietitian.address, role: "DIETITIAN" })
+      .expect(201);
+    await request(ctx.app.getHttpServer())
+      .post(`/api/v1/organizations/${org.id}/members`)
+      .set("Cookie", owner.cookie)
+      .send({ email: staff.address, role: "STAFF" })
+      .expect(201);
+    const assigned = await createClient(owner.cookie, org.id, { invitePortal: true });
+    const unassigned = await createClient(owner.cookie, org.id, { invitePortal: true });
+    const dietitianCtx = await request(ctx.app.getHttpServer())
+      .get(`/api/v1/organizations/${org.id}`)
+      .set("Cookie", dietitian.cookie)
+      .expect(200);
+    await request(ctx.app.getHttpServer())
+      .post(`/api/v1/organizations/${org.id}/clients/${assigned.body.id}/assignments`)
+      .set("Cookie", owner.cookie)
+      .send({ organizationMemberId: dietitianCtx.body.context.membershipId })
+      .expect(201);
+
+    const food = await seedFood();
+    const portal = await portalLogin(assigned.body.email);
+    await request(ctx.app.getHttpServer())
+      .post("/api/v1/portal/tracking/food-logs")
+      .set("Cookie", portal)
+      .send({ foodId: food.id, quantity: 150, unit: "g" })
+      .expect(201);
+
+    await request(ctx.app.getHttpServer())
+      .get(`/api/v1/organizations/${org.id}/clients/${unassigned.body.id}/tracking/summary`)
+      .set("Cookie", dietitian.cookie)
+      .expect(403)
+      .expect((res) => expect(res.body.message).toBe(CLIENT_ACCESS_DENIED));
+
+    const ownerSummary = await request(ctx.app.getHttpServer())
+      .get(`/api/v1/organizations/${org.id}/clients/${assigned.body.id}/tracking/summary`)
+      .set("Cookie", owner.cookie)
+      .expect(200);
+    expect(ownerSummary.body.food.presented.energyKcal).toBe(248);
+
+    await request(ctx.app.getHttpServer())
+      .get(`/api/v1/organizations/${org.id}/clients/${assigned.body.id}/tracking/summary`)
+      .set("Cookie", staff.cookie)
+      .expect(403);
+
+    const otherPortal = await portalLogin(unassigned.body.email);
+    const otherSummary = await request(ctx.app.getHttpServer())
+      .get("/api/v1/portal/tracking/summary")
+      .set("Cookie", otherPortal)
+      .expect(200);
+    expect(otherSummary.body.food.logCount).toBe(0);
+  });
+
+  it("calculates water, exercise, sleep, habits, and timeline events", async () => {
+    const owner = await registerVerifyLogin();
+    const org = await createOrg(owner.cookie, "Clinic", "Asia/Beirut");
+    const client = await createClient(owner.cookie, org.id, { invitePortal: true });
+    const portal = await portalLogin(client.body.email);
+    const date = "2026-08-18";
+
+    await request(ctx.app.getHttpServer())
+      .post("/api/v1/portal/tracking/water-logs")
+      .set("Cookie", portal)
+      .send({ amount: 0.5, unit: "l", loggedAt: "2026-08-18T08:00:00.000Z" })
+      .expect(201);
+    await request(ctx.app.getHttpServer())
+      .post("/api/v1/portal/tracking/water-logs")
+      .set("Cookie", portal)
+      .send({ amount: 750, unit: "ml", loggedAt: "2026-08-18T12:30:00.000Z" })
+      .expect(201);
+
+    await request(ctx.app.getHttpServer())
+      .post("/api/v1/portal/tracking/exercise-logs")
+      .set("Cookie", portal)
+      .send({ activityType: "Walking", durationMinutes: 45, performedAt: "2026-08-18T09:00:00.000Z" })
+      .expect(201);
+
+    const sleep = await request(ctx.app.getHttpServer())
+      .put("/api/v1/portal/tracking/sleep")
+      .set("Cookie", portal)
+      .send({
+        date,
+        bedtime: "2026-08-17T21:00:00.000Z",
+        wakeTime: "2026-08-18T05:00:00.000Z",
+        quality: 4,
+      })
+      .expect(200);
+    expect(sleep.body.durationMinutes).toBe(480);
+
+    await request(ctx.app.getHttpServer())
+      .put("/api/v1/portal/tracking/habits")
+      .set("Cookie", portal)
+      .send({ habitKey: "water_goal", habitLabel: "Drink water", date, completed: true })
+      .expect(200);
+
+    const summary = await request(ctx.app.getHttpServer())
+      .get(`/api/v1/portal/tracking/summary?date=${date}`)
+      .set("Cookie", portal)
+      .expect(200);
+    expect(summary.body.water.totalMl).toBe(1250);
+    expect(summary.body.exercise.totalDurationMinutes).toBe(45);
+    expect(summary.body.sleep.durationMinutes).toBe(480);
+    expect(summary.body.habits.completed).toBe(1);
+
+    const timeline = await request(ctx.app.getHttpServer())
+      .get(`/api/v1/organizations/${org.id}/clients/${client.body.id}/timeline`)
+      .set("Cookie", owner.cookie)
+      .expect(200);
+    const types = timeline.body.map((row: { type: string }) => row.type);
+    expect(types).toContain("WATER_LOGGED");
+    expect(types).toContain("EXERCISE_LOGGED");
+    expect(types).toContain("SLEEP_LOGGED");
+    expect(types).toContain("HABIT_COMPLETED");
+
+    await request(ctx.app.getHttpServer())
+      .put("/api/v1/portal/tracking/sleep")
+      .set("Cookie", portal)
+      .send({ date, bedtime: "2026-08-18T05:00:00.000Z", wakeTime: "2026-08-18T04:00:00.000Z" })
+      .expect(400);
+
+    expect(await ctx.entitlements.can(org.id, FEATURE_KEYS.AI)).toBe(false);
+  });
+
+  it("rejects invalid exercise duration and archives logs", async () => {
+    const owner = await registerVerifyLogin();
+    const org = await createOrg(owner.cookie, "Clinic");
+    const client = await createClient(owner.cookie, org.id, { invitePortal: true });
+    const food = await seedFood();
+    const portal = await portalLogin(client.body.email);
+
+    await request(ctx.app.getHttpServer())
+      .post("/api/v1/portal/tracking/exercise-logs")
+      .set("Cookie", portal)
+      .send({ activityType: "Run", durationMinutes: 0 })
+      .expect(400);
+
+    const foodLog = await request(ctx.app.getHttpServer())
+      .post("/api/v1/portal/tracking/food-logs")
+      .set("Cookie", portal)
+      .send({ foodId: food.id, quantity: 100, unit: "g" })
+      .expect(201);
+    await request(ctx.app.getHttpServer())
+      .delete(`/api/v1/portal/tracking/food-logs/${foodLog.body.id}`)
+      .set("Cookie", portal)
+      .expect(200);
+
+    const summary = await request(ctx.app.getHttpServer()).get("/api/v1/portal/tracking/summary").set("Cookie", portal).expect(200);
+    expect(summary.body.food.logCount).toBe(0);
+  });
+});

@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  quality:
+    name: Typecheck and lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+
+  test:
+    name: API tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: nutrition
+          POSTGRES_PASSWORD: nutrition
+          POSTGRES_DB: nutrition
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U nutrition -d nutrition"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://nutrition:nutrition@localhost:5432/nutrition?schema=public
+      REDIS_URL: redis://localhost:6379
+      FILE_STORAGE_PATH: ./storage
+      AUTH_TOKEN_SECRET: test-auth-token-secret-value-32chars-min
+      CORS_ORIGIN: http://localhost:3000
+      APP_URL: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @nutrition-saas/validation build
+      - run: pnpm --filter @nutrition-saas/config build
+      - run: pnpm --filter @nutrition-saas/types build
+      - run: pnpm --filter @nutrition-saas/utilities build
+      - run: pnpm prisma:generate
+      - run: pnpm prisma:migrate
+      - run: pnpm test

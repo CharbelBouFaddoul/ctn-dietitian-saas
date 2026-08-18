@@ -1,0 +1,109 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-nutrition}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nutrition}
+      POSTGRES_DB: ${POSTGRES_DB:-nutrition}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nutrition} -d ${POSTGRES_DB:-nutrition}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      API_PORT: 3001
+      DATABASE_URL: postgresql://${POSTGRES_USER:-nutrition}:${POSTGRES_PASSWORD:-nutrition}@postgres:5432/${POSTGRES_DB:-nutrition}?schema=public
+      REDIS_URL: redis://redis:6379
+      FILE_STORAGE_PATH: /data/storage
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      SWAGGER_ENABLED: "true"
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      AUTH_TOKEN_SECRET: ${AUTH_TOKEN_SECRET:-change-me-to-a-long-random-secret-value}
+      SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-604800}
+      EMAIL_VERIFICATION_TTL_SECONDS: ${EMAIL_VERIFICATION_TTL_SECONDS:-86400}
+      PASSWORD_RESET_TTL_SECONDS: ${PASSWORD_RESET_TTL_SECONDS:-3600}
+      INVITATION_TTL_SECONDS: ${INVITATION_TTL_SECONDS:-604800}
+      PASSWORD_MIN_LENGTH: ${PASSWORD_MIN_LENGTH:-10}
+      AUTH_THROTTLE_TTL_MS: ${AUTH_THROTTLE_TTL_MS:-60000}
+      AUTH_THROTTLE_LIMIT: ${AUTH_THROTTLE_LIMIT:-10}
+    ports:
+      - "${API_PORT:-3001}:3001"
+    volumes:
+      - storage_data:/data/storage
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    command: ["/app/docker/worker-entrypoint.sh"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      API_PORT: 3001
+      DATABASE_URL: postgresql://${POSTGRES_USER:-nutrition}:${POSTGRES_PASSWORD:-nutrition}@postgres:5432/${POSTGRES_DB:-nutrition}?schema=public
+      REDIS_URL: redis://redis:6379
+      FILE_STORAGE_PATH: /data/storage
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      SWAGGER_ENABLED: "false"
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      AUTH_TOKEN_SECRET: ${AUTH_TOKEN_SECRET:-change-me-to-a-long-random-secret-value}
+    volumes:
+      - storage_data:/data/storage
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+
+volumes:
+  postgres_data:
+  storage_data:

@@ -1,0 +1,26 @@
+:root {
+  --color-bg: #f6f5f2;
+  --color-surface: #ffffff;
+  --color-text: #1c1917;
+  --color-muted: #78716c;
+  --color-accent: #0f766e;
+  --color-accent-soft: #ccfbf1;
+  --color-border: #e7e5e4;
+  --color-danger: #b91c1c;
+  --radius: 12px;
+  --shadow: 0 1px 2px rgb(28 25 23 / 6%);
+  --font-sans: "IBM Plex Sans", "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+}
