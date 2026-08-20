@@ -9,7 +9,8 @@ Tracks the DietitianAccount tenancy restructure (Phases 1–6+).
 | **Phase 3** | Product cutover: `registrationEnabled` gate, admin dietitian provision + `DIETITIAN_ACTIVATION`, portal multi-connection + `Session.activeClientId`, web `/practice` remount, patient connection switcher | **Done** |
 | **Phase 4** | Subscription lifecycle (ACTIVE → GRACE 3d → READ_ONLY 7d → LOCKED), period dates, CLIENT_LIMIT seeds, centralized TenantGuard enforcement | **Done** |
 | **Phase 5** | Practice/portal dashboards, notification types + mark-all-read + bell UI, `emailNotificationsEnabled` product-email gate, auth-route redirects | **Done** |
-| **Phase 6+** | API remount `/api/v1/dietitian`, `DietitianGuard`, drop org membership shells / dual-write / legacy org tables | **Deferred** |
+| **Phase 6** | Client Portfolio aggregate + chart tab IA, timeline pagination, assessment read-only GET, portal profile enrichment | **Done** |
+| **Phase 7+** | API remount `/api/v1/dietitian`, `DietitianGuard`, drop org membership shells / dual-write / legacy org tables | **Deferred** |
 
 ## Phase 4 notes
 
@@ -31,7 +32,16 @@ Tracks the DietitianAccount tenancy restructure (Phases 1–6+).
 - Practice dashboard extended (`todayAppointments`, conversations, notifications). Portal: `GET /api/v1/portal/dashboard`.
 - Auth: client login + both register pages redirect when a session already exists.
 
-## Phase 6+ (deferred remount)
+## Phase 6 notes
+
+- Practice chart evolves in place (`/practice/:id/clients/:clientId`); no second client workspace.
+- `GET …/clients/:clientId/portfolio` is **read/composition-only** (snapshot + missing/alerts + small recent timeline). Mutations stay on existing domain APIs.
+- Timeline tab uses paginated `GET …/timeline?before=&limit=`; portfolio does not embed full history.
+- Assessment: thin `GET …/assessments/:assessmentId` for read-only responses.
+- Portal `GET /api/v1/portal/me` includes lightweight personal + dietary/lifestyle + practice name for `activeClientId` only (no clinical editing).
+- Profile photo upload deferred (Avatar initials only).
+
+## Phase 7+ (deferred remount)
 
 - Remount practice APIs under `/api/v1/dietitian`
 - Replace TenantGuard with DietitianGuard

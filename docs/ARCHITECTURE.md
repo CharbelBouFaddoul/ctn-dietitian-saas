@@ -143,9 +143,10 @@ Tenant-scoped queries via dietitianAccountId (tenantWhere)
 - Platform roles stay on `users` (`SUPER_ADMIN` \| `ADMIN`).
 - Self-serve register/org create is gated by `PlatformSettings.registrationEnabled` (default off); admins provision dietitians.
 - Patients may connect to multiple dietitians (isolated `Client` per link); clinical portal ops require a selected `Session.activeClientId` when more than one connection exists.
-- Web practice UI is `/practice/:id` (redirects from `/orgs`). API remount under `/api/v1/dietitian` and org-shell drops remain deferred (Phase 6+).
+- Web practice UI is `/practice/:id` (redirects from `/orgs`). API remount under `/api/v1/dietitian` and org-shell drops remain deferred (Phase 7+).
 - Subscription access is derived (`ACTIVE` / `GRACE` / `READ_ONLY` / `LOCKED`) from period end + status; `TenantGuard` enforces mutations vs reads. See [TENANCY_MIGRATION.md](./TENANCY_MIGRATION.md).
 - Phase 5 dashboards: `GET …/practice/dashboard` (extended) and `GET /api/v1/portal/dashboard`. In-app notifications reuse `Notification` with org/portal list, unread-count, mark-one, mark-all-read; shells poll unread. `PlatformSettings.emailNotificationsEnabled` (default off, admin-only) gates product emails only.
+- Phase 6 client portfolio: `GET …/clients/:clientId/portfolio` composes identity, profile, latest measurements/BMI, goals, assessment, meal plan, appointment, messages, small recent timeline, and missing/alerts. Chart tabs: overview → personal → assessments → goals → meal-plan → tracking → documents → appointments → messages → invoices → timeline → ai → portal. Full timeline loads separately (paginated). Portal profile is read-only lightweight fields for the active connection.
 
 ---
 

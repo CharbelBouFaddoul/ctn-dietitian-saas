@@ -404,9 +404,11 @@ No user
 
 **Phase 4 (done):** subscription lifecycle enforcement — see [TENANCY_MIGRATION.md](./TENANCY_MIGRATION.md).
 
-**Phase 5 (done):** dashboards + notifications + product email gate — remount `/api/v1/dietitian` still deferred to Phase 6+.
+**Phase 5 (done):** dashboards + notifications + product email gate.
 
-**Phase 6+ (deferred):** `/api/v1/dietitian` remount, DietitianGuard, stop dual-write, drop Organization/Member/Assignment tables — not started.
+**Phase 6 (done):** client portfolio aggregate (`GET …/clients/:id/portfolio`), chart tab IA (overview snapshot + missing/alerts), timeline pagination, assessment GET-by-id, portal `me` profile enrichment. Profile photo upload still deferred. Remount `/api/v1/dietitian` deferred to Phase 7+.
+
+**Phase 7+ (deferred):** `/api/v1/dietitian` remount, DietitianGuard, stop dual-write, drop Organization/Member/Assignment tables — not started.
 
 What must change later (audit only):
 

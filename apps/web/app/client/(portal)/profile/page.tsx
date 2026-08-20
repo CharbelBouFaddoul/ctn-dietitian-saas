@@ -2,18 +2,40 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Alert, LoadingState, PageHeader, Section } from "@nutrition-saas/ui";
+import { Alert, LoadingState, PageHeader, Section, StatusBadge, humanizeLabel } from "@nutrition-saas/ui";
 import { api } from "../../../../lib/api";
 import { errorMessage } from "../../../../lib/humanize-error";
+import { statusLabel } from "../../../../lib/practice-labels";
 
 interface PortalMe {
   client: {
+    id: string;
     firstName: string;
     lastName: string;
     displayName: string | null;
+    email: string | null;
+    phone: string | null;
+    dateOfBirth: string | null;
+    sex: string | null;
+    status: string;
   };
+  profile: {
+    allergies: string | null;
+    intolerances: string | null;
+    dietaryPreferences: string | null;
+    lifestyle: string | null;
+  } | null;
   practiceName?: string | null;
-  user?: { email?: string | null };
+}
+
+function row(label: string, value: string | null | undefined) {
+  if (!value?.trim()) return null;
+  return (
+    <div className="ui-client-focus-row">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
 }
 
 export default function ClientProfilePage() {
@@ -35,29 +57,55 @@ export default function ClientProfilePage() {
 
   return (
     <section>
-      <PageHeader eyebrow="Account" title="Profile" description="Your account details and practice connection." />
+      <PageHeader
+        eyebrow="Account"
+        title="Profile"
+        description="Your personal details for the active practice connection. Contact your dietitian to update clinical information."
+      />
       {error ? <Alert tone="danger">{error}</Alert> : null}
       {loading ? <LoadingState>Loading profile…</LoadingState> : null}
 
-      {!loading ? (
+      {!loading && data ? (
         <div className="ui-client-stack">
           <Section title="Personal information" tone="mint">
+            {row("Name", name)}
+            {row("Email", data.client.email)}
+            {row("Phone", data.client.phone)}
+            {row("Date of birth", data.client.dateOfBirth)}
+            {row("Sex", data.client.sex ? humanizeLabel(data.client.sex) : null)}
             <div className="ui-client-focus-row">
-              <span>Name</span>
-              <strong>{name}</strong>
+              <span>Status</span>
+              <StatusBadge status={data.client.status} label={statusLabel(data.client.status)} />
             </div>
-            {data?.user?.email ? (
-              <div className="ui-client-focus-row">
-                <span>Email</span>
-                <strong>{data.user.email}</strong>
-              </div>
+          </Section>
+
+          <Section title="Dietary preferences & restrictions" description="Recorded by your dietitian for this practice.">
+            {row("Allergies", data.profile?.allergies)}
+            {row("Intolerances", data.profile?.intolerances)}
+            {row("Dietary preferences", data.profile?.dietaryPreferences)}
+            {!data.profile?.allergies &&
+            !data.profile?.intolerances &&
+            !data.profile?.dietaryPreferences ? (
+              <p className="ui-muted" style={{ margin: 0 }}>
+                No dietary restrictions recorded yet.
+              </p>
             ) : null}
           </Section>
 
-          <Section title="Your practice" description="The dietitian practice you’re connected to.">
+          <Section title="Lifestyle">
+            {data.profile?.lifestyle?.trim() ? (
+              <p style={{ margin: 0, whiteSpace: "pre-wrap", lineHeight: 1.55 }}>{data.profile.lifestyle}</p>
+            ) : (
+              <p className="ui-muted" style={{ margin: 0 }}>
+                No lifestyle notes yet.
+              </p>
+            )}
+          </Section>
+
+          <Section title="Your practice" description="The dietitian practice for this connection.">
             <div className="ui-client-focus-row">
               <span>Practice</span>
-              <strong>{data?.practiceName?.trim() || "Connected to your dietitian"}</strong>
+              <strong>{data.practiceName?.trim() || "Connected to your dietitian"}</strong>
             </div>
           </Section>
 

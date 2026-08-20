@@ -77,6 +77,18 @@ export class AssessmentService {
     return rows.map((row) => this.toResponse(row));
   }
 
+  async get(tenant: TenantContext, clientId: string, assessmentId: string) {
+    await this.access.assertCanAccess(tenant, clientId, "read");
+    const row = await this.prisma.assessment.findFirst({
+      where: { id: assessmentId, clientId, ...tenantWhere(tenant.organizationId) },
+      include: { template: true },
+    });
+    if (!row) {
+      throw new NotFoundException("Assessment not found");
+    }
+    return this.toResponse(row);
+  }
+
   async start(tenant: TenantContext, clientId: string, templateId: string) {
     await this.access.assertCanAccess(tenant, clientId, "manageRecords");
     const template = await this.prisma.assessmentTemplate.findFirst({

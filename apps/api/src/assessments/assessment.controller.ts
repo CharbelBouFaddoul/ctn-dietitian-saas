@@ -110,6 +110,16 @@ export class AssessmentController {
     return this.assessments.list(tenant, clientId);
   }
 
+  @Get("clients/:clientId/assessments/:assessmentId")
+  @UseGuards(ClientAccessGuard)
+  getOne(
+    @CurrentTenant() tenant: TenantContext,
+    @Param("clientId", ParseUUIDPipe) clientId: string,
+    @Param("assessmentId", ParseUUIDPipe) assessmentId: string,
+  ) {
+    return this.assessments.get(tenant, clientId, assessmentId);
+  }
+
   @Post("clients/:clientId/assessments")
   @UseGuards(ClientAccessGuard)
   @ClientActionRequired("manageRecords")

@@ -5,6 +5,7 @@ import { CurrentTenant } from "../organizations/decorators/current-tenant.decora
 import { TenantGuard } from "../organizations/guards/tenant.guard";
 import type { TenantContext } from "../organizations/tenant.types";
 import { ClientService } from "./client.service";
+import { ClientPortfolioService } from "./client-portfolio.service";
 import { ClientActionRequired } from "./decorators/client-action.decorator";
 import { CreateClientDto, ListClientsQueryDto, RestoreClientDto, UpdateClientDto } from "./dto/client.dto";
 import { ClientAccessGuard } from "./guards/client-access.guard";
@@ -14,7 +15,10 @@ import { ClientAccessGuard } from "./guards/client-access.guard";
 @UseGuards(SessionGuard, TenantGuard)
 @Controller("api/v1/organizations/:organizationId/clients")
 export class ClientController {
-  constructor(private readonly clients: ClientService) {}
+  constructor(
+    private readonly clients: ClientService,
+    private readonly portfolio: ClientPortfolioService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: "List visible clients (server-side filter/pagination)" })
@@ -26,6 +30,16 @@ export class ClientController {
   @ApiOperation({ summary: "Create a client. Does not create an organization membership." })
   create(@CurrentTenant() tenant: TenantContext, @Body() body: CreateClientDto) {
     return this.clients.create(tenant, body);
+  }
+
+  @Get(":clientId/portfolio")
+  @UseGuards(ClientAccessGuard)
+  @ApiOperation({ summary: "Read-only client portfolio overview aggregate" })
+  getPortfolio(
+    @CurrentTenant() tenant: TenantContext,
+    @Param("clientId", ParseUUIDPipe) clientId: string,
+  ) {
+    return this.portfolio.get(tenant, clientId);
   }
 
   @Get(":clientId")

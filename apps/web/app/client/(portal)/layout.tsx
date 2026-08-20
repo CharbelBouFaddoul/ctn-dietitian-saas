@@ -180,7 +180,7 @@ export default function ClientPortalLayout({ children }: { children: ReactNode }
         />
       }
     >
-      {children}
+      <div key={me?.client.id ?? "portal"}>{children}</div>
     </AppShell>
   );
 }

@@ -35,11 +35,20 @@ export class TimelineService {
     });
   }
 
-  async list(organizationId: string, clientId: string) {
+  async list(
+    organizationId: string,
+    clientId: string,
+    options?: { before?: string; limit?: number },
+  ) {
+    const take = Math.min(Math.max(options?.limit ?? 50, 1), 100);
     const events = await this.prisma.timelineEvent.findMany({
-      where: { ...tenantWhere(organizationId), clientId },
+      where: {
+        ...tenantWhere(organizationId),
+        clientId,
+        ...(options?.before ? { occurredAt: { lt: new Date(options.before) } } : {}),
+      },
       orderBy: { occurredAt: "desc" },
-      take: 100,
+      take,
     });
     return events.map((event) => ({
       id: event.id,

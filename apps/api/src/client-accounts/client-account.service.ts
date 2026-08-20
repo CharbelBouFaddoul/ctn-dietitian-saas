@@ -233,9 +233,12 @@ export class ClientAccountService {
       activeClientId,
       requireSelection: false,
     });
-    const account = await this.prisma.dietitianAccount.findUnique({
-      where: { id: client.dietitianAccountId ?? client.organizationId },
-    });
+    const [account, profile] = await Promise.all([
+      this.prisma.dietitianAccount.findUnique({
+        where: { id: client.dietitianAccountId ?? client.organizationId },
+      }),
+      this.prisma.clientProfile.findUnique({ where: { clientId: client.id } }),
+    ]);
     return {
       client: {
         id: client.id,
@@ -243,8 +246,20 @@ export class ClientAccountService {
         firstName: client.firstName,
         lastName: client.lastName,
         displayName: client.displayName,
+        email: client.email,
+        phone: client.phone,
+        dateOfBirth: client.dateOfBirth?.toISOString().slice(0, 10) ?? null,
+        sex: client.sex,
         status: client.status,
       },
+      profile: profile
+        ? {
+            allergies: profile.allergies,
+            intolerances: profile.intolerances,
+            dietaryPreferences: profile.dietaryPreferences,
+            lifestyle: profile.lifestyle,
+          }
+        : null,
       practiceName: account?.displayName ?? null,
       activeClientId: client.id,
     };
