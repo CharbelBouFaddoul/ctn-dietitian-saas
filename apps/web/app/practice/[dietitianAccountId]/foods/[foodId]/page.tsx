@@ -16,6 +16,8 @@ import {
   Table,
   Td,
 } from "@nutrition-saas/ui";
+import { type ExtraNutrients } from "../../../../../lib/micronutrients";
+import { ExtraNutrientTables } from "../../../../../lib/extra-nutrient-tables";
 import { api } from "../../../../../lib/api";
 import { errorMessage } from "../../../../../lib/humanize-error";
 import { unitLabel } from "../../../../../lib/practice-labels";
@@ -62,11 +64,14 @@ interface EffectiveFood {
   presentedEffectiveNutrition: NutritionValues;
   overriddenFields: NutrientKey[];
   override: { id: string; status: string } | null;
+  extraNutrients?: ExtraNutrients;
+  presentedExtraNutrients?: ExtraNutrients;
 }
 
 interface CalculateResult {
   nutrition: NutritionValues;
   presented: NutritionValues;
+  presentedExtraNutrients?: ExtraNutrients;
 }
 
 const NUTRIENTS: Array<{ key: NutrientKey; label: string; unit: string }> = [
@@ -79,8 +84,8 @@ const NUTRIENTS: Array<{ key: NutrientKey; label: string; unit: string }> = [
   { key: "sodiumMg", label: "Sodium", unit: "mg" },
 ];
 
-function fmtVal(value: number | null): string {
-  return value === null ? "—" : String(value);
+function fmtVal(value: number | null | undefined): string {
+  return value === null || value === undefined ? "—" : String(value);
 }
 
 export default function FoodDetailPage() {
@@ -196,16 +201,15 @@ export default function FoodDetailPage() {
   const unitOptions =
     food.referenceUnit === "g" ? ["g", "kg", "oz", "lb"] : ["ml", "l", "fl_oz"];
 
-  const metaParts: string[] = [
-    `${food.referenceQuantity} ${unitLabel(food.referenceUnit)}`,
-  ];
+  const metaParts: string[] = [`${food.referenceQuantity} ${unitLabel(food.referenceUnit)}`];
   if (food.servingDescription) metaParts.push(food.servingDescription);
   if (food.category) metaParts.push(food.category);
 
   const isCustom = food.origin === "custom";
+  const presentedExtras = food.presentedExtraNutrients ?? food.extraNutrients ?? {};
 
   return (
-    <section>
+    <section className="ui-stack" style={{ gap: 20, width: "100%" }}>
       <Breadcrumbs
         items={[
           { href: `/practice/${dietitianAccountId}/foods`, label: "Food database" },
@@ -230,14 +234,13 @@ export default function FoodDetailPage() {
       {error ? <Alert tone="danger">{error}</Alert> : null}
       {notice ? <Alert tone="success">{notice}</Alert> : null}
 
-      {/* Nutrition table */}
       <Section
-        title="Nutrition values"
+        title="Macros"
         description={
           isCustom
             ? "Practice-private custom food. Nutrients live on the food row (no FoodOverride merge)."
             : canOverride
-              ? "Practice overrides replace catalog values for this food in recipes and meal plans in your practice."
+              ? "Practice overrides replace catalog macros for this food in recipes and meal plans in your practice."
               : "Effective values are sourced from the catalog. Staff cannot create overrides."
         }
       >
@@ -266,6 +269,15 @@ export default function FoodDetailPage() {
                 ))}
               </tbody>
             </Table>
+
+            <div style={{ marginTop: 12 }}>
+              <ExtraNutrientTables
+                values={presentedExtras}
+                caption={`per ${food.referenceQuantity} ${unitLabel(food.referenceUnit)}`}
+                emptyMessage="No vitamin, mineral, or lipid extras on file for this food."
+              />
+            </div>
+
             {canOverride ? (
               <Button
                 variant="danger"
@@ -284,94 +296,93 @@ export default function FoodDetailPage() {
             ) : null}
           </div>
         ) : (
-        <form onSubmit={(event) => void saveOverride(event)}>
-          <Table>
-            <thead>
-              <tr>
-                <th>Nutrient</th>
-                <th>Effective</th>
-                <th>Global catalog</th>
-                <th>Origin</th>
-                {canOverride ? <th>Override value</th> : null}
-              </tr>
-            </thead>
-            <tbody>
-              {NUTRIENTS.map((item) => {
-                const isOverridden = food.overriddenFields.includes(item.key);
-                return (
-                  <tr key={item.key}>
-                    <Td label="Nutrient">
-                      {item.label}{" "}
-                      <span className="ui-muted" style={{ fontSize: 12 }}>
-                        ({item.unit})
-                      </span>
-                    </Td>
-                    <Td label="Effective">
-                      <strong>{fmtVal(food.presentedEffectiveNutrition[item.key])}</strong>
-                    </Td>
-                    <Td label="Global catalog">
-                      {fmtVal(food.globalNutrition[item.key])}
-                    </Td>
-                    <Td label="Origin">
-                      {isOverridden ? (
-                        <Badge tone="accent">Practice</Badge>
-                      ) : (
-                        <Badge tone="neutral">Catalog</Badge>
-                      )}
-                    </Td>
-                    {canOverride ? (
-                      <Td label="Override value">
-                        <input
-                          className="ui-input"
-                          style={{ width: 100 }}
-                          value={draft[item.key]}
-                          placeholder={isOverridden ? String(food.effectiveNutrition[item.key] ?? "") : "global"}
-                          onChange={(event) =>
-                            setDraft((curr) => ({ ...curr, [item.key]: event.target.value }))
-                          }
-                        />
+          <form onSubmit={(event) => void saveOverride(event)}>
+            <Table>
+              <thead>
+                <tr>
+                  <th>Nutrient</th>
+                  <th>Effective</th>
+                  <th>Global catalog</th>
+                  <th>Origin</th>
+                  {canOverride ? <th>Override value</th> : null}
+                </tr>
+              </thead>
+              <tbody>
+                {NUTRIENTS.map((item) => {
+                  const isOverridden = food.overriddenFields.includes(item.key);
+                  return (
+                    <tr key={item.key}>
+                      <Td label="Nutrient">
+                        {item.label}{" "}
+                        <span className="ui-muted" style={{ fontSize: 12 }}>
+                          ({item.unit})
+                        </span>
                       </Td>
-                    ) : null}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </Table>
+                      <Td label="Effective">
+                        <strong>{fmtVal(food.presentedEffectiveNutrition[item.key])}</strong>
+                      </Td>
+                      <Td label="Global catalog">{fmtVal(food.globalNutrition[item.key])}</Td>
+                      <Td label="Origin">
+                        {isOverridden ? (
+                          <Badge tone="accent">Practice</Badge>
+                        ) : (
+                          <Badge tone="neutral">Catalog</Badge>
+                        )}
+                      </Td>
+                      {canOverride ? (
+                        <Td label="Override value">
+                          <input
+                            className="ui-input"
+                            style={{ width: 100 }}
+                            value={draft[item.key]}
+                            placeholder={
+                              isOverridden ? String(food.effectiveNutrition[item.key] ?? "") : "global"
+                            }
+                            onChange={(event) =>
+                              setDraft((curr) => ({ ...curr, [item.key]: event.target.value }))
+                            }
+                          />
+                        </Td>
+                      ) : null}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </Table>
 
-          {canOverride ? (
-            <div className="ui-row" style={{ marginTop: 12 }}>
-              <Button type="submit" disabled={saveBusy}>
-                {saveBusy ? "Saving…" : "Save practice override"}
-              </Button>
-              {food.override ? (
-                <Button
-                  type="button"
-                  variant="danger"
-                  onClick={() => void resetOverride()}
-                >
-                  Remove override
-                </Button>
-              ) : null}
+            <div style={{ marginTop: 12 }}>
+              <ExtraNutrientTables
+                values={presentedExtras}
+                caption={`per ${food.referenceQuantity} ${unitLabel(food.referenceUnit)}`}
+                emptyMessage="No vitamin, mineral, or lipid extras on file for this food."
+              />
             </div>
-          ) : (
-            <p className="ui-muted" style={{ marginTop: 8, fontSize: 13 }}>
-              Staff members can view effective nutrition but cannot create overrides.
-            </p>
-          )}
-        </form>
+
+            {canOverride ? (
+              <div className="ui-row" style={{ marginTop: 12 }}>
+                <Button type="submit" disabled={saveBusy}>
+                  {saveBusy ? "Saving…" : "Save practice override"}
+                </Button>
+                {food.override ? (
+                  <Button type="button" variant="danger" onClick={() => void resetOverride()}>
+                    Remove override
+                  </Button>
+                ) : null}
+              </div>
+            ) : (
+              <p className="ui-muted" style={{ marginTop: 8, fontSize: 13 }}>
+                Staff members can view effective nutrition but cannot create overrides.
+              </p>
+            )}
+          </form>
         )}
       </Section>
 
-      {/* Quantity calculator */}
       <Section
         title="Quantity calculator"
         description="Calculate nutrition for any amount using effective values (g/ml via the nutrition package)."
       >
-        <form
-          onSubmit={(event) => void calculate(event)}
-          className="ui-row"
-          style={{ flexWrap: "wrap", alignItems: "end" }}
-        >
+        <form onSubmit={(event) => void calculate(event)} className="ui-inline-form">
           <Field label="Quantity">
             <Input
               value={quantity}
@@ -390,7 +401,7 @@ export default function FoodDetailPage() {
               ))}
             </Select>
           </Field>
-          <div>
+          <div className="ui-inline-form__action">
             <Button type="submit">Calculate</Button>
           </div>
         </form>
@@ -401,43 +412,40 @@ export default function FoodDetailPage() {
         ) : null}
 
         {calculated ? (
-          <div className="ui-row" style={{ marginTop: 12, flexWrap: "wrap" }}>
-            <div className="ui-stat">
-              <div className="ui-stat__label">Calories</div>
-              <div className="ui-stat__value">{fmtVal(calculated.presented.energyKcal)} kcal</div>
+          <div className="ui-stack" style={{ marginTop: 16, gap: 16 }}>
+            <div className="ui-row" style={{ flexWrap: "wrap" }}>
+              <div className="ui-stat">
+                <div className="ui-stat__label">Calories</div>
+                <div className="ui-stat__value">{fmtVal(calculated.presented.energyKcal)} kcal</div>
+              </div>
+              {NUTRIENTS.filter((n) => n.key !== "energyKcal").map((item) =>
+                calculated.presented[item.key] !== null ? (
+                  <div className="ui-stat" key={item.key}>
+                    <div className="ui-stat__label">{item.label}</div>
+                    <div className="ui-stat__value">
+                      {fmtVal(calculated.presented[item.key])}
+                      {item.unit}
+                    </div>
+                  </div>
+                ) : null,
+              )}
             </div>
-            {calculated.presented.proteinG !== null ? (
-              <div className="ui-stat">
-                <div className="ui-stat__label">Protein</div>
-                <div className="ui-stat__value">{fmtVal(calculated.presented.proteinG)}g</div>
-              </div>
-            ) : null}
-            {calculated.presented.carbohydrateG !== null ? (
-              <div className="ui-stat">
-                <div className="ui-stat__label">Carbs</div>
-                <div className="ui-stat__value">{fmtVal(calculated.presented.carbohydrateG)}g</div>
-              </div>
-            ) : null}
-            {calculated.presented.fatG !== null ? (
-              <div className="ui-stat">
-                <div className="ui-stat__label">Fat</div>
-                <div className="ui-stat__value">{fmtVal(calculated.presented.fatG)}g</div>
-              </div>
-            ) : null}
-            {calculated.presented.fiberG !== null ? (
-              <div className="ui-stat">
-                <div className="ui-stat__label">Fiber</div>
-                <div className="ui-stat__value">{fmtVal(calculated.presented.fiberG)}g</div>
-              </div>
+            {calculated.presentedExtraNutrients ? (
+              <ExtraNutrientTables
+                values={calculated.presentedExtraNutrients}
+                caption="for this amount"
+              />
             ) : null}
           </div>
         ) : null}
       </Section>
 
-      {/* Source attribution */}
       <Section title="Data source">
         <p style={{ marginBottom: 4 }}>
           <strong>{food.source.name}</strong>
+          {food.source.datasetVersion ? (
+            <span className="ui-muted"> · {food.source.datasetVersion}</span>
+          ) : null}
         </p>
         {food.source.attribution ? (
           <p className="ui-muted" style={{ fontSize: 13, marginBottom: 4 }}>

@@ -184,11 +184,11 @@ export interface FoodReference {
  * Deterministic quantity scaling against the food's reference amount (typically 100 g or 100 ml).
  * Does not round. Call roundNutrition at API/presentation boundaries.
  */
-export function calculateFoodNutrition(
-  food: FoodReference,
+export function foodQuantityScaleFactor(
+  food: Pick<FoodReference, "referenceQuantity" | "referenceUnit">,
   quantity: number,
   unit: FoodQuantityUnit,
-): NutritionValues {
+): number {
   if (!(quantity > 0) || !Number.isFinite(quantity)) {
     throw new RangeError("Quantity must be a finite number greater than zero");
   }
@@ -209,7 +209,15 @@ export function calculateFoodNutrition(
     quantityInReference = quantityToMilliliters(quantity, unit);
   }
 
-  return scaleNutrition(food.nutrition, quantityInReference / food.referenceQuantity);
+  return quantityInReference / food.referenceQuantity;
+}
+
+export function calculateFoodNutrition(
+  food: FoodReference,
+  quantity: number,
+  unit: FoodQuantityUnit,
+): NutritionValues {
+  return scaleNutrition(food.nutrition, foodQuantityScaleFactor(food, quantity, unit));
 }
 
 /** Known-zero totals (empty recipe or meal). Distinct from unknown/null nutrients. */
@@ -243,3 +251,17 @@ export function sumNutrition(parts: NutritionValues[]): NutritionValues {
 }
 
 export const NUTRITION_ENGINE_VERSION = 1;
+
+export {
+  MICRONUTRIENT_DEFS,
+  MICRONUTRIENT_KEYS,
+  isMicronutrientKey,
+  sanitizeExtraNutrients,
+  roundExtraNutrients,
+  scaleExtraNutrients,
+  sumExtraNutrients,
+  type ExtraNutrients,
+  type MicronutrientDef,
+  type MicronutrientKey,
+} from "./micronutrients";
+

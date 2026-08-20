@@ -23,6 +23,7 @@ interface Nutrition {
 interface Snapshot {
   days: Array<{
     dayNumber: number;
+    weekday?: string | null;
     title: string | null;
     notes: string | null;
     presented: Nutrition;
@@ -51,8 +52,18 @@ interface PortalPlan {
   } | null;
 }
 
-function kcal(value: number | null): string {
-  return value === null ? "" : `${value} kcal`;
+function nutritionSummary(n: Nutrition): string {
+  const parts: string[] = [];
+  if (n.energyKcal !== null) parts.push(`${n.energyKcal} kcal`);
+  if (n.proteinG !== null) parts.push(`Protein ${n.proteinG} g`);
+  if (n.carbohydrateG !== null) parts.push(`Carbs ${n.carbohydrateG} g`);
+  if (n.fatG !== null) parts.push(`Fat ${n.fatG} g`);
+  if (n.fiberG !== null) parts.push(`Fiber ${n.fiberG} g`);
+  return parts.join(" · ");
+}
+
+function dayLabel(day: { title: string | null; weekday?: string | null; dayNumber: number }): string {
+  return day.title ?? day.weekday ?? `Day ${day.dayNumber}`;
 }
 
 export default function ClientPlanPage() {
@@ -99,15 +110,8 @@ export default function ClientPlanPage() {
 
           {day ? (
             <Section
-              title={day.title ?? `Day ${day.dayNumber}`}
-              description={
-                [
-                  kcal(day.presented.energyKcal),
-                  day.presented.proteinG != null ? `Protein ${day.presented.proteinG} g` : null,
-                ]
-                  .filter(Boolean)
-                  .join(" · ") || undefined
-              }
+              title={dayLabel(day)}
+              description={nutritionSummary(day.presented) || undefined}
             >
               <div className="ui-client-plan-day" role="tablist" aria-label="Plan days">
                 {plan.snapshot.days.map((item, index) => (
@@ -117,7 +121,7 @@ export default function ClientPlanPage() {
                     className={index === dayIndex ? "is-active" : undefined}
                     onClick={() => setDayIndex(index)}
                   >
-                    {item.title ?? `Day ${item.dayNumber}`}
+                    {dayLabel(item)}
                   </button>
                 ))}
               </div>
@@ -126,7 +130,9 @@ export default function ClientPlanPage() {
                 <details key={meal.name} className="ui-client-meal" open>
                   <summary>
                     <span>{meal.name}</span>
-                    <span className="ui-muted">{kcal(meal.presented.energyKcal) || " "}</span>
+                    <span className="ui-muted">
+                      {meal.presented.energyKcal != null ? `${meal.presented.energyKcal} kcal` : " "}
+                    </span>
                   </summary>
                   {meal.notes ? <p className="ui-muted">{meal.notes}</p> : null}
                   <ul className="ui-client-meal-items">
@@ -134,6 +140,7 @@ export default function ClientPlanPage() {
                       <li key={`${item.food?.name ?? item.recipe?.name}-${index}`}>
                         <span>
                           {item.food?.name ?? item.recipe?.name}
+                          {item.recipe ? " (recipe)" : ""}
                           {item.notes ? ` — ${item.notes}` : ""}
                         </span>
                         <span className="ui-muted">
@@ -143,6 +150,11 @@ export default function ClientPlanPage() {
                       </li>
                     ))}
                   </ul>
+                  {nutritionSummary(meal.presented) ? (
+                    <p className="ui-muted" style={{ marginTop: 8, fontSize: 13 }}>
+                      Meal nutrition: {nutritionSummary(meal.presented)}
+                    </p>
+                  ) : null}
                 </details>
               ))}
             </Section>

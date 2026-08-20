@@ -136,6 +136,14 @@ export class CreateCustomFoodDto {
   @IsNumber()
   @Min(0)
   sodiumMg?: number | null;
+
+  @ApiPropertyOptional({
+    description: "Vitamins, minerals, and lipid extras (canonical micronutrient keys)",
+    type: "object",
+    additionalProperties: { type: "number", nullable: true },
+  })
+  @IsOptional()
+  extraNutrients?: Record<string, number | null>;
 }
 
 export class UpdateCustomFoodDto {
@@ -210,6 +218,14 @@ export class UpdateCustomFoodDto {
   @IsNumber()
   @Min(0)
   sodiumMg?: number | null;
+
+  @ApiPropertyOptional({
+    description: "Vitamins, minerals, and lipid extras (canonical micronutrient keys)",
+    type: "object",
+    additionalProperties: { type: "number", nullable: true },
+  })
+  @IsOptional()
+  extraNutrients?: Record<string, number | null>;
 }
 
 export class UpsertFoodOverrideDto {

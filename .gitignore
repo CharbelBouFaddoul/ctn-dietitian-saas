@@ -13,5 +13,6 @@ backups
 .DS_Store
 *.tsbuildinfo
 apps/api/generated
+apps/api/food-data/.fdc-cache
 # Only ignore a root-level .prisma folder — never node_modules/.prisma (Prisma Client types).
 /.prisma

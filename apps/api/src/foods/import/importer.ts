@@ -3,6 +3,7 @@ import {
   isSuspiciousCalorieGap,
   calorieDiscrepancy,
   normalizeFoodName,
+  sanitizeExtraNutrients,
 } from "@nutrition-saas/nutrition";
 import type { FoodDatasetFile, FoodDatasetRecord, ImportReport } from "./dataset.types";
 
@@ -162,7 +163,7 @@ export async function importFoodDataset(prisma: PrismaClient, dataset: FoodDatas
       fiberG: nutrition.fiberG,
       sugarG: nutrition.sugarG,
       sodiumMg: nutrition.sodiumMg,
-      extraNutrients: (record.extraNutrients as Prisma.InputJsonValue | undefined) ?? undefined,
+      extraNutrients: (sanitizeExtraNutrients(record.extraNutrients) as Prisma.InputJsonValue | null) ?? undefined,
       status: "ACTIVE" as const,
       importedAt: now,
     };

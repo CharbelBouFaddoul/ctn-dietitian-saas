@@ -45,6 +45,11 @@ export class CreateMealPlanDto {
   @IsString()
   @MaxLength(4000)
   description?: string | null;
+
+  @ApiPropertyOptional({ enum: ["NUMBERED", "WEEKDAY"] })
+  @IsOptional()
+  @IsEnum(["NUMBERED", "WEEKDAY"])
+  dayLabelMode?: "NUMBERED" | "WEEKDAY";
 }
 
 export class UpdateMealPlanDto {
@@ -60,6 +65,11 @@ export class UpdateMealPlanDto {
   @IsString()
   @MaxLength(4000)
   description?: string | null;
+
+  @ApiPropertyOptional({ enum: ["NUMBERED", "WEEKDAY"] })
+  @IsOptional()
+  @IsEnum(["NUMBERED", "WEEKDAY"])
+  dayLabelMode?: "NUMBERED" | "WEEKDAY";
 }
 
 export class UpdateDayDto {

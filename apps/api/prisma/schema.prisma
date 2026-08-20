@@ -1077,6 +1077,11 @@ enum MealPlanStatus {
   ARCHIVED
 }
 
+enum MealPlanDayLabelMode {
+  NUMBERED
+  WEEKDAY
+}
+
 enum MealPlanVersionStatus {
   DRAFT
   PUBLISHED
@@ -1143,16 +1148,17 @@ model RecipeIngredient {
 }
 
 model MealPlan {
-  id                 String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  dietitianAccountId String         @map("dietitian_account_id") @db.Uuid
-  clientId           String         @map("client_id") @db.Uuid
+  id                 String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  dietitianAccountId String              @map("dietitian_account_id") @db.Uuid
+  clientId           String              @map("client_id") @db.Uuid
   name               String
-  description        String?        @db.Text
-  status             MealPlanStatus @default(DRAFT)
-  createdById        String?        @map("created_by_id") @db.Uuid
-  createdAt          DateTime       @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt          DateTime       @updatedAt @map("updated_at") @db.Timestamptz
-  archivedAt         DateTime?      @map("archived_at") @db.Timestamptz
+  description        String?             @db.Text
+  status             MealPlanStatus      @default(DRAFT)
+  dayLabelMode       MealPlanDayLabelMode @default(NUMBERED) @map("day_label_mode")
+  createdById        String?             @map("created_by_id") @db.Uuid
+  createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime            @updatedAt @map("updated_at") @db.Timestamptz
+  archivedAt         DateTime?           @map("archived_at") @db.Timestamptz
 
   dietitianAccount DietitianAccount  @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
   client           Client            @relation(fields: [clientId], references: [id], onDelete: Restrict)

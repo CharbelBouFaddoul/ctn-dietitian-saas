@@ -7,18 +7,25 @@ import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { FoodOverride, Prisma } from "@prisma/client";
+import { Prisma as PrismaNamespace } from "@prisma/client";
 import {
   calculateFoodNutrition,
+  foodQuantityScaleFactor,
   IncompatibleFoodUnitError,
   normalizeFoodName,
   roundNutrition,
   mergeNutrition,
+  sanitizeExtraNutrients,
+  scaleExtraNutrients,
+  roundExtraNutrients,
   type FoodQuantityUnit,
+  type ExtraNutrients,
 } from "@nutrition-saas/nutrition";
 import { PrismaService } from "../prisma/prisma.service";
 import {
   foodIdentity,
   nutritionFromRow,
+  nutritionPayloadExtras,
   overrideNutrition,
   overriddenFields,
   sourcePayload,
@@ -132,12 +139,14 @@ export class FoodService {
       items: sorted.map((row) => {
         const nutrition = nutritionFromRow(row);
         const isCustom = Boolean(row.dietitianAccountId);
+        const extras = nutritionPayloadExtras(row);
         return {
           ...foodIdentity(row),
           origin: isCustom ? ("custom" as const) : ("catalog" as const),
           dietitianAccountId: row.dietitianAccountId,
           nutrition,
           presentedNutrition: roundNutrition(nutrition),
+          ...extras,
           hasOverride: !isCustom && overridden.has(row.id),
           source: { id: row.source.id, name: row.source.name, datasetVersion: row.source.datasetVersion },
         };
@@ -149,6 +158,7 @@ export class FoodService {
     const food = await this.loadAccessibleFood(dietitianAccountId, foodId);
     if (food.dietitianAccountId) {
       const nutrition = nutritionFromRow(food);
+      const extras = nutritionPayloadExtras(food);
       return {
         ...foodIdentity(food),
         origin: "custom" as const,
@@ -160,6 +170,7 @@ export class FoodService {
         presentedEffectiveNutrition: roundNutrition(nutrition),
         presentedGlobalNutrition: roundNutrition(nutrition),
         overriddenFields: [] as string[],
+        ...extras,
       };
     }
     const override = await this.prisma.foodOverride.findUnique({
@@ -208,6 +219,7 @@ export class FoodService {
           presentedEffectiveNutrition: roundNutrition(nutrition),
           presentedGlobalNutrition: roundNutrition(nutrition),
           overriddenFields: [],
+          ...nutritionPayloadExtras(food),
         });
       } else {
         result.set(food.id, {
@@ -236,6 +248,7 @@ export class FoodService {
       fiberG?: number | null;
       sugarG?: number | null;
       sodiumMg?: number | null;
+      extraNutrients?: ExtraNutrients | null;
     },
   ) {
     void createdById;
@@ -243,6 +256,7 @@ export class FoodService {
     const name = input.name.trim();
     if (!name) throw new BadRequestException("Name is required");
     if (!(input.referenceQuantity > 0)) throw new BadRequestException("Invalid referenceQuantity");
+    const extras = sanitizeExtraNutrients(input.extraNutrients);
     const row = await this.prisma.food.create({
       data: {
         foodSourceId: source.id,
@@ -261,6 +275,7 @@ export class FoodService {
         fiberG: input.fiberG ?? null,
         sugarG: input.sugarG ?? null,
         sodiumMg: input.sodiumMg ?? null,
+        extraNutrients: extras ? (extras as Prisma.InputJsonValue) : undefined,
         status: "ACTIVE",
         importedAt: new Date(),
       },
@@ -285,6 +300,7 @@ export class FoodService {
       fiberG?: number | null;
       sugarG?: number | null;
       sodiumMg?: number | null;
+      extraNutrients?: ExtraNutrients | null;
     },
   ) {
     const food = await this.requireOwnedCustom(dietitianAccountId, foodId);
@@ -292,6 +308,8 @@ export class FoodService {
       throw new BadRequestException("Invalid referenceQuantity");
     }
     const name = input.name?.trim();
+    const extras =
+      input.extraNutrients !== undefined ? sanitizeExtraNutrients(input.extraNutrients) : undefined;
     await this.prisma.food.update({
       where: { id: food.id },
       data: {
@@ -309,6 +327,9 @@ export class FoodService {
         ...(input.fiberG !== undefined ? { fiberG: input.fiberG } : {}),
         ...(input.sugarG !== undefined ? { sugarG: input.sugarG } : {}),
         ...(input.sodiumMg !== undefined ? { sodiumMg: input.sodiumMg } : {}),
+        ...(extras !== undefined
+          ? { extraNutrients: extras ? (extras as Prisma.InputJsonValue) : PrismaNamespace.JsonNull }
+          : {}),
       },
     });
     return this.getEffective(dietitianAccountId, foodId);
@@ -343,6 +364,7 @@ export class FoodService {
     const globalNutrition = nutritionFromRow(food);
     const overrideValues = overrideNutrition(activeOverride);
     const effectiveNutrition = mergeNutrition(globalNutrition, overrideValues);
+    const extras = nutritionPayloadExtras(food);
 
     return {
       ...foodIdentity(food),
@@ -360,6 +382,7 @@ export class FoodService {
       presentedEffectiveNutrition: roundNutrition(effectiveNutrition),
       presentedGlobalNutrition: roundNutrition(globalNutrition),
       overriddenFields: overriddenFields(overrideValues),
+      ...extras,
     };
   }
 
@@ -382,14 +405,15 @@ export class FoodService {
   async calculate(dietitianAccountId: string, foodId: string, quantity: number, unit: FoodQuantityUnit) {
     const effective = await this.getEffective(dietitianAccountId, foodId);
     try {
-      const nutrition = calculateFoodNutrition(
-        {
-          referenceQuantity: effective.referenceQuantity,
-          referenceUnit: effective.referenceUnit,
-          nutrition: effective.effectiveNutrition,
-        },
-        quantity,
-        unit,
+      const ref = {
+        referenceQuantity: effective.referenceQuantity,
+        referenceUnit: effective.referenceUnit as "g" | "ml",
+        nutrition: effective.effectiveNutrition,
+      };
+      const nutrition = calculateFoodNutrition(ref, quantity, unit);
+      const extras = scaleExtraNutrients(
+        effective.extraNutrients ?? {},
+        foodQuantityScaleFactor(ref, quantity, unit),
       );
       return {
         foodId,
@@ -397,6 +421,8 @@ export class FoodService {
         unit,
         nutrition,
         presented: roundNutrition(nutrition),
+        extraNutrients: extras,
+        presentedExtraNutrients: roundExtraNutrients(extras),
       };
     } catch (error) {
       if (error instanceof IncompatibleFoodUnitError || error instanceof RangeError) {

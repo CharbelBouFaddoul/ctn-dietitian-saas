@@ -7,7 +7,6 @@
     "emitDecoratorMetadata": true,
     "declaration": false,
     "declarationMap": false,
-    "types": ["node", "express"],
     "strictNullChecks": true,
     "noFallthroughCasesInSwitch": true
   },

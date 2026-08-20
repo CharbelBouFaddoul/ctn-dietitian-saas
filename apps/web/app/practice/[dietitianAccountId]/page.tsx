@@ -420,7 +420,7 @@ export default function PracticeDashboardPage() {
               </p>
             ) : (
               <ol className="ui-practice-timeline">
-                {(data?.recentActivity ?? []).map((row) => (
+                {(data?.recentActivity ?? []).slice(0, 5).map((row) => (
                   <li key={row.id}>
                     <p>
                       <Link href={`/practice/${dietitianAccountId}/clients/${row.clientId}`} className="ui-link">

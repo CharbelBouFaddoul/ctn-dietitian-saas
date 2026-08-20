@@ -71,7 +71,7 @@ export class PracticeDashboardService {
         where: { ...tenantWhere(tenant.dietitianAccountId), client: visible },
         include: { client: true },
         orderBy: { occurredAt: "desc" },
-        take: 10,
+        take: 5,
       }),
       this.prisma.task.count({
         where: {

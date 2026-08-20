@@ -150,6 +150,7 @@ Tenant-scoped queries via dietitianAccountId (tenantWhere)
 - Phase 7 (tenancy remount): canonical tenant key is `dietitianAccountId`. Admin manages accounts at `/api/v1/admin/dietitians`. Portal remains `ClientAccount` + `activeClientId`.
 - **Product Phase 7 (portfolio / evolution / assessments):** practice chart adds Evolution (`GET …/evolution` + SVG charts), assessment question editor + `schemaSnapshot`, portal `/assessments` + `/evolution`. Distinct from tenancy Phase 7 above.
 - **Product Phase 8 (food + reusable meals):** curated catalog, `Food.dietitianAccountId` custom foods, Recipes as meal library. Distinct from older “Phase 8 tracking” docs.
+- **Product Phase 9 (meal plans):** editor composes meals from foods + recipes; live meal/day nutrition via existing snapshot path; portal shows published composition + macros. No new Meal catalog / migration.
 ---
 
 ## 3. Authorization
@@ -407,11 +408,21 @@ There is **one** calculation path. Controllers and React do not reimplement food
 
 **Meal plans** belong to dietitian account + client. Plan status (`DRAFT` / `ACTIVE` / `ARCHIVED`) is not version publication status. Versions: `DRAFT` → `PUBLISHED`; the previous published version becomes `SUPERSEDED` and is retained. Publishing is transactional: validate, write snapshot, supersede, mark published, set plan `ACTIVE`.
 
-**Draft vs published:** drafts use current effective foods and current recipes. After publication, GET returns the stored snapshot (`immutable: true`). Later override or recipe edits must not change published/client payloads. A new draft clones the latest version’s structure and recalculates live.
+### Meal composition (Product Phase 9)
+
+```text
+Food = individual ingredient (catalog or practice custom)
+Recipe = reusable meal composition (meal library)
+Meal = concrete meal inside a meal-plan day (Breakfast, Lunch, …)
+```
+
+`MealItem` is either `FOOD` (mass/volume quantity) or `RECIPE` (`unit = serving`). Meal nutrition = sum of item nutrition; day nutrition = sum of meals. Draft GETs recalculate live via `FoodService` + `RecipeNutritionService` + `packages/nutrition`. Published versions return the frozen `snapshot` (includes item/meal/day `nutrition` + `presented`). Food payloads in the snapshot include `origin` (`catalog` | `custom`).
+
+Meal items may only reference global ACTIVE foods, the current practice’s custom foods, or the current practice’s ACTIVE recipes. No separate reusable Meal catalog table.
 
 **Authorization:** recipes are tenant-scoped via `DietitianGuard`. Meal plans use `ClientAccessService` (`read` / `manageRecords`). Portal `GET /api/v1/portal/meal-plan` returns only that client’s current `PUBLISHED` snapshot. Clients never see private recipe libraries, drafts, superseded versions, or other clients.
 
-**MealPlan editor / publish / versioning UX redesign** is **Product Phase 9** (out of scope for Phase 8).
+**Migration:** none for Product Phase 9 (schema already supports FOOD/RECIPE items + snapshot).
 
 **Nutrition targets:** reuse Phase 5 `client_goals`. No separate target table.
 

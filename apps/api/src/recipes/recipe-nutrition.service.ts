@@ -2,10 +2,15 @@ import { BadRequestException, Injectable } from "@nestjs/common";
 import type { QuantityUnit, Recipe, RecipeIngredient } from "@prisma/client";
 import {
   calculateFoodNutrition,
+  foodQuantityScaleFactor,
   IncompatibleFoodUnitError,
+  roundExtraNutrients,
   roundNutrition,
+  scaleExtraNutrients,
   scaleNutrition,
+  sumExtraNutrients,
   sumNutrition,
+  type ExtraNutrients,
   type FoodQuantityUnit,
   type NutritionValues,
 } from "@nutrition-saas/nutrition";
@@ -29,6 +34,8 @@ export interface RecipeIngredientNutrition {
   sortOrder: number;
   nutrition: NutritionValues;
   presented: NutritionValues;
+  extraNutrients: ExtraNutrients;
+  presentedExtraNutrients: ExtraNutrients;
 }
 
 export interface RecipeNutritionResult {
@@ -41,6 +48,10 @@ export interface RecipeNutritionResult {
   perServing: NutritionValues;
   presentedTotal: NutritionValues;
   presentedPerServing: NutritionValues;
+  extraNutrientsTotal: ExtraNutrients;
+  extraNutrientsPerServing: ExtraNutrients;
+  presentedExtraNutrientsTotal: ExtraNutrients;
+  presentedExtraNutrientsPerServing: ExtraNutrients;
 }
 
 @Injectable()
@@ -69,6 +80,8 @@ export class RecipeNutritionService {
       .map((ingredient) => this.ingredientNutrition(ingredient, resolved));
     const total = sumNutrition(calculated.map((row) => row.nutrition));
     const perServing = scaleNutrition(total, 1 / servings);
+    const extraTotal = sumExtraNutrients(calculated.map((row) => row.extraNutrients));
+    const extraPerServing = scaleExtraNutrients(extraTotal, 1 / servings);
     return {
       recipeId: recipe.id,
       name: recipe.name,
@@ -79,6 +92,10 @@ export class RecipeNutritionService {
       perServing,
       presentedTotal: roundNutrition(total),
       presentedPerServing: roundNutrition(perServing),
+      extraNutrientsTotal: extraTotal,
+      extraNutrientsPerServing: extraPerServing,
+      presentedExtraNutrientsTotal: roundExtraNutrients(extraTotal),
+      presentedExtraNutrientsPerServing: roundExtraNutrients(extraPerServing),
     };
   }
 
@@ -95,15 +112,14 @@ export class RecipeNutritionService {
       throw new BadRequestException("Recipe ingredients must use a mass or volume unit");
     }
     try {
-      const nutrition = calculateFoodNutrition(
-        {
-          referenceQuantity: food.referenceQuantity,
-          referenceUnit: food.referenceUnit,
-          nutrition: food.effectiveNutrition,
-        },
-        Number(ingredient.quantity),
-        unit,
-      );
+      const ref = {
+        referenceQuantity: food.referenceQuantity,
+        referenceUnit: food.referenceUnit as "g" | "ml",
+        nutrition: food.effectiveNutrition,
+      };
+      const factor = foodQuantityScaleFactor(ref, Number(ingredient.quantity), unit);
+      const nutrition = calculateFoodNutrition(ref, Number(ingredient.quantity), unit);
+      const extraNutrients = scaleExtraNutrients(food.extraNutrients ?? {}, factor);
       return {
         id: ingredient.id,
         foodId: food.id,
@@ -114,6 +130,8 @@ export class RecipeNutritionService {
         sortOrder: ingredient.sortOrder,
         nutrition,
         presented: roundNutrition(nutrition),
+        extraNutrients,
+        presentedExtraNutrients: roundExtraNutrients(extraNutrients),
       };
     } catch (error) {
       if (error instanceof IncompatibleFoodUnitError || error instanceof RangeError) {

@@ -1329,12 +1329,18 @@
 [data-theme="practice"] .ui-app__main {
   width: 100%;
   max-width: none;
-  padding: var(--space-6) clamp(1.25rem, 3vw, 2.75rem) var(--space-10);
+  padding: var(--space-6) clamp(1.25rem, 2.5vw, 2rem) var(--space-10);
+}
+
+[data-theme="practice"] .ui-app__main > * {
+  width: 100%;
+  max-width: none;
 }
 
 /* Practice dashboard — patient-aligned ops chrome */
 [data-theme="practice"] {
   min-height: 100vh;
+  width: 100%;
   background:
     radial-gradient(920px 440px at 100% -8%, rgb(13 148 136 / 12%), transparent 55%),
     radial-gradient(680px 340px at -8% 28%, rgb(15 23 42 / 4%), transparent 52%),
@@ -1343,6 +1349,7 @@
 
 [data-theme="practice"] .ui-app {
   background: transparent;
+  width: 100%;
 }
 
 [data-theme="practice"] .ui-app__sidebar {
@@ -1441,7 +1448,7 @@
 
 [data-theme="practice"] .ui-page-header .ui-muted {
   margin: 0;
-  max-width: 42rem;
+  max-width: none;
   line-height: 1.55;
 }
 
@@ -6115,3 +6122,178 @@
     font-size: 0.6rem;
   }
 }
+
+/* Compact vitamins / minerals expand panel */
+.ui-micro-panel {
+  margin: 0;
+  border: 1px solid rgb(15 23 42 / 8%);
+  border-radius: 12px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.ui-micro-panel__summary {
+  list-style: none;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.65rem 1rem;
+  padding: 0.7rem 0.95rem;
+  font-size: 0.875rem;
+}
+
+.ui-micro-panel__summary::-webkit-details-marker {
+  display: none;
+}
+
+.ui-micro-panel__title {
+  font-weight: 650;
+  color: var(--color-text, #0f172a);
+  white-space: nowrap;
+}
+
+.ui-micro-panel__caption {
+  margin-left: 0.4rem;
+  font-weight: 500;
+  color: var(--color-muted, #64748b);
+  font-size: 0.8rem;
+}
+
+.ui-micro-panel__preview {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.8125rem;
+  min-width: 0;
+}
+
+.ui-micro-panel__toggle {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--accent, #0d9488);
+  white-space: nowrap;
+}
+
+.ui-micro-panel__toggle::after {
+  content: attr(data-closed);
+}
+
+.ui-micro-panel[open] .ui-micro-panel__toggle::after {
+  content: attr(data-open);
+}
+
+.ui-micro-panel[open] .ui-micro-panel__preview {
+  display: none;
+}
+
+.ui-micro-panel__body {
+  padding: 0.75rem 0.95rem 0.9rem;
+  border-top: 1px solid rgb(15 23 42 / 6%);
+  display: grid;
+  gap: 0.65rem;
+}
+
+.ui-micro-panel__tabs {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.2rem;
+  border-radius: 10px;
+  background: rgb(15 23 42 / 4%);
+}
+
+.ui-micro-panel__tab {
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0.4rem 0.55rem;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-muted, #64748b);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ui-micro-panel__tab:hover {
+  color: var(--color-text, #0f172a);
+}
+
+.ui-micro-panel__tab.is-active {
+  background: #fff;
+  color: var(--color-text, #0f172a);
+  box-shadow: 0 1px 2px rgb(15 23 42 / 8%);
+}
+
+.ui-micro-panel__tab-count {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--color-muted, #64748b);
+  font-variant-numeric: tabular-nums;
+}
+
+.ui-micro-panel__tab.is-active .ui-micro-panel__tab-count {
+  color: var(--accent, #0d9488);
+}
+
+.ui-micro-panel__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-width: 22rem;
+}
+
+.ui-micro-panel__list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid rgb(15 23 42 / 6%);
+  font-size: 0.875rem;
+}
+
+.ui-micro-panel__list li:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.ui-micro-panel__name {
+  color: var(--color-text, #0f172a);
+  font-weight: 500;
+}
+
+.ui-micro-panel__value {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text, #0f172a);
+  white-space: nowrap;
+}
+
+.ui-micro-panel__unit {
+  margin-left: 0.25rem;
+  font-weight: 500;
+  color: var(--color-muted, #64748b);
+  font-size: 0.75rem;
+}
+
+@media (max-width: 640px) {
+  .ui-micro-panel__summary {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .ui-micro-panel__preview {
+    grid-column: 1 / -1;
+    order: 3;
+  }
+
+  .ui-micro-panel__list {
+    max-width: none;
+  }
+}
+

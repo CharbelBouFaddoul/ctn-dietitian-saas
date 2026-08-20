@@ -7,10 +7,15 @@ import {
 import type { MealItemType, Prisma, QuantityUnit } from "@prisma/client";
 import {
   calculateFoodNutrition,
+  foodQuantityScaleFactor,
   IncompatibleFoodUnitError,
+  roundExtraNutrients,
   roundNutrition,
+  scaleExtraNutrients,
   scaleNutrition,
+  sumExtraNutrients,
   sumNutrition,
+  type ExtraNutrients,
   type NutritionValues,
 } from "@nutrition-saas/nutrition";
 import { PrismaService } from "../prisma/prisma.service";
@@ -25,11 +30,29 @@ import { RecipeService } from "../recipes/recipe.service";
 
 const DEFAULT_MEALS = ["Breakfast", "Lunch", "Dinner"];
 
+const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"] as const;
+
+export type DayLabelMode = "NUMBERED" | "WEEKDAY";
+
+/** Labels for plan days: Day 1/2… or Monday/Tuesday… (cycles each week). */
+export function dayLabels(dayNumber: number, mode: DayLabelMode): { title: string; weekday: string | null } {
+  if (mode === "WEEKDAY") {
+    const weekday = WEEKDAYS[(dayNumber - 1) % 7]!;
+    const week = Math.ceil(dayNumber / 7);
+    return {
+      title: week > 1 ? `${weekday} · week ${week}` : weekday,
+      weekday,
+    };
+  }
+  return { title: `Day ${dayNumber}`, weekday: null };
+}
+
 export interface MealPlanSnapshot {
   schemaVersion: 1;
   calculatedAt: string;
   planName: string;
   planDescription: string | null;
+  dayLabelMode: DayLabelMode;
   versionNumber: number;
   days: Array<{
     id: string;
@@ -39,6 +62,8 @@ export interface MealPlanSnapshot {
     notes: string | null;
     nutrition: NutritionValues;
     presented: NutritionValues;
+    extraNutrients: ExtraNutrients;
+    presentedExtraNutrients: ExtraNutrients;
     meals: Array<{
       id: string;
       name: string;
@@ -46,16 +71,20 @@ export interface MealPlanSnapshot {
       notes: string | null;
       nutrition: NutritionValues;
       presented: NutritionValues;
+      extraNutrients: ExtraNutrients;
+      presentedExtraNutrients: ExtraNutrients;
       items: Array<{
         id: string;
         itemType: MealItemType;
         quantity: number;
         unit: QuantityUnit;
         notes: string | null;
-        food: { id: string; name: string } | null;
+        food: { id: string; name: string; origin: "catalog" | "custom"; servingDescription: string | null } | null;
         recipe: { id: string; name: string; servings: number } | null;
         nutrition: NutritionValues;
         presented: NutritionValues;
+        extraNutrients: ExtraNutrients;
+        presentedExtraNutrients: ExtraNutrients;
       }>;
     }>;
   }>;
@@ -125,8 +154,14 @@ export class MealPlanService {
     };
   }
 
-  async create(tenant: DietitianTenantContext, clientId: string, input: { name: string; description?: string | null }) {
+  async create(
+    tenant: DietitianTenantContext,
+    clientId: string,
+    input: { name: string; description?: string | null; dayLabelMode?: DayLabelMode },
+  ) {
     await this.access.assertCanAccess(tenant, clientId, "manageRecords");
+    const dayLabelMode: DayLabelMode = input.dayLabelMode === "WEEKDAY" ? "WEEKDAY" : "NUMBERED";
+    const firstDay = dayLabels(1, dayLabelMode);
     const created = await this.prisma.$transaction(async (tx) => {
       const plan = await tx.mealPlan.create({
         data: {
@@ -134,6 +169,7 @@ export class MealPlanService {
           clientId,
           name: input.name.trim(),
           description: input.description ?? null,
+          dayLabelMode,
           createdById: tenant.userId,
         },
       });
@@ -150,7 +186,8 @@ export class MealPlanService {
           dietitianAccountId: tenant.dietitianAccountId,
           mealPlanVersionId: version.id,
           dayNumber: 1,
-          title: "Day 1",
+          title: firstDay.title,
+          weekday: firstDay.weekday,
         },
       });
       await tx.meal.createMany({
@@ -170,7 +207,7 @@ export class MealPlanService {
       dietitianAccountId: tenant.dietitianAccountId,
       targetType: "meal_plan",
       targetId: created.plan.id,
-      metadata: { clientId },
+      metadata: { clientId, dayLabelMode },
     });
     await this.timeline.record({
       dietitianAccountId: tenant.dietitianAccountId,
@@ -195,24 +232,59 @@ export class MealPlanService {
       name: plan.name,
       description: plan.description,
       status: plan.status,
+      dayLabelMode: plan.dayLabelMode as DayLabelMode,
       clientId: plan.clientId,
       versions,
       updatedAt: plan.updatedAt.toISOString(),
     };
   }
 
-  async update(tenant: DietitianTenantContext, planId: string, input: { name?: string; description?: string | null }) {
+  async update(
+    tenant: DietitianTenantContext,
+    planId: string,
+    input: { name?: string; description?: string | null; dayLabelMode?: DayLabelMode },
+  ) {
     const plan = await this.requirePlan(tenant, planId, "manageRecords");
     if (plan.status === "ARCHIVED") {
       throw new BadRequestException("Archived meal plans cannot be edited");
     }
-    await this.prisma.mealPlan.update({
-      where: { id: plan.id },
-      data: {
-        ...(input.name !== undefined ? { name: input.name.trim() } : {}),
-        ...(input.description !== undefined ? { description: input.description } : {}),
-      },
+    const nextMode =
+      input.dayLabelMode === "WEEKDAY" || input.dayLabelMode === "NUMBERED"
+        ? input.dayLabelMode
+        : undefined;
+    const modeChanged = nextMode !== undefined && nextMode !== plan.dayLabelMode;
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.mealPlan.update({
+        where: { id: plan.id },
+        data: {
+          ...(input.name !== undefined ? { name: input.name.trim() } : {}),
+          ...(input.description !== undefined ? { description: input.description } : {}),
+          ...(nextMode !== undefined ? { dayLabelMode: nextMode } : {}),
+        },
+      });
+
+      if (modeChanged && nextMode) {
+        const drafts = await tx.mealPlanVersion.findMany({
+          where: { mealPlanId: plan.id, status: "DRAFT", ...tenantWhere(tenant.dietitianAccountId) },
+          select: { id: true },
+        });
+        for (const draft of drafts) {
+          const days = await tx.mealPlanDay.findMany({
+            where: { mealPlanVersionId: draft.id },
+            select: { id: true, dayNumber: true },
+          });
+          for (const day of days) {
+            const labels = dayLabels(day.dayNumber, nextMode);
+            await tx.mealPlanDay.update({
+              where: { id: day.id },
+              data: { title: labels.title, weekday: labels.weekday },
+            });
+          }
+        }
+      }
     });
+
     await this.security.record({
       type: "meal_plan_updated",
       outcome: "success",
@@ -220,6 +292,7 @@ export class MealPlanService {
       dietitianAccountId: tenant.dietitianAccountId,
       targetType: "meal_plan",
       targetId: plan.id,
+      metadata: modeChanged ? { dayLabelMode: nextMode } : undefined,
     });
     return this.get(tenant, plan.id);
   }
@@ -428,17 +501,21 @@ export class MealPlanService {
     input: { title?: string | null; weekday?: string | null; notes?: string | null },
   ) {
     const version = await this.assertDraft(tenant, planId, versionId);
+    const plan = await this.requirePlan(tenant, planId, "manageRecords");
+    const mode = plan.dayLabelMode as DayLabelMode;
     const last = await this.prisma.mealPlanDay.aggregate({
       where: { mealPlanVersionId: version.id },
       _max: { dayNumber: true },
     });
+    const dayNumber = (last._max.dayNumber ?? 0) + 1;
+    const auto = dayLabels(dayNumber, mode);
     const day = await this.prisma.mealPlanDay.create({
       data: {
         dietitianAccountId: tenant.dietitianAccountId,
         mealPlanVersionId: version.id,
-        dayNumber: (last._max.dayNumber ?? 0) + 1,
-        title: input.title ?? `Day ${(last._max.dayNumber ?? 0) + 1}`,
-        weekday: input.weekday ?? null,
+        dayNumber,
+        title: input.title ?? auto.title,
+        weekday: input.weekday !== undefined ? input.weekday : auto.weekday,
         notes: input.notes ?? null,
       },
     });
@@ -666,6 +743,7 @@ export class MealPlanService {
               .sort((a, b) => a.sortOrder - b.sortOrder)
               .map((item) => this.itemNutrition(item, foodMap, recipeMap));
             const nutrition = sumNutrition(items.map((row) => row.nutrition));
+            const extraNutrients = sumExtraNutrients(items.map((row) => row.extraNutrients));
             return {
               id: meal.id,
               name: meal.name,
@@ -673,10 +751,13 @@ export class MealPlanService {
               notes: meal.notes,
               nutrition,
               presented: roundNutrition(nutrition),
+              extraNutrients,
+              presentedExtraNutrients: roundExtraNutrients(extraNutrients),
               items,
             };
           });
         const nutrition = sumNutrition(meals.map((row) => row.nutrition));
+        const extraNutrients = sumExtraNutrients(meals.map((row) => row.extraNutrients));
         return {
           id: day.id,
           dayNumber: day.dayNumber,
@@ -685,6 +766,8 @@ export class MealPlanService {
           notes: day.notes,
           nutrition,
           presented: roundNutrition(nutrition),
+          extraNutrients,
+          presentedExtraNutrients: roundExtraNutrients(extraNutrients),
           meals,
         };
       });
@@ -694,6 +777,7 @@ export class MealPlanService {
       calculatedAt: new Date().toISOString(),
       planName: version.mealPlan.name,
       planDescription: version.mealPlan.description,
+      dayLabelMode: version.mealPlan.dayLabelMode as DayLabelMode,
       versionNumber: version.versionNumber,
       days,
     };
@@ -710,25 +794,31 @@ export class MealPlanService {
         throw new BadRequestException("Meal item food is not available");
       }
       try {
-        const nutrition = calculateFoodNutrition(
-          {
-            referenceQuantity: food.referenceQuantity,
-            referenceUnit: food.referenceUnit,
-            nutrition: food.effectiveNutrition,
-          },
-          Number(item.quantity),
-          item.unit,
-        );
+        const ref = {
+          referenceQuantity: food.referenceQuantity,
+          referenceUnit: food.referenceUnit as "g" | "ml",
+          nutrition: food.effectiveNutrition,
+        };
+        const factor = foodQuantityScaleFactor(ref, Number(item.quantity), item.unit);
+        const nutrition = calculateFoodNutrition(ref, Number(item.quantity), item.unit);
+        const extraNutrients = scaleExtraNutrients(food.extraNutrients ?? {}, factor);
         return {
           id: item.id,
           itemType: item.itemType,
           quantity: Number(item.quantity),
           unit: item.unit,
           notes: item.notes,
-          food: { id: food.id, name: food.name },
+          food: {
+            id: food.id,
+            name: food.name,
+            origin: food.origin === "custom" ? ("custom" as const) : ("catalog" as const),
+            servingDescription: food.servingDescription ?? null,
+          },
           recipe: null,
           nutrition,
           presented: roundNutrition(nutrition),
+          extraNutrients,
+          presentedExtraNutrients: roundExtraNutrients(extraNutrients),
         };
       } catch (error) {
         if (error instanceof IncompatibleFoodUnitError || error instanceof RangeError) {
@@ -742,6 +832,7 @@ export class MealPlanService {
       throw new BadRequestException("Meal item recipe is not available");
     }
     const nutrition = scaleNutrition(recipe.perServing, Number(item.quantity));
+    const extraNutrients = scaleExtraNutrients(recipe.extraNutrientsPerServing, Number(item.quantity));
     return {
       id: item.id,
       itemType: item.itemType,
@@ -752,6 +843,8 @@ export class MealPlanService {
       recipe: { id: recipe.recipeId, name: recipe.name, servings: recipe.servings },
       nutrition,
       presented: roundNutrition(nutrition),
+      extraNutrients,
+      presentedExtraNutrients: roundExtraNutrients(extraNutrients),
     };
   }
 

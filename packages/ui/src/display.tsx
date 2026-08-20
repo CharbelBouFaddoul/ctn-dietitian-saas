@@ -89,7 +89,7 @@ export function Section({
   className,
   tone = "plain",
 }: {
-  title?: string;
+  title?: ReactNode;
   description?: ReactNode;
   actions?: ReactNode;
   children: ReactNode;

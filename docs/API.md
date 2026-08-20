@@ -227,28 +227,30 @@ Practice-scoped reusable meals. Ingredient foods may be global ACTIVE catalog fo
 
 Recipe meal-item quantity: `unit` must be `serving`. `quantity` is the number of recipe servings, not copies of the whole recipe.
 
-### Meal plans (`/organizations/:organizationId/meal-plans`)
+### Meal plans (`/api/v1/dietitian/:dietitianAccountId/meal-plans`)
 
 Every endpoint authenticates, establishes tenant context, and uses `ClientAccessService` for the plan’s client. Writes use `manageRecords`. GET version is the draft preview (live calculation) or the published/superseded snapshot (`immutable: true`).
+
+**Product Phase 9:** meals are composed from `MealItem` FOOD (catalog/custom) and RECIPE (reusable meal library) rows. Nutrition is never typed by hand — drafts recalculate via `packages/nutrition`; publish freezes item/meal/day nutrition in `snapshot`. Food items in the snapshot include `origin`.
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | GET | `/meal-plans` | Member + visible clients | List (`clientId`, `status`, pagination) |
-| POST | `/meal-plans` | manageRecords | Create plan + draft version 1 + Day 1 + Breakfast/Lunch/Dinner |
-| GET | `/meal-plans/:planId` | read | Plan metadata + version list |
-| PATCH | `/meal-plans/:planId` | manageRecords | Name/description |
+| POST | `/meal-plans` | manageRecords | Create plan + draft version 1 + first day + Breakfast/Lunch/Dinner (`dayLabelMode`: `NUMBERED` \| `WEEKDAY`) |
+| GET | `/meal-plans/:planId` | read | Plan metadata + version list (`dayLabelMode`) |
+| PATCH | `/meal-plans/:planId` | manageRecords | Name/description/`dayLabelMode` (relabels draft days) |
 | POST | `/meal-plans/:planId/archive` | manageRecords | Soft-archive plan |
 | POST | `/meal-plans/:planId/versions` | manageRecords | Clone latest version into a new DRAFT (409 if a draft exists) |
 | GET | `/meal-plans/:planId/versions/:versionId` | read | Draft = live snapshot; published/superseded = stored snapshot |
 | POST | `/meal-plans/:planId/versions/:versionId/publish` | manageRecords | Validate, write snapshot, supersede previous PUBLISHED, mark ACTIVE |
 | POST | `/.../versions/:versionId/days` | manageRecords | Add day (draft only) |
 | PATCH/DELETE | `/.../days/:dayId` | manageRecords | Draft only |
-| POST | `/.../days/:dayId/meals` | manageRecords | Add meal (draft only) |
-| PATCH/DELETE | `/.../meals/:mealId` | manageRecords | Reorder/rename/notes (draft only) |
+| POST | `/.../days/:dayId/meals` | manageRecords | Create meal (name presets in UI; free-text `name` in API) |
+| PATCH/DELETE | `/.../meals/:mealId` | manageRecords | Rename/reorder/notes/delete (draft only) |
 | POST | `/.../meals/:mealId/items` | manageRecords | FOOD (mass/volume) or RECIPE (`serving`) |
-| PATCH/DELETE | `/.../items/:itemId` | manageRecords | Draft only |
+| PATCH/DELETE | `/.../items/:itemId` | manageRecords | Quantity/unit/notes/sortOrder (draft only) |
 
-Published versions reject content mutations (`400` “Published versions cannot be modified”). Empty drafts cannot publish. Archived recipes cannot be added as new items.
+Published versions reject content mutations (`400` “Published versions cannot be modified”). Empty drafts cannot publish. Archived recipes cannot be added as new items. Cross-practice custom foods/recipes are rejected.
 
 ## Client portal
 
@@ -259,7 +261,7 @@ Published versions reject content mutations (`400` “Published versions cannot 
 | POST | `/api/v1/portal/join` | Patient session | Confirm join with the same code. Creates `Client` + `ClientAccount` when new; `{ status: "joined" \| "already_connected", … }`. Does not consume reusable practice invites |
 | GET | `/api/v1/portal/connections` | Patient session | List linked practices / client accounts |
 | POST | `/api/v1/portal/connections/active` | Patient session | Set `Session.activeClientId` for portal scoping |
-| GET | `/api/v1/portal/meal-plan` | Session + active client account | Current published plan snapshot only. Drafts and superseded versions are not returned. `{ plan: null }` when none exists |
+| GET | `/api/v1/portal/meal-plan` | Session + active client account | Current published plan snapshot only (composition + meal/day nutrition). Drafts and superseded versions are not returned. `{ plan: null }` when none exists |
 
 Portal cookies cannot call dietitian meal-plan routes.
 

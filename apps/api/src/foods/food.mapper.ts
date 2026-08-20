@@ -1,5 +1,12 @@
 import type { Food, FoodOverride, FoodSource } from "@prisma/client";
-import { type NutritionValues, type NutrientKey, NUTRIENT_KEYS } from "@nutrition-saas/nutrition";
+import {
+  type NutritionValues,
+  type NutrientKey,
+  type ExtraNutrients,
+  NUTRIENT_KEYS,
+  sanitizeExtraNutrients,
+  roundExtraNutrients,
+} from "@nutrition-saas/nutrition";
 
 export function decimalToNumber(value: unknown): number | null {
   if (value === null || value === undefined) {
@@ -26,6 +33,10 @@ export function nutritionFromRow(row: {
     sugarG: decimalToNumber(row.sugarG),
     sodiumMg: decimalToNumber(row.sodiumMg),
   };
+}
+
+export function extraNutrientsFromRow(row: { extraNutrients?: unknown }): ExtraNutrients {
+  return sanitizeExtraNutrients(row.extraNutrients) ?? {};
 }
 
 export function overrideNutrition(row: FoodOverride | null): Partial<NutritionValues> {
@@ -69,5 +80,13 @@ export function foodIdentity(food: Food) {
     referenceUnit: food.referenceUnit,
     sourceFoodId: food.sourceFoodId,
     status: food.status,
+  };
+}
+
+export function nutritionPayloadExtras(row: { extraNutrients?: unknown }) {
+  const extraNutrients = extraNutrientsFromRow(row);
+  return {
+    extraNutrients,
+    presentedExtraNutrients: roundExtraNutrients(extraNutrients),
   };
 }
