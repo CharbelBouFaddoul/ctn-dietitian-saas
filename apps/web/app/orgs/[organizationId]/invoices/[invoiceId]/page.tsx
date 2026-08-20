@@ -164,10 +164,9 @@ export default function InvoiceDetailPage() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(120px, auto))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
           gap: 20,
           marginBottom: 24,
-          maxWidth: 360,
         }}
       >
         <div>

@@ -139,7 +139,7 @@ export default function TasksPage() {
         <Card title="New task">
           <form
             onSubmit={(event) => void create(event)}
-            style={{ display: "grid", gap: 12, maxWidth: 640 }}
+            style={{ display: "grid", gap: 12 }}
           >
             <label className="ui-field">
               Title

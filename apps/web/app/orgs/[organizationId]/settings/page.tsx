@@ -95,7 +95,7 @@ export default function PracticeSettingsPage() {
   }
 
   return (
-    <section style={{ maxWidth: 640 }}>
+    <section>
       <PageHeader
         title="Practice settings"
         description="Practice details, preferences, reminders, and invoice defaults used across this clinic."

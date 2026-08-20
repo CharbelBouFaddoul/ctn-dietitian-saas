@@ -95,7 +95,7 @@ export default function NewClientPage() {
   }
 
   return (
-    <section style={{ maxWidth: 560 }}>
+    <section>
       <PageHeader
         eyebrow="Clients"
         title="Add a client chart"

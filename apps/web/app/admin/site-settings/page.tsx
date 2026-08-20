@@ -159,7 +159,7 @@ export default function AdminSiteSettingsPage() {
       {error ? <Alert tone="danger">{error}</Alert> : null}
       {message ? <Alert tone="success">{message}</Alert> : null}
 
-      <form onSubmit={(event) => void onSave(event)} className="ui-stack" style={{ maxWidth: 880 }}>
+      <form onSubmit={(event) => void onSave(event)} className="ui-stack">
         <Section title="Brand">
           <Field label="Brand text">
             <Input value={brandText} onChange={(event) => setBrandText(event.target.value)} required />

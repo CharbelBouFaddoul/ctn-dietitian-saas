@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Button, Card, StatusBadge } from "@nutrition-saas/ui";
+import { Button, Section, StatusBadge } from "@nutrition-saas/ui";
 import { portalStatusLabel } from "../lib/practice-labels";
 
 export function JoinCodePanel({
@@ -42,11 +42,13 @@ export function JoinCodePanel({
   }
 
   return (
-    <Card title={title}>
+    <Section title={title}>
       <p className="ui-muted">{description}</p>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "12px 0 8px" }}>
-        <span className="ui-muted" style={{ fontSize: "0.875rem" }}>Status:</span>
+      <div className="ui-client-chart__toolbar" style={{ margin: "12px 0 8px" }}>
+        <span className="ui-muted" style={{ fontSize: "0.875rem" }}>
+          Status:
+        </span>
         <StatusBadge
           status={connectionStatus ?? undefined}
           label={portalStatusLabel(connectionStatus)}
@@ -83,7 +85,7 @@ export function JoinCodePanel({
         </p>
       ) : null}
 
-      <div className="ui-row" style={{ marginTop: 12 }}>
+      <div className="ui-client-chart__toolbar" style={{ marginTop: 12 }}>
         {allowManage && !connected ? (
           <Button disabled={portalBusy} onClick={onGenerate}>
             {waiting ? "Regenerate join code" : "Generate join code"}
@@ -105,6 +107,6 @@ export function JoinCodePanel({
           </Button>
         ) : null}
       </div>
-    </Card>
+    </Section>
   );
 }

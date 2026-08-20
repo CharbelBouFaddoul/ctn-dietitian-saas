@@ -7,8 +7,8 @@ import {
   Alert,
   Avatar,
   Badge,
+  Breadcrumbs,
   Button,
-  Card,
   ConfirmDialog,
   EmptyState,
   Field,
@@ -17,7 +17,6 @@ import {
   Section,
   Select,
   Skeleton,
-  StatCard,
   StatusBadge,
   Table,
   Tabs,
@@ -73,7 +72,7 @@ export default function ClientWorkspaceRoute() {
 
 function ClientWorkspaceSkeleton() {
   return (
-    <section>
+    <section className="ui-client-chart">
       <header className="ui-page-header">
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <Skeleton style={{ width: 48, height: 48, borderRadius: "50%" }} />
@@ -84,7 +83,7 @@ function ClientWorkspaceSkeleton() {
         </div>
       </header>
       <Skeleton style={{ width: "100%", height: 44, margin: "16px 0" }} />
-      <Skeleton style={{ width: "100%", height: 200, borderRadius: 8 }} />
+      <Skeleton style={{ width: "100%", height: 200, borderRadius: 12 }} />
     </section>
   );
 }
@@ -237,7 +236,13 @@ function ClientWorkspacePage() {
   const activeAssignee = client?.assignments.find((row) => row.active)?.email;
 
   return (
-    <section>
+    <section className="ui-client-chart">
+      <Breadcrumbs
+        items={[
+          { label: "Clients", href: `/orgs/${organizationId}/clients` },
+          { label: name },
+        ]}
+      />
       <PageHeader
         eyebrow="Client chart"
         title={name}
@@ -250,63 +255,65 @@ function ClientWorkspacePage() {
             </span>
           ) : undefined
         }
-        actions={
-          client ? (
-            <Avatar name={name} />
-          ) : undefined
-        }
+        actions={client ? <Avatar name={name} /> : undefined}
       />
 
-      <Tabs items={tabs} value={tab} onChange={selectTab} />
+      <div className="ui-client-chart__tabs">
+        <Tabs items={tabs} value={tab} onChange={selectTab} />
+      </div>
 
-      {error ? <div style={{ margin: "12px 0" }}><Alert tone="danger">{error}</Alert></div> : null}
+      {error ? (
+        <div style={{ margin: "0 0 12px" }}>
+          <Alert tone="danger">{error}</Alert>
+        </div>
+      ) : null}
 
       {/* ── OVERVIEW ── */}
       {tab === "overview" && client && profile ? (
-        <div className="ui-stack">
-
-          {/* Quick-info strip */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
-              gap: 12,
-              padding: "4px 0 8px",
-            }}
-          >
-            <StatCard
-              label="Status"
-              value={<StatusBadge status={client.status} label={statusLabel(client.status)} />}
-            />
-            <StatCard
-              label="Portal"
-              value={<StatusBadge status={connectionStatus ?? undefined} label={portalStatusLabel(connectionStatus)} />}
-            />
-            <StatCard
-              label="Assigned to"
-              value={activeAssignee ?? "—"}
-            />
-            {client.phone ? <StatCard label="Phone" value={client.phone} /> : null}
+        <div className="ui-client-chart__panel ui-stack">
+          <div className="ui-client-chart__metrics">
+            <div className="ui-client-chart__metric">
+              <span className="ui-client-chart__metric-label">Status</span>
+              <span className="ui-client-chart__metric-value">
+                <StatusBadge status={client.status} label={statusLabel(client.status)} />
+              </span>
+            </div>
+            <div className="ui-client-chart__metric">
+              <span className="ui-client-chart__metric-label">Portal</span>
+              <span className="ui-client-chart__metric-value">
+                <StatusBadge status={connectionStatus ?? undefined} label={portalStatusLabel(connectionStatus)} />
+              </span>
+            </div>
+            <div className="ui-client-chart__metric">
+              <span className="ui-client-chart__metric-label">Assigned</span>
+              <span className="ui-client-chart__metric-value">{activeAssignee ?? "—"}</span>
+            </div>
+            {client.phone ? (
+              <div className="ui-client-chart__metric">
+                <span className="ui-client-chart__metric-label">Phone</span>
+                <span className="ui-client-chart__metric-value">{client.phone}</span>
+              </div>
+            ) : null}
             {client.tags.length > 0 ? (
-              <StatCard
-                label="Tags"
-                value={
-                  <span style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                    {client.tags.map((tag) => (
-                      <Badge key={tag.id} tone="neutral">{tag.name}</Badge>
-                    ))}
-                  </span>
-                }
-              />
+              <div className="ui-client-chart__metric">
+                <span className="ui-client-chart__metric-label">Tags</span>
+                <span className="ui-client-chart__metric-value" style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                  {client.tags.map((tag) => (
+                    <Badge key={tag.id} tone="neutral">
+                      {tag.name}
+                    </Badge>
+                  ))}
+                </span>
+              </div>
             ) : null}
           </div>
 
-          {/* Reassign + Archive */}
           {allowManage ? (
-            <Card title="Chart management">
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "flex-end" }}>
+            <Section title="Chart management">
+              <div className="ui-client-chart__toolbar">
                 <form
-                  className="ui-row"
+                  className="ui-client-chart__toolbar"
+                  style={{ flex: "1 1 18rem" }}
                   onSubmit={(event) => {
                     event.preventDefault();
                     void api(`${base}/assignments`, {
@@ -316,8 +323,8 @@ function ClientWorkspacePage() {
                   }}
                 >
                   <Field label="Reassign to">
-                    <Select value={assignTo} onChange={(event) => setAssignTo(event.target.value)}>
-                      <option value="">Select member</option>
+                    <Select value={assignTo} onChange={(event) => setAssignTo(event.target.value)} required>
+                      <option value="">Select member…</option>
                       {members.map((member) => (
                         <option key={member.id} value={member.id}>
                           {member.email}
@@ -329,21 +336,20 @@ function ClientWorkspacePage() {
                     Assign
                   </Button>
                 </form>
-                {client.status !== "ARCHIVED" ? (
+                {client.status === "ACTIVE" ? (
                   <Button variant="danger" onClick={() => setConfirmArchive(true)}>
                     Archive client
                   </Button>
                 ) : null}
               </div>
-            </Card>
+            </Section>
           ) : null}
 
-          {/* Goals */}
           <Section
             title="Goals"
             actions={
               <form
-                className="ui-row"
+                className="ui-client-chart__toolbar"
                 onSubmit={(event) => {
                   event.preventDefault();
                   void api(`${base}/goals`, { method: "POST", body: JSON.stringify({ title: goalTitle }) }).then(() => {
@@ -358,27 +364,18 @@ function ClientWorkspacePage() {
                   placeholder="New goal…"
                   required
                 />
-                <Button type="submit" size="sm">Add</Button>
+                <Button type="submit" size="sm">
+                  Add
+                </Button>
               </form>
             }
           >
             {goals.length === 0 ? (
               <EmptyState title="No goals yet" />
             ) : (
-              <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+              <ul className="ui-client-chart__list">
                 {goals.map((goal) => (
-                  <li
-                    key={goal.id}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "8px 12px",
-                      borderRadius: 8,
-                      border: "1px solid var(--color-border)",
-                      background: "var(--color-surface)",
-                    }}
-                  >
+                  <li key={goal.id}>
                     <span>{goal.title}</span>
                     <StatusBadge status={goal.status} label={humanizeLabel(goal.status)} />
                   </li>
@@ -387,21 +384,14 @@ function ClientWorkspacePage() {
             )}
           </Section>
 
-          {/* Profile */}
-          <Card title="Dietary profile">
+          <Section title="Dietary profile">
             <form
               onSubmit={(event) => {
                 event.preventDefault();
                 void api(`${base}/profile`, { method: "PATCH", body: JSON.stringify(profile) }).then(() => load());
               }}
             >
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
-                  gap: 12,
-                }}
-              >
+              <div className="ui-client-chart__form-grid">
                 {(["allergies", "intolerances", "dietaryPreferences", "notes"] as const).map((key) => (
                   <Field key={key} label={humanizeLabel(key)}>
                     <Textarea
@@ -414,19 +404,23 @@ function ClientWorkspacePage() {
               </div>
               <Button type="submit">Save profile</Button>
             </form>
-          </Card>
+          </Section>
 
-          {/* Measurements */}
           <Section
             title="Measurements"
             actions={
               <form
-                className="ui-row"
+                className="ui-client-chart__toolbar"
                 onSubmit={(event) => {
                   event.preventDefault();
                   void api(`${base}/measurements`, {
                     method: "POST",
-                    body: JSON.stringify({ type: "WEIGHT", value: Number(weight), unit: "kg", measuredAt: new Date().toISOString() }),
+                    body: JSON.stringify({
+                      type: "WEIGHT",
+                      value: Number(weight),
+                      unit: "kg",
+                      measuredAt: new Date().toISOString(),
+                    }),
                   }).then(() => {
                     setWeight("");
                     return load();
@@ -442,12 +436,14 @@ function ClientWorkspacePage() {
                   required
                   style={{ width: 130 }}
                 />
-                <Button type="submit" size="sm">Record</Button>
+                <Button type="submit" size="sm">
+                  Record
+                </Button>
               </form>
             }
           >
             {measurements.length === 0 ? (
-              <p className="ui-muted">No measurements recorded yet.</p>
+              <EmptyState title="No measurements yet" />
             ) : (
               <Table>
                 <thead>
@@ -472,24 +468,13 @@ function ClientWorkspacePage() {
             )}
           </Section>
 
-          {/* Timeline */}
           <Section title="Recent activity">
             {timeline.length === 0 ? (
-              <p className="ui-muted">No activity yet.</p>
+              <EmptyState title="No activity yet" />
             ) : (
-              <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 6 }}>
+              <ul className="ui-client-chart__list">
                 {timeline.slice(0, 20).map((row) => (
-                  <li
-                    key={row.id}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      padding: "6px 0",
-                      borderBottom: "1px solid var(--color-border)",
-                      fontSize: "0.875rem",
-                    }}
-                  >
+                  <li key={row.id}>
                     <span>{activityLabel(row.type)}</span>
                     <span className="ui-muted">{formatDate(row.occurredAt)}</span>
                   </li>
@@ -502,11 +487,11 @@ function ClientWorkspacePage() {
 
       {/* ── ASSESSMENTS ── */}
       {tab === "assessments" ? (
-        <div className="ui-stack">
+        <div className="ui-client-chart__panel ui-stack">
           {templates.length > 0 ? (
-            <Card title="Start an assessment">
+            <Section title="Start an assessment">
               <form
-                className="ui-row"
+                className="ui-client-chart__toolbar"
                 onSubmit={(event) => {
                   event.preventDefault();
                   void api(`${base}/assessments`, { method: "POST", body: JSON.stringify({ templateId }) }).then(() => load());
@@ -525,30 +510,18 @@ function ClientWorkspacePage() {
                   Start assessment
                 </Button>
               </form>
-            </Card>
+            </Section>
           ) : null}
 
           <Section title="Assessments">
             {assessments.length === 0 ? (
               <EmptyState title="No assessments yet" />
             ) : (
-              <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+              <ul className="ui-client-chart__list">
                 {assessments.map((row) => (
-                  <li
-                    key={row.id}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "10px 14px",
-                      borderRadius: 8,
-                      border: "1px solid var(--color-border)",
-                      background: "var(--color-surface)",
-                    }}
-                  >
+                  <li key={row.id}>
                     <span>
-                      {row.templateName}{" "}
-                      <span className="ui-muted">v{row.templateVersion}</span>
+                      {row.templateName} <span className="ui-muted">v{row.templateVersion}</span>
                     </span>
                     <StatusBadge status={row.status} label={humanizeLabel(row.status)} />
                   </li>
@@ -579,20 +552,9 @@ function ClientWorkspacePage() {
               }
             />
           ) : (
-            <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+            <ul className="ui-client-chart__list">
               {plans.map((plan) => (
-                <li
-                  key={plan.id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: "10px 14px",
-                    borderRadius: 8,
-                    border: "1px solid var(--color-border)",
-                    background: "var(--color-surface)",
-                  }}
-                >
+                <li key={plan.id}>
                   <Link href={`/orgs/${organizationId}/meal-plans/${plan.id}`} className="ui-link" style={{ fontWeight: 500 }}>
                     {plan.name}
                   </Link>
@@ -606,42 +568,42 @@ function ClientWorkspacePage() {
 
       {/* ── TRACKING ── */}
       {tab === "tracking" ? (
-        <div className="ui-stack">
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <Field label="Date">
-              <Input type="date" value={trackingDate} onChange={(event) => setTrackingDate(event.target.value)} />
-            </Field>
-          </div>
+        <div className="ui-client-chart__panel ui-stack">
+          <Section title="Tracking day">
+            <div className="ui-client-chart__toolbar">
+              <Field label="Date">
+                <Input type="date" value={trackingDate} onChange={(event) => setTrackingDate(event.target.value)} />
+              </Field>
+            </div>
+          </Section>
 
           {trackingSummary ? (
             <>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))",
-                  gap: 12,
-                }}
-              >
-                <StatCard
-                  label="Calories"
-                  value={nutritionLabel(trackingSummary.food.presented.energyKcal, "kcal")}
-                />
-                <StatCard
-                  label="Protein"
-                  value={nutritionLabel(trackingSummary.food.presented.proteinG, "g")}
-                />
-                <StatCard
-                  label="Water"
-                  value={`${trackingSummary.water.totalLiters.toFixed(1)} L`}
-                />
-                <StatCard
-                  label="Exercise"
-                  value={`${trackingSummary.exercise.totalDurationMinutes} min`}
-                />
+              <div className="ui-client-chart__metrics">
+                <div className="ui-client-chart__metric">
+                  <span className="ui-client-chart__metric-label">Calories</span>
+                  <span className="ui-client-chart__metric-value">
+                    {nutritionLabel(trackingSummary.food.presented.energyKcal, "kcal")}
+                  </span>
+                </div>
+                <div className="ui-client-chart__metric">
+                  <span className="ui-client-chart__metric-label">Protein</span>
+                  <span className="ui-client-chart__metric-value">
+                    {nutritionLabel(trackingSummary.food.presented.proteinG, "g")}
+                  </span>
+                </div>
+                <div className="ui-client-chart__metric">
+                  <span className="ui-client-chart__metric-label">Water</span>
+                  <span className="ui-client-chart__metric-value">{trackingSummary.water.totalLiters.toFixed(1)} L</span>
+                </div>
+                <div className="ui-client-chart__metric">
+                  <span className="ui-client-chart__metric-label">Exercise</span>
+                  <span className="ui-client-chart__metric-value">{trackingSummary.exercise.totalDurationMinutes} min</span>
+                </div>
               </div>
 
               {trackingFood.length > 0 ? (
-                <Card title="Food log">
+                <Section title="Food log">
                   <Table>
                     <thead>
                       <tr>
@@ -664,15 +626,15 @@ function ClientWorkspacePage() {
                       ))}
                     </tbody>
                   </Table>
-                </Card>
+                </Section>
               ) : (
                 <EmptyState title="No food logged for this day" />
               )}
             </>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+            <div className="ui-client-chart__metrics">
               {[1, 2, 3, 4].map((i) => (
-                <Skeleton key={i} style={{ height: 80, borderRadius: 8 }} />
+                <Skeleton key={i} style={{ height: 76, borderRadius: 14 }} />
               ))}
             </div>
           )}
@@ -681,37 +643,22 @@ function ClientWorkspacePage() {
 
       {/* ── MESSAGES ── */}
       {tab === "messages" ? (
-        <div className="ui-stack">
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 10,
-              maxHeight: 480,
-              overflowY: "auto",
-              padding: "4px 0",
-            }}
-          >
-            {chatMessages.length === 0 ? (
-              <EmptyState title="No messages yet" />
-            ) : (
-              chatMessages.map((message) => (
-                <div
-                  key={message.id}
-                  style={{
-                    padding: "10px 14px",
-                    borderRadius: 10,
-                    border: "1px solid var(--color-border)",
-                    background: "var(--color-surface)",
-                  }}
-                >
-                  <div style={{ marginBottom: 4, whiteSpace: "pre-wrap" }}>{message.body}</div>
-                  <div className="ui-hint">{formatDate(message.createdAt)}</div>
-                </div>
-              ))
-            )}
-          </div>
-          <Card title="New message">
+        <div className="ui-client-chart__panel ui-stack">
+          <Section title="Conversation">
+            <div className="ui-client-chart__chat">
+              {chatMessages.length === 0 ? (
+                <EmptyState title="No messages yet" />
+              ) : (
+                chatMessages.map((message) => (
+                  <div key={message.id} className="ui-client-chart__bubble">
+                    <div className="ui-client-chart__bubble-body">{message.body}</div>
+                    <div className="ui-hint">{formatDate(message.createdAt)}</div>
+                  </div>
+                ))
+              )}
+            </div>
+          </Section>
+          <Section title="New message">
             <form
               onSubmit={(event) => {
                 event.preventDefault();
@@ -735,16 +682,16 @@ function ClientWorkspacePage() {
                 Send message
               </Button>
             </form>
-          </Card>
+          </Section>
         </div>
       ) : null}
 
       {/* ── DOCUMENTS ── */}
       {tab === "documents" ? (
-        <div className="ui-stack">
-          <Card title="Upload document">
+        <div className="ui-client-chart__panel ui-stack">
+          <Section title="Upload document">
             <form
-              className="ui-row"
+              className="ui-client-chart__toolbar"
               onSubmit={(event) => {
                 event.preventDefault();
                 const form = event.currentTarget;
@@ -769,26 +716,15 @@ function ClientWorkspacePage() {
               </Select>
               <Button type="submit">Upload</Button>
             </form>
-          </Card>
+          </Section>
 
-          {clientDocuments.length === 0 ? (
-            <EmptyState title="No documents yet" />
-          ) : (
-            <Section title="Documents">
-              <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+          <Section title="Documents">
+            {clientDocuments.length === 0 ? (
+              <EmptyState title="No documents yet" />
+            ) : (
+              <ul className="ui-client-chart__list">
                 {clientDocuments.map((doc) => (
-                  <li
-                    key={doc.id}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "8px 14px",
-                      borderRadius: 8,
-                      border: "1px solid var(--color-border)",
-                      background: "var(--color-surface)",
-                    }}
-                  >
+                  <li key={doc.id}>
                     <span style={{ fontWeight: 500 }}>{doc.filename}</span>
                     <Badge tone={doc.visibility === "SHARED" ? "info" : "neutral"}>
                       {humanizeLabel(doc.visibility)}
@@ -796,8 +732,8 @@ function ClientWorkspacePage() {
                   </li>
                 ))}
               </ul>
-            </Section>
-          )}
+            )}
+          </Section>
         </div>
       ) : null}
 
@@ -839,8 +775,8 @@ function ClientWorkspacePage() {
 
       {/* ── APPOINTMENTS ── */}
       {tab === "appointments" ? (
-        <div className="ui-stack">
-          <Card title="Schedule appointment">
+        <div className="ui-client-chart__panel ui-stack">
+          <Section title="Schedule appointment">
             <form
               onSubmit={(event) => {
                 event.preventDefault();
@@ -854,7 +790,7 @@ function ClientWorkspacePage() {
                 }).then(() => load());
               }}
             >
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+              <div className="ui-client-chart__form-grid">
                 <Field label="Title">
                   <Input value={appointmentTitle} onChange={(event) => setAppointmentTitle(event.target.value)} required />
                 </Field>
@@ -867,26 +803,15 @@ function ClientWorkspacePage() {
               </div>
               <Button type="submit">Schedule</Button>
             </form>
-          </Card>
+          </Section>
 
           <Section title="Appointments">
             {appointments.length === 0 ? (
               <EmptyState title="No appointments yet" />
             ) : (
-              <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+              <ul className="ui-client-chart__list">
                 {appointments.map((row) => (
-                  <li
-                    key={row.id}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "10px 14px",
-                      borderRadius: 8,
-                      border: "1px solid var(--color-border)",
-                      background: "var(--color-surface)",
-                    }}
-                  >
+                  <li key={row.id}>
                     <div>
                       <div style={{ fontWeight: 500 }}>{row.title}</div>
                       <div className="ui-hint">{formatDate(row.startAt)}</div>
@@ -902,7 +827,7 @@ function ClientWorkspacePage() {
 
       {/* ── AI ── */}
       {tab === "ai" ? (
-        <div className="ui-stack">
+        <div className="ui-client-chart__ai">
           <AiPanel organizationId={organizationId} clientId={clientId} action="client-summary" title="Client summary" description="Concise overview from profile, goals, tracking, and meal-plan context." />
           <AiPanel organizationId={organizationId} clientId={clientId} action="meal-plan-assistance" title="Meal plan assistance" description="Suggestions only — review and apply manually in the meal-plan editor." />
           <AiPanel organizationId={organizationId} clientId={clientId} action="nutrition-assistance" title="Nutrition assistance" description="Explain foods using values from your food database." foodQuery />

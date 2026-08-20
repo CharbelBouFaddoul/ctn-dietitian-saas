@@ -57,7 +57,7 @@ export default function NewRecipePage() {
 
       <form
         onSubmit={(event) => void onSubmit(event)}
-        style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 480 }}
+        style={{ display: "flex", flexDirection: "column", gap: 16 }}
       >
         <Field label="Recipe name">
           <Input

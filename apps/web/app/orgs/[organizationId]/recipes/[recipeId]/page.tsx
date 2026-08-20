@@ -255,7 +255,7 @@ export default function RecipeDetailPage() {
       <Section title="Details">
         <form
           onSubmit={(event) => void save(event)}
-          style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 560 }}
+          style={{ display: "flex", flexDirection: "column", gap: 16 }}
         >
           <Field label="Recipe name">
             <Input value={name} onChange={(event) => setName(event.target.value)} required />
