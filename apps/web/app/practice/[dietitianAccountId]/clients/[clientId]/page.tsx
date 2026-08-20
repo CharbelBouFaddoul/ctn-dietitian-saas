@@ -330,15 +330,57 @@ function ClientWorkspacePage() {
 
   const [trackingSummary, setTrackingSummary] = useState<{
     date: string;
-    food: { presented: { energyKcal: number | null; proteinG: number | null } };
-    water: { totalLiters: number };
-    exercise: { totalDurationMinutes: number };
+    food: {
+      presented: {
+        energyKcal: number | null;
+        proteinG: number | null;
+        carbohydrateG: number | null;
+        fatG: number | null;
+        fiberG: number | null;
+      };
+      byMeal: Array<{
+        category: string;
+        items: Array<{
+          id: string;
+          foodName: string;
+          quantity: number;
+          unit: string;
+          presented: { energyKcal: number | null };
+        }>;
+        presented: { energyKcal: number | null };
+      }>;
+    };
+    water: {
+      totalLiters: number;
+      totalMl: number;
+      targetMl: number | null;
+      entries: Array<{ id: string; amountMl: number }>;
+    };
+    exercise: {
+      totalDurationMinutes: number;
+      entries: Array<{
+        id: string;
+        activityType: string;
+        durationMinutes: number;
+        intensity: string | null;
+      }>;
+    };
+    sleep: { durationMinutes: number | null; quality: number | null } | null;
+    sleepWeek: { averageDurationMinutes: number | null; nightsLogged: number };
+    habits: {
+      completed: number;
+      total: number;
+      items: Array<{ habitKey: string; habitLabel: string; completed: boolean }>;
+    };
   } | null>(null);
-  const [trackingFood, setTrackingFood] = useState<
-    Array<{ id: string; foodName: string; quantity: number; unit: string; presented: { energyKcal: number | null } }>
-  >([]);
   const [trackingDate, setTrackingDate] = useState("");
 
+  function shiftTrackingDate(days: number) {
+    if (!trackingDate) return;
+    const parts = trackingDate.split("-").map(Number);
+    const next = new Date(Date.UTC(parts[0] ?? 0, (parts[1] ?? 1) - 1, (parts[2] ?? 1) + days));
+    setTrackingDate(next.toISOString().slice(0, 10));
+  }
   const [chatMessages, setChatMessages] = useState<Array<{ id: string; body: string; createdAt: string }>>([]);
   const [messageBody, setMessageBody] = useState("");
 
@@ -461,14 +503,10 @@ function ClientWorkspacePage() {
   useEffect(() => {
     if (tab !== "tracking") return;
     const query = trackingDate ? `?date=${trackingDate}` : "";
-    void Promise.all([
-      api<NonNullable<typeof trackingSummary>>(`${base}/tracking/summary${query}`),
-      api<typeof trackingFood>(`${base}/tracking/food-logs${query}`),
-    ])
-      .then(([summary, foods]) => {
+    void api<NonNullable<typeof trackingSummary>>(`${base}/tracking/summary${query}`)
+      .then((summary) => {
         setTrackingSummary(summary);
         if (!trackingDate) setTrackingDate(summary.date);
-        setTrackingFood(foods);
       })
       .catch((err) => setError(errorMessage(err, "Unable to load tracking")));
   }, [tab, trackingDate, base]);
@@ -1086,11 +1124,24 @@ function ClientWorkspacePage() {
       {/* ── TRACKING ── */}
       {tab === "tracking" ? (
         <div className="ui-client-chart__panel ui-stack">
-          <Section title="Tracking day">
-            <div className="ui-client-chart__toolbar">
+          <Section
+            title="Tracking day"
+            description="Patient-entered logs for this calendar day. Measurements live on Evolution."
+          >
+            <div className="ui-row" style={{ gap: 8, flexWrap: "wrap", alignItems: "end" }}>
+              <Button type="button" size="sm" variant="secondary" onClick={() => shiftTrackingDate(-1)}>
+                Previous
+              </Button>
               <Field label="Date">
-                <Input type="date" value={trackingDate} onChange={(event) => setTrackingDate(event.target.value)} />
+                <Input
+                  type="date"
+                  value={trackingDate}
+                  onChange={(event) => setTrackingDate(event.target.value)}
+                />
               </Field>
+              <Button type="button" size="sm" variant="secondary" onClick={() => shiftTrackingDate(1)}>
+                Next
+              </Button>
             </div>
           </Section>
 
@@ -1110,9 +1161,23 @@ function ClientWorkspacePage() {
                   </span>
                 </div>
                 <div className="ui-client-chart__metric">
+                  <span className="ui-client-chart__metric-label">Carbs</span>
+                  <span className="ui-client-chart__metric-value">
+                    {nutritionLabel(trackingSummary.food.presented.carbohydrateG, "g")}
+                  </span>
+                </div>
+                <div className="ui-client-chart__metric">
+                  <span className="ui-client-chart__metric-label">Fat</span>
+                  <span className="ui-client-chart__metric-value">
+                    {nutritionLabel(trackingSummary.food.presented.fatG, "g")}
+                  </span>
+                </div>
+                <div className="ui-client-chart__metric">
                   <span className="ui-client-chart__metric-label">Water</span>
                   <span className="ui-client-chart__metric-value">
-                    {trackingSummary.water.totalLiters.toFixed(1)} L
+                    {trackingSummary.water.targetMl != null
+                      ? `${trackingSummary.water.totalLiters.toFixed(1)} / ${(trackingSummary.water.targetMl / 1000).toFixed(1)} L`
+                      : `${trackingSummary.water.totalLiters.toFixed(1)} L`}
                   </span>
                 </div>
                 <div className="ui-client-chart__metric">
@@ -1123,34 +1188,120 @@ function ClientWorkspacePage() {
                 </div>
               </div>
 
-              {trackingFood.length > 0 ? (
-                <Section title="Food log">
-                  <Table>
-                    <thead>
-                      <tr>
-                        <th>Food</th>
-                        <th>Quantity</th>
-                        <th>Calories</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {trackingFood.map((row) => (
-                        <tr key={row.id}>
-                          <Td label="Food">{row.foodName}</Td>
-                          <Td label="Quantity">
-                            {row.quantity} {humanizeLabel(row.unit)}
-                          </Td>
-                          <Td label="Calories">
-                            {row.presented.energyKcal != null ? `${row.presented.energyKcal} kcal` : "—"}
-                          </Td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </Table>
-                </Section>
-              ) : (
-                <EmptyState title="No food logged for this day" />
-              )}
+              <Section title="Food by meal">
+                {trackingSummary.food.byMeal.length === 0 ? (
+                  <EmptyState title="No food logged for this day" />
+                ) : (
+                  <div className="ui-stack" style={{ gap: 16 }}>
+                    {trackingSummary.food.byMeal.map((meal) => (
+                      <div key={meal.category}>
+                        <div className="ui-row" style={{ justifyContent: "space-between", marginBottom: 6 }}>
+                          <strong>{humanizeLabel(meal.category)}</strong>
+                          <span className="ui-muted">
+                            {meal.presented.energyKcal != null ? `${meal.presented.energyKcal} kcal` : "—"}
+                          </span>
+                        </div>
+                        <Table>
+                          <thead>
+                            <tr>
+                              <th>Food</th>
+                              <th>Quantity</th>
+                              <th>Calories</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {meal.items.map((row) => (
+                              <tr key={row.id}>
+                                <Td label="Food">{row.foodName}</Td>
+                                <Td label="Quantity">
+                                  {row.quantity} {humanizeLabel(row.unit)}
+                                </Td>
+                                <Td label="Calories">
+                                  {row.presented.energyKcal != null
+                                    ? `${row.presented.energyKcal} kcal`
+                                    : "—"}
+                                </Td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </Table>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Section>
+
+              <Section title="Water">
+                {trackingSummary.water.entries.length === 0 ? (
+                  <p className="ui-muted" style={{ margin: 0 }}>
+                    No water logged.
+                  </p>
+                ) : (
+                  <ul className="ui-client-chart__list">
+                    {trackingSummary.water.entries.map((row) => (
+                      <li key={row.id}>
+                        <span>{row.amountMl} ml</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Section>
+
+              <Section title="Exercise">
+                {trackingSummary.exercise.entries.length === 0 ? (
+                  <p className="ui-muted" style={{ margin: 0 }}>
+                    No exercise logged.
+                  </p>
+                ) : (
+                  <ul className="ui-client-chart__list">
+                    {trackingSummary.exercise.entries.map((row) => (
+                      <li key={row.id}>
+                        <span>
+                          {row.activityType} · {row.durationMinutes} min
+                          {row.intensity ? ` · ${humanizeLabel(row.intensity)}` : ""}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Section>
+
+              <Section title="Sleep">
+                {trackingSummary.sleep?.durationMinutes != null ? (
+                  <p style={{ margin: 0 }}>
+                    {Math.floor(trackingSummary.sleep.durationMinutes / 60)}h{" "}
+                    {trackingSummary.sleep.durationMinutes % 60}m
+                    {trackingSummary.sleep.quality != null
+                      ? ` · quality ${trackingSummary.sleep.quality}/5`
+                      : ""}
+                    {trackingSummary.sleepWeek.averageDurationMinutes != null
+                      ? ` · week avg ${Math.floor(trackingSummary.sleepWeek.averageDurationMinutes / 60)}h ${trackingSummary.sleepWeek.averageDurationMinutes % 60}m`
+                      : ""}
+                  </p>
+                ) : (
+                  <p className="ui-muted" style={{ margin: 0 }}>
+                    No sleep logged.
+                  </p>
+                )}
+              </Section>
+
+              <Section title="Habits">
+                {trackingSummary.habits.items.length === 0 ? (
+                  <p className="ui-muted" style={{ margin: 0 }}>
+                    No habits logged.
+                  </p>
+                ) : (
+                  <ul className="ui-client-chart__list">
+                    {trackingSummary.habits.items.map((item) => (
+                      <li key={item.habitKey}>
+                        <span>
+                          {item.completed ? "✓" : "○"} {item.habitLabel}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Section>
             </>
           ) : (
             <div className="ui-client-chart__metrics">

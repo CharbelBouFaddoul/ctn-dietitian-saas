@@ -267,20 +267,27 @@ Portal cookies cannot call dietitian meal-plan routes.
 
 ### Client tracking — portal (`/api/v1/portal/tracking`)
 
-Authenticated client account only. Mutations use `assertPortalAccess`. Food search for logging: `GET /api/v1/portal/foods` (**catalog only** — no practice custom foods).
+Authenticated client account only (`Session.activeClientId`). Mutations use `assertPortalAccess`. Food search for logging: `GET /api/v1/portal/foods` (catalog **and** practice-visible custom foods for the active connection).
 
 | Method | Path | Description |
 |---|---|---|
-| GET | `/summary` | Daily derived totals (`?date=YYYY-MM-DD`, defaults to org-local today) |
-| GET/POST/PATCH/DELETE | `/food-logs` … | Food logging with immutable `nutrition_snapshot` |
+| GET | `/summary` | Daily derived totals (`?date=YYYY-MM-DD`, defaults to practice-local today). Includes `food.byMeal`, water `entries` + optional `targetMl` (from matching `ClientGoal`), exercise `entries`, `sleepWeek` |
+| GET/POST/PATCH/DELETE | `/food-logs` … | Food logging with immutable `nutrition_snapshot`; optional `mealCategory` |
 | GET/POST/PATCH/DELETE | `/water-logs` … | Water logging (`amount` + `ml`/`l`, stored as ml) |
-| GET/POST/PATCH/DELETE | `/exercise-logs` … | Simple exercise log |
+| GET/POST/PATCH/DELETE | `/exercise-logs` … | Exercise log (optional intensity) |
 | GET/PUT/DELETE | `/sleep` … | Upsert one sleep row per local date |
 | GET/PUT | `/habits` … | Upsert daily habit completion |
+| POST | `/log-planned-meal` | Log **FOOD** items from a published plan meal (`{ mealId, date? }`). RECIPE items are skipped (documented limitation) |
 
-### Client tracking — dietitian review (`/organizations/:organizationId/clients/:clientId/tracking`)
+### Portal measurements
 
-Read-only. `ClientAccessService` `read`. Same summary/list shapes as portal.
+| Method | Path | Description |
+|---|---|---|
+| POST | `/api/v1/portal/measurements` | Create measurement for active client (`type`, `value`, `unit`, optional `measuredAt`). Feeds existing Evolution API |
+
+### Client tracking — dietitian review (`/api/v1/dietitian/:dietitianAccountId/clients/:clientId/tracking`)
+
+Read-only. `ClientAccessService` `read`. Same summary/list shapes as portal (including Phase 10 summary enrichment).
 
 | Method | Path | Description |
 |---|---|---|
@@ -326,6 +333,7 @@ Scoped to `Session.activeClientId` + `ClientAccount`.
 | PATCH | `/api/v1/portal/assessments/:assessmentId` | Save draft responses |
 | POST | `/api/v1/portal/assessments/:assessmentId/complete` | Submit |
 | GET | `/api/v1/portal/evolution` | Measurement evolution for the active client (`?from=&to=`) |
+| POST | `/api/v1/portal/measurements` | Log weight/height/etc. for the active client |
 
 Assessment templates use a JSON schema contract (`sections[].questions[]` with types `TEXT`, `TEXTAREA`, `NUMBER`, `BOOLEAN`, `SINGLE_CHOICE`, `MULTI_CHOICE`). Deactivating a question soft-flags `active: false`. Started assessments freeze `schemaSnapshot` so historical responses stay readable after template edits.
 

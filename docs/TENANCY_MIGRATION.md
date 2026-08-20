@@ -75,9 +75,10 @@ No Organization layer. No OrganizationMember. No STAFF tenancy. No `organization
 - Portal `GET /api/v1/portal/me` includes lightweight personal + dietary/lifestyle + practice name.
 - **Product Phase 6 (calendar + appointments):** extends `Appointment` with `category`, `RESCHEDULE_PENDING`, and proposal fields; practice calendar month/week/day; portal appointments under `activeClientId`; REST + notifications only (no appointment WebSockets); no Organization.
 
-## Product Phase 8–9 notes (food / recipes / meal plans)
+## Product Phase 8–10 notes (food / recipes / meal plans / tracking)
 
 - Canonical tenant remains `dietitianAccountId`. No Organization / STAFF reintroduction.
 - **Product Phase 8:** global + practice custom foods; Recipes = reusable meal library.
 - **Product Phase 9:** MealPlan meals composed from Food + Recipe items; nutrition from `packages/nutrition` only; publish freezes snapshot; portal reads published plan for `activeClientId`.
-- **Migration required for Phase 9:** no.
+- **Product Phase 10:** Tracking summary enrichment; portal `POST /measurements`; `log-planned-meal` (FOOD items only); portal food search includes practice foods; no new tracking tables.
+- **Migration required for Phase 9–10:** no (Phase 9 day-label mode migration is separate if already applied).

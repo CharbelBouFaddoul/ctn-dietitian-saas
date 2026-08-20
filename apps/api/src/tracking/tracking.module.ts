@@ -15,6 +15,7 @@ import {
   SleepLogService,
   WaterLogService,
 } from "./water-exercise-sleep-habit.service";
+import { PlannedMealLogService } from "./planned-meal-log.service";
 
 @Module({
   imports: [AuthModule, DietitianModule, ClientsModule, FoodsModule, TimelineModule],
@@ -28,6 +29,7 @@ import {
     SleepLogService,
     HabitLogService,
     TrackingSummaryService,
+    PlannedMealLogService,
   ],
   exports: [TrackingSummaryService, FoodLogService],
 })

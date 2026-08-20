@@ -22,6 +22,7 @@ import {
   CreateExerciseLogDto,
   CreateFoodLogDto,
   CreateWaterLogDto,
+  LogPlannedMealDto,
   TrackingDateQueryDto,
   UpdateExerciseLogDto,
   UpdateFoodLogDto,
@@ -36,6 +37,7 @@ import {
   WaterLogService,
 } from "./water-exercise-sleep-habit.service";
 import { TrackingSummaryService } from "./tracking-summary.service";
+import { PlannedMealLogService } from "./planned-meal-log.service";
 
 @ApiTags("portal")
 @ApiCookieAuth()
@@ -51,6 +53,7 @@ export class PortalTrackingController {
     private readonly exerciseLogs: ExerciseLogService,
     private readonly sleepLogs: SleepLogService,
     private readonly habitLogs: HabitLogService,
+    private readonly plannedMeals: PlannedMealLogService,
   ) {}
 
   @Get("summary")
@@ -179,6 +182,18 @@ export class PortalTrackingController {
   upsertHabit(@CurrentUser() user: AuthenticatedRequestUser,
     @CurrentSession() session: AuthenticatedSession, @Body() body: UpsertHabitLogDto) {
     return this.withClient(user, session, (client) => this.habitLogs.upsertForClient(client, user.id, body));
+  }
+
+  @Post("log-planned-meal")
+  @ApiOperation({ summary: "Log FOOD items from a published meal plan meal (recipes skipped)" })
+  logPlannedMeal(
+    @CurrentUser() user: AuthenticatedRequestUser,
+    @CurrentSession() session: AuthenticatedSession,
+    @Body() body: LogPlannedMealDto,
+  ) {
+    return this.withClient(user, session, (client) =>
+      this.plannedMeals.logPlannedMeal(client, user.id, body),
+    );
   }
 
   private async withClient<T>(

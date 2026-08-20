@@ -151,6 +151,7 @@ Tenant-scoped queries via dietitianAccountId (tenantWhere)
 - **Product Phase 7 (portfolio / evolution / assessments):** practice chart adds Evolution (`GET …/evolution` + SVG charts), assessment question editor + `schemaSnapshot`, portal `/assessments` + `/evolution`. Distinct from tenancy Phase 7 above.
 - **Product Phase 8 (food + reusable meals):** curated catalog, `Food.dietitianAccountId` custom foods, Recipes as meal library. Distinct from older “Phase 8 tracking” docs.
 - **Product Phase 9 (meal plans):** editor composes meals from foods + recipes; live meal/day nutrition via existing snapshot path; portal shows published composition + macros. No new Meal catalog / migration.
+- **Product Phase 10 (patient tracking + progress):** enrich daily tracking summary (`byMeal`, water target/entries, sleep week), portal weight logging, meal-plan→food-log for FOOD items only, practice/portal UX polish. Reuses existing log models — no duplicate tables.
 ---
 
 ## 3. Authorization
@@ -428,9 +429,9 @@ Meal items may only reference global ACTIVE foods, the current practice’s cust
 
 **Entitlements:** no `RECIPES` / `MEAL_PLANS` feature key is defined in the master spec; none was invented.
 
-### Client tracking (historical Phase 8 in older docs)
+### Client tracking (Product Phase 10; historical Phase 8 in older docs)
 
-Product Phase 8 in this codebase is food/custom foods/recipes-as-meals (above). Older “Phase 8 — Client tracking” content refers to food/water/exercise logs:
+Product Phase 8 in this codebase is food/custom foods/recipes-as-meals (above). Tracking logs were built earlier and are polished in **Product Phase 10**:
 
 ```text
 Client portal / dietitian review
@@ -440,21 +441,29 @@ ClientAccessService (portal assertPortalAccess / member assertCanAccess read)
 food_logs.nutrition_snapshot (immutable history at log time)
 water_logs.amount_ml
 exercise_logs / sleep_logs / habit_logs
+ClientMeasurement (portal POST + practice)
         ↓
-TrackingSummaryService (derived daily totals)
+TrackingSummaryService (daily totals, food.byMeal, water.targetMl, sleepWeek)
+Evolution API (measurements → series / BMI)
 ```
 
-**Food logs:** independent of meal plans. At create/edit, nutrition is calculated through `FoodService.getEffective()` and stored in `nutrition_snapshot`. Daily food totals sum snapshots — never live food rows. Editing recalculates using current effective food at edit time only for that log.
+**Food logs:** independent of meal plans for free-form logging. At create/edit, nutrition is calculated through `FoodService.getEffective()` and stored in `nutrition_snapshot`. Daily food totals sum snapshots — never live food rows. Editing recalculates using current effective food at edit time only for that log. Summary groups by `mealCategory`.
 
-**Water:** stored as `amount_ml`. Input accepts `ml` or `l`.
+**Meal-plan → log (Phase 10):** `POST /portal/tracking/log-planned-meal` creates FoodLogs for **FOOD** items on a published meal. RECIPE items are skipped (FoodLog has `foodId` only). Notes tag `From plan: {mealName}`.
 
-**Sleep:** one active row per client/local `date`. Duration derived from `bedtime` → `wake_time` when both provided (supports overnight spans).
+**Water:** stored as `amount_ml`. Input accepts `ml` or `l`. Optional `targetMl` on summary when an active `ClientGoal` uses unit `ml`/`l` or a water-like title.
+
+**Sleep:** one active row per client/local `date`. Duration derived from `bedtime` → `wake_time` when both provided. Summary includes `sleepWeek` average over the last 7 local dates.
 
 **Habits:** `habit_logs` only — no separate habit catalog. `client_goals` remains the nutrition-target layer; habit keys are client-entered/simple defaults in the UI.
 
+**Measurements:** practice and portal write `ClientMeasurement`; Evolution stays the single progress series API (`from`/`to` filters).
+
 **Dietitian access:** read-only review APIs under `/clients/:clientId/tracking`. Clients mutate via `/portal/tracking`. Timeline records create events (`FOOD_LOGGED`, `WATER_LOGGED`, …), not every edit.
 
-**Timezone:** organization `timezone` maps event timestamps to local `tracking_date` / `log_date` / sleep `date`.
+**Timezone:** practice `timezone` maps event timestamps to local `tracking_date` / `log_date` / sleep `date`.
+
+**Multi-practice:** portal tracking/measurements/evolution always use `Session.activeClientId`.
 
 ### Messaging and documents (Phase 9)
 

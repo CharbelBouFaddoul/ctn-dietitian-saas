@@ -2,18 +2,20 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Alert, EmptyState, LineChart, PageHeader, Section, Skeleton } from "@nutrition-saas/ui";
+import { Alert, Button, EmptyState, LineChart, PageHeader, Section, Skeleton } from "@nutrition-saas/ui";
 import { api } from "../../../../lib/api";
 import { errorMessage } from "../../../../lib/humanize-error";
 import { nutritionLabel } from "../../../../lib/format";
+import { addLocalDays, localDateKey } from "../../../../lib/local-date";
 import { PatientAccents } from "../patient-accents";
 
 interface Summary {
   date: string;
   food: { presented: { energyKcal: number | null; proteinG: number | null } };
-  water: { totalLiters: number };
+  water: { totalLiters: number; targetMl?: number | null };
   exercise: { totalDurationMinutes: number };
   sleep: { durationMinutes: number | null } | null;
+  sleepWeek?: { averageDurationMinutes: number | null };
   habits: { completed: number; total: number };
 }
 
@@ -23,41 +25,61 @@ type EvolutionResponse = {
   comparison: { available: boolean; weight: { absolute: number; percent: number | null } | null };
 };
 
+type RangePreset = "7" | "30" | "90" | "all";
+
+function rangeQuery(preset: RangePreset): string {
+  if (preset === "all") return "";
+  const days = Number(preset);
+  const to = localDateKey();
+  const from = addLocalDays(to, -(days - 1));
+  return `?from=${from}T00:00:00.000Z&to=${to}T23:59:59.999Z`;
+}
+
 export default function ClientProgressPage() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [evolution, setEvolution] = useState<EvolutionResponse | null>(null);
+  const [range, setRange] = useState<RangePreset>("30");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    void Promise.all([
+  async function load(preset: RangePreset = range) {
+    const [s, evo] = await Promise.all([
       api<Summary>("/api/v1/portal/tracking/summary"),
-      api<EvolutionResponse>("/api/v1/portal/evolution").catch(() => null),
-    ])
-      .then(([s, evo]) => {
-        setSummary(s);
-        setEvolution(evo);
-      })
+      api<EvolutionResponse>(`/api/v1/portal/evolution${rangeQuery(preset)}`).catch(() => null),
+    ]);
+    setSummary(s);
+    setEvolution(evo);
+  }
+
+  useEffect(() => {
+    void load()
       .catch((err) => setError(errorMessage(err, "Unable to load progress")))
       .finally(() => setLoading(false));
 
     function onSwitch() {
       setLoading(true);
-      void Promise.all([
-        api<Summary>("/api/v1/portal/tracking/summary"),
-        api<EvolutionResponse>("/api/v1/portal/evolution").catch(() => null),
-      ])
-        .then(([s, evo]) => {
-          setSummary(s);
-          setEvolution(evo);
-          setError(null);
-        })
+      void load()
+        .then(() => setError(null))
         .catch((err) => setError(errorMessage(err, "Unable to load progress")))
         .finally(() => setLoading(false));
     }
     window.addEventListener("portal-connection-changed", onSwitch);
     return () => window.removeEventListener("portal-connection-changed", onSwitch);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function selectRange(preset: RangePreset) {
+    setRange(preset);
+    setLoading(true);
+    try {
+      await load(preset);
+      setError(null);
+    } catch (err) {
+      setError(errorMessage(err, "Unable to load progress"));
+    } finally {
+      setLoading(false);
+    }
+  }
 
   const hasAny =
     summary &&
@@ -82,7 +104,11 @@ export default function ClientProgressPage() {
     {
       tone: "water" as const,
       label: "Hydration",
-      value: summary ? `${summary.water.totalLiters.toFixed(1)} L` : "—",
+      value: summary
+        ? summary.water.targetMl != null
+          ? `${summary.water.totalLiters.toFixed(1)} L / ${(summary.water.targetMl / 1000).toFixed(1)} L`
+          : `${summary.water.totalLiters.toFixed(1)} L`
+        : "—",
       icon: PatientAccents.water,
     },
     {
@@ -156,7 +182,25 @@ export default function ClientProgressPage() {
         </Section>
       )}
 
-      <Section title="Weight evolution" tone="muted">
+      <Section
+        title="Weight evolution"
+        tone="muted"
+        actions={
+          <div className="ui-row" style={{ gap: 6, flexWrap: "wrap" }}>
+            {(["7", "30", "90", "all"] as const).map((preset) => (
+              <Button
+                key={preset}
+                type="button"
+                size="sm"
+                variant={range === preset ? "primary" : "secondary"}
+                onClick={() => void selectRange(preset)}
+              >
+                {preset === "all" ? "All" : `${preset}d`}
+              </Button>
+            ))}
+          </div>
+        }
+      >
         <LineChart
           points={weightPoints}
           unit={weightUnit}

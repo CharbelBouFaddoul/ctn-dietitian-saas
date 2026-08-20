@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import {
   Alert,
+  Button,
   EmptyState,
   LoadingState,
   PageHeader,
@@ -28,15 +29,17 @@ interface Snapshot {
     notes: string | null;
     presented: Nutrition;
     meals: Array<{
+      id: string;
       name: string;
       notes: string | null;
       presented: Nutrition;
       items: Array<{
+        itemType?: string;
         quantity: number;
         unit: string;
         notes: string | null;
-        food: { name: string } | null;
-        recipe: { name: string } | null;
+        food: { id?: string; name: string } | null;
+        recipe: { id?: string; name: string } | null;
         presented: Nutrition;
       }>;
     }>;
@@ -66,11 +69,19 @@ function dayLabel(day: { title: string | null; weekday?: string | null; dayNumbe
   return day.title ?? day.weekday ?? `Day ${day.dayNumber}`;
 }
 
+function mealHasFoodItems(meal: Snapshot["days"][number]["meals"][number]): boolean {
+  return meal.items.some(
+    (item) => item.itemType === "FOOD" || (item.food != null && item.recipe == null),
+  );
+}
+
 export default function ClientPlanPage() {
   const [data, setData] = useState<PortalPlan | null>(null);
   const [dayIndex, setDayIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [busyMealId, setBusyMealId] = useState<string | null>(null);
 
   useEffect(() => {
     void api<PortalPlan>("/api/v1/portal/meal-plan")
@@ -78,6 +89,34 @@ export default function ClientPlanPage() {
       .catch((err) => setError(errorMessage(err, "Unable to load your meal plan")))
       .finally(() => setLoading(false));
   }, []);
+
+  async function logMeal(mealId: string) {
+    setError(null);
+    setNotice(null);
+    setBusyMealId(mealId);
+    try {
+      const result = await api<{
+        createdCount: number;
+        skippedRecipes: Array<{ name: string }>;
+      }>("/api/v1/portal/tracking/log-planned-meal", {
+        method: "POST",
+        body: JSON.stringify({ mealId }),
+      });
+      const recipeNote =
+        result.skippedRecipes.length > 0
+          ? ` Recipes not auto-logged: ${result.skippedRecipes.map((r) => r.name).join(", ")}.`
+          : "";
+      setNotice(
+        result.createdCount > 0
+          ? `Logged ${result.createdCount} food item${result.createdCount === 1 ? "" : "s"}.${recipeNote}`
+          : `No food items logged.${recipeNote}`,
+      );
+    } catch (err) {
+      setError(errorMessage(err, "Unable to log meal"));
+    } finally {
+      setBusyMealId(null);
+    }
+  }
 
   const plan = data?.plan;
   const day = plan?.snapshot.days[dayIndex];
@@ -90,6 +129,7 @@ export default function ClientPlanPage() {
         description="Your current nutrition plan from your dietitian."
       />
       {error ? <Alert tone="danger">{error}</Alert> : null}
+      {notice ? <Alert tone="success">{notice}</Alert> : null}
       {loading ? <LoadingState>Loading your plan…</LoadingState> : null}
       {!loading && !plan ? (
         <Section title="My Plan" tone="muted">
@@ -109,10 +149,7 @@ export default function ClientPlanPage() {
           </Section>
 
           {day ? (
-            <Section
-              title={dayLabel(day)}
-              description={nutritionSummary(day.presented) || undefined}
-            >
+            <Section title={dayLabel(day)} description={nutritionSummary(day.presented) || undefined}>
               <div className="ui-client-plan-day" role="tablist" aria-label="Plan days">
                 {plan.snapshot.days.map((item, index) => (
                   <button
@@ -127,7 +164,7 @@ export default function ClientPlanPage() {
               </div>
               {day.notes ? <p className="ui-muted">{day.notes}</p> : null}
               {day.meals.map((meal) => (
-                <details key={meal.name} className="ui-client-meal" open>
+                <details key={meal.id || meal.name} className="ui-client-meal" open>
                   <summary>
                     <span>{meal.name}</span>
                     <span className="ui-muted">
@@ -145,7 +182,9 @@ export default function ClientPlanPage() {
                         </span>
                         <span className="ui-muted">
                           {item.quantity} {unitLabel(item.unit)}
-                          {item.presented.energyKcal != null ? ` · ${item.presented.energyKcal} kcal` : ""}
+                          {item.presented.energyKcal != null
+                            ? ` · ${item.presented.energyKcal} kcal`
+                            : ""}
                         </span>
                       </li>
                     ))}
@@ -154,6 +193,23 @@ export default function ClientPlanPage() {
                     <p className="ui-muted" style={{ marginTop: 8, fontSize: 13 }}>
                       Meal nutrition: {nutritionSummary(meal.presented)}
                     </p>
+                  ) : null}
+                  {mealHasFoodItems(meal) ? (
+                    <div style={{ marginTop: 10 }}>
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={busyMealId === meal.id}
+                        onClick={() => void logMeal(meal.id)}
+                      >
+                        {busyMealId === meal.id ? "Logging…" : "Log meal"}
+                      </Button>
+                      {meal.items.some((i) => i.recipe) ? (
+                        <p className="ui-muted" style={{ margin: "6px 0 0", fontSize: 12 }}>
+                          Recipes in this meal are skipped — log those foods separately.
+                        </p>
+                      ) : null}
+                    </div>
                   ) : null}
                 </details>
               ))}

@@ -23,6 +23,19 @@ export type MeasurementListFilters = {
   to?: string;
 };
 
+/** Inclusive day bounds for YYYY-MM-DD; otherwise parse as full timestamp. */
+function parseMeasuredAtBound(value: string, endOfDay: boolean): Date {
+  const trimmed = value.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return new Date(endOfDay ? `${trimmed}T23:59:59.999Z` : `${trimmed}T00:00:00.000Z`);
+  }
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new BadRequestException(`${endOfDay ? "to" : "from"} must be a valid date`);
+  }
+  return parsed;
+}
+
 @Injectable()
 export class ClientMeasurementService {
   constructor(
@@ -47,8 +60,8 @@ export class ClientMeasurementService {
     const measuredAt =
       filters.from || filters.to
         ? {
-            ...(filters.from ? { gte: new Date(filters.from) } : {}),
-            ...(filters.to ? { lte: new Date(filters.to) } : {}),
+            ...(filters.from ? { gte: parseMeasuredAtBound(filters.from, false) } : {}),
+            ...(filters.to ? { lte: parseMeasuredAtBound(filters.to, true) } : {}),
           }
         : undefined;
     const rows = await this.prisma.clientMeasurement.findMany({
@@ -135,25 +148,53 @@ export class ClientMeasurementService {
     input: { type: MeasurementType; value: number; unit: string; measuredAt: string; notes?: string },
   ) {
     await this.access.assertCanAccess(tenant, clientId, "manageRecords");
+    return this.createScoped(tenant.dietitianAccountId, clientId, tenant.userId, input);
+  }
+
+  /** Portal: ownership already checked via assertPortalAccess. */
+  async createForPortal(
+    client: { id: string; dietitianAccountId: string },
+    actorUserId: string,
+    input: { type: MeasurementType; value: number; unit: string; measuredAt?: string; notes?: string },
+  ) {
+    return this.createScoped(client.dietitianAccountId, client.id, actorUserId, {
+      type: input.type,
+      value: input.value,
+      unit: input.unit,
+      measuredAt: input.measuredAt ?? new Date().toISOString(),
+      notes: input.notes,
+    });
+  }
+
+  private async createScoped(
+    dietitianAccountId: string,
+    clientId: string,
+    actorUserId: string,
+    input: { type: MeasurementType; value: number; unit: string; measuredAt: string; notes?: string },
+  ) {
     const internalUnit = INTERNAL_BY_TYPE[input.type];
     const value = this.toInternal(input.type, input.value, input.unit);
+    const measuredAt = new Date(input.measuredAt);
+    if (Number.isNaN(measuredAt.getTime())) {
+      throw new BadRequestException("measuredAt must be a valid timestamp");
+    }
     const row = await this.prisma.clientMeasurement.create({
       data: {
-        dietitianAccountId: tenant.dietitianAccountId,
+        dietitianAccountId,
         clientId,
         type: input.type,
         value,
         unit: internalUnit,
-        measuredAt: new Date(input.measuredAt),
-        recordedById: tenant.userId,
+        measuredAt,
+        recordedById: actorUserId,
         notes: input.notes?.trim() ?? null,
       },
     });
     await this.timeline.record({
-      dietitianAccountId: tenant.dietitianAccountId,
+      dietitianAccountId,
       clientId,
       type: "MEASUREMENT_ADDED",
-      actorUserId: tenant.userId,
+      actorUserId,
       targetType: "measurement",
       targetId: row.id,
       metadata: { measurementType: input.type, unit: internalUnit },
@@ -161,8 +202,8 @@ export class ClientMeasurementService {
     await this.security.record({
       type: "measurement_added",
       outcome: "success",
-      userId: tenant.userId,
-      dietitianAccountId: tenant.dietitianAccountId,
+      userId: actorUserId,
+      dietitianAccountId,
       targetType: "measurement",
       targetId: row.id,
       metadata: { measurementType: input.type },

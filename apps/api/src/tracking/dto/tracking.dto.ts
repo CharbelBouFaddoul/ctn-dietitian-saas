@@ -283,3 +283,14 @@ export class UpsertHabitLogDto {
   @MaxLength(500)
   notes?: string;
 }
+
+export class LogPlannedMealDto {
+  @ApiProperty()
+  @IsUUID()
+  mealId!: string;
+
+  @ApiPropertyOptional({ description: "Local calendar date YYYY-MM-DD" })
+  @IsOptional()
+  @IsString()
+  date?: string;
+}

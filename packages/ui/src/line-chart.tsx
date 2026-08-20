@@ -12,6 +12,7 @@ export type LineChartProps = {
   points: LineChartPoint[];
   unit?: string;
   emptyTitle?: string;
+  /** SVG viewBox height; keep compact by default. */
   height?: number;
 };
 
@@ -19,6 +20,43 @@ function formatAxisDate(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function formatTick(value: number): string {
+  if (!Number.isFinite(value)) return "—";
+  const abs = Math.abs(value);
+  if (abs >= 100) return String(Math.round(value));
+  if (abs >= 10) return (Math.round(value * 10) / 10).toString();
+  return (Math.round(value * 100) / 100).toString();
+}
+
+/** Round domain outward to readable tick steps (~3–4 ticks). */
+function niceDomain(minV: number, maxV: number): { yMin: number; yMax: number; ticks: number[] } {
+  const span = maxV - minV || Math.max(Math.abs(maxV) * 0.08, 1);
+  let yMin = minV - span * 0.1;
+  let yMax = maxV + span * 0.1;
+  if (yMin === yMax) {
+    yMin -= 1;
+    yMax += 1;
+  }
+  const targetGaps = 3;
+  const rawStep = (yMax - yMin) / targetGaps;
+  const magnitude = 10 ** Math.floor(Math.log10(Math.max(rawStep, 1e-6)));
+  const residual = rawStep / magnitude;
+  const niceResidual =
+    residual <= 1 ? 1 : residual <= 2 ? 2 : residual <= 2.5 ? 2.5 : residual <= 5 ? 5 : 10;
+  const step = niceResidual * magnitude;
+  const niceMin = Math.floor(yMin / step) * step;
+  const niceMax = Math.ceil(yMax / step) * step;
+  const ticks: number[] = [];
+  for (let v = niceMin; v <= niceMax + step * 0.001; v += step) {
+    ticks.push(Math.round(v * 1000) / 1000);
+    if (ticks.length > 8) break;
+  }
+  if (ticks.length < 2) {
+    return { yMin: niceMin, yMax: niceMax || niceMin + step, ticks: [niceMin, niceMax || niceMin + step] };
+  }
+  return { yMin: niceMin, yMax: niceMax, ticks };
 }
 
 /** Lightweight SVG line chart — no third-party chart library. */
@@ -33,30 +71,27 @@ export function LineChart({
 
   const layout = useMemo(() => {
     if (points.length === 0) return null;
-    const pad = { top: 16, right: 16, bottom: 36, left: 44 };
+    const pad = { top: 12, right: 14, bottom: 28, left: 42 };
     const width = 640;
     const innerW = width - pad.left - pad.right;
     const innerH = height - pad.top - pad.bottom;
     const values = points.map((p) => p.value);
     const minV = Math.min(...values);
     const maxV = Math.max(...values);
-    const span = maxV - minV || Math.max(Math.abs(maxV) * 0.1, 1);
-    const yMin = minV - span * 0.08;
-    const yMax = maxV + span * 0.08;
+    const { yMin, yMax, ticks: yTicks } = niceDomain(minV, maxV);
     const xs = points.map((_, i) =>
       points.length === 1 ? pad.left + innerW / 2 : pad.left + (i / (points.length - 1)) * innerW,
     );
     const ys = points.map(
-      (p) => pad.top + innerH - ((p.value - yMin) / (yMax - yMin)) * innerH,
+      (p) => pad.top + innerH - ((p.value - yMin) / (yMax - yMin || 1)) * innerH,
     );
     const line = points
-      .map((p, i) => `${i === 0 ? "M" : "L"} ${xs[i]!.toFixed(1)} ${ys[i]!.toFixed(1)}`)
+      .map((_, i) => `${i === 0 ? "M" : "L"} ${xs[i]!.toFixed(1)} ${ys[i]!.toFixed(1)}`)
       .join(" ");
     const area =
       points.length > 1
         ? `${line} L ${xs[xs.length - 1]!.toFixed(1)} ${(pad.top + innerH).toFixed(1)} L ${xs[0]!.toFixed(1)} ${(pad.top + innerH).toFixed(1)} Z`
         : "";
-    const yTicks = [yMin, (yMin + yMax) / 2, yMax].map((v) => Math.round(v * 100) / 100);
     return { pad, width, height, innerW, innerH, xs, ys, line, area, yTicks, yMin, yMax };
   }, [points, height]);
 
@@ -67,8 +102,6 @@ export function LineChart({
       </div>
     );
   }
-
-  const tipIdx = hover ?? (points.length > 0 ? points.length - 1 : null);
 
   return (
     <div className="ui-line-chart">
@@ -81,15 +114,15 @@ export function LineChart({
       >
         <defs>
           <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--color-accent)" stopOpacity="0.28" />
-            <stop offset="100%" stopColor="var(--color-accent)" stopOpacity="0.02" />
+            <stop offset="0%" stopColor="var(--color-accent)" stopOpacity="0.22" />
+            <stop offset="100%" stopColor="var(--color-accent)" stopOpacity="0" />
           </linearGradient>
         </defs>
         {layout.yTicks.map((tick, i) => {
           const y =
             layout.pad.top +
             layout.innerH -
-            ((tick - layout.yMin) / (layout.yMax - layout.yMin)) * layout.innerH;
+            ((tick - layout.yMin) / (layout.yMax - layout.yMin || 1)) * layout.innerH;
           return (
             <g key={`yt-${i}`}>
               <line
@@ -99,9 +132,8 @@ export function LineChart({
                 y2={y}
                 className="ui-line-chart__grid"
               />
-              <text x={layout.pad.left - 8} y={y + 4} textAnchor="end" className="ui-line-chart__tick">
-                {tick}
-                {unit ? ` ${unit}` : ""}
+              <text x={layout.pad.left - 6} y={y + 3.5} textAnchor="end" className="ui-line-chart__tick">
+                {formatTick(tick)}
               </text>
             </g>
           );
@@ -113,11 +145,31 @@ export function LineChart({
             key={p.at + String(i)}
             cx={layout.xs[i]}
             cy={layout.ys[i]}
-            r={tipIdx === i ? 5 : 3.5}
+            r={hover === i ? 5 : 3.25}
             className="ui-line-chart__dot"
             onMouseEnter={() => setHover(i)}
           />
         ))}
+        {/* Endpoint value callouts when few points — avoids a permanent footer tooltip */}
+        {points.length <= 4
+          ? points.map((p, i) => {
+              const x = layout.xs[i]!;
+              const y = layout.ys[i]!;
+              const above = y > layout.pad.top + 18;
+              return (
+                <text
+                  key={`vl-${i}`}
+                  x={x}
+                  y={above ? y - 10 : y + 16}
+                  textAnchor="middle"
+                  className="ui-line-chart__value"
+                >
+                  {formatTick(p.value)}
+                  {unit ? ` ${unit}` : ""}
+                </text>
+              );
+            })
+          : null}
         {points.map((p, i) => {
           const show =
             points.length <= 6 || i === 0 || i === points.length - 1 || i === Math.floor(points.length / 2);
@@ -126,7 +178,7 @@ export function LineChart({
             <text
               key={`xl-${i}`}
               x={layout.xs[i]}
-              y={layout.height - 10}
+              y={layout.height - 8}
               textAnchor="middle"
               className="ui-line-chart__tick"
             >
@@ -135,15 +187,22 @@ export function LineChart({
           );
         })}
       </svg>
-      {tipIdx != null && points[tipIdx] ? (
-        <div className="ui-line-chart__tooltip">
+      {hover != null && points[hover] ? (
+        <div className="ui-line-chart__tooltip" aria-live="polite">
           <strong>
-            {points[tipIdx]!.value}
+            {formatTick(points[hover]!.value)}
             {unit ? ` ${unit}` : ""}
           </strong>
-          <span>{formatAxisDate(points[tipIdx]!.at)}</span>
+          <span className="ui-muted">{formatAxisDate(points[hover]!.at)}</span>
         </div>
-      ) : null}
+      ) : (
+        <div className="ui-line-chart__tooltip ui-line-chart__tooltip--hint">
+          <span className="ui-muted">
+            {points.length} reading{points.length === 1 ? "" : "s"}
+            {unit ? ` · ${unit}` : ""}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

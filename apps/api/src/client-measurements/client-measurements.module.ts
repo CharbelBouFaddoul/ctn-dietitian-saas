@@ -6,10 +6,11 @@ import { TimelineModule } from "../timeline/timeline.module";
 import { ClientMeasurementController } from "./client-measurement.controller";
 import { ClientMeasurementService } from "./client-measurement.service";
 import { PortalEvolutionController } from "./portal-evolution.controller";
+import { PortalMeasurementController } from "./portal-measurement.controller";
 
 @Module({
   imports: [AuthModule, DietitianModule, ClientsModule, TimelineModule],
-  controllers: [ClientMeasurementController, PortalEvolutionController],
+  controllers: [ClientMeasurementController, PortalEvolutionController, PortalMeasurementController],
   providers: [ClientMeasurementService],
   exports: [ClientMeasurementService],
 })
