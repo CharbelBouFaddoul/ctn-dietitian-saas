@@ -16,6 +16,7 @@ const nav = [
   { href: "/admin/plans", label: "Plans" },
   { href: "/admin/food-sources", label: "Food database" },
   { href: "/admin/features", label: "Features" },
+  { href: "/admin/site-settings", label: "Site" },
   { href: "/admin/audit", label: "Audit" },
   { href: "/admin/health", label: "System health" },
 ];

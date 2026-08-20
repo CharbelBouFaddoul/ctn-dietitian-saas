@@ -57,7 +57,7 @@ export default function ForgotPasswordPage() {
         </div>
       ) : null}
       <p style={{ marginTop: 16, fontSize: 13 }}>
-        <Link href="/auth/login" className="ui-link">
+        <Link href="/auth/dietitian/login" className="ui-link">
           Back to sign in
         </Link>
       </p>

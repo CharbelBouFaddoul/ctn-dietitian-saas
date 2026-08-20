@@ -59,7 +59,7 @@ function ResetPasswordForm() {
         <div style={{ marginTop: 12 }}>
           <Alert tone="success">
             {message}{" "}
-            <Link href="/auth/login" className="ui-link">
+            <Link href="/auth/dietitian/login" className="ui-link">
               Sign in
             </Link>
           </Alert>

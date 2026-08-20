@@ -1650,3 +1650,35 @@ model AutomationUsage {
   @@index([organizationId])
   @@map("automation_usage")
 }
+
+enum BrandDisplayMode {
+  LOGO
+  TEXT
+  LOGO_AND_TEXT
+}
+
+/// Singleton platform-wide settings for the public marketing website.
+model PlatformSettings {
+  id                     String           @id @db.Uuid
+  brandText              String           @map("brand_text")
+  logoUrl                String?          @map("logo_url")
+  brandDisplay           BrandDisplayMode @default(TEXT) @map("brand_display")
+  navItems               Json             @map("nav_items")
+  ctaText                String           @map("cta_text")
+  ctaHref                String           @map("cta_href")
+  ctaVisible             Boolean          @default(true) @map("cta_visible")
+  dietitianSignInLabel   String           @map("dietitian_sign_in_label")
+  patientSignInLabel     String           @map("patient_sign_in_label")
+  footerDescription      String           @map("footer_description") @db.Text
+  footerGroups           Json             @map("footer_groups")
+  copyrightText          String           @map("copyright_text")
+  socialLinks            Json             @map("social_links")
+  contactEmail           String?          @map("contact_email")
+  contactPhone           String?          @map("contact_phone")
+  contactAddress         String?          @map("contact_address") @db.Text
+  contactHours           String?          @map("contact_hours")
+  createdAt              DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt              DateTime         @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("platform_settings")
+}

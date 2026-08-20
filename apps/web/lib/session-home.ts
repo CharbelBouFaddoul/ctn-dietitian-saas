@@ -22,7 +22,8 @@ interface PortalOnboarding {
 
 export function loginPathFor(kind: Exclude<SessionKind, "unauthenticated">): string {
   if (kind === "admin") return "/admin/login";
-  return "/auth/login";
+  if (kind === "client") return "/auth/client/login";
+  return "/auth/dietitian/login";
 }
 
 export function pickSessionHome(input: {

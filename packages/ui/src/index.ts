@@ -26,3 +26,10 @@ export { ToastProvider, useToast, Toast } from "./toast";
 export { AppShell, Sidebar } from "./app-shell";
 export type { NavItem, ShellLink } from "./app-shell";
 export { MarketingShell, AuthLayout } from "./marketing";
+export type {
+  MarketingSiteSettings,
+  MarketingNavItem,
+  MarketingFooterGroup,
+  BrandDisplayMode,
+  AuthLayoutAudience,
+} from "./marketing";

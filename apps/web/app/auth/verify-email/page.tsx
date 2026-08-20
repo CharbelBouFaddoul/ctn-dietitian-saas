@@ -12,7 +12,7 @@ function VerifyEmailForm() {
   const searchParams = useSearchParams();
   const tokenFromLink = searchParams.get("token") ?? "";
   const audience = searchParams.get("audience") === "client" ? "client" : "dietitian";
-  const signInHref = audience === "client" ? "/auth/client/login" : "/auth/login";
+  const signInHref = audience === "client" ? "/auth/client/login" : "/auth/dietitian/login";
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);

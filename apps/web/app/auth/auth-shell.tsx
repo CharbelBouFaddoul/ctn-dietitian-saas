@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { AuthLayout } from "@nutrition-saas/ui";
+import { AuthLayout, type AuthLayoutAudience } from "@nutrition-saas/ui";
 
 export type AuthAudience = "chooser" | "admin" | "dietitian" | "client";
 
@@ -15,8 +15,19 @@ export function AuthShell({
   description?: string;
   children: ReactNode;
 }) {
+  const layoutAudience: AuthLayoutAudience =
+    audience === "admin" ? "admin" : audience === "client" ? "client" : "dietitian";
+
   return (
-    <AuthLayout title={title} description={description} footer={<AuthFooter audience={audience} />}>
+    <AuthLayout
+      title={title}
+      description={description}
+      audience={layoutAudience}
+      eyebrow={audience === "client" ? "Patient portal" : audience === "admin" ? "Platform" : "Practice"}
+      backHref="/"
+      backLabel="Back to website"
+      footer={<AuthFooter audience={audience} />}
+    >
       {children}
     </AuthLayout>
   );
@@ -35,38 +46,50 @@ function AuthFooter({ audience }: { audience: AuthAudience }) {
 
   if (audience === "client") {
     return (
-      <p style={{ marginTop: 20, fontSize: 13 }}>
+      <p className="ui-auth__footer">
         <Link href="/auth/client/login" className="ui-link">
-          Sign in
+          Patient sign in
         </Link>
         {" · "}
         <Link href="/auth/client/register" className="ui-link">
-          Register
+          Create patient account
         </Link>
         {" · "}
         <Link href="/auth/forgot-password" className="ui-link">
           Forgot password
         </Link>
         <span className="ui-muted" style={{ display: "block", marginTop: 8 }}>
-          Register, then enter the join code from your dietitian.
+          Create your patient account, then enter the join code provided by your dietitian.
+        </span>
+        <span className="ui-muted" style={{ display: "block", marginTop: 8 }}>
+          Dietitian?{" "}
+          <Link href="/auth/dietitian/login" className="ui-link">
+            Sign in as Dietitian
+          </Link>
         </span>
       </p>
     );
   }
 
   return (
-    <p style={{ marginTop: 20, fontSize: 13 }}>
-      <Link href="/auth/login" className="ui-link">
-        Sign in
+    <p className="ui-auth__footer">
+      <Link href="/auth/dietitian/login" className="ui-link">
+        Dietitian sign in
       </Link>
       {" · "}
-      <Link href="/auth/register" className="ui-link">
-        Create a practice account
+      <Link href="/auth/dietitian/register" className="ui-link">
+        Create practice account
       </Link>
       {" · "}
       <Link href="/auth/forgot-password" className="ui-link">
         Forgot password
       </Link>
+      <span className="ui-muted" style={{ display: "block", marginTop: 8 }}>
+        Patient?{" "}
+        <Link href="/auth/client/login" className="ui-link">
+          Sign in as Patient
+        </Link>
+      </span>
     </p>
   );
 }

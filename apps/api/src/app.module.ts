@@ -8,6 +8,7 @@ import { AdminModule } from "./admin/admin.module";
 import { EmailModule } from "./email/email.module";
 import { EntitlementsModule } from "./entitlements/entitlements.module";
 import { HealthModule } from "./health/health.module";
+import { PlatformSettingsModule } from "./platform-settings/platform-settings.module";
 import { OrganizationModule } from "./organizations/organization.module";
 import { TimelineModule } from "./timeline/timeline.module";
 import { ClientsModule } from "./clients/clients.module";
@@ -77,6 +78,7 @@ import { loadEnv } from "./config/env";
     AnalyticsModule,
     AiModule,
     AutomationModule,
+    PlatformSettingsModule,
     HealthModule,
   ],
 })

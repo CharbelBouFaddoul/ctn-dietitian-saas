@@ -45,9 +45,9 @@ export default function ClientRegisterPage() {
 
   return (
     <AuthShell
-      title="Create a client account"
+      title="Create your patient account"
       audience="client"
-      description="Create your login first. After you verify your email and sign in, enter the join code from your dietitian. The name you enter here is what they will see on their client list."
+      description="Create your patient account, then enter the join code provided by your dietitian. After you verify your email and sign in, you’ll connect to their practice. The name you enter here is what they will see on their client list."
     >
       <form onSubmit={(event) => void onSubmit(event)}>
         <Field label="First name">

@@ -76,9 +76,39 @@
 }
 
 [data-theme="marketing"] {
-  --color-bg: #f7f4ee;
-  --color-accent: #0f766e;
+  --color-bg: #fafcfb;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f0fdfa;
+  --color-text: #0f172a;
+  --color-muted: #64748b;
+  --color-accent: #0d9488;
+  --color-accent-hover: #0f766e;
+  --color-accent-soft: #e6fffa;
+  --color-border: #d5ebe6;
+  --color-danger: #dc2626;
+  --color-danger-soft: #fee2e2;
+  --color-success: #22c55e;
+  --color-success-soft: #dcfce7;
+  --color-warning: #f59e0b;
+  --color-warning-soft: #fef3c7;
+  --focus-ring: 0 0 0 3px rgb(13 148 136 / 28%);
+  --mkt-deep-teal: #0f766e;
+  --mkt-teal: #0d9488;
+  --mkt-soft-teal: #14b8a6;
+  --mkt-navy: #0f172a;
+  --mkt-slate: #334155;
+  --mkt-muted: #64748b;
+  --mkt-warm-white: #fafcfb;
+  --mkt-soft-mint: #f0fdfa;
+  --mkt-pale-teal: #e6fffa;
+  --mkt-soft-slate: #f8fafc;
+  --mkt-fresh-green: #22c55e;
+  --mkt-soft-green: #dcfce7;
+  --mkt-amber: #f59e0b;
+  --mkt-soft-amber: #fef3c7;
+  --mkt-footer-bg: #0f172a;
 }
+
 
 * {
   box-sizing: border-box;

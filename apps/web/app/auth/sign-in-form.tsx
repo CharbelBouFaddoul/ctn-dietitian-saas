@@ -32,7 +32,9 @@ export function SignInForm({
         method: "POST",
         body: JSON.stringify({ email, password }),
       });
-      const home = await resolveSessionHome();
+      const home = await resolveSessionHome(
+        audience === "client" ? "client" : audience === "admin" ? "admin" : "dietitian",
+      );
       router.replace(home.path);
     } catch (err) {
       setError(errorMessage(err, "Sign in failed"));

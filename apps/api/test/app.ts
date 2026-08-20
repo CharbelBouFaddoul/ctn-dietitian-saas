@@ -12,6 +12,8 @@ import { AdminModule } from "../src/admin/admin.module";
 import { EntitlementService } from "../src/entitlements/entitlement.service";
 import { seedEntitlementCatalog } from "../src/entitlements/catalog.seed";
 import { seedPlatformAssessmentTemplate } from "../src/assessments/platform-template.seed";
+import { seedPlatformSettings } from "../src/platform-settings/platform-settings.seed";
+import { PlatformSettingsModule } from "../src/platform-settings/platform-settings.module";
 import { OrganizationModule } from "../src/organizations/organization.module";
 import { OrganizationLifecycleService } from "../src/organizations/organization-lifecycle.service";
 import { MembershipService } from "../src/organizations/membership.service";
@@ -102,6 +104,7 @@ export async function createAuthTestApp(): Promise<AuthTestContext> {
       AnalyticsModule,
       AiModule,
       AutomationModule,
+      PlatformSettingsModule,
       StorageModule,
     ],
   })
@@ -188,6 +191,7 @@ export async function resetAuthDatabase(prisma: PrismaService): Promise<void> {
   await prisma.plan.deleteMany();
   await seedEntitlementCatalog(prisma);
   await seedPlatformAssessmentTemplate(prisma);
+  await seedPlatformSettings(prisma);
 }
 
 async function assertTestDatabase(prisma: PrismaService): Promise<void> {
