@@ -32,6 +32,7 @@ export interface PlatformSettingsPayload {
   ctaText: string;
   ctaHref: string;
   ctaVisible: boolean;
+  registrationEnabled: boolean;
   dietitianSignInLabel: string;
   patientSignInLabel: string;
   footerDescription: string;
@@ -57,6 +58,7 @@ export const DEFAULT_PLATFORM_SETTINGS: PlatformSettingsPayload = {
   ctaText: "Get Started",
   ctaHref: "/auth/dietitian/register",
   ctaVisible: true,
+  registrationEnabled: false,
   dietitianSignInLabel: "Sign in as Dietitian",
   patientSignInLabel: "Sign in as Patient",
   footerDescription:

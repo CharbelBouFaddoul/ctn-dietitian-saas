@@ -36,30 +36,24 @@ export function pickSessionHome(input: {
     return { kind: "admin", path: "/admin" };
   }
   if (input.audience === "client") {
-    if (input.organizationIds.length === 1) {
+    if (input.organizationIds.length >= 1) {
       const organizationId = input.organizationIds[0];
       if (organizationId) {
-        return { kind: "dietitian", path: `/orgs/${organizationId}` };
+        return { kind: "dietitian", path: `/practice/${organizationId}` };
       }
-    }
-    if (input.organizationIds.length > 1) {
-      return { kind: "dietitian", path: "/orgs" };
     }
     return { kind: "client", path: input.hasPortal ? "/client" : "/client/join" };
   }
-  if (input.organizationIds.length === 1) {
+  if (input.organizationIds.length >= 1) {
     const organizationId = input.organizationIds[0];
     if (organizationId) {
-      return { kind: "dietitian", path: `/orgs/${organizationId}` };
+      return { kind: "dietitian", path: `/practice/${organizationId}` };
     }
-  }
-  if (input.organizationIds.length > 1) {
-    return { kind: "dietitian", path: "/orgs" };
   }
   if (input.hasPortal) {
     return { kind: "client", path: "/client" };
   }
-  return { kind: "dietitian", path: "/orgs" };
+  return { kind: "dietitian", path: "/practice" };
 }
 
 export async function resolveSessionHome(audience?: SessionAudience): Promise<SessionHome> {

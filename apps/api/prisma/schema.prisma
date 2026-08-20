@@ -86,20 +86,23 @@ model User {
 }
 
 model Session {
-  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId     String    @map("user_id") @db.Uuid
-  tokenHash  String    @unique @map("token_hash")
-  expiresAt  DateTime  @map("expires_at") @db.Timestamptz
-  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz
-  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  lastUsedAt DateTime  @default(now()) @map("last_used_at") @db.Timestamptz
-  ipAddress  String?   @map("ip_address")
-  userAgent  String?   @map("user_agent") @db.Text
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  tokenHash      String    @unique @map("token_hash")
+  expiresAt      DateTime  @map("expires_at") @db.Timestamptz
+  revokedAt      DateTime? @map("revoked_at") @db.Timestamptz
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  lastUsedAt     DateTime  @default(now()) @map("last_used_at") @db.Timestamptz
+  ipAddress      String?   @map("ip_address")
+  userAgent      String?   @map("user_agent") @db.Text
+  activeClientId String?   @map("active_client_id") @db.Uuid
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activeClient Client? @relation(fields: [activeClientId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([expiresAt])
+  @@index([activeClientId])
   @@map("sessions")
 }
 
@@ -802,6 +805,7 @@ model Client {
   invoices         Invoice[]
   tasks            Task[]
   aiRequests       AiRequest[]
+  activeSessions   Session[]
 
   @@index([organizationId, status])
   @@index([organizationId, lastName])
@@ -1882,6 +1886,7 @@ model PlatformSettings {
   contactPhone           String?          @map("contact_phone")
   contactAddress         String?          @map("contact_address") @db.Text
   contactHours           String?          @map("contact_hours")
+  registrationEnabled    Boolean          @default(false) @map("registration_enabled")
   createdAt              DateTime         @default(now()) @map("created_at") @db.Timestamptz
   updatedAt              DateTime         @updatedAt @map("updated_at") @db.Timestamptz
 

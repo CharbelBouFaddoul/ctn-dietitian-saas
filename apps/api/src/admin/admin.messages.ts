@@ -8,5 +8,6 @@ export const ADMIN_MESSAGES = {
   planNotFound: "Plan not found",
   organizationNotFound: "Organization not found",
   userNotFound: "User not found",
+  userAlreadyExists: "A user with this email already exists",
   invalidOverride: "Override must set enabled and/or limitValue",
 } as const;

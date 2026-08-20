@@ -37,6 +37,7 @@ export interface MarketingSiteSettings {
   ctaText: string;
   ctaHref: string;
   ctaVisible: boolean;
+  registrationEnabled?: boolean;
   dietitianSignInLabel: string;
   patientSignInLabel: string;
   footerDescription: string;
@@ -62,6 +63,7 @@ const DEFAULT_SETTINGS: MarketingSiteSettings = {
   ctaText: "Get Started",
   ctaHref: "/auth/dietitian/register",
   ctaVisible: true,
+  registrationEnabled: false,
   dietitianSignInLabel: "Sign in as Dietitian",
   patientSignInLabel: "Sign in as Patient",
   footerDescription:
@@ -146,8 +148,15 @@ export function MarketingShell({
 }) {
   const [open, setOpen] = useState(false);
   const navId = useId();
+  const registrationEnabled = settings.registrationEnabled !== false;
+  const ctaVisible = settings.ctaVisible && (registrationEnabled || !settings.ctaHref.includes("/register"));
+  const footerGroups = settings.footerGroups.map((group) => ({
+    ...group,
+    links: group.links.filter((link) => registrationEnabled || !link.href.includes("/register")),
+  }));
   const navItems = [...settings.navItems]
     .filter((item) => item.visible !== false)
+    .filter((item) => registrationEnabled || !item.href.includes("/register"))
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
   function close() {
@@ -178,7 +187,7 @@ export function MarketingShell({
               <Link href="/auth/client/login" className="ui-mkt__auth-link" onClick={close}>
                 {settings.patientSignInLabel}
               </Link>
-              {settings.ctaVisible ? (
+              {ctaVisible ? (
                 <Link href={settings.ctaHref} className="ui-btn ui-btn--primary ui-btn--sm" onClick={close}>
                   {settings.ctaText}
                 </Link>
@@ -193,7 +202,7 @@ export function MarketingShell({
             <Link href="/auth/client/login" className="ui-mkt__auth-link ui-mkt__auth-desktop">
               {settings.patientSignInLabel}
             </Link>
-            {settings.ctaVisible ? (
+            {ctaVisible ? (
               <Link href={settings.ctaHref} className="ui-btn ui-btn--primary ui-btn--sm ui-mkt__auth-desktop">
                 {settings.ctaText}
               </Link>
@@ -249,7 +258,7 @@ export function MarketingShell({
           </div>
 
           <div className="ui-mkt__footer-groups">
-            {settings.footerGroups.map((group) => (
+            {footerGroups.map((group) => (
               <div key={group.title} className="ui-mkt__footer-group">
                 <h3>{group.title}</h3>
                 <ul>

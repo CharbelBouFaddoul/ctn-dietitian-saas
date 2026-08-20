@@ -36,6 +36,7 @@ export default function AdminSiteSettingsPage() {
   const [ctaText, setCtaText] = useState("");
   const [ctaHref, setCtaHref] = useState("");
   const [ctaVisible, setCtaVisible] = useState(true);
+  const [registrationEnabled, setRegistrationEnabled] = useState(false);
   const [dietitianSignInLabel, setDietitianSignInLabel] = useState("");
   const [patientSignInLabel, setPatientSignInLabel] = useState("");
   const [footerDescription, setFooterDescription] = useState("");
@@ -53,6 +54,7 @@ export default function AdminSiteSettingsPage() {
     setCtaText(data.ctaText);
     setCtaHref(data.ctaHref);
     setCtaVisible(data.ctaVisible);
+    setRegistrationEnabled(data.registrationEnabled);
     setDietitianSignInLabel(data.dietitianSignInLabel);
     setPatientSignInLabel(data.patientSignInLabel);
     setFooterDescription(data.footerDescription);
@@ -123,6 +125,7 @@ export default function AdminSiteSettingsPage() {
           ctaText,
           ctaHref,
           ctaVisible,
+          registrationEnabled,
           dietitianSignInLabel,
           patientSignInLabel,
           footerDescription,
@@ -167,6 +170,16 @@ export default function AdminSiteSettingsPage() {
         </Section>
 
         <Section title="Header">
+          <Field label="Self-serve registration">
+            <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <input
+                type="checkbox"
+                checked={registrationEnabled}
+                onChange={(event) => setRegistrationEnabled(event.target.checked)}
+              />
+              Allow dietitian and patient self-registration
+            </label>
+          </Field>
           <Field label="Dietitian sign-in label">
             <Input value={dietitianSignInLabel} onChange={(event) => setDietitianSignInLabel(event.target.value)} required />
           </Field>

@@ -108,6 +108,11 @@ export class UpdatePlatformSettingsDto {
 
   @ApiPropertyOptional()
   @IsOptional()
+  @IsBoolean()
+  registrationEnabled?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsString()
   @MaxLength(80)
   dietitianSignInLabel?: string;

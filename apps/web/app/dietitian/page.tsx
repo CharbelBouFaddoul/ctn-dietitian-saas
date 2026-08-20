@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
 export default function DietitianRedirectPage() {
-  redirect("/orgs");
+  redirect("/practice");
 }

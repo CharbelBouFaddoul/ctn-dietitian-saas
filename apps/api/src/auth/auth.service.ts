@@ -1,11 +1,13 @@
-import { Injectable, UnauthorizedException } from "@nestjs/common";
+import { BadRequestException, Injectable, UnauthorizedException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { normalizeEmail } from "@nutrition-saas/utilities";
 import { PrismaService } from "../prisma/prisma.service";
+import { assertRegistrationEnabled } from "../platform-settings/registration-gate";
 import { AUTH_MESSAGES } from "./auth.messages";
 import type { RequestMeta } from "./auth.types";
 import { ConsentService } from "./consent.service";
 import { EmailVerificationService } from "./email-verification.service";
+import { InvitationService, InvalidInvitationTokenError } from "./invitation.service";
 import { PasswordService } from "./password.service";
 import { SecurityEventLogger } from "./security-event.logger";
 import { SessionService } from "./session.service";
@@ -26,10 +28,12 @@ export class AuthService {
     private readonly sessions: SessionService,
     private readonly verification: EmailVerificationService,
     private readonly consents: ConsentService,
+    private readonly invitations: InvitationService,
     private readonly security: SecurityEventLogger,
   ) {}
 
   async register(input: RegisterInput, meta: RequestMeta = {}): Promise<void> {
+    await assertRegistrationEnabled(this.prisma);
     this.passwords.assertPolicy(input.password);
     const emailNormalized = normalizeEmail(input.email);
     const passwordHash = await this.passwords.hash(input.password);
@@ -152,6 +156,55 @@ export class AuthService {
       userId,
       ipAddress: meta.ipAddress,
       reason: "revoke_all",
+    });
+  }
+
+  async acceptDietitianInvitation(
+    rawToken: string,
+    password: string,
+    meta: RequestMeta = {},
+  ): Promise<void> {
+    this.passwords.assertPolicy(password);
+
+    let invitation;
+    try {
+      invitation = await this.invitations.validate(rawToken);
+    } catch (error) {
+      if (error instanceof InvalidInvitationTokenError) {
+        throw new BadRequestException(AUTH_MESSAGES.invalidInvitationToken);
+      }
+      throw error;
+    }
+
+    if (invitation.purpose !== "DIETITIAN_ACTIVATION" || !invitation.emailNormalized) {
+      throw new BadRequestException(AUTH_MESSAGES.invalidInvitationToken);
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { emailNormalized: invitation.emailNormalized },
+    });
+    if (!user || user.status === "SUSPENDED" || user.status === "ARCHIVED") {
+      throw new BadRequestException(AUTH_MESSAGES.invalidInvitationToken);
+    }
+
+    const passwordHash = await this.passwords.hash(password);
+    const now = new Date();
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash,
+        status: "ACTIVE",
+        emailVerifiedAt: user.emailVerifiedAt ?? now,
+      },
+    });
+    await this.invitations.consume(rawToken, user.id);
+    await this.sessions.revokeAllForUser(user.id);
+    await this.security.record({
+      type: "dietitian_invitation_accepted",
+      outcome: "success",
+      userId: user.id,
+      emailNormalized: user.emailNormalized,
+      ipAddress: meta.ipAddress,
     });
   }
 

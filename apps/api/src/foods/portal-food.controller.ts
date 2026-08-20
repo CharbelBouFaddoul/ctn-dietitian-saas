@@ -1,8 +1,8 @@
 import { Controller, Get, Query, UseGuards } from "@nestjs/common";
 import { ApiCookieAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
-import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { CurrentSession, CurrentUser } from "../auth/decorators/current-user.decorator";
 import { SessionGuard } from "../auth/guards/session.guard";
-import type { AuthenticatedRequestUser } from "../auth/auth.types";
+import type { AuthenticatedRequestUser, AuthenticatedSession } from "../auth/auth.types";
 import { ClientAccessService } from "../clients/client-access.service";
 import { requireDietitianAccountId } from "../organizations/tenant-scope";
 import { ListFoodsQueryDto } from "./dto/food.dto";
@@ -20,8 +20,9 @@ export class PortalFoodController {
 
   @Get()
   @ApiOperation({ summary: "Search foods for client food logging (organization effective values)" })
-  async search(@CurrentUser() user: AuthenticatedRequestUser, @Query() query: ListFoodsQueryDto) {
-    const client = await this.access.assertPortalAccess(user.id);
+  async search(@CurrentUser() user: AuthenticatedRequestUser,
+    @CurrentSession() session: AuthenticatedSession, @Query() query: ListFoodsQueryDto) {
+    const client = await this.access.assertPortalAccess(user.id, { activeClientId: session.activeClientId });
     return this.foods.search(requireDietitianAccountId(client), query);
   }
 }

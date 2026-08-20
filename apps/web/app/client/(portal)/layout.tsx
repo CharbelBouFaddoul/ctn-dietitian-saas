@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { AppShell, Button, LoadingState, type NavSection } from "@nutrition-saas/ui";
@@ -10,8 +10,15 @@ import { loginPathFor, resolveSessionHome } from "../../../lib/session-home";
 import { PatientNavIcons } from "./patient-nav-icons";
 
 interface PortalMe {
-  client: { firstName: string; lastName: string; displayName: string | null };
+  client: { id: string; firstName: string; lastName: string; displayName: string | null };
   practiceName?: string | null;
+  activeClientId?: string;
+}
+
+interface PortalConnection {
+  clientId: string;
+  practiceName: string;
+  dietitianAccountId: string | null;
 }
 
 export default function ClientPortalLayout({ children }: { children: ReactNode }) {
@@ -19,16 +26,24 @@ export default function ClientPortalLayout({ children }: { children: ReactNode }
   const pathname = usePathname();
   const [state, setState] = useState<"loading" | "ok">("loading");
   const [me, setMe] = useState<PortalMe | null>(null);
+  const [connections, setConnections] = useState<PortalConnection[]>([]);
+  const [switching, setSwitching] = useState(false);
+
+  const load = useCallback(async () => {
+    const [profile, links] = await Promise.all([
+      api<PortalMe>("/api/v1/portal/me"),
+      api<PortalConnection[]>("/api/v1/portal/connections").catch(() => [] as PortalConnection[]),
+    ]);
+    setMe(profile);
+    setConnections(links);
+    setState("ok");
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
-        const profile = await api<PortalMe>("/api/v1/portal/me");
-        if (!cancelled) {
-          setMe(profile);
-          setState("ok");
-        }
+        await load();
       } catch (error) {
         if (cancelled) return;
         if (error instanceof ApiError && error.status === 401) {
@@ -46,11 +61,28 @@ export default function ClientPortalLayout({ children }: { children: ReactNode }
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, [router, load]);
 
   async function onLogout() {
     await logout();
     router.replace(loginPathFor("client"));
+  }
+
+  async function onSwitch(clientId: string) {
+    if (clientId === me?.client.id) return;
+    setSwitching(true);
+    try {
+      await api("/api/v1/portal/connections/active", {
+        method: "POST",
+        body: JSON.stringify({ clientId }),
+      });
+      await load();
+      router.refresh();
+    } catch {
+      /* keep current */
+    } finally {
+      setSwitching(false);
+    }
   }
 
   if (state !== "ok") {
@@ -89,7 +121,10 @@ export default function ClientPortalLayout({ children }: { children: ReactNode }
     },
     {
       label: "Account",
-      items: [{ href: "/client/profile", label: "Profile", icon: PatientNavIcons.profile }],
+      items: [
+        { href: "/client/profile", label: "Profile", icon: PatientNavIcons.profile },
+        { href: "/client/join", label: "Join another practice", icon: PatientNavIcons.profile },
+      ],
     },
   ];
 
@@ -103,9 +138,28 @@ export default function ClientPortalLayout({ children }: { children: ReactNode }
       linkComponent={Link}
       collapsible
       footer={
-        <Button variant="ghost" size="sm" onClick={() => void onLogout()}>
-          Sign out
-        </Button>
+        <div style={{ display: "grid", gap: 8 }}>
+          {connections.length > 1 ? (
+            <label className="ui-field" style={{ margin: 0 }}>
+              <span style={{ fontSize: 12 }}>Active practice</span>
+              <select
+                className="ui-input"
+                value={me?.client.id ?? ""}
+                disabled={switching}
+                onChange={(event) => void onSwitch(event.target.value)}
+              >
+                {connections.map((row) => (
+                  <option key={row.clientId} value={row.clientId}>
+                    {row.practiceName}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+          <Button variant="ghost" size="sm" onClick={() => void onLogout()}>
+            Sign out
+          </Button>
+        </div>
       }
     >
       {children}

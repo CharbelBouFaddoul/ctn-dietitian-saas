@@ -13,6 +13,7 @@ export interface AuthenticatedRequestUser {
 export interface AuthenticatedSession {
   id: string;
   userId: string;
+  activeClientId: string | null;
   createdAt: Date;
   expiresAt: Date;
   lastUsedAt: Date;

@@ -218,8 +218,14 @@ export class ClientAccountService {
     return this.joinExistingClient(userId, invitation.clientId, dietitianAccountId, normalized);
   }
 
-  async portalMe(userId: string) {
-    const client = await this.access.assertPortalAccess(userId);
+  async portalMe(userId: string, activeClientId?: string | null) {
+    const client = await this.access.assertPortalAccess(userId, {
+      activeClientId,
+      requireSelection: false,
+    });
+    const account = await this.prisma.dietitianAccount.findUnique({
+      where: { id: client.dietitianAccountId ?? client.organizationId },
+    });
     return {
       client: {
         id: client.id,
@@ -229,7 +235,48 @@ export class ClientAccountService {
         displayName: client.displayName,
         status: client.status,
       },
+      practiceName: account?.displayName ?? null,
+      activeClientId: client.id,
     };
+  }
+
+  async listConnections(userId: string) {
+    const dietitianAccount = await this.prisma.dietitianAccount.findUnique({ where: { userId } });
+    if (dietitianAccount) {
+      throw new ForbiddenException(JOIN_NOT_ALLOWED);
+    }
+
+    const accounts = await this.prisma.clientAccount.findMany({
+      where: { userId, status: "ACTIVE" },
+      include: {
+        client: true,
+        dietitianAccount: { select: { id: true, displayName: true } },
+      },
+      orderBy: { activatedAt: "asc" },
+    });
+
+    return accounts
+      .filter((row) => row.client.status === "ACTIVE")
+      .map((row) => ({
+        clientId: row.clientId,
+        practiceName:
+          row.dietitianAccount?.displayName ??
+          row.client.displayName ??
+          "Practice",
+        dietitianAccountId: row.dietitianAccountId ?? row.organizationId,
+        client: {
+          id: row.client.id,
+          firstName: row.client.firstName,
+          lastName: row.client.lastName,
+          displayName: row.client.displayName,
+        },
+        activatedAt: row.activatedAt?.toISOString() ?? null,
+      }));
+  }
+
+  async setActiveConnection(userId: string, sessionId: string, clientId: string) {
+    await this.sessions.setActiveClientId(sessionId, userId, clientId);
+    return this.portalMe(userId, clientId);
   }
 
   private async joinPractice(
@@ -239,11 +286,13 @@ export class ClientAccountService {
     input: { firstName?: string; lastName?: string },
   ) {
     const userAccounts = await this.prisma.clientAccount.findMany({ where: { userId } });
-    const active = userAccounts.find((row) => row.status === "ACTIVE");
-    if (active) {
-      const sameDietitian =
-        (active.dietitianAccountId ?? active.organizationId) === dietitianAccountId;
-      throw new ConflictException(sameDietitian ? JOIN_ALREADY_CONNECTED : JOIN_ALREADY_CONNECTED);
+    const activeSame = userAccounts.find(
+      (row) =>
+        row.status === "ACTIVE" &&
+        (row.dietitianAccountId ?? row.organizationId) === dietitianAccountId,
+    );
+    if (activeSame) {
+      throw new ConflictException(JOIN_ALREADY_CONNECTED);
     }
     const existingForDietitian = userAccounts.find(
       (row) => (row.dietitianAccountId ?? row.organizationId) === dietitianAccountId,
@@ -347,14 +396,6 @@ export class ClientAccountService {
     const userAccount = userAccounts.find(
       (row) => (row.dietitianAccountId ?? row.organizationId) === dietitianAccountId,
     );
-    const otherActive = userAccounts.find(
-      (row) =>
-        row.status === "ACTIVE" &&
-        (row.dietitianAccountId ?? row.organizationId) !== dietitianAccountId,
-    );
-    if (otherActive) {
-      throw new ConflictException(JOIN_ALREADY_CONNECTED);
-    }
     if (userAccount && userAccount.clientId !== clientId) {
       throw new ConflictException(JOIN_ALREADY_CONNECTED);
     }

@@ -3,7 +3,11 @@ import type { Client, Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import type { TenantContext } from "../organizations/tenant.types";
 import { tenantWhere } from "../organizations/tenant-scope";
-import { CLIENT_ACCESS_DENIED, CLIENT_NOT_AVAILABLE } from "./client.messages";
+import {
+  CLIENT_ACCESS_DENIED,
+  CLIENT_NOT_AVAILABLE,
+  PORTAL_CONNECTION_REQUIRED,
+} from "./client.messages";
 
 export type ClientAction =
   | "read"
@@ -13,6 +17,18 @@ export type ClientAction =
   | "invite"
   | "create"
   | "manageRecords";
+
+export type PortalAccessOptions = {
+  /** Explicit client id override. */
+  clientId?: string;
+  /** Session.activeClientId when present. */
+  activeClientId?: string | null;
+  /**
+   * When true (clinical ops), multiple ACTIVE connections without a selected
+   * active client require the user to pick one. Onboarding may pass false.
+   */
+  requireSelection?: boolean;
+};
 
 @Injectable()
 export class ClientAccessService {
@@ -49,7 +65,7 @@ export class ClientAccessService {
     return client;
   }
 
-  async assertPortalAccess(userId: string, clientId?: string): Promise<Client> {
+  async assertPortalAccess(userId: string, options: PortalAccessOptions = {}): Promise<Client> {
     const dietitianAccount = await this.prisma.dietitianAccount.findUnique({
       where: { userId },
     });
@@ -57,9 +73,12 @@ export class ClientAccessService {
       throw new ForbiddenException(CLIENT_ACCESS_DENIED);
     }
 
-    if (clientId) {
+    const requireSelection = options.requireSelection ?? true;
+    const preferredClientId = options.clientId ?? options.activeClientId ?? null;
+
+    if (preferredClientId) {
       const account = await this.prisma.clientAccount.findFirst({
-        where: { userId, clientId, status: "ACTIVE" },
+        where: { userId, clientId: preferredClientId, status: "ACTIVE" },
         include: { client: true },
       });
       if (!account) {
@@ -76,12 +95,17 @@ export class ClientAccessService {
       include: { client: true },
       orderBy: { activatedAt: "asc" },
     });
-    const account = accounts[0];
-    if (!account) {
+    const usable = accounts.filter((row) => row.client.status === "ACTIVE");
+    if (usable.length === 0) {
       throw new ForbiddenException(CLIENT_ACCESS_DENIED);
     }
-    if (account.client.status !== "ACTIVE") {
-      throw new ForbiddenException(CLIENT_NOT_AVAILABLE);
+    if (usable.length > 1 && requireSelection) {
+      throw new ForbiddenException(PORTAL_CONNECTION_REQUIRED);
+    }
+
+    const account = usable[0];
+    if (!account) {
+      throw new ForbiddenException(CLIENT_ACCESS_DENIED);
     }
     return account.client;
   }

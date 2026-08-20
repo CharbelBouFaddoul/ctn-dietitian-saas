@@ -22,6 +22,8 @@ import {
 import { SessionGuard } from "../auth/guards/session.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import type { AuthenticatedRequestUser } from "../auth/auth.types";
+import { PrismaService } from "../prisma/prisma.service";
+import { assertRegistrationEnabled } from "../platform-settings/registration-gate";
 import { CurrentTenant } from "./decorators/current-tenant.decorator";
 import { AddMemberDto, ChangeMemberRoleDto, TransferOwnershipDto } from "./dto/membership.dto";
 import {
@@ -53,6 +55,7 @@ export class OrganizationController {
     private readonly members: MembershipService,
     private readonly lifecycle: OrganizationLifecycleService,
     private readonly entitlements: EntitlementService,
+    private readonly prisma: PrismaService,
   ) {}
 
   @Post()
@@ -60,13 +63,14 @@ export class OrganizationController {
   @ApiOperation({
     summary: "Create an organization",
     description:
-      "The authenticated user becomes OWNER. The organization starts ACTIVE. No clients or subscriptions are created.",
+      "The authenticated user becomes OWNER. The organization starts ACTIVE. No clients or subscriptions are created. Self-serve create requires registrationEnabled.",
   })
   @ApiOkResponse({ type: OrganizationResponseDto })
   async create(
     @CurrentUser() user: AuthenticatedRequestUser,
     @Body() body: CreateOrganizationDto,
   ): Promise<OrganizationResponseDto> {
+    await assertRegistrationEnabled(this.prisma);
     const created = await this.organizations.create(user.id, body);
     if (!created) {
       throw new ForbiddenException(ORGANIZATION_ACCESS_DENIED);

@@ -35,6 +35,7 @@ export class PlatformSettingsService {
     if (input.ctaText !== undefined) data.ctaText = input.ctaText;
     if (input.ctaHref !== undefined) data.ctaHref = input.ctaHref;
     if (input.ctaVisible !== undefined) data.ctaVisible = input.ctaVisible;
+    if (input.registrationEnabled !== undefined) data.registrationEnabled = input.registrationEnabled;
     if (input.dietitianSignInLabel !== undefined) data.dietitianSignInLabel = input.dietitianSignInLabel;
     if (input.patientSignInLabel !== undefined) data.patientSignInLabel = input.patientSignInLabel;
     if (input.footerDescription !== undefined) data.footerDescription = input.footerDescription;
@@ -77,6 +78,7 @@ export class PlatformSettingsService {
     ctaText: string;
     ctaHref: string;
     ctaVisible: boolean;
+    registrationEnabled: boolean;
     dietitianSignInLabel: string;
     patientSignInLabel: string;
     footerDescription: string;
@@ -96,6 +98,7 @@ export class PlatformSettingsService {
       ctaText: row.ctaText || DEFAULT_PLATFORM_SETTINGS.ctaText,
       ctaHref: row.ctaHref || DEFAULT_PLATFORM_SETTINGS.ctaHref,
       ctaVisible: row.ctaVisible,
+      registrationEnabled: row.registrationEnabled ?? DEFAULT_PLATFORM_SETTINGS.registrationEnabled,
       dietitianSignInLabel: row.dietitianSignInLabel || DEFAULT_PLATFORM_SETTINGS.dietitianSignInLabel,
       patientSignInLabel: row.patientSignInLabel || DEFAULT_PLATFORM_SETTINGS.patientSignInLabel,
       footerDescription: row.footerDescription || DEFAULT_PLATFORM_SETTINGS.footerDescription,

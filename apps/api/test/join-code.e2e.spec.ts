@@ -221,8 +221,14 @@ describe("client join codes", () => {
       .post("/api/v1/portal/join")
       .set("Cookie", portalA)
       .send({ code: otherCode.code })
-      .expect(409)
-      .expect((res) => expect(res.body.message).toBe(JOIN_ALREADY_CONNECTED));
+      .expect(201)
+      .expect((res) => expect(res.body.status).toBe("connected"));
+
+    const connections = await request(ctx.app.getHttpServer())
+      .get("/api/v1/portal/connections")
+      .set("Cookie", portalA)
+      .expect(200);
+    expect(connections.body).toHaveLength(2);
 
     await request(ctx.app.getHttpServer())
       .get("/api/v1/portal/onboarding")

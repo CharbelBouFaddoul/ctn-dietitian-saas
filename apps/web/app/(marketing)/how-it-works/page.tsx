@@ -100,7 +100,7 @@ export default function HowItWorksPage() {
                 <li>Message and share documents</li>
                 <li>Run appointments, tasks, invoices, and analytics</li>
               </ul>
-              <Link href="/auth/dietitian/register" className="ui-link">
+              <Link href="/auth/dietitian/login" className="ui-link">
                 Create practice account →
               </Link>
             </article>

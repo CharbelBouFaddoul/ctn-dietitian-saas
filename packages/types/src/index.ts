@@ -20,6 +20,7 @@ export interface PublicSession {
   createdAt: string;
   expiresAt: string;
   lastUsedAt: string;
+  activeClientId?: string | null;
 }
 
 export interface AuthMeResponse {

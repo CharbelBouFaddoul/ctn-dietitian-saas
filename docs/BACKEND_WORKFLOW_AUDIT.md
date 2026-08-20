@@ -400,14 +400,18 @@ No user
 
 > Platform admin should eventually provision accounts and assign them to users. Self-registration will eventually be disabled.
 
+**Phase 3 update (2026-08-20):** Implemented. `registrationEnabled` defaults to `false`; admin `POST /api/v1/admin/dietitians` provisions User + DietitianAccount + optional subscription + `DIETITIAN_ACTIVATION` email. Self-serve register/org create are gated. See [TENANCY_MIGRATION.md](./TENANCY_MIGRATION.md).
+
+**Phase 4 (deferred):** `/api/v1/dietitian` remount, DietitianGuard, stop dual-write, drop Organization/Member/Assignment tables — not started.
+
 What must change later (audit only):
 
-1. Gate or remove public `POST /auth/register` (or audience-specific).
-2. Admin APIs to create users (with invite/activation), create orgs, attach OWNER, assign ACTIVE subscription.
-3. Replace or wrap self-serve `POST /organizations`.
+1. Gate or remove public `POST /auth/register` (or audience-specific). ✅ Phase 3
+2. Admin APIs to create users (with invite/activation), create orgs, attach OWNER, assign ACTIVE subscription. ✅ Phase 3
+3. Replace or wrap self-serve `POST /organizations`. ✅ Phase 3 (gated)
 4. Possibly replace practice self-serve join with provisioned client accounts.
 5. Bootstrap story for first SUPER_ADMIN (currently unclear in-repo).
-6. Staff/dietitian invite purposes already in schema (`STAFF_INVITE`, `DIETITIAN_ACTIVATION`) but unused — likely vehicle for provisioned activation.
+6. Staff/dietitian invite purposes already in schema (`STAFF_INVITE`, `DIETITIAN_ACTIVATION`) but unused — likely vehicle for provisioned activation. ✅ `DIETITIAN_ACTIVATION` wired in Phase 3
 
 ---
 

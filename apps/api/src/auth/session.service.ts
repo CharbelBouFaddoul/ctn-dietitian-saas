@@ -1,8 +1,9 @@
-import { Injectable } from "@nestjs/common";
+import { ForbiddenException, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { Session, User } from "@prisma/client";
 import type { AppEnv } from "@nutrition-saas/validation";
 import { PrismaService } from "../prisma/prisma.service";
+import { CLIENT_ACCESS_DENIED, CLIENT_NOT_AVAILABLE } from "../clients/client.messages";
 import type { AuthenticatedRequestUser, AuthenticatedSession, RequestMeta } from "./auth.types";
 import { TokenService } from "./token.service";
 
@@ -52,6 +53,18 @@ export class SessionService {
       return null;
     }
 
+    let activeClientId = session.activeClientId;
+    if (activeClientId) {
+      const account = await this.prisma.clientAccount.findFirst({
+        where: { userId: session.userId, clientId: activeClientId, status: "ACTIVE" },
+        include: { client: true },
+      });
+      if (!account || account.client.status !== "ACTIVE") {
+        await this.clearActiveClientId(session.id);
+        activeClientId = null;
+      }
+    }
+
     const now = new Date();
     const updated = await this.prisma.session.update({
       where: { id: session.id },
@@ -63,7 +76,31 @@ export class SessionService {
       include: { user: true },
     });
 
-    return updated;
+    return { ...updated, activeClientId };
+  }
+
+  async setActiveClientId(sessionId: string, userId: string, clientId: string): Promise<void> {
+    const account = await this.prisma.clientAccount.findFirst({
+      where: { userId, clientId, status: "ACTIVE" },
+      include: { client: true },
+    });
+    if (!account) {
+      throw new ForbiddenException(CLIENT_ACCESS_DENIED);
+    }
+    if (account.client.status !== "ACTIVE") {
+      throw new ForbiddenException(CLIENT_NOT_AVAILABLE);
+    }
+    await this.prisma.session.update({
+      where: { id: sessionId },
+      data: { activeClientId: clientId },
+    });
+  }
+
+  async clearActiveClientId(sessionId: string): Promise<void> {
+    await this.prisma.session.update({
+      where: { id: sessionId },
+      data: { activeClientId: null },
+    });
   }
 
   async revoke(sessionId: string): Promise<void> {
@@ -131,6 +168,7 @@ export class SessionService {
     return {
       id: session.id,
       userId: session.userId,
+      activeClientId: session.activeClientId ?? null,
       createdAt: session.createdAt,
       expiresAt: session.expiresAt,
       lastUsedAt: session.lastUsedAt,

@@ -13,9 +13,9 @@ import {
 } from "@nestjs/common";
 import { ApiCookieAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { localDateKey } from "@nutrition-saas/utilities";
-import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { CurrentSession, CurrentUser } from "../auth/decorators/current-user.decorator";
 import { SessionGuard } from "../auth/guards/session.guard";
-import type { AuthenticatedRequestUser } from "../auth/auth.types";
+import type { AuthenticatedRequestUser, AuthenticatedSession } from "../auth/auth.types";
 import { ClientAccessService } from "../clients/client-access.service";
 import { FoodLogService, TrackingTimezoneService } from "./food-log.service";
 import {
@@ -55,119 +55,138 @@ export class PortalTrackingController {
 
   @Get("summary")
   @ApiOperation({ summary: "Daily tracking summary for the signed-in client" })
-  async summaryForDay(@CurrentUser() user: AuthenticatedRequestUser, @Query() query: TrackingDateQueryDto) {
-    const client = await this.access.assertPortalAccess(user.id);
+  async summaryForDay(@CurrentUser() user: AuthenticatedRequestUser,
+    @CurrentSession() session: AuthenticatedSession, @Query() query: TrackingDateQueryDto) {
+    const client = await this.access.assertPortalAccess(user.id, { activeClientId: session.activeClientId });
     const date = await this.resolveDate(client, query.date);
     return this.summary.dailySummary(client, date);
   }
 
   @Get("food-logs")
-  async listFood(@CurrentUser() user: AuthenticatedRequestUser, @Query() query: TrackingDateQueryDto) {
-    const client = await this.access.assertPortalAccess(user.id);
+  async listFood(@CurrentUser() user: AuthenticatedRequestUser,
+    @CurrentSession() session: AuthenticatedSession, @Query() query: TrackingDateQueryDto) {
+    const client = await this.access.assertPortalAccess(user.id, { activeClientId: session.activeClientId });
     return this.foodLogs.listForClient(client, await this.resolveDate(client, query.date));
   }
 
   @Post("food-logs")
-  createFood(@CurrentUser() user: AuthenticatedRequestUser, @Body() body: CreateFoodLogDto) {
-    return this.withClient(user, (client) => this.foodLogs.createForClient(client, user.id, body));
+  createFood(@CurrentUser() user: AuthenticatedRequestUser,
+    @CurrentSession() session: AuthenticatedSession, @Body() body: CreateFoodLogDto) {
+    return this.withClient(user, session, (client) => this.foodLogs.createForClient(client, user.id, body));
   }
 
   @Patch("food-logs/:logId")
   updateFood(
     @CurrentUser() user: AuthenticatedRequestUser,
+    @CurrentSession() session: AuthenticatedSession,
     @Param("logId", ParseUUIDPipe) logId: string,
     @Body() body: UpdateFoodLogDto,
   ) {
-    return this.withClient(user, (client) => this.foodLogs.updateForClient(client, logId, body));
+    return this.withClient(user, session, (client) => this.foodLogs.updateForClient(client, logId, body));
   }
 
   @Delete("food-logs/:logId")
-  archiveFood(@CurrentUser() user: AuthenticatedRequestUser, @Param("logId", ParseUUIDPipe) logId: string) {
-    return this.withClient(user, (client) => this.foodLogs.archiveForClient(client, logId));
+  archiveFood(@CurrentUser() user: AuthenticatedRequestUser,
+    @CurrentSession() session: AuthenticatedSession, @Param("logId", ParseUUIDPipe) logId: string) {
+    return this.withClient(user, session, (client) => this.foodLogs.archiveForClient(client, logId));
   }
 
   @Get("water-logs")
-  async listWater(@CurrentUser() user: AuthenticatedRequestUser, @Query() query: TrackingDateQueryDto) {
-    const client = await this.access.assertPortalAccess(user.id);
+  async listWater(@CurrentUser() user: AuthenticatedRequestUser,
+    @CurrentSession() session: AuthenticatedSession, @Query() query: TrackingDateQueryDto) {
+    const client = await this.access.assertPortalAccess(user.id, { activeClientId: session.activeClientId });
     return this.waterLogs.listForClient(client, await this.resolveDate(client, query.date));
   }
 
   @Post("water-logs")
-  createWater(@CurrentUser() user: AuthenticatedRequestUser, @Body() body: CreateWaterLogDto) {
-    return this.withClient(user, (client) => this.waterLogs.createForClient(client, user.id, body));
+  createWater(@CurrentUser() user: AuthenticatedRequestUser,
+    @CurrentSession() session: AuthenticatedSession, @Body() body: CreateWaterLogDto) {
+    return this.withClient(user, session, (client) => this.waterLogs.createForClient(client, user.id, body));
   }
 
   @Patch("water-logs/:logId")
   updateWater(
     @CurrentUser() user: AuthenticatedRequestUser,
+    @CurrentSession() session: AuthenticatedSession,
     @Param("logId", ParseUUIDPipe) logId: string,
     @Body() body: UpdateWaterLogDto,
   ) {
-    return this.withClient(user, (client) => this.waterLogs.updateForClient(client, logId, body));
+    return this.withClient(user, session, (client) => this.waterLogs.updateForClient(client, logId, body));
   }
 
   @Delete("water-logs/:logId")
-  archiveWater(@CurrentUser() user: AuthenticatedRequestUser, @Param("logId", ParseUUIDPipe) logId: string) {
-    return this.withClient(user, (client) => this.waterLogs.archiveForClient(client, logId));
+  archiveWater(@CurrentUser() user: AuthenticatedRequestUser,
+    @CurrentSession() session: AuthenticatedSession, @Param("logId", ParseUUIDPipe) logId: string) {
+    return this.withClient(user, session, (client) => this.waterLogs.archiveForClient(client, logId));
   }
 
   @Get("exercise-logs")
-  async listExercise(@CurrentUser() user: AuthenticatedRequestUser, @Query() query: TrackingDateQueryDto) {
-    const client = await this.access.assertPortalAccess(user.id);
+  async listExercise(@CurrentUser() user: AuthenticatedRequestUser,
+    @CurrentSession() session: AuthenticatedSession, @Query() query: TrackingDateQueryDto) {
+    const client = await this.access.assertPortalAccess(user.id, { activeClientId: session.activeClientId });
     return this.exerciseLogs.listForClient(client, await this.resolveDate(client, query.date));
   }
 
   @Post("exercise-logs")
-  createExercise(@CurrentUser() user: AuthenticatedRequestUser, @Body() body: CreateExerciseLogDto) {
-    return this.withClient(user, (client) => this.exerciseLogs.createForClient(client, user.id, body));
+  createExercise(@CurrentUser() user: AuthenticatedRequestUser,
+    @CurrentSession() session: AuthenticatedSession, @Body() body: CreateExerciseLogDto) {
+    return this.withClient(user, session, (client) => this.exerciseLogs.createForClient(client, user.id, body));
   }
 
   @Patch("exercise-logs/:logId")
   updateExercise(
     @CurrentUser() user: AuthenticatedRequestUser,
+    @CurrentSession() session: AuthenticatedSession,
     @Param("logId", ParseUUIDPipe) logId: string,
     @Body() body: UpdateExerciseLogDto,
   ) {
-    return this.withClient(user, (client) => this.exerciseLogs.updateForClient(client, logId, body));
+    return this.withClient(user, session, (client) => this.exerciseLogs.updateForClient(client, logId, body));
   }
 
   @Delete("exercise-logs/:logId")
-  archiveExercise(@CurrentUser() user: AuthenticatedRequestUser, @Param("logId", ParseUUIDPipe) logId: string) {
-    return this.withClient(user, (client) => this.exerciseLogs.archiveForClient(client, logId));
+  archiveExercise(@CurrentUser() user: AuthenticatedRequestUser,
+    @CurrentSession() session: AuthenticatedSession, @Param("logId", ParseUUIDPipe) logId: string) {
+    return this.withClient(user, session, (client) => this.exerciseLogs.archiveForClient(client, logId));
   }
 
   @Get("sleep")
-  async getSleep(@CurrentUser() user: AuthenticatedRequestUser, @Query() query: TrackingDateQueryDto) {
-    const client = await this.access.assertPortalAccess(user.id);
+  async getSleep(@CurrentUser() user: AuthenticatedRequestUser,
+    @CurrentSession() session: AuthenticatedSession, @Query() query: TrackingDateQueryDto) {
+    const client = await this.access.assertPortalAccess(user.id, { activeClientId: session.activeClientId });
     return this.sleepLogs.getForClient(client, await this.resolveDate(client, query.date));
   }
 
   @Put("sleep")
-  upsertSleep(@CurrentUser() user: AuthenticatedRequestUser, @Body() body: UpsertSleepLogDto) {
-    return this.withClient(user, (client) => this.sleepLogs.upsertForClient(client, user.id, body));
+  upsertSleep(@CurrentUser() user: AuthenticatedRequestUser,
+    @CurrentSession() session: AuthenticatedSession, @Body() body: UpsertSleepLogDto) {
+    return this.withClient(user, session, (client) => this.sleepLogs.upsertForClient(client, user.id, body));
   }
 
   @Delete("sleep/:logId")
-  archiveSleep(@CurrentUser() user: AuthenticatedRequestUser, @Param("logId", ParseUUIDPipe) logId: string) {
-    return this.withClient(user, (client) => this.sleepLogs.archiveForClient(client, logId));
+  archiveSleep(@CurrentUser() user: AuthenticatedRequestUser,
+    @CurrentSession() session: AuthenticatedSession, @Param("logId", ParseUUIDPipe) logId: string) {
+    return this.withClient(user, session, (client) => this.sleepLogs.archiveForClient(client, logId));
   }
 
   @Get("habits")
-  async listHabits(@CurrentUser() user: AuthenticatedRequestUser, @Query() query: TrackingDateQueryDto) {
-    const client = await this.access.assertPortalAccess(user.id);
+  async listHabits(@CurrentUser() user: AuthenticatedRequestUser,
+    @CurrentSession() session: AuthenticatedSession, @Query() query: TrackingDateQueryDto) {
+    const client = await this.access.assertPortalAccess(user.id, { activeClientId: session.activeClientId });
     return this.habitLogs.listForClient(client, await this.resolveDate(client, query.date));
   }
 
   @Put("habits")
-  upsertHabit(@CurrentUser() user: AuthenticatedRequestUser, @Body() body: UpsertHabitLogDto) {
-    return this.withClient(user, (client) => this.habitLogs.upsertForClient(client, user.id, body));
+  upsertHabit(@CurrentUser() user: AuthenticatedRequestUser,
+    @CurrentSession() session: AuthenticatedSession, @Body() body: UpsertHabitLogDto) {
+    return this.withClient(user, session, (client) => this.habitLogs.upsertForClient(client, user.id, body));
   }
 
   private async withClient<T>(
     user: AuthenticatedRequestUser,
+    session: AuthenticatedSession,
     fn: (client: Awaited<ReturnType<ClientAccessService["assertPortalAccess"]>>) => Promise<T>,
   ) {
-    const client = await this.access.assertPortalAccess(user.id);
+    const client = await this.access.assertPortalAccess(user.id, { activeClientId: session.activeClientId });
     return fn(client);
   }
 

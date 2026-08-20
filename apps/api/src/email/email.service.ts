@@ -50,6 +50,20 @@ export class EmailService {
     });
   }
 
+  async sendDietitianActivation(to: string, rawToken: string): Promise<void> {
+    const url = this.link("/auth/invitation", rawToken);
+    await this.provider.send({
+      to,
+      subject: "Activate your practice account",
+      text: [
+        "An administrator provisioned a dietitian practice account for you.",
+        "Set your password to activate the account:",
+        `Open: ${url}`,
+        `Token: ${rawToken}`,
+      ].join("\n"),
+    });
+  }
+
   async sendInvoiceNotification(
     to: string,
     invoiceNumber: string,

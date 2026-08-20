@@ -595,8 +595,8 @@ export class MealPlanService {
     return this.getVersion(tenant, planId, versionId);
   }
 
-  async portalCurrent(userId: string) {
-    const client = await this.access.assertPortalAccess(userId);
+  async portalCurrent(userId: string, activeClientId?: string | null) {
+    const client = await this.access.assertPortalAccess(userId, { activeClientId });
     const version = await this.prisma.mealPlanVersion.findFirst({
       where: {
         status: "PUBLISHED",

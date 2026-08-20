@@ -1,3 +1,3 @@
 export function canManageClients(role: string | null | undefined): boolean {
-  return role === "OWNER" || role === "DIETITIAN";
+  return role === "OWNER";
 }

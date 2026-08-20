@@ -172,7 +172,7 @@ export default function FeaturesPage() {
             <Link href="/how-it-works" className="ui-btn ui-btn--primary ui-btn--lg">
               How it works
             </Link>
-            <Link href="/auth/dietitian/register" className="ui-btn ui-btn--secondary ui-btn--lg">
+            <Link href="/auth/dietitian/login" className="ui-btn ui-btn--secondary ui-btn--lg">
               Get Started
             </Link>
           </div>

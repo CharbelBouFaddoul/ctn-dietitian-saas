@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { API_URL } from "../../lib/api";
 import { highlightedFeatures } from "../../lib/marketing/features-catalog";
 import { resolveSessionHome } from "../../lib/session-home";
 
@@ -62,6 +63,7 @@ function ProductPreview() {
 
 export default function HomePage() {
   const router = useRouter();
+  const [registrationEnabled, setRegistrationEnabled] = useState(false);
   const dietitianHighlights = highlightedFeatures("dietitian").slice(0, 4);
   const patientHighlights = highlightedFeatures("patient").slice(0, 4);
 
@@ -71,6 +73,13 @@ export default function HomePage() {
         router.replace(home.path);
       }
     });
+    void fetch(`${API_URL}/api/v1/public/site-settings`)
+      .then(async (res) => {
+        if (!res.ok) return;
+        const data = (await res.json()) as { registrationEnabled?: boolean };
+        setRegistrationEnabled(data.registrationEnabled === true);
+      })
+      .catch(() => undefined);
   }, [router]);
 
   return (
@@ -86,9 +95,15 @@ export default function HomePage() {
                 workspace — while patients use a focused portal to follow their plan and stay connected.
               </p>
               <div className="ui-mkt__hero-ctas">
-                <Link href="/auth/dietitian/register" className="ui-btn ui-btn--primary ui-btn--lg">
-                  Start your practice
-                </Link>
+                {registrationEnabled ? (
+                  <Link href={registrationEnabled ? "/auth/dietitian/register" : "/auth/dietitian/login"} className="ui-btn ui-btn--primary ui-btn--lg">
+                    Start your practice
+                  </Link>
+                ) : (
+                  <Link href="/auth/dietitian/login" className="ui-btn ui-btn--primary ui-btn--lg">
+                    Sign in as Dietitian
+                  </Link>
+                )}
                 <Link href="/auth/client/login" className="ui-btn ui-btn--secondary ui-btn--lg">
                   Sign in as Patient
                 </Link>
@@ -200,7 +215,7 @@ export default function HomePage() {
           <h2>Ready to modernize your nutrition practice?</h2>
           <p>Dietitians run the workspace. Patients use the portal. One connected platform for both.</p>
           <div className="ui-mkt__hero-ctas" style={{ justifyContent: "center" }}>
-            <Link href="/auth/dietitian/register" className="ui-btn ui-btn--primary ui-btn--lg">
+            <Link href={registrationEnabled ? "/auth/dietitian/register" : "/auth/dietitian/login"} className="ui-btn ui-btn--primary ui-btn--lg">
               Get Started
             </Link>
             <Link href="/auth/dietitian/login" className="ui-btn ui-btn--secondary ui-btn--lg">

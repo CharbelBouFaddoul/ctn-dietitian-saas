@@ -8,6 +8,13 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ["@nutrition-saas/ui"],
   },
+  async redirects() {
+    return [
+      { source: "/orgs", destination: "/practice", permanent: false },
+      { source: "/orgs/:path*", destination: "/practice/:path*", permanent: false },
+      { source: "/dietitian", destination: "/practice", permanent: false },
+    ];
+  },
 };
 
 export default nextConfig;

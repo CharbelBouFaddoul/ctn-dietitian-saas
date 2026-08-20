@@ -29,9 +29,9 @@ import {
 } from "class-validator";
 import { Type } from "class-transformer";
 import type { InvoiceStatus } from "@prisma/client";
-import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { CurrentSession, CurrentUser } from "../auth/decorators/current-user.decorator";
 import { SessionGuard } from "../auth/guards/session.guard";
-import type { AuthenticatedRequestUser } from "../auth/auth.types";
+import type { AuthenticatedRequestUser, AuthenticatedSession } from "../auth/auth.types";
 import { ClientAccessService } from "../clients/client-access.service";
 import { ClientAccessGuard } from "../clients/guards/client-access.guard";
 import { ClientActionRequired } from "../clients/decorators/client-action.decorator";
@@ -133,17 +133,19 @@ export class PortalInvoicesController {
   ) {}
 
   @Get()
-  async list(@CurrentUser() user: AuthenticatedRequestUser) {
-    const client = await this.access.assertPortalAccess(user.id);
+  async list(@CurrentUser() user: AuthenticatedRequestUser,
+    @CurrentSession() session: AuthenticatedSession) {
+    const client = await this.access.assertPortalAccess(user.id, { activeClientId: session.activeClientId });
     return this.invoices.listPortal(client);
   }
 
   @Get(":invoiceId")
   async get(
     @CurrentUser() user: AuthenticatedRequestUser,
+    @CurrentSession() session: AuthenticatedSession,
     @Param("invoiceId", ParseUUIDPipe) invoiceId: string,
   ) {
-    const client = await this.access.assertPortalAccess(user.id);
+    const client = await this.access.assertPortalAccess(user.id, { activeClientId: session.activeClientId });
     return this.invoices.getPortal(client, invoiceId);
   }
 }

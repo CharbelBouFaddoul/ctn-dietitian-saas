@@ -123,43 +123,27 @@ Authentication is **identity only**. NestJS `AuthModule` answers who the caller 
 - User lifecycle: `PENDING` → `ACTIVE` after email verification; `SUSPENDED` / `ARCHIVED` cannot authenticate
 - `users.platform_role` is nullable `SUPER_ADMIN` \| `ADMIN` only. Organization roles stay off `users`
 
-**Authorization** (what this user may access) starts in Phase 3 with organization membership. Client assignment authorization is `ClientAccessService` (Phase 5). Keep those boundaries. A client portal user authenticates as a `users` row linked by `client_accounts` and is never an `organization_members` row.
+**Authorization** (what this user may access) is dietitian-account ownership via TenantGuard on `/api/v1/organizations/:organizationId` (path id = `DietitianAccount.id`). Portal patients use `ClientAccount` links and never practice membership. See [TENANCY_MIGRATION.md](./TENANCY_MIGRATION.md).
 
 See [SECURITY.md](./SECURITY.md) and [API.md](./API.md).
 
-### 2.4 Organizations and tenant context (Phase 3)
+### 2.4 Organizations / DietitianAccount tenancy (Phases 1–3)
 
-A user is **not** bound to one `users.organization_id`. Membership is `organization_members` (unique `(organization_id, user_id)`). A user may belong to multiple organizations.
+Runtime tenant root is **`DietitianAccount`** (1:1 with the owning User). Legacy `Organization` / `OrganizationMember` rows are still dual-written for compatibility; API paths remain `/organizations/:organizationId` where the id is the dietitian account id.
 
 ```text
 Authenticated User
        ↓
-Route organizationId  (never a client-supplied role)
+DietitianAccount ownership (TenantGuard)
+  or ClientAccount + Session.activeClientId (portal)
        ↓
-TenantGuard → active membership + operable organization
-       ↓
-TenantContext { organizationId, userId, membershipId, role }
-       ↓
-OrgRolesGuard (OWNER | DIETITIAN | STAFF)
+Tenant-scoped queries via dietitianAccountId (tenantWhere)
 ```
 
-- Organization roles live only on `organization_members`. Platform roles stay on `users`.
-- `CLIENT` is not an organization role.
-- Tenant-owned queries use `tenantWhere(organizationId, …)`. Knowing a UUID is not authorization.
-- Only `ACTIVE` organizations allow normal member operations. `PENDING`, `SUSPENDED`, and `ARCHIVED` are retained and blocked by `OrganizationLifecycleService`.
-- New organizations are created **ACTIVE** with the creator as `OWNER`. Platform admins can later suspend or archive an organization. There is no signup approval queue.
-- Last remaining `OWNER` cannot be demoted or deactivated. Ownership transfer promotes the target and demotes the current user to `DIETITIAN`.
-- `ClientAccessService` answers client visibility and mutations. Phase 3 only answers organization membership. Clients are never `organization_members`.
-
-Phase 3 permissions:
-
-| Role | Read org/settings/members | Change settings, members, archive |
-|---|---|---|
-| OWNER | yes | yes |
-| DIETITIAN | yes | no |
-| STAFF | yes | no |
-
-Granular staff permissions are later. STAFF has organization access only.
+- Platform roles stay on `users` (`SUPER_ADMIN` \| `ADMIN`).
+- Self-serve register/org create is gated by `PlatformSettings.registrationEnabled` (default off); admins provision dietitians.
+- Patients may connect to multiple dietitians (isolated `Client` per link); clinical portal ops require a selected `Session.activeClientId` when more than one connection exists.
+- Web practice UI is `/practice/:id` (redirects from `/orgs`). Phase 4 will remount APIs and drop org shells — deferred.
 
 ---
 

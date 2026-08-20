@@ -34,6 +34,7 @@ import { EmailDto } from "./dto/email.dto";
 import { LoginDto } from "./dto/login.dto";
 import { RegisterDto } from "./dto/register.dto";
 import { ResetPasswordDto } from "./dto/reset-password.dto";
+import { AcceptInvitationDto } from "./dto/accept-invitation.dto";
 import {
   AuthMeResponseDto,
   MessageResponseDto,
@@ -201,6 +202,24 @@ export class AuthController {
     await this.passwordReset.reset(body.token, body.password);
     clearSessionCookie(res, this.cookieSettings());
     return { message: AUTH_MESSAGES.passwordReset };
+  }
+
+  @Post("accept-invitation")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Accept a dietitian activation invitation",
+    description: "Sets password, activates the user, and consumes the invitation token.",
+  })
+  @ApiOkResponse({ type: MessageResponseDto })
+  @ApiBadRequestResponse({ type: ValidationErrorResponseDto })
+  async acceptInvitation(
+    @Body() body: AcceptInvitationDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<MessageResponseDto> {
+    await this.auth.acceptDietitianInvitation(body.token, body.password, this.meta(req));
+    clearSessionCookie(res, this.cookieSettings());
+    return { message: AUTH_MESSAGES.invitationAccepted };
   }
 
   @Post("sessions/revoke-all")

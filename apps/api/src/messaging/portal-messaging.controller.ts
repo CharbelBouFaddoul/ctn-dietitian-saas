@@ -2,9 +2,9 @@ import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, UseGua
 import { ApiCookieAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { Throttle, ThrottlerGuard } from "@nestjs/throttler";
 import { THROTTLE_NAMES } from "@nutrition-saas/config";
-import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { CurrentSession, CurrentUser } from "../auth/decorators/current-user.decorator";
 import { SessionGuard } from "../auth/guards/session.guard";
-import type { AuthenticatedRequestUser } from "../auth/auth.types";
+import type { AuthenticatedRequestUser, AuthenticatedSession } from "../auth/auth.types";
 import { ClientAccessService } from "../clients/client-access.service";
 import { ConversationService } from "./conversation.service";
 import { MessagingRecipientService } from "./messaging-recipient.service";
@@ -25,8 +25,9 @@ export class PortalMessagingController {
 
   @Get()
   @ApiOperation({ summary: "Get the signed-in client's conversation" })
-  async getConversation(@CurrentUser() user: AuthenticatedRequestUser) {
-    const client = await this.access.assertPortalAccess(user.id);
+  async getConversation(@CurrentUser() user: AuthenticatedRequestUser,
+    @CurrentSession() session: AuthenticatedSession) {
+    const client = await this.access.assertPortalAccess(user.id, { activeClientId: session.activeClientId });
     const conversation = await this.conversations.getOrCreate(client);
     const unread = await this.conversations.unreadCount(conversation.id, user.id);
     return {
@@ -40,8 +41,9 @@ export class PortalMessagingController {
   }
 
   @Get("messages")
-  async listMessages(@CurrentUser() user: AuthenticatedRequestUser, @Query() query: MessagePaginationQueryDto) {
-    const client = await this.access.assertPortalAccess(user.id);
+  async listMessages(@CurrentUser() user: AuthenticatedRequestUser,
+    @CurrentSession() session: AuthenticatedSession, @Query() query: MessagePaginationQueryDto) {
+    const client = await this.access.assertPortalAccess(user.id, { activeClientId: session.activeClientId });
     const conversation = await this.conversations.getOrCreate(client);
     return this.conversations.listMessages(
       conversation.id,
@@ -54,8 +56,9 @@ export class PortalMessagingController {
   @Post("messages")
   @UseGuards(ThrottlerGuard)
   @Throttle({ [THROTTLE_NAMES.MESSAGING]: {} })
-  async sendMessage(@CurrentUser() user: AuthenticatedRequestUser, @Body() body: SendMessageDto) {
-    const client = await this.access.assertPortalAccess(user.id);
+  async sendMessage(@CurrentUser() user: AuthenticatedRequestUser,
+    @CurrentSession() session: AuthenticatedSession, @Body() body: SendMessageDto) {
+    const client = await this.access.assertPortalAccess(user.id, { activeClientId: session.activeClientId });
     const conversation = await this.conversations.getOrCreate(client);
     const notifyUserIds = await this.recipients.assignedMemberUserIds(
       requireDietitianAccountId(client),
@@ -72,8 +75,9 @@ export class PortalMessagingController {
   }
 
   @Post("read")
-  async markRead(@CurrentUser() user: AuthenticatedRequestUser, @Body() _body: MarkConversationReadDto) {
-    const client = await this.access.assertPortalAccess(user.id);
+  async markRead(@CurrentUser() user: AuthenticatedRequestUser,
+    @CurrentSession() session: AuthenticatedSession, @Body() _body: MarkConversationReadDto) {
+    const client = await this.access.assertPortalAccess(user.id, { activeClientId: session.activeClientId });
     const conversation = await this.conversations.getOrCreate(client);
     return this.conversations.markRead(conversation.id, client, user.id);
   }
@@ -90,14 +94,16 @@ export class PortalNotificationController {
   ) {}
 
   @Get()
-  async list(@CurrentUser() user: AuthenticatedRequestUser) {
-    const client = await this.access.assertPortalAccess(user.id);
+  async list(@CurrentUser() user: AuthenticatedRequestUser,
+    @CurrentSession() session: AuthenticatedSession) {
+    const client = await this.access.assertPortalAccess(user.id, { activeClientId: session.activeClientId });
     return this.notifications.listForUser(user.id, requireDietitianAccountId(client));
   }
 
   @Get("unread-count")
-  async unread(@CurrentUser() user: AuthenticatedRequestUser) {
-    const client = await this.access.assertPortalAccess(user.id);
+  async unread(@CurrentUser() user: AuthenticatedRequestUser,
+    @CurrentSession() session: AuthenticatedSession) {
+    const client = await this.access.assertPortalAccess(user.id, { activeClientId: session.activeClientId });
     const count = await this.notifications.unreadCount(user.id, requireDietitianAccountId(client));
     return { count };
   }
@@ -105,9 +111,10 @@ export class PortalNotificationController {
   @Patch(":notificationId/read")
   async markRead(
     @CurrentUser() user: AuthenticatedRequestUser,
+    @CurrentSession() session: AuthenticatedSession,
     @Param("notificationId", ParseUUIDPipe) notificationId: string,
   ) {
-    await this.access.assertPortalAccess(user.id);
+    await this.access.assertPortalAccess(user.id, { activeClientId: session.activeClientId });
     return this.notifications.markRead(user.id, notificationId);
   }
 }

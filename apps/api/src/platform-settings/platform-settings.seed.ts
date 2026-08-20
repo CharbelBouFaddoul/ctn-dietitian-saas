@@ -19,6 +19,7 @@ export async function seedPlatformSettings(prisma: PrismaClient): Promise<void> 
       ctaText: defaults.ctaText,
       ctaHref: defaults.ctaHref,
       ctaVisible: defaults.ctaVisible,
+      registrationEnabled: defaults.registrationEnabled,
       dietitianSignInLabel: defaults.dietitianSignInLabel,
       patientSignInLabel: defaults.patientSignInLabel,
       footerDescription: defaults.footerDescription,

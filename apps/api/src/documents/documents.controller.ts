@@ -17,9 +17,9 @@ import { ApiBody, ApiConsumes, ApiCookieAuth, ApiOperation, ApiTags } from "@nes
 import { Throttle, ThrottlerGuard } from "@nestjs/throttler";
 import { THROTTLE_NAMES } from "@nutrition-saas/config";
 import type { Response } from "express";
-import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { CurrentSession, CurrentUser } from "../auth/decorators/current-user.decorator";
 import { SessionGuard } from "../auth/guards/session.guard";
-import type { AuthenticatedRequestUser } from "../auth/auth.types";
+import type { AuthenticatedRequestUser, AuthenticatedSession } from "../auth/auth.types";
 import { ClientAccessService } from "../clients/client-access.service";
 import { DocumentService } from "./document.service";
 import { UpdateDocumentVisibilityDto } from "../messaging/dto/messaging.dto";
@@ -44,18 +44,20 @@ export class PortalDocumentsController {
   ) {}
 
   @Get()
-  async list(@CurrentUser() user: AuthenticatedRequestUser) {
-    const client = await this.access.assertPortalAccess(user.id);
+  async list(@CurrentUser() user: AuthenticatedRequestUser,
+    @CurrentSession() session: AuthenticatedSession) {
+    const client = await this.access.assertPortalAccess(user.id, { activeClientId: session.activeClientId });
     return this.documents.listSharedForPortal(client);
   }
 
   @Get(":documentId/download")
   async download(
     @CurrentUser() user: AuthenticatedRequestUser,
+    @CurrentSession() session: AuthenticatedSession,
     @Param("documentId", ParseUUIDPipe) documentId: string,
     @Res() res: Response,
   ) {
-    const client = await this.access.assertPortalAccess(user.id);
+    const client = await this.access.assertPortalAccess(user.id, { activeClientId: session.activeClientId });
     try {
       const document = await this.documents.getMetadata(documentId, client, true);
       const file = this.documents.openDownloadStream(document);
@@ -75,8 +77,9 @@ export class PortalDocumentsController {
   @UseInterceptors(FileInterceptor("file"))
   @UseGuards(ThrottlerGuard)
   @Throttle({ [THROTTLE_NAMES.UPLOAD]: {} })
-  async upload(@CurrentUser() user: AuthenticatedRequestUser, @UploadedFile() file: UploadedFilePayload) {
-    const client = await this.access.assertPortalAccess(user.id);
+  async upload(@CurrentUser() user: AuthenticatedRequestUser,
+    @CurrentSession() session: AuthenticatedSession, @UploadedFile() file: UploadedFilePayload) {
+    const client = await this.access.assertPortalAccess(user.id, { activeClientId: session.activeClientId });
     if (!file?.buffer?.length) {
       throw new NotFoundException("File is required");
     }

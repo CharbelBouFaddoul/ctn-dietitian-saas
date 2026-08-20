@@ -1,13 +1,14 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
-import { Alert, Button, Field, Input, PasswordInput } from "@nutrition-saas/ui";
-import { api } from "../../../../lib/api";
+import { Alert, Button, Field, Input, PasswordInput, LoadingState } from "@nutrition-saas/ui";
+import { API_URL, api } from "../../../../lib/api";
 import { errorMessage } from "../../../../lib/humanize-error";
 import { AuthShell } from "../../auth-shell";
 
 export default function ClientRegisterPage() {
+  const [enabled, setEnabled] = useState<boolean | null>(null);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -15,6 +16,19 @@ export default function ClientRegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    void fetch(`${API_URL}/api/v1/public/site-settings`)
+      .then(async (res) => {
+        if (!res.ok) {
+          setEnabled(false);
+          return;
+        }
+        const data = (await res.json()) as { registrationEnabled?: boolean };
+        setEnabled(data.registrationEnabled === true);
+      })
+      .catch(() => setEnabled(false));
+  }, []);
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -41,6 +55,34 @@ export default function ClientRegisterPage() {
     } catch (err) {
       setError(errorMessage(err, "Registration failed"));
     }
+  }
+
+  if (enabled === null) {
+    return (
+      <AuthShell title="Create your patient account" audience="client" description="Checking registration availability…">
+        <LoadingState>Loading…</LoadingState>
+      </AuthShell>
+    );
+  }
+
+  if (!enabled) {
+    return (
+      <AuthShell
+        title="Registration is closed"
+        audience="client"
+        description="Self-serve patient registration is currently disabled. Sign in if you already have an account, then join with your dietitian’s code."
+      >
+        <Link href="/auth/client/login" className="ui-btn ui-btn--primary ui-btn--block">
+          Sign in as Patient
+        </Link>
+        <p style={{ marginTop: 16 }}>
+          Already signed in?{" "}
+          <Link href="/client/join" className="ui-link">
+            Enter a join code
+          </Link>
+        </p>
+      </AuthShell>
+    );
   }
 
   return (

@@ -1,17 +1,31 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
-import { Alert, Button, Field, Input, PasswordInput } from "@nutrition-saas/ui";
-import { api } from "../../../../lib/api";
+import { Alert, Button, Field, Input, PasswordInput, LoadingState } from "@nutrition-saas/ui";
+import { API_URL, api } from "../../../../lib/api";
 import { errorMessage } from "../../../../lib/humanize-error";
 import { AuthShell } from "../../auth-shell";
 
 export default function DietitianRegisterPage() {
+  const [enabled, setEnabled] = useState<boolean | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    void fetch(`${API_URL}/api/v1/public/site-settings`)
+      .then(async (res) => {
+        if (!res.ok) {
+          setEnabled(false);
+          return;
+        }
+        const data = (await res.json()) as { registrationEnabled?: boolean };
+        setEnabled(data.registrationEnabled === true);
+      })
+      .catch(() => setEnabled(false));
+  }, []);
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -32,6 +46,33 @@ export default function DietitianRegisterPage() {
     } catch (err) {
       setError(errorMessage(err, "Registration failed"));
     }
+  }
+
+  if (enabled === null) {
+    return (
+      <AuthShell title="Create your practice account" audience="dietitian" description="Checking registration availability…">
+        <LoadingState>Loading…</LoadingState>
+      </AuthShell>
+    );
+  }
+
+  if (!enabled) {
+    return (
+      <AuthShell
+        title="Registration is closed"
+        audience="dietitian"
+        description="Self-serve practice registration is currently disabled. Sign in if you already have an account, or contact the platform administrator."
+      >
+        <Link href="/auth/dietitian/login" className="ui-btn ui-btn--primary ui-btn--block">
+          Sign in as Dietitian
+        </Link>
+        <p style={{ marginTop: 16 }}>
+          <Link href="/contact" className="ui-link">
+            Contact us
+          </Link>
+        </p>
+      </AuthShell>
+    );
   }
 
   return (

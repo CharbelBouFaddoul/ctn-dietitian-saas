@@ -96,6 +96,45 @@ export class UpdatePlatformRoleDto {
   platformRole!: "SUPER_ADMIN" | "ADMIN" | null;
 }
 
+export class ProvisionDietitianDto {
+  @ApiProperty()
+  @IsString()
+  @MinLength(3)
+  @MaxLength(320)
+  email!: string;
+
+  @ApiPropertyOptional({ description: "Practice display name" })
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(120)
+  displayName?: string;
+
+  @ApiPropertyOptional({ description: "Alias for displayName" })
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(120)
+  name?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  firstName?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  lastName?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  planId?: string;
+}
+
 export class CreatePlanDto {
   @ApiProperty()
   @IsString()

@@ -30,7 +30,8 @@ describe("auth rate limiting", () => {
   });
 
   afterAll(async () => {
-    process.env.AUTH_THROTTLE_LIMIT = "100";
+    process.env.AUTH_THROTTLE_LIMIT = "10000";
+    process.env.AUTH_THROTTLE_TTL_MS = "60000";
     await ctx?.app.close();
   });
 
@@ -54,7 +55,7 @@ describe("ai and messaging rate limiting", () => {
   beforeAll(async () => {
     process.env.AI_THROTTLE_LIMIT = "2";
     process.env.MESSAGING_THROTTLE_LIMIT = "2";
-    process.env.AUTH_THROTTLE_LIMIT = "100";
+    process.env.AUTH_THROTTLE_LIMIT = "10000";
     process.env.AI_ENABLED = "true";
     process.env.AI_PROVIDER = "mock";
     ctx = await createAuthTestApp();
@@ -65,8 +66,9 @@ describe("ai and messaging rate limiting", () => {
   });
 
   afterAll(async () => {
-    process.env.AI_THROTTLE_LIMIT = "20";
-    process.env.MESSAGING_THROTTLE_LIMIT = "30";
+    process.env.AI_THROTTLE_LIMIT = "10000";
+    process.env.MESSAGING_THROTTLE_LIMIT = "10000";
+    process.env.AUTH_THROTTLE_LIMIT = "10000";
     await ctx?.app.close();
   });
 
@@ -129,7 +131,7 @@ describe("ai and messaging rate limiting", () => {
 describe("cookie secure flag", () => {
   it("can be forced on via COOKIE_SECURE", async () => {
     process.env.COOKIE_SECURE = "true";
-    process.env.AUTH_THROTTLE_LIMIT = "100";
+    process.env.AUTH_THROTTLE_LIMIT = "10000";
     const ctx = await createAuthTestApp();
     await resetAuthDatabase(ctx.prisma);
 
