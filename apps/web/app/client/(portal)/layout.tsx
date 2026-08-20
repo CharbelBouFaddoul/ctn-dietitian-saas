@@ -101,6 +101,7 @@ export default function ClientPortalLayout({ children }: { children: ReactNode }
       navSections={navSections}
       pathname={pathname}
       linkComponent={Link}
+      collapsible
       footer={
         <Button variant="ghost" size="sm" onClick={() => void onLogout()}>
           Sign out

@@ -1161,6 +1161,15 @@
   color: #e2e8f0;
 }
 
+[data-theme="admin"] .ui-app__collapse-btn:hover {
+  background: rgb(255 255 255 / 10%);
+  color: #ffffff;
+}
+
+[data-theme="admin"] .ui-app__footer .ui-btn:hover {
+  color: #ffffff;
+}
+
 [data-theme="admin"] .ui-page-header {
   position: relative;
   margin-bottom: var(--space-5);

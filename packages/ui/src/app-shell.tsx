@@ -67,7 +67,7 @@ export function AppShell({
   children: ReactNode;
   linkComponent?: ShellLink;
   variant?: "sidebar" | "client";
-  /** Desktop icon-rail collapse (practice). */
+  /** Desktop icon-rail collapse (practice / admin / patient). */
   collapsible?: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -85,7 +85,7 @@ export function AppShell({
         : [];
 
   const rootHref = sections[0]?.items[0]?.href;
-  const showCollapse = collapsible && variant === "sidebar" && (theme === "practice" || theme === "admin");
+  const showCollapse = collapsible && variant === "sidebar";
   const isCollapsed = Boolean(collapsed && showCollapse);
 
   return (
