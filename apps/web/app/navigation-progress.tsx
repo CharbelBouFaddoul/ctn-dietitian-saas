@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 
 /**
- * Thin top progress bar for App Router navigations.
+ * Top progress bar for App Router navigations.
  * Starts on internal link clicks; completes when pathname/search changes.
  */
 export function NavigationProgress() {
@@ -50,7 +50,7 @@ export function NavigationProgress() {
     hideTimer.current = setTimeout(() => {
       setActive(false);
       setDone(false);
-    }, 280);
+    }, 160);
     return () => {
       if (hideTimer.current) clearTimeout(hideTimer.current);
     };

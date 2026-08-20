@@ -937,7 +937,7 @@
     0 10px 28px rgb(15 23 42 / 3.5%);
   backdrop-filter: blur(6px);
   transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
-  animation: ui-practice-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: ui-practice-rise 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 [data-theme="practice"] .ui-section:hover {
@@ -1215,7 +1215,7 @@
   padding: 1.05rem 1.15rem 1.2rem;
   margin: 0 0 1rem;
   box-shadow: 0 1px 2px rgb(15 23 42 / 3%), 0 8px 22px rgb(15 23 42 / 3%);
-  animation: ui-admin-rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: ui-admin-rise 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 [data-theme="admin"] .ui-section__title {
@@ -1312,7 +1312,7 @@
   background: #fff;
   border: 1px solid rgb(15 23 42 / 7%);
   box-shadow: 0 4px 12px rgb(15 23 42 / 4%);
-  animation: ui-admin-rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: ui-admin-rise 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .ui-admin-metric__label {
@@ -1661,7 +1661,7 @@
     0 10px 28px rgb(15 23 42 / 3.5%);
   backdrop-filter: blur(6px);
   transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
-  animation: ui-client-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: ui-client-rise 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 [data-theme="client"] .ui-section:hover {
@@ -1782,7 +1782,7 @@
     linear-gradient(125deg, #0f766e 0%, #0d9488 42%, #14b8a6 100%);
   color: #fff;
   box-shadow: 0 16px 40px rgb(15 118 110 / 22%);
-  animation: ui-client-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: ui-client-rise 0.26s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .ui-client-welcome__copy {
@@ -1869,7 +1869,7 @@
   border: 1px solid rgb(15 23 42 / 6%);
   box-shadow: 0 4px 14px rgb(15 23 42 / 4%);
   min-height: 5.5rem;
-  animation: ui-client-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: ui-client-rise 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .ui-client-metric:nth-child(2) { animation-delay: 0.04s; }
@@ -2212,7 +2212,7 @@
   border-radius: 18px;
   padding: 1.15rem 1.25rem 1.25rem;
   box-shadow: 0 12px 32px rgb(15 23 42 / 5%);
-  animation: ui-client-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: ui-client-rise 0.26s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .ui-client-chat__bubbles {
@@ -2706,23 +2706,24 @@
   position: fixed;
   top: 0;
   left: 0;
-  height: 2px;
+  height: 4px;
   width: 0;
   z-index: 100;
   pointer-events: none;
   background: var(--color-accent, var(--mkt-teal, #0d9488));
-  transition: width 0.28s ease-out, opacity 0.2s ease;
+  box-shadow: 0 0 10px rgb(13 148 136 / 45%);
+  transition: width 0.2s ease-out, opacity 0.15s ease;
 }
 
 .ui-nav-progress.is-active {
-  width: 72%;
-  transition: width 8s cubic-bezier(0.1, 0.4, 0.2, 1);
+  width: 78%;
+  transition: width 1.15s cubic-bezier(0.15, 0.55, 0.25, 1);
 }
 
 .ui-nav-progress.is-done {
   width: 100%;
   opacity: 0;
-  transition: width 0.18s ease-out, opacity 0.25s ease 0.05s;
+  transition: width 0.12s ease-out, opacity 0.18s ease 0.02s;
 }
 
 .ui-practice-dash {
@@ -2746,7 +2747,7 @@
   background: linear-gradient(125deg, #0f766e 0%, #0d9488 48%, #14b8a6 100%);
   color: #fff;
   box-shadow: 0 16px 40px rgb(15 118 110 / 20%);
-  animation: ui-practice-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: ui-practice-rise 0.26s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .ui-practice-welcome__copy {
@@ -2840,7 +2841,7 @@
   border: 1px solid rgb(15 23 42 / 6%);
   box-shadow: 0 4px 14px rgb(15 23 42 / 4%);
   min-height: 5.75rem;
-  animation: ui-practice-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: ui-practice-rise 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .ui-practice-metric:nth-child(2) { animation-delay: 0.04s; }

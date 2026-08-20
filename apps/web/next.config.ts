@@ -5,6 +5,9 @@ const nextConfig: NextConfig = {
   output: "standalone",
   outputFileTracingRoot: path.join(__dirname, "../.."),
   transpilePackages: ["@nutrition-saas/ui"],
+  experimental: {
+    optimizePackageImports: ["@nutrition-saas/ui"],
+  },
 };
 
 export default nextConfig;
