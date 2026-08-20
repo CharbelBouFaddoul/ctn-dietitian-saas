@@ -6,10 +6,8 @@ import { useParams } from "next/navigation";
 import {
   Alert,
   EmptyState,
-  PageHeader,
   Section,
   Skeleton,
-  StatCard,
   Table,
   Td,
   humanizeLabel,
@@ -19,6 +17,7 @@ import { clientIdentityLine } from "../../../lib/client-identity";
 import { errorMessage } from "../../../lib/humanize-error";
 import { formatDate, formatMoney } from "../../../lib/format";
 import { activityLabel } from "../../../lib/practice-labels";
+import { PracticeAccents } from "./practice-accents";
 import { usePractice } from "./practice-shell";
 
 interface Dashboard {
@@ -60,6 +59,14 @@ function greetingForNow(now = new Date()): string {
   return "Good evening";
 }
 
+function todayLabel(now = new Date()): string {
+  return now.toLocaleDateString(undefined, {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
+}
+
 export default function PracticeDashboardPage() {
   const params = useParams<{ organizationId: string }>();
   const organizationId = params.organizationId;
@@ -77,24 +84,103 @@ export default function PracticeDashboardPage() {
   }, [organizationId]);
 
   const greeting = useMemo(() => greetingForNow(), []);
+  const dateLabel = useMemo(() => todayLabel(), []);
+
+  const metrics = [
+    {
+      tone: "clients" as const,
+      label: "Active clients",
+      value: loading ? "—" : String(data?.activeClients ?? 0),
+      hint: `${data?.newClientsThisMonth ?? 0} new this month`,
+      icon: PracticeAccents.clients,
+    },
+    {
+      tone: "tasks" as const,
+      label: "My tasks",
+      value: loading ? "—" : String(data?.myTasks ?? 0),
+      hint: `${data?.myOverdueTasks ?? 0} overdue`,
+      icon: PracticeAccents.tasks,
+    },
+    {
+      tone: "billing" as const,
+      label: "Outstanding",
+      value: loading ? "—" : String(data?.outstandingInvoices ?? 0),
+      hint: `${data?.overdueInvoices ?? 0} overdue`,
+      icon: PracticeAccents.billing,
+    },
+    {
+      tone: "paid" as const,
+      label: "Paid this month",
+      value: loading ? "—" : formatMoney(data?.paidThisMonth),
+      hint: data?.invoicedThisMonth != null ? `Invoiced ${formatMoney(data.invoicedThisMonth)}` : undefined,
+      icon: PracticeAccents.paid,
+    },
+  ];
 
   return (
     <section className="ui-practice-dash">
-      <PageHeader
-        title={greeting}
-        description={`Here’s what’s happening in ${practice.name} today.`}
-        actions={
-          <div className="ui-row">
-            <Link href={`/orgs/${organizationId}/calendar`} className="ui-btn ui-btn--secondary">
-              Open calendar
-            </Link>
-            <Link href={`/orgs/${organizationId}/clients`} className="ui-btn ui-btn--primary">
+      <header className="ui-practice-welcome">
+        <div className="ui-practice-welcome__copy">
+          <p className="ui-practice-welcome__eyebrow">{dateLabel}</p>
+          <h1>{greeting}</h1>
+          <p>Here’s what’s happening in {practice.name} today — clients, schedule, and follow-ups.</p>
+          <div className="ui-practice-welcome__actions">
+            <Link href={`/orgs/${organizationId}/clients`} className="ui-btn ui-btn--primary ui-btn--sm">
               Open clients
             </Link>
+            <Link href={`/orgs/${organizationId}/calendar`} className="ui-btn ui-btn--secondary ui-btn--sm">
+              Open calendar
+            </Link>
           </div>
-        }
-      />
+        </div>
+        <div className="ui-practice-welcome__orb" aria-hidden="true" />
+      </header>
+
       {error ? <Alert tone="danger">{error}</Alert> : null}
+
+      <div className="ui-practice-metrics" aria-label="Practice overview">
+        {loading
+          ? [0, 1, 2, 3].map((key) => <Skeleton key={key} style={{ height: 96, borderRadius: 14 }} />)
+          : metrics.map((metric) => (
+              <div key={metric.tone} className="ui-practice-metric" data-tone={metric.tone}>
+                <span className="ui-practice-metric__icon">{metric.icon}</span>
+                <span className="ui-practice-metric__label">{metric.label}</span>
+                <strong className="ui-practice-metric__value">{metric.value}</strong>
+                {metric.hint ? <span className="ui-practice-metric__hint">{metric.hint}</span> : null}
+              </div>
+            ))}
+      </div>
+
+      <nav className="ui-practice-quick" aria-label="Quick links">
+        <Link href={`/orgs/${organizationId}/clients`} className="ui-practice-quick__item" data-tone="clients">
+          <span className="ui-practice-quick__icon">{PracticeAccents.clients}</span>
+          <span>
+            <strong>Clients</strong>
+            <span className="ui-muted">Roster & profiles</span>
+          </span>
+        </Link>
+        <Link href={`/orgs/${organizationId}/calendar`} className="ui-practice-quick__item" data-tone="schedule">
+          <span className="ui-practice-quick__icon">{PracticeAccents.schedule}</span>
+          <span>
+            <strong>Calendar</strong>
+            <span className="ui-muted">Appointments</span>
+          </span>
+        </Link>
+        <Link href={`/orgs/${organizationId}/messages`} className="ui-practice-quick__item" data-tone="messages">
+          <span className="ui-practice-quick__icon">{PracticeAccents.messages}</span>
+          <span>
+            <strong>Messages</strong>
+            <span className="ui-muted">Client conversations</span>
+          </span>
+        </Link>
+        <Link href={`/orgs/${organizationId}/tasks`} className="ui-practice-quick__item" data-tone="tasks">
+          <span className="ui-practice-quick__icon">{PracticeAccents.tasks}</span>
+          <span>
+            <strong>Tasks</strong>
+            <span className="ui-muted">Due & overdue work</span>
+          </span>
+        </Link>
+      </nav>
 
       <div className="ui-practice-dash__layout">
         <div className="ui-practice-dash__primary">
@@ -115,7 +201,14 @@ export default function PracticeDashboardPage() {
                 <Skeleton style={{ height: 18, width: "62%" }} />
               </div>
             ) : (data?.upcomingAppointments ?? []).length === 0 ? (
-              <EmptyState title="No upcoming appointments" action={<Link href={`/orgs/${organizationId}/calendar`} className="ui-btn ui-btn--secondary ui-btn--sm">Open calendar</Link>}>
+              <EmptyState
+                title="No upcoming appointments"
+                action={
+                  <Link href={`/orgs/${organizationId}/calendar`} className="ui-btn ui-btn--secondary ui-btn--sm">
+                    Open calendar
+                  </Link>
+                }
+              >
                 Nothing scheduled yet. Book from a client workspace or the calendar.
               </EmptyState>
             ) : (
@@ -168,35 +261,16 @@ export default function PracticeDashboardPage() {
         </div>
 
         <aside className="ui-practice-dash__aside">
-          <Section title="Practice overview" description="Snapshot from your practice data — not trend estimates.">
-            <div className="ui-practice-stat-stack">
-              <StatCard
-                label="Active clients"
-                value={loading ? "—" : (data?.activeClients ?? 0)}
-                hint={`${data?.newClientsThisMonth ?? 0} new this month`}
-              />
-              <StatCard
-                label="My tasks"
-                value={loading ? "—" : (data?.myTasks ?? 0)}
-                hint={`${data?.myOverdueTasks ?? 0} overdue`}
-              />
-              <StatCard
-                label="Outstanding invoices"
-                value={loading ? "—" : (data?.outstandingInvoices ?? 0)}
-                hint={`${data?.overdueInvoices ?? 0} overdue`}
-              />
-              <StatCard label="Paid this month" value={loading ? "—" : formatMoney(data?.paidThisMonth)} />
-            </div>
-          </Section>
-
-          <Section title="Recent activity">
+          <Section title="Recent activity" description="Latest client and practice events.">
             {loading ? (
               <div className="ui-stack">
                 <Skeleton style={{ height: 14, width: "90%" }} />
                 <Skeleton style={{ height: 14, width: "70%" }} />
               </div>
             ) : (data?.recentActivity ?? []).length === 0 ? (
-              <p className="ui-muted">No recent activity yet.</p>
+              <p className="ui-muted" style={{ margin: 0 }}>
+                No recent activity yet.
+              </p>
             ) : (
               <ol className="ui-practice-timeline">
                 {(data?.recentActivity ?? []).map((row) => (

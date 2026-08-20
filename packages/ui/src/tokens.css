@@ -90,6 +90,18 @@
   --practice-warm-white: #fafaf9;
   --practice-soft-mint: #f0fdfa;
   --practice-pale-teal: #ccfbf1;
+  --practice-tone-clients: #0d9488;
+  --practice-tone-clients-soft: #ecfdf8;
+  --practice-tone-tasks: #ea580c;
+  --practice-tone-tasks-soft: #fff7ed;
+  --practice-tone-billing: #2563eb;
+  --practice-tone-billing-soft: #eff6ff;
+  --practice-tone-schedule: #7c3aed;
+  --practice-tone-schedule-soft: #f5f3ff;
+  --practice-tone-messages: #0284c7;
+  --practice-tone-messages-soft: #e0f2fe;
+  --practice-tone-paid: #16a34a;
+  --practice-tone-paid-soft: #dcfce7;
 }
 
 [data-theme="client"] {
