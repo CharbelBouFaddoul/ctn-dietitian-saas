@@ -8,6 +8,7 @@ export {
   Card,
   StatCard,
   Badge,
+  StatusBadge,
   Alert,
   EmptyState,
   LoadingState,
@@ -20,11 +21,14 @@ export {
   Td,
   Tabs,
   Tooltip,
+  Section,
+  FilterBar,
+  SearchInput,
 } from "./display";
 export { Dialog, ConfirmDialog, Dropdown, DropdownItem } from "./overlay";
 export { ToastProvider, useToast, Toast } from "./toast";
 export { AppShell, Sidebar } from "./app-shell";
-export type { NavItem, ShellLink } from "./app-shell";
+export type { NavItem, NavSection, ShellLink } from "./app-shell";
 export { MarketingShell, AuthLayout } from "./marketing";
 export type {
   MarketingSiteSettings,

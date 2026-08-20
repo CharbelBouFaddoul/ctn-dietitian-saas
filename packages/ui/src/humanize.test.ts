@@ -10,7 +10,7 @@ describe("humanizeLabel", () => {
   });
 
   it("title-cases unknown snake_case values", () => {
-    assert.equal(humanizeLabel("due_today"), "Due Today");
+    assert.equal(humanizeLabel("meal_check_in"), "Meal Check In");
     assert.equal(humanizeLabel("DRAFT"), "Draft");
   });
 });

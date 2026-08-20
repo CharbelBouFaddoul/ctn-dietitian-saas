@@ -62,10 +62,34 @@
 }
 
 [data-theme="practice"] {
-  --color-bg: #f4f7f6;
-  --color-accent: #0f766e;
-  --color-accent-hover: #0d5f59;
+  --color-bg: #fafaf9;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f0fdfa;
+  --color-text: #0f172a;
+  --color-muted: #64748b;
+  --color-accent: #0d9488;
+  --color-accent-hover: #0f766e;
   --color-accent-soft: #ccfbf1;
+  --color-border: #e2e8f0;
+  --color-danger: #dc2626;
+  --color-danger-soft: #fee2e2;
+  --color-success: #16a34a;
+  --color-success-soft: #dcfce7;
+  --color-warning: #d97706;
+  --color-warning-soft: #fef3c7;
+  --color-info: #2563eb;
+  --color-info-soft: #dbeafe;
+  --focus-ring: 0 0 0 3px rgb(13 148 136 / 28%);
+  --sidebar-width: 260px;
+  --sidebar-collapsed-width: 72px;
+  --practice-deep-teal: #0f766e;
+  --practice-teal: #0d9488;
+  --practice-bright-teal: #14b8a6;
+  --practice-navy: #0f172a;
+  --practice-slate: #334155;
+  --practice-warm-white: #fafaf9;
+  --practice-soft-mint: #f0fdfa;
+  --practice-pale-teal: #ccfbf1;
 }
 
 [data-theme="client"] {

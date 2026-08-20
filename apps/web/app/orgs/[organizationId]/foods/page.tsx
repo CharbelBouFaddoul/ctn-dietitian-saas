@@ -3,7 +3,21 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import {
+  Alert,
+  Badge,
+  Button,
+  EmptyState,
+  Field,
+  PageHeader,
+  Select,
+  Table,
+  Td,
+} from "@nutrition-saas/ui";
 import { api } from "../../../../lib/api";
+import { errorMessage } from "../../../../lib/humanize-error";
+import { unitLabel } from "../../../../lib/practice-labels";
+
 interface NutritionValues {
   energyKcal: number | null;
   proteinG: number | null;
@@ -35,7 +49,7 @@ interface FoodSource {
   name: string;
 }
 
-function formatNutrient(value: number | null): string {
+function fmtNutrient(value: number | null): string {
   return value === null ? "—" : String(value);
 }
 
@@ -52,13 +66,13 @@ export default function FoodsPage() {
   const [error, setError] = useState<string | null>(null);
 
   const query = useMemo(() => {
-    const params = new URLSearchParams();
-    if (q) params.set("q", q);
-    if (category) params.set("category", category);
-    if (sourceId) params.set("sourceId", sourceId);
-    params.set("page", String(page));
-    params.set("pageSize", "20");
-    return params.toString();
+    const p = new URLSearchParams();
+    if (q) p.set("q", q);
+    if (category) p.set("category", category);
+    if (sourceId) p.set("sourceId", sourceId);
+    p.set("page", String(page));
+    p.set("pageSize", "20");
+    return p.toString();
   }, [q, category, sourceId, page]);
 
   async function load() {
@@ -73,7 +87,7 @@ export default function FoodsPage() {
       setCategories(categoryRows);
       setSources(sourceRows);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to load foods");
+      setError(errorMessage(err, "Unable to load foods"));
     }
   }
 
@@ -88,91 +102,132 @@ export default function FoodsPage() {
   }
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
+  const items = data?.items ?? [];
 
   return (
     <section>
-      <h1>Food database</h1>
-      <p style={{ color: "var(--color-muted)" }}>
-        Search the internal catalog. Changing a food creates an organization override; the global record is never
-        edited.
-      </p>
-      {error ? <p style={{ color: "var(--color-danger)" }}>{error}</p> : null}
-      <form onSubmit={onSearch} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr auto", gap: 12 }}>
-        <label className="ui-field">
-          Search
-          <input className="ui-input" value={q} onChange={(event) => setQ(event.target.value)} />
-        </label>
-        <label className="ui-field">
-          Category
-          <select className="ui-input" value={category} onChange={(event) => { setCategory(event.target.value); setPage(1); }}>
-            <option value="">All</option>
+      <PageHeader
+        title="Food database"
+        description="Search the internal catalog. Editing a food creates a practice override — the global record is never changed."
+      />
+
+      {error ? <Alert tone="danger">{error}</Alert> : null}
+
+      <form onSubmit={onSearch} className="ui-grid" style={{ margin: "20px 0", alignItems: "end" }}>
+        <Field label="Search">
+          <input
+            className="ui-input"
+            value={q}
+            onChange={(event) => setQ(event.target.value)}
+            placeholder="Food name…"
+          />
+        </Field>
+        <Field label="Category">
+          <Select
+            value={category}
+            onChange={(event) => {
+              setCategory(event.target.value);
+              setPage(1);
+            }}
+          >
+            <option value="">All categories</option>
             {categories.map((item) => (
               <option key={item} value={item}>
                 {item}
               </option>
             ))}
-          </select>
-        </label>
-        <label className="ui-field">
-          Source
-          <select className="ui-input" value={sourceId} onChange={(event) => { setSourceId(event.target.value); setPage(1); }}>
-            <option value="">All</option>
+          </Select>
+        </Field>
+        <Field label="Source">
+          <Select
+            value={sourceId}
+            onChange={(event) => {
+              setSourceId(event.target.value);
+              setPage(1);
+            }}
+          >
+            <option value="">All sources</option>
             {sources.map((item) => (
               <option key={item.id} value={item.id}>
                 {item.name}
               </option>
             ))}
-          </select>
-        </label>
-        <button type="submit" className="ui-btn ui-btn--primary" style={{alignSelf: "end", height: 38}}>
-          Search
-        </button>
+          </Select>
+        </Field>
+        <div>
+          <Button type="submit">Apply filters</Button>
+        </div>
       </form>
-      <table className="ui-table">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Category</th>
-            <th>kcal</th>
-            <th>Protein</th>
-            <th>Source</th>
-            <th>Values</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data?.items.map((row) => (
-            <tr key={row.id}>
-              <td>
-                <Link href={`/orgs/${organizationId}/foods/${row.id}`} style={{ color: "var(--color-accent)" }}>
-                  {row.name}
-                </Link>
-              </td>
-              <td>{row.category ?? "—"}</td>
-              <td>
-                {formatNutrient(row.presentedNutrition.energyKcal)} / {row.referenceQuantity} {row.referenceUnit}
-              </td>
-              <td>{formatNutrient(row.presentedNutrition.proteinG)}</td>
-              <td>{row.source.name}</td>
-              <td>{row.hasOverride ? "Practice food" : "Catalog food"}</td>
+
+      {items.length === 0 ? (
+        <EmptyState title={q ? "No foods match this search" : "No foods found"}>
+          {q ? "Try a different search term or clear filters." : "No foods available for this source or category."}
+        </EmptyState>
+      ) : (
+        <Table>
+          <thead>
+            <tr>
+              <th>Food</th>
+              <th>Category</th>
+              <th>Reference</th>
+              <th>Calories</th>
+              <th>Protein</th>
+              <th>Source</th>
+              <th>Values</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-      <p style={{ marginTop: 12, display: "flex", gap: 12, alignItems: "center" }}>
-        <button type="button" className="ui-btn ui-btn--primary" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>
-          Previous
-        </button>
-        <span>
+          </thead>
+          <tbody>
+            {items.map((row) => (
+              <tr key={row.id}>
+                <Td label="Food">
+                  <Link href={`/orgs/${organizationId}/foods/${row.id}`} className="ui-link">
+                    {row.name}
+                  </Link>
+                </Td>
+                <Td label="Category">{row.category ?? "—"}</Td>
+                <Td label="Reference">
+                  {row.referenceQuantity} {unitLabel(row.referenceUnit)}
+                </Td>
+                <Td label="Calories">
+                  {fmtNutrient(row.presentedNutrition.energyKcal)} kcal
+                </Td>
+                <Td label="Protein">{fmtNutrient(row.presentedNutrition.proteinG)}g</Td>
+                <Td label="Source">
+                  <span className="ui-muted">{row.source.name}</span>
+                </Td>
+                <Td label="Values">
+                  {row.hasOverride ? (
+                    <Badge tone="accent">Practice food</Badge>
+                  ) : (
+                    <Badge tone="neutral">Catalog food</Badge>
+                  )}
+                </Td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      )}
+
+      <p className="ui-row" style={{ marginTop: 16 }}>
+        <span className="ui-muted">
           Page {data?.page ?? page} of {totalPages} ({data?.total ?? 0} foods)
         </span>
-        <button
-          type="button"
-          className="ui-btn ui-btn--primary"
+        <Button
+          variant="secondary"
+          size="sm"
+          disabled={page <= 1}
+          onClick={() => setPage((p) => p - 1)}
+        >
+          Previous
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
           disabled={page >= totalPages}
-          onClick={() => setPage((value) => value + 1)}
+          onClick={() => setPage((p) => p + 1)}
         >
           Next
-        </button>
+        </Button>
       </p>
     </section>
   );

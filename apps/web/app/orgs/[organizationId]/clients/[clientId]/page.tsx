@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   Alert,
+  Avatar,
   Badge,
   Button,
   Card,
@@ -13,7 +14,11 @@ import {
   Field,
   Input,
   PageHeader,
+  Section,
   Select,
+  Skeleton,
+  StatCard,
+  StatusBadge,
   Table,
   Tabs,
   Td,
@@ -23,11 +28,10 @@ import {
 import { AiPanel } from "../../../../../components/ai-panel";
 import { JoinCodePanel } from "../../../../../components/join-code-panel";
 import { api, apiUrl } from "../../../../../lib/api";
-import { connectionStatusLabel } from "../../../../../lib/connection-status";
-import { formatDate, formatMoney, nutritionLabel, statusTone } from "../../../../../lib/format";
+import { formatDate, formatMoney, nutritionLabel } from "../../../../../lib/format";
 import { errorMessage } from "../../../../../lib/humanize-error";
 import { canManageClients } from "../../../../../lib/practice-access";
-import { shortId } from "../../../../../lib/client-identity";
+import { portalStatusLabel, statusLabel, activityLabel } from "../../../../../lib/practice-labels";
 import { usePractice } from "../../practice-shell";
 
 type Tab =
@@ -61,9 +65,27 @@ function isTab(value: string | null): value is Tab {
 
 export default function ClientWorkspaceRoute() {
   return (
-    <Suspense fallback={<p className="ui-muted">Loading client…</p>}>
+    <Suspense fallback={<ClientWorkspaceSkeleton />}>
       <ClientWorkspacePage />
     </Suspense>
+  );
+}
+
+function ClientWorkspaceSkeleton() {
+  return (
+    <section>
+      <header className="ui-page-header">
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <Skeleton style={{ width: 48, height: 48, borderRadius: "50%" }} />
+          <div>
+            <Skeleton style={{ width: 200, height: 28, marginBottom: 8 }} />
+            <Skeleton style={{ width: 140, height: 18 }} />
+          </div>
+        </div>
+      </header>
+      <Skeleton style={{ width: "100%", height: 44, margin: "16px 0" }} />
+      <Skeleton style={{ width: "100%", height: 200, borderRadius: 8 }} />
+    </section>
   );
 }
 
@@ -94,7 +116,7 @@ function ClientWorkspacePage() {
   const [assessments, setAssessments] = useState<Array<{ id: string; status: string; templateName: string; templateVersion: number }>>([]);
   const [appointments, setAppointments] = useState<Array<{ id: string; title: string; startAt: string; status: string }>>([]);
   const [timeline, setTimeline] = useState<Array<{ id: string; type: string; occurredAt: string }>>([]);
-  const [tags, setTags] = useState<Array<{ id: string; name: string }>>([]);
+  const [, setTags] = useState<Array<{ id: string; name: string }>>([]);
   const [templates, setTemplates] = useState<Array<{ id: string; name: string; version: number }>>([]);
   const [members, setMembers] = useState<Array<{ id: string; email: string }>>([]);
   const [plans, setPlans] = useState<Array<{ id: string; name: string; status: string; client: { id: string } }>>([]);
@@ -144,7 +166,7 @@ function ClientWorkspacePage() {
           api<typeof assessments>(`${base}/assessments`),
           api<typeof appointments>(`${base}/appointments`),
           api<typeof timeline>(`${base}/timeline`),
-          api<typeof tags>(`/api/v1/organizations/${organizationId}/tags`),
+          api<Array<{ id: string; name: string }>>(`/api/v1/organizations/${organizationId}/tags`),
           api<typeof templates>(`/api/v1/organizations/${organizationId}/assessment-templates`),
           api<Array<{ id: string; email: string; status: string }>>(`/api/v1/organizations/${organizationId}/members`),
           api<{ items: typeof plans }>(`/api/v1/organizations/${organizationId}/meal-plans`),
@@ -211,180 +233,342 @@ function ClientWorkspacePage() {
   }, [tab, base]);
 
   const name = client ? `${client.firstName} ${client.lastName}` : "Client";
+  const connectionStatus = client?.connectionStatus ?? portalAccount?.connectionStatus;
+  const activeAssignee = client?.assignments.find((row) => row.active)?.email;
 
   return (
     <section>
       <PageHeader
-        eyebrow="Client workspace"
+        eyebrow="Client chart"
         title={name}
-        description={`${client?.email ?? "No email"} · ${shortId(clientId)} · ${humanizeLabel(client?.status)} · ${connectionStatusLabel(client?.connectionStatus ?? portalAccount?.connectionStatus)}`}
+        description={
+          client ? (
+            <span style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
+              <StatusBadge status={client.status} label={statusLabel(client.status)} />
+              <StatusBadge status={connectionStatus ?? undefined} label={portalStatusLabel(connectionStatus)} />
+              {client.email ? <span>{client.email}</span> : null}
+            </span>
+          ) : undefined
+        }
+        actions={
+          client ? (
+            <Avatar name={name} />
+          ) : undefined
+        }
       />
-      <Tabs items={tabs} value={tab} onChange={selectTab} />
-      {error ? <Alert tone="danger">{error}</Alert> : null}
 
+      <Tabs items={tabs} value={tab} onChange={selectTab} />
+
+      {error ? <div style={{ margin: "12px 0" }}><Alert tone="danger">{error}</Alert></div> : null}
+
+      {/* ── OVERVIEW ── */}
       {tab === "overview" && client && profile ? (
         <div className="ui-stack">
-          <Card title="Chart">
-            <p>Assigned: {client.assignments.find((row) => row.active)?.email ?? "None"}</p>
-            <p>Phone: {client.phone ?? "—"}</p>
-            {allowManage ? (
+
+          {/* Quick-info strip */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
+              gap: 12,
+              padding: "4px 0 8px",
+            }}
+          >
+            <StatCard
+              label="Status"
+              value={<StatusBadge status={client.status} label={statusLabel(client.status)} />}
+            />
+            <StatCard
+              label="Portal"
+              value={<StatusBadge status={connectionStatus ?? undefined} label={portalStatusLabel(connectionStatus)} />}
+            />
+            <StatCard
+              label="Assigned to"
+              value={activeAssignee ?? "—"}
+            />
+            {client.phone ? <StatCard label="Phone" value={client.phone} /> : null}
+            {client.tags.length > 0 ? (
+              <StatCard
+                label="Tags"
+                value={
+                  <span style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                    {client.tags.map((tag) => (
+                      <Badge key={tag.id} tone="neutral">{tag.name}</Badge>
+                    ))}
+                  </span>
+                }
+              />
+            ) : null}
+          </div>
+
+          {/* Reassign + Archive */}
+          {allowManage ? (
+            <Card title="Chart management">
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "flex-end" }}>
+                <form
+                  className="ui-row"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void api(`${base}/assignments`, {
+                      method: "POST",
+                      body: JSON.stringify({ organizationMemberId: assignTo }),
+                    }).then(() => load());
+                  }}
+                >
+                  <Field label="Reassign to">
+                    <Select value={assignTo} onChange={(event) => setAssignTo(event.target.value)}>
+                      <option value="">Select member</option>
+                      {members.map((member) => (
+                        <option key={member.id} value={member.id}>
+                          {member.email}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                  <Button type="submit" disabled={!assignTo}>
+                    Assign
+                  </Button>
+                </form>
+                {client.status !== "ARCHIVED" ? (
+                  <Button variant="danger" onClick={() => setConfirmArchive(true)}>
+                    Archive client
+                  </Button>
+                ) : null}
+              </div>
+            </Card>
+          ) : null}
+
+          {/* Goals */}
+          <Section
+            title="Goals"
+            actions={
               <form
                 className="ui-row"
                 onSubmit={(event) => {
                   event.preventDefault();
-                  void api(`${base}/assignments`, {
-                    method: "POST",
-                    body: JSON.stringify({ organizationMemberId: assignTo }),
-                  }).then(() => load());
+                  void api(`${base}/goals`, { method: "POST", body: JSON.stringify({ title: goalTitle }) }).then(() => {
+                    setGoalTitle("");
+                    return load();
+                  });
                 }}
               >
-                <Field label="Reassign">
-                  <Select value={assignTo} onChange={(event) => setAssignTo(event.target.value)}>
-                    <option value="">Select member</option>
-                    {members.map((member) => (
-                      <option key={member.id} value={member.id}>
-                        {member.email}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-                <Button type="submit" disabled={!assignTo}>
-                  Assign
-                </Button>
+                <Input
+                  value={goalTitle}
+                  onChange={(event) => setGoalTitle(event.target.value)}
+                  placeholder="New goal…"
+                  required
+                />
+                <Button type="submit" size="sm">Add</Button>
               </form>
-            ) : null}
-            {allowManage && client.status !== "ARCHIVED" ? (
-              <Button variant="danger" onClick={() => setConfirmArchive(true)}>
-                Archive client
-              </Button>
-            ) : null}
-          </Card>
-          <Card title="Profile">
+            }
+          >
+            {goals.length === 0 ? (
+              <EmptyState title="No goals yet" />
+            ) : (
+              <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+                {goals.map((goal) => (
+                  <li
+                    key={goal.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "8px 12px",
+                      borderRadius: 8,
+                      border: "1px solid var(--color-border)",
+                      background: "var(--color-surface)",
+                    }}
+                  >
+                    <span>{goal.title}</span>
+                    <StatusBadge status={goal.status} label={humanizeLabel(goal.status)} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Section>
+
+          {/* Profile */}
+          <Card title="Dietary profile">
             <form
               onSubmit={(event) => {
                 event.preventDefault();
                 void api(`${base}/profile`, { method: "PATCH", body: JSON.stringify(profile) }).then(() => load());
               }}
             >
-              {(["allergies", "intolerances", "dietaryPreferences", "notes"] as const).map((key) => (
-                <Field key={key} label={humanizeLabel(key)}>
-                  <Textarea
-                    value={profile[key] ?? ""}
-                    onChange={(event) => setProfile({ ...profile, [key]: event.target.value })}
-                  />
-                </Field>
-              ))}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+                  gap: 12,
+                }}
+              >
+                {(["allergies", "intolerances", "dietaryPreferences", "notes"] as const).map((key) => (
+                  <Field key={key} label={humanizeLabel(key)}>
+                    <Textarea
+                      value={profile[key] ?? ""}
+                      onChange={(event) => setProfile({ ...profile, [key]: event.target.value })}
+                      style={{ minHeight: 80 }}
+                    />
+                  </Field>
+                ))}
+              </div>
               <Button type="submit">Save profile</Button>
             </form>
           </Card>
-          <Card title="Goals">
-            <form
-              className="ui-row"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void api(`${base}/goals`, { method: "POST", body: JSON.stringify({ title: goalTitle }) }).then(() => {
-                  setGoalTitle("");
-                  return load();
-                });
-              }}
-            >
-              <Field label="Goal">
-                <Input value={goalTitle} onChange={(event) => setGoalTitle(event.target.value)} required />
-              </Field>
-              <Button type="submit">Add</Button>
-            </form>
-            {goals.length === 0 ? <EmptyState title="No goals yet" /> : (
-              <ul>
-                {goals.map((goal) => (
-                  <li key={goal.id}>
-                    {goal.title} ({humanizeLabel(goal.status)})
+
+          {/* Measurements */}
+          <Section
+            title="Measurements"
+            actions={
+              <form
+                className="ui-row"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void api(`${base}/measurements`, {
+                    method: "POST",
+                    body: JSON.stringify({ type: "WEIGHT", value: Number(weight), unit: "kg", measuredAt: new Date().toISOString() }),
+                  }).then(() => {
+                    setWeight("");
+                    return load();
+                  });
+                }}
+              >
+                <Input
+                  type="number"
+                  step="0.1"
+                  value={weight}
+                  onChange={(event) => setWeight(event.target.value)}
+                  placeholder="Weight (kg)"
+                  required
+                  style={{ width: 130 }}
+                />
+                <Button type="submit" size="sm">Record</Button>
+              </form>
+            }
+          >
+            {measurements.length === 0 ? (
+              <p className="ui-muted">No measurements recorded yet.</p>
+            ) : (
+              <Table>
+                <thead>
+                  <tr>
+                    <th>Type</th>
+                    <th>Value</th>
+                    <th>Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {measurements.map((row) => (
+                    <tr key={row.id}>
+                      <Td label="Type">{humanizeLabel(row.type)}</Td>
+                      <Td label="Value">
+                        {row.value} {row.unit}
+                      </Td>
+                      <Td label="Date">{formatDate(row.measuredAt)}</Td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            )}
+          </Section>
+
+          {/* Timeline */}
+          <Section title="Recent activity">
+            {timeline.length === 0 ? (
+              <p className="ui-muted">No activity yet.</p>
+            ) : (
+              <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 6 }}>
+                {timeline.slice(0, 20).map((row) => (
+                  <li
+                    key={row.id}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: "6px 0",
+                      borderBottom: "1px solid var(--color-border)",
+                      fontSize: "0.875rem",
+                    }}
+                  >
+                    <span>{activityLabel(row.type)}</span>
+                    <span className="ui-muted">{formatDate(row.occurredAt)}</span>
                   </li>
                 ))}
               </ul>
             )}
-          </Card>
-          <Card title="Measurements">
-            <form
-              className="ui-row"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void api(`${base}/measurements`, {
-                  method: "POST",
-                  body: JSON.stringify({ type: "WEIGHT", value: Number(weight), unit: "kg", measuredAt: new Date().toISOString() }),
-                }).then(() => {
-                  setWeight("");
-                  return load();
-                });
-              }}
-            >
-              <Field label="Weight (kg)">
-                <Input type="number" step="0.1" value={weight} onChange={(event) => setWeight(event.target.value)} required />
-              </Field>
-              <Button type="submit">Record</Button>
-            </form>
-            {measurements.length === 0 ? <p className="ui-muted">No measurements yet.</p> : (
-              <ul>
-                {measurements.map((row) => (
-                  <li key={row.id}>
-                    {humanizeLabel(row.type)} {row.value} {row.unit} · {formatDate(row.measuredAt)}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-          <Card title="Timeline">
-            {timeline.length === 0 ? <p className="ui-muted">No activity yet.</p> : (
-              <ul>
-                {timeline.map((row) => (
-                  <li key={row.id}>
-                    {humanizeLabel(row.type)} · {formatDate(row.occurredAt)}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-          <Card title="Tags">
-            <p>{client.tags.map((tag) => tag.name).join(", ") || "No tags"}</p>
-            <p className="ui-muted">{tags.length} tags in this practice.</p>
-          </Card>
+          </Section>
         </div>
       ) : null}
 
+      {/* ── ASSESSMENTS ── */}
       {tab === "assessments" ? (
-        <Card title="Assessments">
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              void api(`${base}/assessments`, { method: "POST", body: JSON.stringify({ templateId }) }).then(() => load());
-            }}
-          >
-            <Field label="Template">
-              <Select value={templateId} onChange={(event) => setTemplateId(event.target.value)}>
-                {templates.map((template) => (
-                  <option key={template.id} value={template.id}>
-                    {template.name} (v{template.version})
-                  </option>
+        <div className="ui-stack">
+          {templates.length > 0 ? (
+            <Card title="Start an assessment">
+              <form
+                className="ui-row"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void api(`${base}/assessments`, { method: "POST", body: JSON.stringify({ templateId }) }).then(() => load());
+                }}
+              >
+                <Field label="Template">
+                  <Select value={templateId} onChange={(event) => setTemplateId(event.target.value)}>
+                    {templates.map((template) => (
+                      <option key={template.id} value={template.id}>
+                        {template.name} (v{template.version})
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                <Button type="submit" disabled={!templateId}>
+                  Start assessment
+                </Button>
+              </form>
+            </Card>
+          ) : null}
+
+          <Section title="Assessments">
+            {assessments.length === 0 ? (
+              <EmptyState title="No assessments yet" />
+            ) : (
+              <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+                {assessments.map((row) => (
+                  <li
+                    key={row.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "10px 14px",
+                      borderRadius: 8,
+                      border: "1px solid var(--color-border)",
+                      background: "var(--color-surface)",
+                    }}
+                  >
+                    <span>
+                      {row.templateName}{" "}
+                      <span className="ui-muted">v{row.templateVersion}</span>
+                    </span>
+                    <StatusBadge status={row.status} label={humanizeLabel(row.status)} />
+                  </li>
                 ))}
-              </Select>
-            </Field>
-            <Button type="submit" disabled={!templateId}>
-              Start assessment
-            </Button>
-          </form>
-          {assessments.length === 0 ? <EmptyState title="No assessments yet" /> : (
-            <ul>
-              {assessments.map((row) => (
-                <li key={row.id}>
-                  {row.templateName} v{row.templateVersion} · {humanizeLabel(row.status)}
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
+              </ul>
+            )}
+          </Section>
+        </div>
       ) : null}
 
+      {/* ── MEAL PLAN ── */}
       {tab === "meal-plan" ? (
-        <Card title="Meal plans">
+        <Section
+          title="Meal plans"
+          actions={
+            <Link href={`/orgs/${organizationId}/meal-plans`} className="ui-btn ui-btn--secondary ui-btn--sm">
+              All meal plans
+            </Link>
+          }
+        >
           {plans.length === 0 ? (
             <EmptyState
               title="No meal plans for this client"
@@ -395,138 +579,240 @@ function ClientWorkspacePage() {
               }
             />
           ) : (
-            <ul>
+            <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8 }}>
               {plans.map((plan) => (
-                <li key={plan.id}>
-                  <Link href={`/orgs/${organizationId}/meal-plans/${plan.id}`} className="ui-link">
+                <li
+                  key={plan.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "10px 14px",
+                    borderRadius: 8,
+                    border: "1px solid var(--color-border)",
+                    background: "var(--color-surface)",
+                  }}
+                >
+                  <Link href={`/orgs/${organizationId}/meal-plans/${plan.id}`} className="ui-link" style={{ fontWeight: 500 }}>
                     {plan.name}
-                  </Link>{" "}
-                  · {humanizeLabel(plan.status)}
+                  </Link>
+                  <StatusBadge status={plan.status} label={humanizeLabel(plan.status)} />
                 </li>
               ))}
             </ul>
           )}
-        </Card>
+        </Section>
       ) : null}
 
+      {/* ── TRACKING ── */}
       {tab === "tracking" ? (
-        <Card title="Tracking">
-          <Field label="Date">
-            <Input type="date" value={trackingDate} onChange={(event) => setTrackingDate(event.target.value)} />
-          </Field>
+        <div className="ui-stack">
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <Field label="Date">
+              <Input type="date" value={trackingDate} onChange={(event) => setTrackingDate(event.target.value)} />
+            </Field>
+          </div>
+
           {trackingSummary ? (
             <>
-              <p>
-                {nutritionLabel(trackingSummary.food.presented.energyKcal, "kcal")} · protein{" "}
-                {nutritionLabel(trackingSummary.food.presented.proteinG, "g")} · water {trackingSummary.water.totalLiters.toFixed(1)} L
-                · exercise {trackingSummary.exercise.totalDurationMinutes} min
-              </p>
-              <Table>
-                <thead>
-                  <tr>
-                    <th>Food</th>
-                    <th>Quantity</th>
-                    <th>kcal</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {trackingFood.map((row) => (
-                    <tr key={row.id}>
-                      <Td label="Food">{row.foodName}</Td>
-                      <Td label="Quantity">
-                        {row.quantity} {humanizeLabel(row.unit)}
-                      </Td>
-                      <Td label="kcal">{row.presented.energyKcal ?? "—"}</Td>
-                    </tr>
-                  ))}
-                </tbody>
-              </Table>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))",
+                  gap: 12,
+                }}
+              >
+                <StatCard
+                  label="Calories"
+                  value={nutritionLabel(trackingSummary.food.presented.energyKcal, "kcal")}
+                />
+                <StatCard
+                  label="Protein"
+                  value={nutritionLabel(trackingSummary.food.presented.proteinG, "g")}
+                />
+                <StatCard
+                  label="Water"
+                  value={`${trackingSummary.water.totalLiters.toFixed(1)} L`}
+                />
+                <StatCard
+                  label="Exercise"
+                  value={`${trackingSummary.exercise.totalDurationMinutes} min`}
+                />
+              </div>
+
+              {trackingFood.length > 0 ? (
+                <Card title="Food log">
+                  <Table>
+                    <thead>
+                      <tr>
+                        <th>Food</th>
+                        <th>Quantity</th>
+                        <th>Calories</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {trackingFood.map((row) => (
+                        <tr key={row.id}>
+                          <Td label="Food">{row.foodName}</Td>
+                          <Td label="Quantity">
+                            {row.quantity} {humanizeLabel(row.unit)}
+                          </Td>
+                          <Td label="Calories">
+                            {row.presented.energyKcal != null ? `${row.presented.energyKcal} kcal` : "—"}
+                          </Td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </Table>
+                </Card>
+              ) : (
+                <EmptyState title="No food logged for this day" />
+              )}
             </>
           ) : (
-            <p className="ui-muted">Loading tracking…</p>
-          )}
-        </Card>
-      ) : null}
-
-      {tab === "messages" ? (
-        <Card title="Messages">
-          <div className="ui-stack" style={{ marginBottom: 16 }}>
-            {chatMessages.map((message) => (
-              <div key={message.id} className="ui-card">
-                <div>{message.body}</div>
-                <div className="ui-hint">{formatDate(message.createdAt)}</div>
-              </div>
-            ))}
-            {chatMessages.length === 0 ? <EmptyState title="No messages yet" /> : null}
-          </div>
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              void api(`${base}/conversation/messages`, { method: "POST", body: JSON.stringify({ body: messageBody }) })
-                .then(() => {
-                  setMessageBody("");
-                  return api<typeof chatMessages>(`${base}/conversation/messages`);
-                })
-                .then(setChatMessages);
-            }}
-          >
-            <Field label="Message">
-              <Textarea value={messageBody} onChange={(event) => setMessageBody(event.target.value)} />
-            </Field>
-            <Button type="submit">Send</Button>
-          </form>
-        </Card>
-      ) : null}
-
-      {tab === "documents" ? (
-        <Card title="Documents">
-          <form
-            className="ui-row"
-            onSubmit={(event) => {
-              event.preventDefault();
-              const form = event.currentTarget;
-              const fileInput = form.elements.namedItem("file") as HTMLInputElement;
-              const visibilityInput = form.elements.namedItem("visibility") as HTMLSelectElement;
-              const file = fileInput.files?.[0];
-              if (!file) return;
-              const body = new FormData();
-              body.append("file", file);
-              body.append("visibility", visibilityInput.value);
-              void fetch(apiUrl(`${base}/documents`), { method: "POST", body, credentials: "include" }).then((res) => {
-                if (!res.ok) throw new Error("Upload failed");
-                fileInput.value = "";
-                return api<typeof clientDocuments>(`${base}/documents`).then(setClientDocuments);
-              });
-            }}
-          >
-            <input type="file" name="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.docx" />
-            <select name="visibility" defaultValue="INTERNAL" className="ui-select">
-              <option value="INTERNAL">Internal</option>
-              <option value="SHARED">Shared with client</option>
-            </select>
-            <Button type="submit">Upload</Button>
-          </form>
-          {clientDocuments.length === 0 ? <EmptyState title="No documents yet" /> : (
-            <ul>
-              {clientDocuments.map((doc) => (
-                <li key={doc.id}>
-                  {doc.filename} · {humanizeLabel(doc.visibility)}
-                </li>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+              {[1, 2, 3, 4].map((i) => (
+                <Skeleton key={i} style={{ height: 80, borderRadius: 8 }} />
               ))}
-            </ul>
+            </div>
           )}
-        </Card>
+        </div>
       ) : null}
 
+      {/* ── MESSAGES ── */}
+      {tab === "messages" ? (
+        <div className="ui-stack">
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
+              maxHeight: 480,
+              overflowY: "auto",
+              padding: "4px 0",
+            }}
+          >
+            {chatMessages.length === 0 ? (
+              <EmptyState title="No messages yet" />
+            ) : (
+              chatMessages.map((message) => (
+                <div
+                  key={message.id}
+                  style={{
+                    padding: "10px 14px",
+                    borderRadius: 10,
+                    border: "1px solid var(--color-border)",
+                    background: "var(--color-surface)",
+                  }}
+                >
+                  <div style={{ marginBottom: 4, whiteSpace: "pre-wrap" }}>{message.body}</div>
+                  <div className="ui-hint">{formatDate(message.createdAt)}</div>
+                </div>
+              ))
+            )}
+          </div>
+          <Card title="New message">
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                void api(`${base}/conversation/messages`, { method: "POST", body: JSON.stringify({ body: messageBody }) })
+                  .then(() => {
+                    setMessageBody("");
+                    return api<typeof chatMessages>(`${base}/conversation/messages`);
+                  })
+                  .then(setChatMessages);
+              }}
+            >
+              <Field label="Message">
+                <Textarea
+                  value={messageBody}
+                  onChange={(event) => setMessageBody(event.target.value)}
+                  placeholder="Type a message to the client…"
+                  style={{ minHeight: 100 }}
+                />
+              </Field>
+              <Button type="submit" disabled={!messageBody.trim()}>
+                Send message
+              </Button>
+            </form>
+          </Card>
+        </div>
+      ) : null}
+
+      {/* ── DOCUMENTS ── */}
+      {tab === "documents" ? (
+        <div className="ui-stack">
+          <Card title="Upload document">
+            <form
+              className="ui-row"
+              onSubmit={(event) => {
+                event.preventDefault();
+                const form = event.currentTarget;
+                const fileInput = form.elements.namedItem("file") as HTMLInputElement;
+                const visibilityInput = form.elements.namedItem("visibility") as HTMLSelectElement;
+                const file = fileInput.files?.[0];
+                if (!file) return;
+                const body = new FormData();
+                body.append("file", file);
+                body.append("visibility", visibilityInput.value);
+                void fetch(apiUrl(`${base}/documents`), { method: "POST", body, credentials: "include" }).then((res) => {
+                  if (!res.ok) throw new Error("Upload failed");
+                  fileInput.value = "";
+                  return api<typeof clientDocuments>(`${base}/documents`).then(setClientDocuments);
+                });
+              }}
+            >
+              <input type="file" name="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.docx" style={{ flex: 1 }} />
+              <Select name="visibility" defaultValue="INTERNAL" style={{ width: "auto" }}>
+                <option value="INTERNAL">Internal only</option>
+                <option value="SHARED">Shared with client</option>
+              </Select>
+              <Button type="submit">Upload</Button>
+            </form>
+          </Card>
+
+          {clientDocuments.length === 0 ? (
+            <EmptyState title="No documents yet" />
+          ) : (
+            <Section title="Documents">
+              <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+                {clientDocuments.map((doc) => (
+                  <li
+                    key={doc.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "8px 14px",
+                      borderRadius: 8,
+                      border: "1px solid var(--color-border)",
+                      background: "var(--color-surface)",
+                    }}
+                  >
+                    <span style={{ fontWeight: 500 }}>{doc.filename}</span>
+                    <Badge tone={doc.visibility === "SHARED" ? "info" : "neutral"}>
+                      {humanizeLabel(doc.visibility)}
+                    </Badge>
+                  </li>
+                ))}
+              </ul>
+            </Section>
+          )}
+        </div>
+      ) : null}
+
+      {/* ── INVOICES ── */}
       {tab === "invoices" ? (
-        <Card title="Invoices">
-          {clientInvoices.length === 0 ? <EmptyState title="No invoices for this client" /> : (
+        <Section title="Invoices">
+          {clientInvoices.length === 0 ? (
+            <EmptyState title="No invoices for this client" />
+          ) : (
             <Table>
               <thead>
                 <tr>
                   <th>Invoice</th>
                   <th>Status</th>
-                  <th>Due</th>
+                  <th>Due date</th>
                   <th>Total</th>
                 </tr>
               </thead>
@@ -539,56 +825,82 @@ function ClientWorkspacePage() {
                       </Link>
                     </Td>
                     <Td label="Status">
-                      <Badge tone={statusTone(row.status)}>{humanizeLabel(row.status)}</Badge>
+                      <StatusBadge status={row.status} label={humanizeLabel(row.status)} />
                     </Td>
-                    <Td label="Due">{row.dueDate ?? "—"}</Td>
+                    <Td label="Due date">{row.dueDate ?? "—"}</Td>
                     <Td label="Total">{formatMoney(row.total, row.currency)}</Td>
                   </tr>
                 ))}
               </tbody>
             </Table>
           )}
-        </Card>
+        </Section>
       ) : null}
 
+      {/* ── APPOINTMENTS ── */}
       {tab === "appointments" ? (
-        <Card title="Appointments">
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              void api(`${base}/appointments`, {
-                method: "POST",
-                body: JSON.stringify({
-                  title: appointmentTitle,
-                  startAt: new Date(startAt).toISOString(),
-                  endAt: new Date(endAt).toISOString(),
-                }),
-              }).then(() => load());
-            }}
-          >
-            <Field label="Title">
-              <Input value={appointmentTitle} onChange={(event) => setAppointmentTitle(event.target.value)} required />
-            </Field>
-            <Field label="Start">
-              <Input type="datetime-local" value={startAt} onChange={(event) => setStartAt(event.target.value)} required />
-            </Field>
-            <Field label="End">
-              <Input type="datetime-local" value={endAt} onChange={(event) => setEndAt(event.target.value)} required />
-            </Field>
-            <Button type="submit">Schedule</Button>
-          </form>
-          {appointments.length === 0 ? <EmptyState title="No appointments yet" /> : (
-            <ul>
-              {appointments.map((row) => (
-                <li key={row.id}>
-                  {row.title} · {humanizeLabel(row.status)} · {formatDate(row.startAt)}
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
+        <div className="ui-stack">
+          <Card title="Schedule appointment">
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                void api(`${base}/appointments`, {
+                  method: "POST",
+                  body: JSON.stringify({
+                    title: appointmentTitle,
+                    startAt: new Date(startAt).toISOString(),
+                    endAt: new Date(endAt).toISOString(),
+                  }),
+                }).then(() => load());
+              }}
+            >
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+                <Field label="Title">
+                  <Input value={appointmentTitle} onChange={(event) => setAppointmentTitle(event.target.value)} required />
+                </Field>
+                <Field label="Start">
+                  <Input type="datetime-local" value={startAt} onChange={(event) => setStartAt(event.target.value)} required />
+                </Field>
+                <Field label="End">
+                  <Input type="datetime-local" value={endAt} onChange={(event) => setEndAt(event.target.value)} required />
+                </Field>
+              </div>
+              <Button type="submit">Schedule</Button>
+            </form>
+          </Card>
+
+          <Section title="Appointments">
+            {appointments.length === 0 ? (
+              <EmptyState title="No appointments yet" />
+            ) : (
+              <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+                {appointments.map((row) => (
+                  <li
+                    key={row.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "10px 14px",
+                      borderRadius: 8,
+                      border: "1px solid var(--color-border)",
+                      background: "var(--color-surface)",
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 500 }}>{row.title}</div>
+                      <div className="ui-hint">{formatDate(row.startAt)}</div>
+                    </div>
+                    <StatusBadge status={row.status} label={humanizeLabel(row.status)} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Section>
+        </div>
       ) : null}
 
+      {/* ── AI ── */}
       {tab === "ai" ? (
         <div className="ui-stack">
           <AiPanel organizationId={organizationId} clientId={clientId} action="client-summary" title="Client summary" description="Concise overview from profile, goals, tracking, and meal-plan context." />
@@ -599,11 +911,12 @@ function ClientWorkspacePage() {
         </div>
       ) : null}
 
+      {/* ── PORTAL ── */}
       {tab === "portal" ? (
         <JoinCodePanel
           title="Reconnect portal"
           description="Use this only for an existing chart. New clients create their own account and join with the practice code from the Clients page."
-          connectionStatus={client?.connectionStatus ?? portalAccount?.connectionStatus}
+          connectionStatus={connectionStatus}
           plainJoinCode={plainJoinCode}
           hint={portalAccount?.joinCode?.hint ?? null}
           expiresAt={portalAccount?.joinCode?.expiresAt ?? null}
@@ -622,7 +935,7 @@ function ClientWorkspacePage() {
           onCopy={() => plainJoinCode && void navigator.clipboard.writeText(plainJoinCode)}
           onRevoke={() => setConfirmRevoke(true)}
           onDeactivate={
-            allowManage && (client?.connectionStatus ?? portalAccount?.connectionStatus) === "connected"
+            allowManage && connectionStatus === "connected"
               ? () => setConfirmDeactivate(true)
               : undefined
           }

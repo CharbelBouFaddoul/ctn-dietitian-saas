@@ -41,7 +41,7 @@ export function Badge({
   tone = "accent",
 }: {
   children: ReactNode;
-  tone?: "accent" | "neutral" | "danger" | "success" | "warning";
+  tone?: "accent" | "neutral" | "danger" | "success" | "warning" | "info";
 }) {
   const cls =
     tone === "accent"
@@ -52,8 +52,91 @@ export function Badge({
           ? "ui-badge ui-badge--danger"
           : tone === "success"
             ? "ui-badge ui-badge--success"
-            : "ui-badge ui-badge--warning";
+            : tone === "info"
+              ? "ui-badge ui-badge--info"
+              : "ui-badge ui-badge--warning";
   return <span className={cls}>{children}</span>;
+}
+
+export function StatusBadge({
+  status,
+  label,
+  tone,
+}: {
+  status?: string | null;
+  label?: string;
+  tone?: "accent" | "neutral" | "danger" | "success" | "warning" | "info";
+}) {
+  const raw = status ?? "";
+  const resolvedTone =
+    tone ??
+    (/(PAID|COMPLETED|PUBLISHED|ACTIVE|CONNECTED|SUCCESS)/i.test(raw)
+      ? "success"
+      : /(OVERDUE|CANCELLED|FAILED|DANGER|EXPIRED|DENIED)/i.test(raw)
+        ? "danger"
+        : /(PENDING|DRAFT|WAITING|OPEN|SENT|ISSUED|PAUSED|WARNING)/i.test(raw)
+          ? "warning"
+          : "neutral");
+  const text = label ?? raw;
+  return <Badge tone={resolvedTone}>{text}</Badge>;
+}
+
+export function Section({
+  title,
+  description,
+  actions,
+  children,
+  className,
+  tone = "plain",
+}: {
+  title?: string;
+  description?: ReactNode;
+  actions?: ReactNode;
+  children: ReactNode;
+  className?: string;
+  tone?: "plain" | "muted" | "mint";
+}) {
+  return (
+    <section className={cn("ui-section", tone !== "plain" && `ui-section--${tone}`, className)}>
+      {title || description || actions ? (
+        <div className="ui-section__head">
+          <div>
+            {title ? <h2 className="ui-section__title">{title}</h2> : null}
+            {description ? <p className="ui-section__desc">{description}</p> : null}
+          </div>
+          {actions ? <div className="ui-row">{actions}</div> : null}
+        </div>
+      ) : null}
+      <div className="ui-section__body">{children}</div>
+    </section>
+  );
+}
+
+export function FilterBar({ children, className }: { children: ReactNode; className?: string }) {
+  return <div className={cn("ui-filter-bar", className)}>{children}</div>;
+}
+
+export function SearchInput({
+  value,
+  onChange,
+  placeholder = "Search…",
+  "aria-label": ariaLabel = "Search",
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  "aria-label"?: string;
+}) {
+  return (
+    <input
+      className="ui-input ui-search-input"
+      type="search"
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      placeholder={placeholder}
+      aria-label={ariaLabel}
+    />
+  );
 }
 
 export function Alert({

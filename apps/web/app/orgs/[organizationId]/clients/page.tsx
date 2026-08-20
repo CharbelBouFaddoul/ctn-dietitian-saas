@@ -10,19 +10,18 @@ import {
   Card,
   ConfirmDialog,
   EmptyState,
-  Field,
-  Input,
+  FilterBar,
   PageHeader,
+  SearchInput,
   Select,
+  StatusBadge,
   Table,
   Td,
   humanizeLabel,
 } from "@nutrition-saas/ui";
 import { api } from "../../../../lib/api";
-import { connectionStatusLabel } from "../../../../lib/connection-status";
-import { shortId } from "../../../../lib/client-identity";
 import { errorMessage } from "../../../../lib/humanize-error";
-import { statusTone } from "../../../../lib/format";
+import { portalStatusLabel } from "../../../../lib/practice-labels";
 import { canManageClients } from "../../../../lib/practice-access";
 import { usePractice } from "../practice-shell";
 
@@ -87,6 +86,7 @@ export default function ClientsPage() {
   const [plainJoinCode, setPlainJoinCode] = useState<string | null>(null);
   const [inviteBusy, setInviteBusy] = useState(false);
   const [confirmRevoke, setConfirmRevoke] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const query = useMemo(() => {
     const params = new URLSearchParams();
@@ -138,6 +138,7 @@ export default function ClientsPage() {
   }
 
   const pageCount = Math.max(1, Math.ceil((data?.total ?? 0) / 20));
+  const hasFilters = Boolean(q || status || tagId || assignedMemberId);
 
   async function generatePracticeCode() {
     setInviteBusy(true);
@@ -176,6 +177,13 @@ export default function ClientsPage() {
     }
   }
 
+  async function handleCopy() {
+    if (!plainJoinCode) return;
+    await navigator.clipboard.writeText(plainJoinCode);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
   return (
     <section>
       <PageHeader
@@ -184,40 +192,62 @@ export default function ClientsPage() {
         actions={
           allowCreate ? (
             <Link href={`/orgs/${organizationId}/clients/new`} className="ui-btn ui-btn--secondary">
-              Add a chart manually
+              Add chart manually
             </Link>
           ) : null
         }
       />
+
       {error ? <Alert tone="danger">{error}</Alert> : null}
 
       {allowCreate ? (
-        <Card title="Invite clients">
+        <Card title="Practice join code">
           <p className="ui-muted">
-            Generate one practice code and send it to people who already created a client account. They enter it after
-            signing in, then they show up on this list.
+            Share this code with clients who already have an account. They enter it after signing in and appear on this
+            list automatically.
           </p>
+
           {plainJoinCode ? (
-            <p className="ui-code">{plainJoinCode}</p>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "12px 0" }}>
+              <code
+                style={{
+                  fontFamily: "monospace",
+                  fontSize: "1.5rem",
+                  letterSpacing: "0.15em",
+                  fontWeight: 700,
+                  background: "var(--color-surface-raised, #f5f5f5)",
+                  padding: "8px 20px",
+                  borderRadius: 8,
+                  border: "1px solid var(--color-border)",
+                }}
+              >
+                {plainJoinCode}
+              </code>
+            </div>
           ) : joinCode?.hint ? (
-            <p>
-              Code ending in <strong>{joinCode.hint}</strong>
+            <p className="ui-muted" style={{ margin: "12px 0" }}>
+              Active code ending in <strong>{joinCode.hint}</strong>
             </p>
           ) : (
-            <p className="ui-muted">No join code yet.</p>
+            <p className="ui-muted" style={{ margin: "12px 0" }}>
+              No join code active.
+            </p>
           )}
+
           {joinCode?.expiresAt ? (
-            <p className="ui-muted">
-              {joinCode.status === "expired" ? "Expired" : "Expires"} {new Date(joinCode.expiresAt).toLocaleString()}
+            <p className="ui-hint">
+              {joinCode.status === "expired" ? "Expired" : "Expires"}{" "}
+              {new Date(joinCode.expiresAt).toLocaleString()}
             </p>
           ) : null}
-          <div className="ui-row">
+
+          <div className="ui-row" style={{ marginTop: 12 }}>
             <Button disabled={inviteBusy} onClick={() => void generatePracticeCode()}>
               {joinCode?.status === "active" || joinCode?.status === "expired" ? "Regenerate code" : "Generate join code"}
             </Button>
             {plainJoinCode ? (
-              <Button variant="secondary" onClick={() => void navigator.clipboard.writeText(plainJoinCode)}>
-                Copy
+              <Button variant="secondary" onClick={() => void handleCopy()}>
+                {copied ? "Copied!" : "Copy code"}
               </Button>
             ) : null}
             {joinCode?.status === "active" || joinCode?.status === "expired" ? (
@@ -229,56 +259,59 @@ export default function ClientsPage() {
         </Card>
       ) : null}
 
-      <form onSubmit={onFilter} className="ui-grid" style={{ margin: "20px 0" }}>
-        <Field label="Search">
-          <Input value={q} onChange={(event) => setQ(event.target.value)} />
-        </Field>
-        <Field label="Status">
-          <Select value={status} onChange={(event) => setStatus(event.target.value)}>
-            <option value="">All</option>
+      <form onSubmit={onFilter} style={{ margin: "20px 0" }}>
+        <FilterBar>
+          <SearchInput
+            value={q}
+            onChange={(value) => { setQ(value); setPage(1); }}
+            placeholder="Search by name or email…"
+            aria-label="Search clients"
+          />
+          <Select value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }}>
+            <option value="">All statuses</option>
             <option value="PENDING">Pending</option>
             <option value="ACTIVE">Active</option>
             <option value="INACTIVE">Inactive</option>
             <option value="ARCHIVED">Archived</option>
           </Select>
-        </Field>
-        <Field label="Tag">
-          <Select value={tagId} onChange={(event) => setTagId(event.target.value)}>
-            <option value="">All</option>
-            {tags.map((tag) => (
-              <option key={tag.id} value={tag.id}>
-                {tag.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Assigned">
-          <Select value={assignedMemberId} onChange={(event) => setAssignedMemberId(event.target.value)}>
-            <option value="">All</option>
-            {members.map((member) => (
-              <option key={member.id} value={member.id}>
-                {member.email} ({humanizeLabel(member.role)})
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <div style={{ alignSelf: "end" }}>
-          <Button type="submit">Apply filters</Button>
-        </div>
+          {tags.length > 0 ? (
+            <Select value={tagId} onChange={(event) => { setTagId(event.target.value); setPage(1); }}>
+              <option value="">All tags</option>
+              {tags.map((tag) => (
+                <option key={tag.id} value={tag.id}>
+                  {tag.name}
+                </option>
+              ))}
+            </Select>
+          ) : null}
+          {members.length > 0 ? (
+            <Select value={assignedMemberId} onChange={(event) => { setAssignedMemberId(event.target.value); setPage(1); }}>
+              <option value="">All assignees</option>
+              {members.map((member) => (
+                <option key={member.id} value={member.id}>
+                  {member.email} ({humanizeLabel(member.role)})
+                </option>
+              ))}
+            </Select>
+          ) : null}
+          <Button type="submit" variant="secondary" size="sm">
+            Apply
+          </Button>
+        </FilterBar>
       </form>
 
       {(data?.items ?? []).length === 0 ? (
         <EmptyState
-          title={q || status || tagId || assignedMemberId ? "No clients match these filters" : "No clients yet"}
+          title={hasFilters ? "No clients match these filters" : "No clients yet"}
           action={
-            allowCreate && !q && !status && !tagId && !assignedMemberId ? (
+            allowCreate && !hasFilters ? (
               <Button onClick={() => void generatePracticeCode()}>Generate a join code</Button>
             ) : undefined
           }
         >
-          {q || status || tagId || assignedMemberId
-            ? "Try a different search."
-            : "Share your practice join code. Manual charts are a secondary option."}
+          {hasFilters
+            ? "Try adjusting your search or clearing the filters."
+            : "Share your practice join code with clients. Manual charts are a secondary option."}
         </EmptyState>
       ) : (
         <Table>
@@ -286,9 +319,8 @@ export default function ClientsPage() {
             <tr>
               <th>Name</th>
               <th>Email</th>
-              <th>ID</th>
               <th>Status</th>
-              <th>Assigned</th>
+              <th>Assigned to</th>
               <th>Tags</th>
               <th>Portal</th>
             </tr>
@@ -297,22 +329,47 @@ export default function ClientsPage() {
             {(data?.items ?? []).map((row) => (
               <tr key={row.id}>
                 <Td label="Name">
-                  <Link href={`/orgs/${organizationId}/clients/${row.id}`} className="ui-link">
+                  <Link href={`/orgs/${organizationId}/clients/${row.id}`} className="ui-link" style={{ fontWeight: 500 }}>
                     {row.displayName ?? `${row.firstName} ${row.lastName}`}
                   </Link>
                 </Td>
-                <Td label="Email">{row.email ?? "—"}</Td>
-                <Td label="ID">
-                  <span className="ui-muted">{shortId(row.id)}</span>
+                <Td label="Email">
+                  {row.email ? (
+                    <span className="ui-muted">{row.email}</span>
+                  ) : (
+                    <span className="ui-muted">—</span>
+                  )}
                 </Td>
                 <Td label="Status">
-                  <Badge tone={statusTone(row.status)}>{humanizeLabel(row.status)}</Badge>
+                  <StatusBadge status={row.status} label={humanizeLabel(row.status)} />
                 </Td>
-                <Td label="Assigned">{row.assignedTo?.email ?? "—"}</Td>
-                <Td label="Tags">{row.tags.map((tag) => tag.name).join(", ") || "—"}</Td>
+                <Td label="Assigned to">
+                  {row.assignedTo?.email ? (
+                    <span className="ui-muted">{row.assignedTo.email}</span>
+                  ) : (
+                    <span className="ui-muted">—</span>
+                  )}
+                </Td>
+                <Td label="Tags">
+                  {row.tags.length > 0 ? (
+                    <span style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                      {row.tags.map((tag) => (
+                        <Badge key={tag.id} tone="neutral">
+                          {tag.name}
+                        </Badge>
+                      ))}
+                    </span>
+                  ) : (
+                    <span className="ui-muted">—</span>
+                  )}
+                </Td>
                 <Td label="Portal">
-                  <Link href={`/orgs/${organizationId}/clients/${row.id}?tab=portal`} className="ui-link">
-                    {connectionStatusLabel(row.connectionStatus)}
+                  <Link
+                    href={`/orgs/${organizationId}/clients/${row.id}?tab=portal`}
+                    className="ui-link"
+                    style={{ fontSize: "0.875rem" }}
+                  >
+                    {portalStatusLabel(row.connectionStatus)}
                   </Link>
                 </Td>
               </tr>
@@ -321,15 +378,24 @@ export default function ClientsPage() {
         </Table>
       )}
 
-      <p className="ui-row" style={{ marginTop: 16 }}>
-        Page {data?.page ?? 1} of {pageCount} ({data?.total ?? 0} total)
-        <Button variant="secondary" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
-          Previous
-        </Button>
-        <Button variant="secondary" size="sm" disabled={page >= pageCount} onClick={() => setPage(page + 1)}>
-          Next
-        </Button>
-      </p>
+      {(data?.total ?? 0) > 0 ? (
+        <div
+          className="ui-row"
+          style={{ marginTop: 16, justifyContent: "space-between", alignItems: "center" }}
+        >
+          <span className="ui-muted" style={{ fontSize: "0.875rem" }}>
+            Page {data?.page ?? 1} of {pageCount} &middot; {data?.total ?? 0} client{(data?.total ?? 0) !== 1 ? "s" : ""}
+          </span>
+          <div className="ui-row">
+            <Button variant="secondary" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+              ← Previous
+            </Button>
+            <Button variant="secondary" size="sm" disabled={page >= pageCount} onClick={() => setPage(page + 1)}>
+              Next →
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       <ConfirmDialog
         open={confirmRevoke}

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { Alert, PageHeader, StatCard, humanizeLabel } from "@nutrition-saas/ui";
+import { Alert, Badge, Card, PageHeader, Section, humanizeLabel } from "@nutrition-saas/ui";
 import { api } from "../../../../lib/api";
 import { errorMessage } from "../../../../lib/humanize-error";
 
@@ -14,6 +14,33 @@ interface Usage {
   remaining: number | null;
   periodKey: string;
 }
+
+const AI_TOOLS = [
+  {
+    key: "client-summary",
+    title: "Client summary",
+    description:
+      "A concise overview of a client's health profile, goals, and recent activity — ready to share in a consultation.",
+  },
+  {
+    key: "meal-plan-assistance",
+    title: "Meal plan suggestions",
+    description:
+      "AI-generated meal plan ideas personalised to a client's dietary goals, restrictions, and logged history.",
+  },
+  {
+    key: "message-draft",
+    title: "Message draft",
+    description:
+      "A drafted follow-up message or coaching note — edit before sending. Never goes to the client automatically.",
+  },
+  {
+    key: "consultation-summary",
+    title: "Consultation notes",
+    description:
+      "Talking points, key observations, and follow-up actions summarised after a session.",
+  },
+] as const;
 
 export default function PracticeAiPage() {
   const params = useParams<{ organizationId: string }>();
@@ -27,27 +54,67 @@ export default function PracticeAiPage() {
       .catch((err) => setError(errorMessage(err, "Unable to load AI usage")));
   }, [organizationId]);
 
+  const aiEnabled = usage === null || usage.enabled;
+  const usageText =
+    usage && usage.enabled
+      ? `${usage.used}${usage.limit !== null ? ` / ${usage.limit}` : ""} used this ${humanizeLabel(usage.periodKey)}${usage.remaining !== null ? ` · ${usage.remaining} remaining` : ""}`
+      : null;
+
   return (
     <section>
       <PageHeader
         title="AI assist"
-        description="Drafts you review before anything reaches a client. Open a client workspace to generate summaries, meal-plan suggestions, or message drafts."
+        description="Every AI output is a draft you review — nothing reaches a client without your approval. Open any client workspace to run the tools below."
+        actions={
+          <Link href={`/orgs/${organizationId}/clients`} className="ui-btn ui-btn--primary">
+            Open a client
+          </Link>
+        }
       />
+
       {error ? <Alert tone="danger">{error}</Alert> : null}
-      <div className="ui-grid">
-        <StatCard label="Enabled" value={usage?.enabled ? "Yes" : usage ? "No" : "—"} />
-        <StatCard label="Used" value={usage ? `${usage.used}${usage.limit !== null ? ` / ${usage.limit}` : ""}` : "—"} />
-        <StatCard
-          label="Remaining"
-          value={usage?.remaining ?? "—"}
-          hint={usage?.periodKey ? humanizeLabel(usage.periodKey) : undefined}
-        />
+
+      <div style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
+        {usage !== null ? (
+          <Badge tone={usage.enabled ? "success" : "danger"}>
+            {usage.enabled ? "AI enabled" : "AI not enabled for this practice"}
+          </Badge>
+        ) : (
+          <Badge tone="neutral">Checking…</Badge>
+        )}
+        {usageText ? <Badge tone="neutral">{usageText}</Badge> : null}
       </div>
-      <p style={{ marginTop: 24 }}>
-        <Link href={`/orgs/${organizationId}/clients`} className="ui-btn ui-btn--primary">
-          Open a client
-        </Link>
-      </p>
+
+      <Section
+        title="Available tools"
+        description="All tools run inside a client workspace. Select a client, then look for the AI assist tab."
+      >
+        <div className="ui-grid">
+          {AI_TOOLS.map((tool) => (
+            <Card key={tool.key}>
+              <h3 style={{ margin: "0 0 6px", fontSize: "0.9375rem", fontWeight: 600 }}>{tool.title}</h3>
+              <p className="ui-muted" style={{ margin: 0, fontSize: "0.875rem", lineHeight: 1.55 }}>
+                {tool.description}
+              </p>
+            </Card>
+          ))}
+        </div>
+      </Section>
+
+      {!aiEnabled ? (
+        <Alert tone="warning">
+          AI is not currently enabled for this practice. Contact support to enable the feature.
+        </Alert>
+      ) : (
+        <Section tone="muted">
+          <p style={{ margin: 0, fontSize: "0.875rem" }}>
+            AI tools open inside a client's workspace — not on this page.{" "}
+            <Link href={`/orgs/${organizationId}/clients`} className="ui-link">
+              Browse clients →
+            </Link>
+          </p>
+        </Section>
+      )}
     </section>
   );
 }

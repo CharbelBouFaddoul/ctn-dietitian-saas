@@ -4,9 +4,10 @@ import type { ReactNode } from "react";
 import { createContext, useContext, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
-import { AppShell, Button, LoadingState } from "@nutrition-saas/ui";
+import { AppShell, Button, LoadingState, type NavSection } from "@nutrition-saas/ui";
 import { ApiError, api, logout } from "../../../lib/api";
 import { loginPathFor, resolveSessionHome } from "../../../lib/session-home";
+import { PracticeNavIcons } from "./practice-nav-icons";
 
 interface OrgDetail {
   id: string;
@@ -31,6 +32,13 @@ export function usePractice(): PracticeContextValue {
     throw new Error("usePractice must be used inside PracticeShell");
   }
   return value;
+}
+
+function roleLabel(role: string): string {
+  if (role === "OWNER") return "Owner";
+  if (role === "DIETITIAN") return "Dietitian";
+  if (role === "STAFF") return "Staff";
+  return "Team member";
 }
 
 export function PracticeShell({ children }: { children: ReactNode }) {
@@ -78,21 +86,48 @@ export function PracticeShell({ children }: { children: ReactNode }) {
   }
 
   const membershipId = org.context?.membershipId ?? "";
-  const nav = [
-    { href: `/orgs/${organizationId}`, label: "Dashboard" },
-    { href: `/orgs/${organizationId}/clients`, label: "Clients" },
-    { href: `/orgs/${organizationId}/calendar`, label: "Calendar" },
-    { href: `/orgs/${organizationId}/meal-plans`, label: "Meal plans" },
-    { href: `/orgs/${organizationId}/recipes`, label: "Recipes" },
-    { href: `/orgs/${organizationId}/foods`, label: "Foods" },
-    { href: `/orgs/${organizationId}/messages`, label: "Messages" },
-    { href: `/orgs/${organizationId}/documents`, label: "Documents" },
-    { href: `/orgs/${organizationId}/invoices`, label: "Invoices" },
-    { href: `/orgs/${organizationId}/tasks`, label: "Tasks" },
-    { href: `/orgs/${organizationId}/analytics`, label: "Analytics" },
-    { href: `/orgs/${organizationId}/ai`, label: "AI" },
-    { href: `/orgs/${organizationId}/automations`, label: "Automations" },
-    { href: `/orgs/${organizationId}/settings`, label: "Settings" },
+  const base = `/orgs/${organizationId}`;
+  const navSections: NavSection[] = [
+    {
+      label: "Overview",
+      items: [{ href: base, label: "Dashboard", icon: PracticeNavIcons.dashboard, exact: true }],
+    },
+    {
+      label: "Patients",
+      items: [
+        { href: `${base}/clients`, label: "Clients", icon: PracticeNavIcons.clients },
+        { href: `${base}/calendar`, label: "Calendar", icon: PracticeNavIcons.calendar },
+        { href: `${base}/messages`, label: "Messages", icon: PracticeNavIcons.messages },
+      ],
+    },
+    {
+      label: "Nutrition",
+      items: [
+        { href: `${base}/meal-plans`, label: "Meal Plans", icon: PracticeNavIcons.mealPlans },
+        { href: `${base}/recipes`, label: "Recipes", icon: PracticeNavIcons.recipes },
+        { href: `${base}/foods`, label: "Foods", icon: PracticeNavIcons.foods },
+      ],
+    },
+    {
+      label: "Practice",
+      items: [
+        { href: `${base}/tasks`, label: "Tasks", icon: PracticeNavIcons.tasks },
+        { href: `${base}/documents`, label: "Documents", icon: PracticeNavIcons.documents },
+        { href: `${base}/invoices`, label: "Invoices", icon: PracticeNavIcons.invoices },
+      ],
+    },
+    {
+      label: "Insights",
+      items: [
+        { href: `${base}/analytics`, label: "Analytics", icon: PracticeNavIcons.analytics },
+        { href: `${base}/ai`, label: "AI", icon: PracticeNavIcons.ai },
+        { href: `${base}/automations`, label: "Automations", icon: PracticeNavIcons.automations },
+      ],
+    },
+    {
+      label: "System",
+      items: [{ href: `${base}/settings`, label: "Settings", icon: PracticeNavIcons.settings }],
+    },
   ];
 
   return (
@@ -100,10 +135,11 @@ export function PracticeShell({ children }: { children: ReactNode }) {
       <AppShell
         theme="practice"
         brand={org.name}
-        meta={org.role === "OWNER" ? "Owner" : org.role === "DIETITIAN" ? "Dietitian" : "Staff"}
-        nav={nav}
+        meta={roleLabel(org.role)}
+        navSections={navSections}
         pathname={pathname}
         linkComponent={Link}
+        collapsible
         footer={
           <div className="ui-stack">
             <Link href="/orgs" className="ui-nav-link">

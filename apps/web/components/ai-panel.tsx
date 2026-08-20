@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
-import { Alert, Button, Card, Field, Input, Textarea } from "@nutrition-saas/ui";
+import { Alert, Badge, Button, Card, Field, Input, Section, Textarea } from "@nutrition-saas/ui";
 import { api } from "../lib/api";
 import { errorMessage } from "../lib/humanize-error";
 import { humanizeLabel } from "@nutrition-saas/ui";
@@ -34,14 +34,94 @@ function asList(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
 
+function looksLikeJson(value: string): boolean {
+  const trimmed = value.trim();
+  return (trimmed.startsWith("{") && trimmed.endsWith("}")) || (trimmed.startsWith("[") && trimmed.endsWith("]"));
+}
+
+function SectionLabel({ children }: { children: ReactNode }) {
+  return (
+    <p
+      style={{
+        fontWeight: 600,
+        marginBottom: 6,
+        marginTop: 0,
+        fontSize: "0.8125rem",
+        textTransform: "uppercase",
+        letterSpacing: "0.06em",
+        color: "var(--color-muted)",
+      }}
+    >
+      {children}
+    </p>
+  );
+}
+
+function BulletList({ items }: { items: string[] }) {
+  return (
+    <ul style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 4 }}>
+      {items.map((item, i) => (
+        <li key={i} style={{ lineHeight: 1.55, fontSize: "0.9375rem" }}>
+          {item}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function renderResult(result: Record<string, unknown>): ReactNode {
   const sections: ReactNode[] = [];
-  if (typeof result.overview === "string") sections.push(<p key="overview">{result.overview}</p>);
-  if (typeof result.explanation === "string") sections.push(<p key="explanation">{result.explanation}</p>);
-  if (typeof result.summary === "string") sections.push(<p key="summary">{result.summary}</p>);
-  if (typeof result.subject === "string") sections.push(<p key="subject"><strong>{result.subject}</strong></p>);
-  if (typeof result.body === "string") sections.push(<p key="body" style={{ whiteSpace: "pre-wrap" }}>{result.body}</p>);
 
+  // ── Prose paragraphs ──────────────────────────────────────────────
+  const proseKeys: Array<[string, string?]> = [
+    ["overview"],
+    ["explanation"],
+    ["summary"],
+    ["insights"],
+    ["assessment"],
+    ["narrative"],
+    ["conclusion"],
+  ];
+  for (const [key] of proseKeys) {
+    if (typeof result[key] === "string" && !looksLikeJson(result[key] as string)) {
+      sections.push(
+        <p key={key} style={{ lineHeight: 1.6, marginTop: 0 }}>
+          {result[key] as string}
+        </p>,
+      );
+    }
+  }
+
+  // ── Email/message shape ───────────────────────────────────────────
+  if (typeof result.subject === "string") {
+    sections.push(
+      <p key="subject" style={{ marginTop: 0 }}>
+        <strong>Subject: {result.subject}</strong>
+      </p>,
+    );
+  }
+  if (typeof result.body === "string") {
+    sections.push(
+      <pre
+        key="body"
+        style={{
+          whiteSpace: "pre-wrap",
+          fontFamily: "inherit",
+          lineHeight: 1.6,
+          background: "var(--color-surface-raised, #f8f8f8)",
+          padding: "12px 16px",
+          borderRadius: 8,
+          border: "1px solid var(--color-border)",
+          margin: "8px 0",
+          fontSize: "0.9375rem",
+        }}
+      >
+        {result.body}
+      </pre>,
+    );
+  }
+
+  // ── Named bullet lists ────────────────────────────────────────────
   const namedLists: Array<[string, string]> = [
     ["observations", "Observations"],
     ["adherence", "Adherence"],
@@ -52,35 +132,38 @@ function renderResult(result: Record<string, unknown>): ReactNode {
     ["key_points", "Key points"],
     ["follow_up_questions", "Follow-up questions"],
     ["action_items", "Action items"],
+    ["recommendations", "Recommendations"],
+    ["concerns", "Concerns"],
+    ["priorities", "Priorities"],
+    ["highlights", "Highlights"],
+    ["goals", "Goals"],
   ];
-  for (const [key, title] of namedLists) {
+
+  for (const [key, label] of namedLists) {
     const items = asList(result[key]);
     if (items.length) {
       sections.push(
-        <div key={key}>
-          <h4>{title}</h4>
-          <ul>
-            {items.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
+        <div key={key} style={{ marginTop: 14 }}>
+          <SectionLabel>{label}</SectionLabel>
+          <BulletList items={items} />
         </div>,
       );
     }
   }
 
-  if (Array.isArray(result.suggestions)) {
+  // ── Suggestions (structured objects) ─────────────────────────────
+  if (Array.isArray(result.suggestions) && result.suggestions.length) {
     sections.push(
-      <div key="suggestions">
-        <h4>Suggestions</h4>
-        <ul>
+      <div key="suggestions" style={{ marginTop: 14 }}>
+        <SectionLabel>Suggestions</SectionLabel>
+        <ul style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 6 }}>
           {result.suggestions.map((item, index) => {
             const row = item as { title?: string; meal?: string; notes?: string };
             return (
-              <li key={index}>
+              <li key={index} style={{ lineHeight: 1.55, fontSize: "0.9375rem" }}>
                 <strong>{row.title ?? "Suggestion"}</strong>
-                {row.meal ? ` · ${row.meal}` : ""}
-                {row.notes ? ` — ${row.notes}` : ""}
+                {row.meal ? <span className="ui-muted"> · {row.meal}</span> : null}
+                {row.notes ? <span className="ui-muted"> — {row.notes}</span> : null}
               </li>
             );
           })}
@@ -89,17 +172,20 @@ function renderResult(result: Record<string, unknown>): ReactNode {
     );
   }
 
-  if (Array.isArray(result.substitutions)) {
+  // ── Substitutions ─────────────────────────────────────────────────
+  if (Array.isArray(result.substitutions) && result.substitutions.length) {
     sections.push(
-      <div key="subs">
-        <h4>Substitutions</h4>
-        <ul>
+      <div key="subs" style={{ marginTop: 14 }}>
+        <SectionLabel>Substitutions</SectionLabel>
+        <ul style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 6 }}>
           {result.substitutions.map((item, index) => {
             const row = item as { from?: string; to?: string; reason?: string };
             return (
-              <li key={index}>
-                {row.from} → {row.to}
-                {row.reason ? ` (${row.reason})` : ""}
+              <li key={index} style={{ lineHeight: 1.55, fontSize: "0.9375rem" }}>
+                <strong>{row.from}</strong>
+                {" → "}
+                <strong>{row.to}</strong>
+                {row.reason ? <span className="ui-muted"> ({row.reason})</span> : null}
               </li>
             );
           })}
@@ -108,15 +194,22 @@ function renderResult(result: Record<string, unknown>): ReactNode {
     );
   }
 
+  // ── Fallback: render readable scalar fields only ──────────────────
   if (!sections.length) {
-    const leftover = Object.entries(result).filter(([, value]) => typeof value === "string" || typeof value === "number");
-    if (!leftover.length) return <p className="ui-muted">No readable draft was returned.</p>;
-    return leftover.map(([key, value]) => (
-      <p key={key}>
-        <strong>{humanizeLabel(key)}:</strong> {String(value)}
-      </p>
-    ));
+    const rendered = Object.entries(result)
+      .filter(([, value]) => (typeof value === "string" || typeof value === "number") && !looksLikeJson(String(value)))
+      .map(([key, value]) => (
+        <p key={key} style={{ margin: "4px 0", fontSize: "0.9375rem" }}>
+          <strong>{humanizeLabel(key)}:</strong> {String(value)}
+        </p>
+      ));
+
+    if (!rendered.length) {
+      return <p className="ui-muted">The AI returned a response but no readable content was found.</p>;
+    }
+    return rendered;
   }
+
   return sections;
 }
 
@@ -146,6 +239,7 @@ export function AiPanel({
   async function generate() {
     setLoading(true);
     setError(null);
+    setResult(null);
     try {
       const response = await api<{
         result: Record<string, unknown>;
@@ -175,52 +269,92 @@ export function AiPanel({
 
   const copyText = result
     ? Object.values(result)
-        .flatMap((value) => (Array.isArray(value) ? value.map((item) => (typeof item === "string" ? item : JSON.stringify(item))) : [String(value)]))
+        .flatMap((value) =>
+          Array.isArray(value)
+            ? value.map((item) =>
+                typeof item === "string"
+                  ? item
+                  : Object.values(item as Record<string, unknown>)
+                      .filter((v) => typeof v === "string")
+                      .join(" — "),
+              )
+            : typeof value === "string"
+              ? [value]
+              : [],
+        )
         .join("\n")
     : "";
 
+  const aiDisabled = usage?.enabled === false;
+  const usageLine = usage?.enabled
+    ? `${usage.used}${usage.limit !== null ? ` / ${usage.limit}` : ""} used this ${humanizeLabel(usage.periodKey)}${usage.remaining !== null ? ` · ${usage.remaining} remaining` : ""}`
+    : null;
+
   return (
     <Card title={title}>
-      <p className="ui-muted">{description}</p>
-      <p className="ui-hint">AI-generated — review before use. Not a diagnosis.</p>
-      {usage ? (
-        <p className="ui-hint">
-          {usage.used}
-          {usage.limit !== null ? ` / ${usage.limit}` : ""} used
-          {usage.remaining !== null ? ` · ${usage.remaining} remaining this ${humanizeLabel(usage.periodKey)}` : ""}
-          {!usage.enabled ? " · AI is not enabled for this practice" : ""}
-        </p>
-      ) : null}
+      <p className="ui-muted" style={{ marginBottom: 10 }}>
+        {description}
+      </p>
+
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+        <Badge tone="warning">AI-generated — review before use</Badge>
+        {usage !== null ? (
+          <Badge tone={aiDisabled ? "danger" : "neutral"}>
+            {aiDisabled ? "AI not enabled for this practice" : usageLine}
+          </Badge>
+        ) : null}
+      </div>
+
       {foodQuery ? (
         <Field label="Food search">
-          <Input value={food} onChange={(event) => setFood(event.target.value)} placeholder="e.g. salmon" />
+          <Input value={food} onChange={(e) => setFood(e.target.value)} placeholder="e.g. salmon, almonds…" />
         </Field>
       ) : null}
+
       <Field label={promptLabel}>
-        <Textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} />
+        <Textarea
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          placeholder="Leave blank for default behaviour, or add specific instructions…"
+          style={{ minHeight: 80 }}
+        />
       </Field>
+
       <div className="ui-row">
-        <Button disabled={loading || usage?.enabled === false} onClick={() => void generate()}>
+        <Button disabled={loading || aiDisabled} onClick={() => void generate()}>
           {loading ? "Generating…" : "Generate"}
         </Button>
         {result ? (
           <>
             <Button variant="secondary" onClick={() => void navigator.clipboard.writeText(copyText)}>
-              Copy
+              Copy all
             </Button>
             <Button variant="ghost" onClick={() => setResult(null)}>
-              Dismiss
+              Clear
             </Button>
           </>
         ) : null}
       </div>
+
       {error ? (
         <div style={{ marginTop: 12 }}>
           <Alert tone="danger">{error}</Alert>
         </div>
       ) : null}
-      {result ? <div style={{ marginTop: 16 }}>{renderResult(result)}</div> : null}
-      {meta?.model ? <p className="ui-hint">{meta.model}</p> : null}
+
+      {result ? (
+        <div style={{ marginTop: 16 }}>
+          <Section tone="muted">
+            {renderResult(result)}
+            {meta?.model ? (
+              <p className="ui-hint" style={{ marginTop: 14, marginBottom: 0 }}>
+                Generated by {meta.model}
+                {meta.provider && meta.provider !== meta.model ? ` (${meta.provider})` : ""}
+              </p>
+            ) : null}
+          </Section>
+        </div>
+      ) : null}
     </Card>
   );
 }

@@ -3,7 +3,23 @@
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import {
+  Alert,
+  Button,
+  EmptyState,
+  Field,
+  Input,
+  PageHeader,
+  Section,
+  Select,
+  StatusBadge,
+  Table,
+  Td,
+} from "@nutrition-saas/ui";
 import { api } from "../../../../lib/api";
+import { errorMessage } from "../../../../lib/humanize-error";
+import { statusLabel } from "../../../../lib/practice-labels";
+
 interface PlanRow {
   id: string;
   name: string;
@@ -31,6 +47,7 @@ export default function MealPlansPage() {
   const [name, setName] = useState("");
   const [clientId, setClientId] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   async function load() {
     const [plans, clientList] = await Promise.all([
@@ -43,67 +60,100 @@ export default function MealPlansPage() {
   }
 
   useEffect(() => {
-    void load().catch((err) => setError(err instanceof Error ? err.message : "Unable to load meal plans"));
+    void load().catch((err) => setError(errorMessage(err, "Unable to load meal plans")));
   }, [organizationId]);
 
   async function create(event: FormEvent) {
     event.preventDefault();
-    const created = await api<{ id: string; versions: Array<{ id: string; status: string }> }>(
-      `/api/v1/organizations/${organizationId}/meal-plans`,
-      { method: "POST", body: JSON.stringify({ clientId, name }) },
-    );
-    const draft = created.versions.find((row) => row.status === "DRAFT") ?? created.versions[0];
-    window.location.href = `/orgs/${organizationId}/meal-plans/${created.id}?versionId=${draft?.id ?? ""}`;
+    setBusy(true);
+    setError(null);
+    try {
+      const created = await api<{ id: string; versions: Array<{ id: string; status: string }> }>(
+        `/api/v1/organizations/${organizationId}/meal-plans`,
+        { method: "POST", body: JSON.stringify({ clientId, name }) },
+      );
+      const draft = created.versions.find((row) => row.status === "DRAFT") ?? created.versions[0];
+      window.location.href = `/orgs/${organizationId}/meal-plans/${created.id}?versionId=${draft?.id ?? ""}`;
+    } catch (err) {
+      setError(errorMessage(err, "Could not create meal plan"));
+      setBusy(false);
+    }
   }
+
+  const items = data?.items ?? [];
 
   return (
     <section>
-      <h1>Meal plans</h1>
-      <p style={{ color: "var(--color-muted)" }}>Draft, publish, and keep historical versions. Clients only see the current published snapshot.</p>
-      {error ? <p style={{ color: "var(--color-danger)" }}>{error}</p> : null}
-      <form onSubmit={(event) => void create(event).catch((err) => setError(err instanceof Error ? err.message : "Create failed"))} style={{ display: "flex", gap: 12, alignItems: "end" }}>
-        <label className="ui-field">
-          Name
-          <input className="ui-input" value={name} onChange={(event) => setName(event.target.value)} required />
-        </label>
-        <label className="ui-field">
-          Client
-          <select className="ui-input" value={clientId} onChange={(event) => setClientId(event.target.value)}>
-            {clients.map((client) => (
-              <option key={client.id} value={client.id}>
-                {client.firstName} {client.lastName}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button type="submit" className="ui-btn ui-btn--primary" style={{height: 38}}>
-          Create draft
-        </button>
-      </form>
-      <table className="ui-table">
-        <thead>
-          <tr>
-            <th>Plan</th>
-            <th>Client</th>
-            <th>Status</th>
-            <th>Published</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data?.items.map((row) => (
-            <tr key={row.id}>
-              <td>
-                <Link href={`/orgs/${organizationId}/meal-plans/${row.id}`} style={{ color: "var(--color-accent)" }}>
-                  {row.name}
-                </Link>
-              </td>
-              <td>{row.client.displayName ?? `${row.client.firstName} ${row.client.lastName}`}</td>
-              <td>{row.status}</td>
-              <td>{row.currentPublishedVersion ? `v${row.currentPublishedVersion}` : "—"}</td>
+      <PageHeader
+        title="Meal Plans"
+        description="Draft, publish, and keep historical versions. Clients only see the current published snapshot."
+      />
+
+      {error ? <Alert tone="danger">{error}</Alert> : null}
+
+      <Section title="Create a meal plan">
+        <form onSubmit={(event) => void create(event)} className="ui-inline-form">
+          <Field label="Plan name">
+            <Input
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              required
+              placeholder="e.g. Week 1 weight-loss plan"
+            />
+          </Field>
+          <Field label="Client">
+            <Select value={clientId} onChange={(event) => setClientId(event.target.value)}>
+              {clients.map((client) => (
+                <option key={client.id} value={client.id}>
+                  {client.firstName} {client.lastName}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <div className="ui-inline-form__action">
+            <Button type="submit" disabled={busy}>
+              {busy ? "Creating…" : "Create draft"}
+            </Button>
+          </div>
+        </form>
+      </Section>
+
+      {items.length === 0 ? (
+        <EmptyState title="No meal plans yet">
+          Create a draft above to get started. Plans support versioning — clients only see published snapshots.
+        </EmptyState>
+      ) : (
+        <Table>
+          <thead>
+            <tr>
+              <th>Plan</th>
+              <th>Client</th>
+              <th>Status</th>
+              <th>Published</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {items.map((row) => (
+              <tr key={row.id}>
+                <Td label="Plan">
+                  <Link href={`/orgs/${organizationId}/meal-plans/${row.id}`} className="ui-link">
+                    {row.name}
+                  </Link>
+                </Td>
+                <Td label="Client">
+                  {row.client.displayName ?? `${row.client.firstName} ${row.client.lastName}`}
+                </Td>
+                <Td label="Status">
+                  <StatusBadge status={row.status} label={statusLabel(row.status)} />
+                </Td>
+                <Td label="Published">
+                  {row.currentPublishedVersion ? `v${row.currentPublishedVersion}` : "—"}
+                </Td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      )}
     </section>
   );
 }

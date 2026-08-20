@@ -3,8 +3,25 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import {
+  Alert,
+  Button,
+  Card,
+  EmptyState,
+  FilterBar,
+  PageHeader,
+  SearchInput,
+  Select,
+  StatusBadge,
+  Table,
+  Td,
+  humanizeLabel,
+} from "@nutrition-saas/ui";
 import { api } from "../../../../lib/api";
-import { humanizeLabel } from "@nutrition-saas/ui";
+import { statusLabel } from "../../../../lib/practice-labels";
+import { errorMessage } from "../../../../lib/humanize-error";
+import { formatDateOnly, formatMoney } from "../../../../lib/format";
+
 interface InvoiceRow {
   id: string;
   invoiceNumber: string | null;
@@ -43,8 +60,12 @@ export default function InvoicesPage() {
   const [quantity, setQuantity] = useState("1");
   const [unitPrice, setUnitPrice] = useState("100");
   const [error, setError] = useState<string | null>(null);
+  const [createBusy, setCreateBusy] = useState(false);
 
-  const subtotal = useMemo(() => Number(quantity || 0) * Number(unitPrice || 0), [quantity, unitPrice]);
+  const subtotal = useMemo(
+    () => Number(quantity || 0) * Number(unitPrice || 0),
+    [quantity, unitPrice],
+  );
 
   async function load() {
     const query = new URLSearchParams();
@@ -62,122 +83,180 @@ export default function InvoicesPage() {
   }
 
   useEffect(() => {
-    void load().catch((err) => setError(err instanceof Error ? err.message : "Unable to load invoices"));
+    void load().catch((err) => setError(errorMessage(err, "Unable to load invoices")));
   }, [organizationId, filterClientId, status, search]);
 
   async function createDraft(event: FormEvent) {
     event.preventDefault();
-    const created = await api<{ id: string }>(`/api/v1/organizations/${organizationId}/invoices`, {
-      method: "POST",
-      body: JSON.stringify({
-        clientId: createClientId,
-        items: [{ description, quantity: Number(quantity), unitPrice: Number(unitPrice) }],
-      }),
-    });
-    window.location.href = `/orgs/${organizationId}/invoices/${created.id}`;
+    setCreateBusy(true);
+    setError(null);
+    try {
+      const created = await api<{ id: string }>(`/api/v1/organizations/${organizationId}/invoices`, {
+        method: "POST",
+        body: JSON.stringify({
+          clientId: createClientId,
+          items: [{ description, quantity: Number(quantity), unitPrice: Number(unitPrice) }],
+        }),
+      });
+      window.location.href = `/orgs/${organizationId}/invoices/${created.id}`;
+    } catch (err) {
+      setError(errorMessage(err, "Could not create invoice"));
+      setCreateBusy(false);
+    }
   }
+
+  const hasFilters = Boolean(filterClientId || status || search);
 
   return (
     <section>
-      <h1>Invoices</h1>
-      <p style={{ color: "var(--color-muted)" }}>
-        Create, issue, and track invoices. Payment is handled outside the platform.
-      </p>
-      {error ? <p style={{ color: "var(--color-danger)" }}>{error}</p> : null}
+      <PageHeader
+        title="Invoices"
+        description="Create, issue, and track invoices. Payment is handled outside the platform."
+      />
+      {error ? <Alert tone="danger">{error}</Alert> : null}
 
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
-        <label className="ui-field">
-          Client filter
-          <select className="ui-input" value={filterClientId} onChange={(event) => setFilterClientId(event.target.value)}>
+      <div style={{ marginBottom: 20 }}>
+        <FilterBar>
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder="Invoice # or client…"
+            aria-label="Search invoices"
+          />
+          <Select
+            value={filterClientId}
+            onChange={(e) => setFilterClientId(e.target.value)}
+          >
             <option value="">All clients</option>
             {clients.map((client) => (
               <option key={client.id} value={client.id}>
                 {client.firstName} {client.lastName}
               </option>
             ))}
-          </select>
-        </label>
-        <label className="ui-field">
-          Status
-          <select className="ui-input" value={status} onChange={(event) => setStatus(event.target.value)}>
+          </Select>
+          <Select value={status} onChange={(e) => setStatus(e.target.value)}>
             {STATUSES.map((value) => (
               <option key={value || "all"} value={value}>
-                {value ? humanizeLabel(value) : "All"}
+                {value ? humanizeLabel(value) : "All statuses"}
               </option>
             ))}
-          </select>
-        </label>
-        <label className="ui-field">
-          Search
-          <input className="ui-input" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Invoice # or client" />
-        </label>
+          </Select>
+        </FilterBar>
       </div>
 
-      <h2>Quick draft</h2>
-      <form
-        onSubmit={(event) => void createDraft(event).catch((err) => setError(err instanceof Error ? err.message : "Create failed"))}
-        style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, alignItems: "end" }}
-      >
-        <label className="ui-field">
-          Client
-          <select className="ui-input" value={createClientId} onChange={(event) => setCreateClientId(event.target.value)} required>
-            {clients.map((client) => (
-              <option key={client.id} value={client.id}>
-                {client.firstName} {client.lastName}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="ui-field">
-          Description
-          <input className="ui-input" value={description} onChange={(event) => setDescription(event.target.value)} required />
-        </label>
-        <label className="ui-field">
-          Qty
-          <input className="ui-input" type="number" min="0.0001" step="0.01" value={quantity} onChange={(event) => setQuantity(event.target.value)} required />
-        </label>
-        <label className="ui-field">
-          Unit price
-          <input className="ui-input" type="number" min="0" step="0.01" value={unitPrice} onChange={(event) => setUnitPrice(event.target.value)} required />
-        </label>
-        <div className="ui-field">
-          <span>Subtotal</span>
-          <strong>{subtotal.toFixed(2)}</strong>
-        </div>
-        <button type="submit" className="ui-btn ui-btn--primary" style={{height: 38}}>
-          Save draft
-        </button>
-      </form>
+      <Card title="New draft invoice">
+        <form onSubmit={(event) => void createDraft(event)} className="ui-inline-form">
+          <label className="ui-field">
+            Client
+            <select
+              className="ui-input"
+              value={createClientId}
+              onChange={(e) => setCreateClientId(e.target.value)}
+              required
+            >
+              {clients.map((client) => (
+                <option key={client.id} value={client.id}>
+                  {client.firstName} {client.lastName}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="ui-field">
+            Description
+            <input
+              className="ui-input"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              required
+            />
+          </label>
+          <label className="ui-field" style={{ flex: "0 1 7rem", minWidth: "6rem" }}>
+            Qty
+            <input
+              className="ui-input"
+              type="number"
+              min="0.0001"
+              step="0.01"
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+              required
+            />
+          </label>
+          <label className="ui-field" style={{ flex: "0 1 8rem", minWidth: "7rem" }}>
+            Unit price
+            <input
+              className="ui-input"
+              type="number"
+              min="0"
+              step="0.01"
+              value={unitPrice}
+              onChange={(e) => setUnitPrice(e.target.value)}
+              required
+            />
+          </label>
+          <div className="ui-field" style={{ flex: "0 1 7rem", minWidth: "6rem" }}>
+            <span>Subtotal</span>
+            <strong style={{ lineHeight: "2.25rem" }}>{subtotal.toFixed(2)}</strong>
+          </div>
+          <div className="ui-inline-form__action">
+            <Button type="submit" disabled={createBusy}>
+              {createBusy ? "Saving…" : "Save draft"}
+            </Button>
+          </div>
+        </form>
+      </Card>
 
-      <table className="ui-table">
-        <thead>
-          <tr>
-            <th>Invoice</th>
-            <th>Client</th>
-            <th>Status</th>
-            <th>Due</th>
-            <th>Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data?.items.map((row) => (
-            <tr key={row.id}>
-              <td>
-                <Link href={`/orgs/${organizationId}/invoices/${row.id}`} style={{ color: "var(--color-accent)" }}>
-                  {row.invoiceNumber ?? "Draft"}
-                </Link>
-              </td>
-              <td>{row.clientName ?? row.clientId}</td>
-              <td>{row.status}</td>
-              <td>{row.dueDate ?? "—"}</td>
-              <td>
-                {row.total.toFixed(2)} {row.currency}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <p style={{ color: "var(--color-muted)", marginTop: 8 }}>{data?.total ?? 0} invoice(s)</p>
+      {(data?.items ?? []).length === 0 ? (
+        <EmptyState title={hasFilters ? "No invoices match" : "No invoices yet"}>
+          {hasFilters
+            ? "Try adjusting your filters."
+            : "Use the form above to create a draft invoice."}
+        </EmptyState>
+      ) : (
+        <>
+          <Table>
+            <thead>
+              <tr>
+                <th>Invoice</th>
+                <th>Client</th>
+                <th>Status</th>
+                <th>Due</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(data?.items ?? []).map((row) => (
+                <tr key={row.id}>
+                  <Td label="Invoice">
+                    <Link
+                      href={`/orgs/${organizationId}/invoices/${row.id}`}
+                      className="ui-link"
+                      style={{ fontWeight: 500 }}
+                    >
+                      {row.invoiceNumber ?? "Draft"}
+                    </Link>
+                  </Td>
+                  <Td label="Client">{row.clientName ?? "Client"}</Td>
+                  <Td label="Status">
+                    <StatusBadge status={row.status} label={statusLabel(row.status)} />
+                  </Td>
+                  <Td label="Due">
+                    <span className="ui-muted">{formatDateOnly(row.dueDate)}</span>
+                  </Td>
+                  <Td label="Total">
+                    <span style={{ fontVariantNumeric: "tabular-nums" }}>
+                      {formatMoney(row.total, row.currency)}
+                    </span>
+                  </Td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+          <p className="ui-muted" style={{ marginTop: 10, fontSize: "0.875rem" }}>
+            {data?.total ?? 0} invoice{(data?.total ?? 1) !== 1 ? "s" : ""}
+          </p>
+        </>
+      )}
     </section>
   );
 }

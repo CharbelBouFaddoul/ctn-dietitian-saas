@@ -1,7 +1,8 @@
 "use client";
 
-import { Button, Card } from "@nutrition-saas/ui";
-import { connectionStatusLabel } from "../lib/connection-status";
+import { useState } from "react";
+import { Button, Card, StatusBadge } from "@nutrition-saas/ui";
+import { portalStatusLabel } from "../lib/practice-labels";
 
 export function JoinCodePanel({
   title,
@@ -30,30 +31,67 @@ export function JoinCodePanel({
   onRevoke: () => void;
   onDeactivate?: () => void;
 }) {
+  const [copied, setCopied] = useState(false);
   const connected = connectionStatus === "connected";
   const waiting = Boolean(plainJoinCode || hint);
+
+  async function handleCopy() {
+    onCopy();
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
   return (
     <Card title={title}>
       <p className="ui-muted">{description}</p>
-      <p>
-        Status: <strong>{connectionStatusLabel(connectionStatus)}</strong>
-      </p>
-      {plainJoinCode ? <p className="ui-code">{plainJoinCode}</p> : null}
-      {!plainJoinCode && hint ? (
-        <p>
-          Code ending in <strong>{hint}</strong>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "12px 0 8px" }}>
+        <span className="ui-muted" style={{ fontSize: "0.875rem" }}>Status:</span>
+        <StatusBadge
+          status={connectionStatus ?? undefined}
+          label={portalStatusLabel(connectionStatus)}
+        />
+      </div>
+
+      {plainJoinCode ? (
+        <div style={{ margin: "12px 0" }}>
+          <code
+            style={{
+              fontFamily: "monospace",
+              fontSize: "1.375rem",
+              letterSpacing: "0.15em",
+              fontWeight: 700,
+              background: "var(--color-surface-raised, #f5f5f5)",
+              padding: "8px 20px",
+              borderRadius: 8,
+              border: "1px solid var(--color-border)",
+              display: "inline-block",
+            }}
+          >
+            {plainJoinCode}
+          </code>
+        </div>
+      ) : hint ? (
+        <p className="ui-muted" style={{ margin: "8px 0" }}>
+          Active code ending in <strong>{hint}</strong>
         </p>
       ) : null}
-      {expiresAt ? <p className="ui-muted">Expires {new Date(expiresAt).toLocaleString()}</p> : null}
-      <div className="ui-row">
+
+      {expiresAt ? (
+        <p className="ui-hint">
+          Expires {new Date(expiresAt).toLocaleString()}
+        </p>
+      ) : null}
+
+      <div className="ui-row" style={{ marginTop: 12 }}>
         {allowManage && !connected ? (
           <Button disabled={portalBusy} onClick={onGenerate}>
             {waiting ? "Regenerate join code" : "Generate join code"}
           </Button>
         ) : null}
         {allowManage && plainJoinCode ? (
-          <Button variant="secondary" onClick={onCopy}>
-            Copy
+          <Button variant="secondary" onClick={() => void handleCopy()}>
+            {copied ? "Copied!" : "Copy code"}
           </Button>
         ) : null}
         {allowManage && waiting && !connected ? (
