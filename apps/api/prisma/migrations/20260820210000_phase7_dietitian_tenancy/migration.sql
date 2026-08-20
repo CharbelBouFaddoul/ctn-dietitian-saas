@@ -155,6 +155,12 @@ CREATE INDEX IF NOT EXISTS "tasks_dietitian_account_id_assigned_user_id_idx"
 -- Drop orphan rows that could not be backfilled (e.g. legacy platform assessment
 -- templates with null organization_id / dietitian_account_id).
 DELETE FROM "assessments" WHERE "dietitian_account_id" IS NULL;
+-- Tenant assessments may still reference platform templates (null dietitian_account_id).
+-- Clear those FKs before deleting the templates (template_id is NOT NULL + Restrict).
+DELETE FROM "assessments"
+WHERE "template_id" IN (
+  SELECT "id" FROM "assessment_templates" WHERE "dietitian_account_id" IS NULL
+);
 DELETE FROM "assessment_templates" WHERE "dietitian_account_id" IS NULL;
 DELETE FROM "automation_runs" WHERE "dietitian_account_id" IS NULL;
 DELETE FROM "automation_rules" WHERE "dietitian_account_id" IS NULL;

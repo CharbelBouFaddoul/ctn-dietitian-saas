@@ -433,7 +433,7 @@ documents (storage_key on persistent volume via StorageService)
 notifications (in-app)
 ```
 
-**Messaging:** one conversation per client per organization. REST + polling (no WebSockets). Messages immutable in V1. Unread via per-user read cursors.
+**Messaging:** one conversation per client per `DietitianAccount`. **REST is the source of truth** for creating/listing/marking messages. **Socket.IO** (`/realtime` namespace) is the realtime transport only: after a message persists, the API emits `message.created` / `conversation.updated` / `message.read` / `unread_count.updated` into server-authorized rooms (`conversation:{id}`, `user:{userId}`). Handshake authenticates via the same `ns_session` cookie; clients subscribe with `{ clientId }` and the server resolves the conversation (never trusts client-supplied `conversationId` / `dietitianAccountId`). Patient sockets are scoped to `Session.activeClientId`. Redis adapter reuses `REDIS_URL` for multi-instance fan-out. Messages immutable in V1. Unread via per-user read cursors.
 
 **Documents:** binary on `FILE_STORAGE_PATH`; metadata in PostgreSQL. Authenticated download only — no public URLs. Visibility `INTERNAL` (staff only) or `SHARED` (client + staff). Magic-byte validation; `MAX_DOCUMENT_BYTES` configurable.
 

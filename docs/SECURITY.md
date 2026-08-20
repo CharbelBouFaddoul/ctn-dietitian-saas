@@ -139,13 +139,14 @@ The API sets `trust proxy` so `Secure` cookies and client IPs work behind Coolif
 
 ## Phase 9 — Messaging and documents
 
-- All messaging/document tables include `organization_id` and client-scoped rows include `client_id`.
+- Messaging rows are scoped by `dietitianAccountId` + `clientId`.
 - File downloads require authentication + `ClientAccessService`; guessing UUIDs does not bypass authz.
 - `storage_key` is server-generated; original filename is metadata only. No public static file URLs.
 - Portal sees `SHARED` documents only; `INTERNAL` returns 404 to clients.
 - Magic-byte validation and `MAX_DOCUMENT_BYTES` enforced server-side.
 - Timeline events do not bypass client access. Audit on document upload/share/archive/download-denied.
-- Tests: `apps/api/test/messaging-documents.e2e.spec.ts`.
+- **Realtime:** Socket.IO `/realtime` authenticates via `ns_session` cookie; conversation rooms are joined only after server-side dietitian ownership or portal `activeClientId` checks. Client-supplied `conversationId` / `dietitianAccountId` are not authorization inputs.
+- Tests: `apps/api/test/messaging-documents.e2e.spec.ts`, `apps/api/test/phase5-chat-websocket.e2e.spec.ts`.
 
 ## Phase 10 — Invoices, tasks, analytics
 

@@ -7,6 +7,7 @@ import { AppModule } from "./app.module";
 import { GlobalExceptionFilter } from "./common/global-exception.filter";
 import { ErrorTrackingService } from "./common/error-tracking.service";
 import { isSwaggerEnabled, loadEnv } from "./config/env";
+import { RedisIoAdapter } from "./messaging/redis-io.adapter";
 
 async function bootstrap(): Promise<void> {
   const env = loadEnv();
@@ -16,6 +17,10 @@ async function bootstrap(): Promise<void> {
 
   configureHttpApp(app, env);
   app.useGlobalFilters(new GlobalExceptionFilter(app.get(ErrorTrackingService)));
+
+  const redisIoAdapter = new RedisIoAdapter(app, env);
+  await redisIoAdapter.connectToRedis();
+  app.useWebSocketAdapter(redisIoAdapter);
 
   if (isSwaggerEnabled(env)) {
     const document = SwaggerModule.createDocument(

@@ -282,15 +282,19 @@ Read-only. `ClientAccessService` `read`. Same summary/list shapes as portal.
 |---|---|---|
 | GET | `/` | Conversation + unread count |
 | GET | `/messages` | Paginated messages |
-| POST | `/messages` | Send message |
-| POST | `/read` | Mark read |
+| POST | `/messages` | Send message (persists; emits realtime) |
+| POST | `/read` | Mark read (persists; emits realtime) |
 
-### Messaging — organization
+### Messaging — practice (`/api/v1/dietitian/:dietitianAccountId`)
 
 | Method | Path | Description |
 |---|---|---|
-| GET | `/organizations/:orgId/conversations` | Inbox for visible clients |
-| GET/POST | `/organizations/:orgId/clients/:clientId/conversation/...` | Thread, send, read |
+| GET | `/conversations` | Inbox for visible clients |
+| GET/POST | `/clients/:clientId/conversation/...` | Thread, send, read |
+
+### Realtime (`Socket.IO` namespace `/realtime`)
+
+Cookie auth: same `ns_session` as REST (`withCredentials`). Client emits `conversation.subscribe` with `{ clientId }` only; server authorizes and joins `conversation:{id}`. Events: `message.created`, `conversation.updated`, `message.read`, `unread_count.updated`. REST remains the persistence path; sockets are transport-only.
 
 ### Documents — portal (`/api/v1/portal/documents`)
 

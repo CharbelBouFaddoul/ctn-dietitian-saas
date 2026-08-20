@@ -32,6 +32,7 @@ import { RecipesModule } from "../src/recipes/recipes.module";
 import { MealPlansModule } from "../src/meal-plans/meal-plans.module";
 import { TrackingModule } from "../src/tracking/tracking.module";
 import { MessagingModule } from "../src/messaging/messaging.module";
+import { RedisIoAdapter } from "../src/messaging/redis-io.adapter";
 import { DocumentsModule } from "../src/documents/documents.module";
 import { InvoicesModule } from "../src/invoices/invoices.module";
 import { TasksModule } from "../src/tasks/tasks.module";
@@ -42,6 +43,7 @@ import { DietitianAccountsModule } from "../src/dietitian-accounts/dietitian-acc
 import { AppThrottlerModule } from "../src/common/app-throttler.module";
 import { CommonModule } from "../src/common/common.module";
 import { StorageModule } from "../src/storage/storage.module";
+import { RedisModule } from "../src/redis/redis.module";
 import { configureHttpApp } from "../src/app.setup";
 import { loadEnv } from "../src/config/env";
 import { EMAIL_PROVIDER } from "../src/email/email.provider";
@@ -61,9 +63,11 @@ export interface AuthTestContext {
   lifecycle: DietitianLifecycleService;
   entitlements: EntitlementService;
   security: SecurityEventLogger;
+  port?: number;
+  realtimeAdapter?: RedisIoAdapter;
 }
 
-export async function createAuthTestApp(): Promise<AuthTestContext> {
+export async function createAuthTestApp(options?: { realtime?: boolean }): Promise<AuthTestContext> {
   const emails = new CapturingEmailProvider();
   const moduleRef = await Test.createTestingModule({
     imports: [
@@ -75,6 +79,7 @@ export async function createAuthTestApp(): Promise<AuthTestContext> {
       AppThrottlerModule,
       CommonModule,
       PrismaModule,
+      RedisModule,
       EmailModule,
       AuthModule,
       DietitianModule,
@@ -112,7 +117,22 @@ export async function createAuthTestApp(): Promise<AuthTestContext> {
 
   const app = moduleRef.createNestApplication();
   configureHttpApp(app, loadEnv());
+
+  let realtimeAdapter: RedisIoAdapter | undefined;
+  let port: number | undefined;
+  if (options?.realtime) {
+    realtimeAdapter = new RedisIoAdapter(app, loadEnv());
+    await realtimeAdapter.connectToRedis();
+    app.useWebSocketAdapter(realtimeAdapter);
+  }
+
   await app.init();
+
+  if (options?.realtime) {
+    await app.listen(0);
+    const address = app.getHttpServer().address();
+    port = typeof address === "object" && address ? address.port : undefined;
+  }
 
   return {
     app,
@@ -125,6 +145,8 @@ export async function createAuthTestApp(): Promise<AuthTestContext> {
     lifecycle: app.get(DietitianLifecycleService),
     entitlements: app.get(EntitlementService),
     security: app.get(SecurityEventLogger),
+    port,
+    realtimeAdapter,
   };
 }
 

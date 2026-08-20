@@ -78,6 +78,7 @@ export default function ClientPortalLayout({ children }: { children: ReactNode }
         body: JSON.stringify({ clientId }),
       });
       await load();
+      window.dispatchEvent(new CustomEvent("portal-connection-changed"));
       router.refresh();
     } catch {
       /* keep current */

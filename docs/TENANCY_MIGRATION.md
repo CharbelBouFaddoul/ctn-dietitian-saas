@@ -66,6 +66,7 @@ No Organization layer. No OrganizationMember. No STAFF tenancy. No `organization
 - `PlatformSettings.emailNotificationsEnabled` default **false**: gates invoice + automation product emails; auth emails always send.
 - Practice dashboard extended; portal `GET /api/v1/portal/dashboard`.
 - **Product Phase 4 polish:** practice dashboard adds `clientLimit`, `unreadMessageCount`, appointment `endAt`/`status`, recently-active clients UI; notification bell/list deep-link via `targetType`/`targetId`; meal-plan publish notifies linked patient.
+- **Product Phase 5 (chat + WebSockets):** Socket.IO `/realtime` on existing Conversation/Message REST; Redis adapter; practice/portal chat UX; no schema change; no Organization.
 
 ## Phase 6 notes
 

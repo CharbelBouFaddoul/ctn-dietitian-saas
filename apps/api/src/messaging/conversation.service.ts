@@ -4,6 +4,9 @@ import { PrismaService } from "../prisma/prisma.service";
 import { requireDietitianAccountId } from "../dietitian/tenant-scope";
 import { TimelineService } from "../timeline/timeline.service";
 import { NotificationService } from "../notifications/notification.service";
+import { MessagingRealtimeService } from "./messaging-realtime.service";
+import { MessagingRecipientService } from "./messaging-recipient.service";
+
 const PREVIEW_MAX = 120;
 
 @Injectable()
@@ -12,6 +15,8 @@ export class ConversationService {
     private readonly prisma: PrismaService,
     private readonly timeline: TimelineService,
     private readonly notifications: NotificationService,
+    private readonly realtime: MessagingRealtimeService,
+    private readonly recipients: MessagingRecipientService,
   ) {}
 
   async getOrCreate(client: Client): Promise<Conversation> {
@@ -147,7 +152,31 @@ export class ConversationService {
       ),
     );
 
-    return this.toMessageResponse(message);
+    const response = this.toMessageResponse(message);
+    this.realtime.emitMessageCreated({
+      messageId: response.id,
+      conversationId: response.conversationId,
+      clientId: input.client.id,
+      senderUserId: response.senderUserId,
+      body: response.body,
+      createdAt: response.createdAt,
+    });
+
+    // Notify recipients of unread bumps (sender already marked read).
+    await Promise.all(
+      input.notifyUserIds.map(async (userId) => {
+        const unreadCount = await this.unreadCount(input.conversation.id, userId);
+        this.realtime.emitUnreadCountUpdated({
+          scope: "conversation",
+          conversationId: input.conversation.id,
+          clientId: input.client.id,
+          userId,
+          unreadCount,
+        });
+      }),
+    );
+
+    return response;
   }
 
   async listMessages(conversationId: string, dietitianAccountId: string, before?: string, limit = 50) {
@@ -166,7 +195,7 @@ export class ConversationService {
 
   async markRead(
     conversationId: string,
-    client: { dietitianAccountId: string },
+    client: { id: string; dietitianAccountId: string },
     readerUserId: string,
   ) {
     const now = new Date();
@@ -183,7 +212,41 @@ export class ConversationService {
       },
       update: { lastReadAt: now },
     });
-    return { readAt: now.toISOString() };
+
+    const readAt = now.toISOString();
+    this.realtime.emitMessageRead({
+      conversationId,
+      clientId: client.id,
+      readerUserId,
+      lastReadAt: readAt,
+    });
+    this.realtime.emitUnreadCountUpdated({
+      scope: "conversation",
+      conversationId,
+      clientId: client.id,
+      userId: readerUserId,
+      unreadCount: 0,
+    });
+
+    // Peer (other participant) may want conversation list refresh.
+    const peerIds = new Set<string>();
+    const portalUserId = await this.recipients.clientPortalUserId(client.id);
+    if (portalUserId) peerIds.add(portalUserId);
+    const ownerIds = await this.recipients.assignedMemberUserIds(dietitianAccountId, client.id);
+    for (const id of ownerIds) peerIds.add(id);
+    peerIds.delete(readerUserId);
+    for (const userId of peerIds) {
+      const unreadCount = await this.unreadCount(conversationId, userId);
+      this.realtime.emitUnreadCountUpdated({
+        scope: "conversation",
+        conversationId,
+        clientId: client.id,
+        userId,
+        unreadCount,
+      });
+    }
+
+    return { readAt };
   }
 
   async unreadCount(conversationId: string, readerUserId: string, excludeSenderUserId?: string): Promise<number> {
