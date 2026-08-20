@@ -10,4 +10,5 @@ export const ADMIN_MESSAGES = {
   userNotFound: "User not found",
   userAlreadyExists: "A user with this email already exists",
   invalidOverride: "Override must set enabled and/or limitValue",
+  inviteRequiresEmail: "Portal invite requires an email address",
 } as const;

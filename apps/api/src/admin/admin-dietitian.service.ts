@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, Injectable } from "@nestjs/common";
+import { FEATURE_KEYS } from "@nutrition-saas/config";
 import { normalizeEmail } from "@nutrition-saas/utilities";
 import { randomBytes } from "node:crypto";
 import { InvitationService } from "../auth/invitation.service";
@@ -9,6 +10,7 @@ import { DietitianService } from "../dietitian/dietitian.service";
 import { PrismaService } from "../prisma/prisma.service";
 import type { AdminActor } from "./admin-actor";
 import { ADMIN_MESSAGES } from "./admin.messages";
+import { AdminOverrideService } from "./admin-override.service";
 import { AdminSubscriptionService } from "./admin-subscription.service";
 import type { ProvisionDietitianDto } from "./dto/admin.dto";
 
@@ -19,6 +21,7 @@ export class AdminDietitianService {
     private readonly passwords: PasswordService,
     private readonly organizations: DietitianService,
     private readonly subscriptions: AdminSubscriptionService,
+    private readonly overrides: AdminOverrideService,
     private readonly invitations: InvitationService,
     private readonly email: EmailService,
     private readonly security: SecurityEventLogger,
@@ -65,11 +68,35 @@ export class AdminDietitianService {
       throw new BadRequestException("Failed to create dietitian account");
     }
 
+    const phone = input.phone?.trim() || null;
+    const professionalTitle = input.professionalTitle?.trim() || null;
+    const specialization = input.specialization?.trim() || null;
+    if (phone || professionalTitle || specialization) {
+      await this.prisma.dietitianAccount.update({
+        where: { id: account.id },
+        data: { phone, professionalTitle, specialization },
+      });
+    }
+
     let subscription = null;
     if (input.planId) {
       subscription = await this.subscriptions.assign(
         account.id,
         { planId: input.planId, status: "ACTIVE" },
+        actor,
+      );
+    }
+
+    let clientLimitOverride = null;
+    if (input.clientLimit !== undefined) {
+      clientLimitOverride = await this.overrides.upsert(
+        account.id,
+        FEATURE_KEYS.CLIENT_LIMIT,
+        {
+          enabled: true,
+          limitValue: input.clientLimit,
+          reason: "Set during dietitian provision",
+        },
         actor,
       );
     }
@@ -92,7 +119,11 @@ export class AdminDietitianService {
       requestId: actor.requestId,
       targetType: "user",
       targetId: user.id,
-      metadata: { emailNormalized, planId: input.planId ?? null },
+      metadata: {
+        emailNormalized,
+        planId: input.planId ?? null,
+        clientLimit: input.clientLimit ?? null,
+      },
     });
 
     return {
@@ -108,8 +139,12 @@ export class AdminDietitianService {
         name: account.name,
         slug: account.slug,
         status: account.status,
+        phone,
+        professionalTitle,
+        specialization,
       },
       subscription,
+      clientLimitOverride,
       invitationSent: true,
     };
   }

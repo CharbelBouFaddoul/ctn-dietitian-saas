@@ -20,6 +20,8 @@ import { AdminUsersController } from "./admin-users.controller";
 import { AdminUserService } from "./admin-user.service";
 import { AdminDietitiansController } from "./admin-dietitians.controller";
 import { AdminDietitianService } from "./admin-dietitian.service";
+import { AdminPatientsController } from "./admin-patients.controller";
+import { AdminPatientService } from "./admin-patient.service";
 import { PlatformRolesGuard } from "./guards/platform-roles.guard";
 
 @Module({
@@ -37,6 +39,7 @@ import { PlatformRolesGuard } from "./guards/platform-roles.guard";
     AdminDietitiansManageController,
     AdminUsersController,
     AdminDietitiansController,
+    AdminPatientsController,
     AdminCatalogController,
     AdminListsController,
     AdminFoodsController,
@@ -48,6 +51,7 @@ import { PlatformRolesGuard } from "./guards/platform-roles.guard";
     AdminOverrideService,
     AdminUserService,
     AdminDietitianService,
+    AdminPatientService,
     AdminCatalogService,
     AdminAuditService,
   ],

@@ -66,6 +66,20 @@ export class EmailService {
     });
   }
 
+  async sendClientActivation(to: string, rawToken: string): Promise<void> {
+    const url = this.link("/auth/invitation", rawToken);
+    await this.provider.send({
+      to,
+      subject: "Activate your patient portal account",
+      text: [
+        "An administrator created a patient chart and invited you to the portal.",
+        "Set your password to activate the account:",
+        `Open: ${url}`,
+        `Token: ${rawToken}`,
+      ].join("\n"),
+    });
+  }
+
   /** Product email — gated by PlatformSettings.emailNotificationsEnabled. */
   async sendInvoiceNotification(
     to: string,

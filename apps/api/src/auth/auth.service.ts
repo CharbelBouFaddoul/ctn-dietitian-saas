@@ -176,7 +176,12 @@ export class AuthService {
       throw error;
     }
 
-    if (invitation.purpose !== "DIETITIAN_ACTIVATION" || !invitation.emailNormalized) {
+    const activationPurposes = new Set(["DIETITIAN_ACTIVATION", "CLIENT_INVITE"]);
+    if (!activationPurposes.has(invitation.purpose) || !invitation.emailNormalized) {
+      throw new BadRequestException(AUTH_MESSAGES.invalidInvitationToken);
+    }
+    // Join-code CLIENT_INVITE rows have no emailNormalized and are accepted via /portal/join.
+    if (invitation.purpose === "CLIENT_INVITE" && !invitation.clientId) {
       throw new BadRequestException(AUTH_MESSAGES.invalidInvitationToken);
     }
 
@@ -197,10 +202,21 @@ export class AuthService {
         emailVerifiedAt: user.emailVerifiedAt ?? now,
       },
     });
+
+    if (invitation.purpose === "CLIENT_INVITE") {
+      await this.prisma.clientAccount.updateMany({
+        where: { userId: user.id, status: "PENDING" },
+        data: { status: "ACTIVE", activatedAt: now },
+      });
+    }
+
     await this.invitations.consume(rawToken, user.id);
     await this.sessions.revokeAllForUser(user.id);
     await this.security.record({
-      type: "dietitian_invitation_accepted",
+      type:
+        invitation.purpose === "CLIENT_INVITE"
+          ? "client_invitation_accepted"
+          : "dietitian_invitation_accepted",
       outcome: "success",
       userId: user.id,
       emailNormalized: user.emailNormalized,

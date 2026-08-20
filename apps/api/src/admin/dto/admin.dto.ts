@@ -8,6 +8,7 @@ import {
   IsDefined,
   IsEnum,
   IsInt,
+  IsNumber,
   IsOptional,
   IsString,
   IsUUID,
@@ -169,8 +170,101 @@ export class ProvisionDietitianDto {
 
   @ApiPropertyOptional()
   @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  phone?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  professionalTitle?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  specialization?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsUUID()
   planId?: string;
+
+  @ApiPropertyOptional({ description: "Optional CLIENT_LIMIT override after plan assignment" })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  clientLimit?: number;
+}
+
+export class ProvisionPatientDto {
+  @ApiProperty({ description: "DietitianAccount.id — required practice assignment" })
+  @IsUUID()
+  dietitianAccountId!: string;
+
+  @ApiProperty()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  firstName!: string;
+
+  @ApiProperty()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  lastName!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(320)
+  email?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  phone?: string;
+
+  @ApiPropertyOptional({ description: "YYYY-MM-DD" })
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  dateOfBirth?: string;
+
+  @ApiPropertyOptional({ enum: ["FEMALE", "MALE", "OTHER", "UNSPECIFIED"] })
+  @IsOptional()
+  @IsEnum(["FEMALE", "MALE", "OTHER", "UNSPECIFIED"])
+  sex?: "FEMALE" | "MALE" | "OTHER" | "UNSPECIFIED";
+
+  @ApiPropertyOptional({ description: "Stored on ClientProfile.lifestyle" })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  activityLevel?: string;
+
+  @ApiPropertyOptional({ description: "Initial height in cm" })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  heightCm?: number;
+
+  @ApiPropertyOptional({ description: "Initial weight in kg" })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  weightKg?: number;
+
+  @ApiPropertyOptional({
+    description:
+      "Default true when email is provided, false when absent. True without email is invalid.",
+  })
+  @IsOptional()
+  @IsBoolean()
+  inviteToPortal?: boolean;
 }
 
 export class CreatePlanDto {
