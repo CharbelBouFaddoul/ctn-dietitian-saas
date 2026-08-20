@@ -228,10 +228,23 @@ describe("Phase 8 client tracking", () => {
       .expect(200);
     expect(sleep.body.durationMinutes).toBe(480);
 
+    const catalog = await request(ctx.app.getHttpServer())
+      .get(`/api/v1/dietitian/${org.id}/habits`)
+      .set("Cookie", owner.cookie)
+      .expect(200);
+    const waterHabit = catalog.body.find((h: { name: string }) => /water/i.test(h.name));
+    expect(waterHabit).toBeTruthy();
+
     await request(ctx.app.getHttpServer())
-      .put("/api/v1/portal/tracking/habits")
+      .post(`/api/v1/dietitian/${org.id}/clients/${client.body.id}/habits`)
+      .set("Cookie", owner.cookie)
+      .send({ habitDefinitionId: waterHabit.id })
+      .expect(201);
+
+    await request(ctx.app.getHttpServer())
+      .put(`/api/v1/portal/habits/${waterHabit.id}/log`)
       .set("Cookie", portal)
-      .send({ habitKey: "water_goal", habitLabel: "Drink water", date, completed: true })
+      .send({ date, completed: true })
       .expect(200);
 
     const summary = await request(ctx.app.getHttpServer())

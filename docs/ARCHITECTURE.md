@@ -152,6 +152,7 @@ Tenant-scoped queries via dietitianAccountId (tenantWhere)
 - **Product Phase 8 (food + reusable meals):** curated catalog, `Food.dietitianAccountId` custom foods, Recipes as meal library. Distinct from older “Phase 8 tracking” docs.
 - **Product Phase 9 (meal plans):** editor composes meals from foods + recipes; live meal/day nutrition via existing snapshot path; portal shows published composition + macros. No new Meal catalog / migration.
 - **Product Phase 10 (patient tracking + progress):** enrich daily tracking summary (`byMeal`, water target/entries, sleep week), portal weight logging, meal-plan→food-log for FOOD items only, practice/portal UX polish. Reuses existing log models — no duplicate tables.
+- **Product Phase 11 (tracking completion):** planned-meal FoodLog snapshots (FOOD+RECIPE, servings), habit catalog + assignment, summary `plannedMeals` / assignment-based habits. Distinct from historical repo “Phase 11 AI”.
 ---
 
 ## 3. Authorization
@@ -449,17 +450,17 @@ Evolution API (measurements → series / BMI)
 
 **Food logs:** independent of meal plans for free-form logging. At create/edit, nutrition is calculated through `FoodService.getEffective()` and stored in `nutrition_snapshot`. Daily food totals sum snapshots — never live food rows. Editing recalculates using current effective food at edit time only for that log. Summary groups by `mealCategory`.
 
-**Meal-plan → log (Phase 10):** `POST /portal/tracking/log-planned-meal` creates FoodLogs for **FOOD** items on a published meal. RECIPE items are skipped (FoodLog has `foodId` only). Notes tag `From plan: {mealName}`.
+**Meal-plan → log (Product Phase 11):** `POST /portal/tracking/log-planned-meal` creates **one** `FoodLog` per meal from the **published meal-plan snapshot** (FOOD and RECIPE items). Nutrition is `scaleNutrition(meal.nutrition, servings)` into snapshot schemaVersion 2 — never live recipe/food rows. Optional `clientRequestId` makes retries idempotent; legitimate repeats are allowed without that key. `foodId` is null for planned meals; `displayName` / `sourceMealId` / `sourceType=PLANNED_MEAL` carry provenance.
 
 **Water:** stored as `amount_ml`. Input accepts `ml` or `l`. Optional `targetMl` on summary when an active `ClientGoal` uses unit `ml`/`l` or a water-like title.
 
 **Sleep:** one active row per client/local `date`. Duration derived from `bedtime` → `wake_time` when both provided. Summary includes `sleepWeek` average over the last 7 local dates.
 
-**Habits:** `habit_logs` only — no separate habit catalog. `client_goals` remains the nutrition-target layer; habit keys are client-entered/simple defaults in the UI.
+**Habits (Product Phase 11):** `habit_definitions` (global `dietitianAccountId=null` + practice-owned) → `client_habit_assignments` → daily `habit_logs`. Portal checklist is assignment-driven. `client_goals` remains the nutrition-target layer (e.g. water `targetMl`).
 
 **Measurements:** practice and portal write `ClientMeasurement`; Evolution stays the single progress series API (`from`/`to` filters).
 
-**Dietitian access:** read-only review APIs under `/clients/:clientId/tracking`. Clients mutate via `/portal/tracking`. Timeline records create events (`FOOD_LOGGED`, `WATER_LOGGED`, …), not every edit.
+**Dietitian access:** read-only review APIs under `/clients/:clientId/tracking`. Clients mutate via `/portal/tracking` and `/portal/habits`. Timeline records create events (`FOOD_LOGGED`, `WATER_LOGGED`, …), not every edit.
 
 **Timezone:** practice `timezone` maps event timestamps to local `tracking_date` / `log_date` / sleep `date`.
 

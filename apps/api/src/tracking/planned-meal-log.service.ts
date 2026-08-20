@@ -1,10 +1,10 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
-import type { Client, MealLogCategory, QuantityUnit } from "@prisma/client";
+import type { Client, MealLogCategory } from "@prisma/client";
+import type { ExtraNutrients, NutritionValues } from "@nutrition-saas/nutrition";
 import { PrismaService } from "../prisma/prisma.service";
 import { requireDietitianAccountId } from "../dietitian/tenant-scope";
 import { FoodLogService } from "./food-log.service";
-
-const FOOD_UNITS = new Set(["g", "kg", "oz", "lb", "ml", "l", "fl_oz"]);
+import { FoodLogNutritionService } from "./food-log-nutrition.service";
 
 type SnapshotMealItem = {
   id: string;
@@ -13,11 +13,15 @@ type SnapshotMealItem = {
   unit: string;
   food: { id: string; name: string } | null;
   recipe: { id: string; name: string } | null;
+  nutrition: NutritionValues;
 };
 
 type SnapshotMeal = {
   id: string;
   name: string;
+  nutrition: NutritionValues;
+  presented?: NutritionValues;
+  extraNutrients?: ExtraNutrients;
   items: SnapshotMealItem[];
 };
 
@@ -39,13 +43,24 @@ export class PlannedMealLogService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly foodLogs: FoodLogService,
+    private readonly nutrition: FoodLogNutritionService,
   ) {}
 
   async logPlannedMeal(
     client: Client,
     actorUserId: string,
-    input: { mealId: string; date?: string },
+    input: {
+      mealId: string;
+      date?: string;
+      servings?: number;
+      clientRequestId?: string;
+    },
   ) {
+    const servings = input.servings ?? 1;
+    if (!(servings > 0) || !Number.isFinite(servings)) {
+      throw new BadRequestException("Servings must be greater than zero");
+    }
+
     const dietitianAccountId = requireDietitianAccountId(client);
     const version = await this.prisma.mealPlanVersion.findFirst({
       where: {
@@ -58,7 +73,7 @@ export class PlannedMealLogService {
         },
       },
       orderBy: { publishedAt: "desc" },
-      select: { snapshot: true },
+      select: { id: true, snapshot: true },
     });
     if (!version?.snapshot || typeof version.snapshot !== "object") {
       throw new NotFoundException("No published meal plan found");
@@ -77,53 +92,52 @@ export class PlannedMealLogService {
     if (!meal) {
       throw new NotFoundException("Meal not found on the published plan");
     }
-
-    const category = mealCategoryFromName(meal.name);
-    const created: Array<Awaited<ReturnType<FoodLogService["createForClient"]>>> = [];
-    const skippedRecipes: Array<{ id: string; name: string }> = [];
-    const skipped: Array<{ reason: string; detail: string }> = [];
-
-    for (const item of meal.items ?? []) {
-      if (item.itemType === "RECIPE") {
-        skippedRecipes.push({
-          id: item.recipe?.id ?? item.id,
-          name: item.recipe?.name ?? "Recipe",
-        });
-        continue;
-      }
-      if (item.itemType !== "FOOD" || !item.food?.id) {
-        skipped.push({ reason: "unsupported_item", detail: item.id });
-        continue;
-      }
-      if (!FOOD_UNITS.has(item.unit)) {
-        skipped.push({
-          reason: "unsupported_unit",
-          detail: `${item.food.name} (${item.unit})`,
-        });
-        continue;
-      }
-      const log = await this.foodLogs.createForClient(client, actorUserId, {
-        foodId: item.food.id,
-        quantity: item.quantity,
-        unit: item.unit as QuantityUnit,
-        mealCategory: category,
-        notes: `From plan: ${meal.name}`,
-        ...(input.date ? { consumedAt: `${input.date}T12:00:00.000Z` } : {}),
-      });
-      created.push(log);
-    }
-
-    if (created.length === 0 && skippedRecipes.length === 0 && skipped.length === 0) {
+    if (!meal.items?.length) {
       throw new BadRequestException("Meal has no items to log");
     }
+    if (!meal.nutrition) {
+      throw new BadRequestException("Meal snapshot is missing nutrition");
+    }
+
+    const category = mealCategoryFromName(meal.name);
+    const plannedSnapshot = this.nutrition.buildPlannedMealSnapshot({
+      mealId: meal.id,
+      mealName: meal.name,
+      mealPlanVersionId: version.id,
+      servingsLogged: servings,
+      servingDescription: `${servings} serving${servings === 1 ? "" : "s"}`,
+      nutrition: meal.nutrition,
+      extraNutrients: meal.extraNutrients,
+      items: meal.items.map((item) => ({
+        itemType: item.itemType,
+        name: item.food?.name ?? item.recipe?.name ?? "Item",
+        quantity: item.quantity,
+        unit: item.unit,
+        nutrition: item.nutrition,
+      })),
+    });
+
+    const created = await this.foodLogs.createPlannedMealForClient(client, actorUserId, {
+      mealId: meal.id,
+      mealName: meal.name,
+      mealPlanVersionId: version.id,
+      servings,
+      servingDescription: plannedSnapshot.servingDescription,
+      mealCategory: category,
+      notes: `From plan: ${meal.name}`,
+      clientRequestId: input.clientRequestId,
+      snapshot: plannedSnapshot,
+      ...(input.date ? { consumedAt: `${input.date}T12:00:00.000Z` } : {}),
+    });
 
     return {
       mealId: meal.id,
       mealName: meal.name,
-      created,
-      createdCount: created.length,
-      skippedRecipes,
-      skipped,
+      servingsLogged: servings,
+      created: [created],
+      createdCount: 1,
+      skippedRecipes: [] as Array<{ id: string; name: string }>,
+      skipped: [] as Array<{ reason: string; detail: string }>,
     };
   }
 }

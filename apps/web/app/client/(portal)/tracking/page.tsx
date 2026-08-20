@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import {
   Alert,
   Button,
@@ -57,17 +57,23 @@ interface Summary {
   habits: {
     total: number;
     completed: number;
-    items: Array<{ habitKey: string; habitLabel: string; completed: boolean }>;
+    items: Array<{
+      habitKey: string;
+      habitLabel: string;
+      completed: boolean;
+      habitDefinitionId?: string | null;
+    }>;
   };
+  plannedMeals?: { logged: number; total: number };
 }
 
-const DEFAULT_HABITS = [
-  { key: "water_goal", label: "Drink water" },
-  { key: "vegetables", label: "Eat vegetables" },
-  { key: "breakfast", label: "Eat breakfast" },
-  { key: "exercise", label: "Exercise" },
-  { key: "sleep_target", label: "Sleep before midnight" },
-];
+type PortalHabit = {
+  habitDefinitionId: string;
+  name: string;
+  completed: boolean;
+  targetValue: number | null;
+  targetUnit: string | null;
+};
 
 const UNITS = ["g", "kg", "oz", "lb", "ml", "l", "fl_oz"] as const;
 const MEAL_CATEGORIES = ["BREAKFAST", "LUNCH", "DINNER", "SNACK", "OTHER"] as const;
@@ -119,23 +125,14 @@ export default function ClientTrackingPage() {
   const [bedtime, setBedtime] = useState("");
   const [wakeTime, setWakeTime] = useState("");
   const [weight, setWeight] = useState("");
+  const [habits, setHabits] = useState<PortalHabit[]>([]);
 
-  const habitState = useMemo(() => {
-    const map = new Map(summary?.habits.items.map((item) => [item.habitKey, item.completed]) ?? []);
-    const defaults = DEFAULT_HABITS.map((habit) => ({
-      ...habit,
-      completed: map.get(habit.key) ?? false,
-    }));
-    const extra =
-      summary?.habits.items
-        .filter((item) => !DEFAULT_HABITS.some((d) => d.key === item.habitKey))
-        .map((item) => ({
-          key: item.habitKey,
-          label: item.habitLabel,
-          completed: item.completed,
-        })) ?? [];
-    return [...defaults, ...extra];
-  }, [summary]);
+  async function loadHabits(selectedDate?: string) {
+    const row = await api<{ habits: PortalHabit[] }>(
+      `/api/v1/portal/habits${selectedDate ? `?date=${selectedDate}` : ""}`,
+    );
+    setHabits(row.habits);
+  }
 
   async function load(selectedDate?: string) {
     const sum = await api<Summary>(
@@ -143,6 +140,7 @@ export default function ClientTrackingPage() {
     );
     setSummary(sum);
     setDate(sum.date);
+    await loadHabits(sum.date);
   }
 
   useEffect(() => {
@@ -253,11 +251,11 @@ export default function ClientTrackingPage() {
     }, "Unable to save sleep");
   }
 
-  async function toggleHabit(habitKey: string, habitLabel: string, completed: boolean) {
+  async function toggleHabit(habitDefinitionId: string, completed: boolean) {
     await run(async () => {
-      await api("/api/v1/portal/tracking/habits", {
+      await api(`/api/v1/portal/habits/${habitDefinitionId}/log`, {
         method: "PUT",
-        body: JSON.stringify({ habitKey, habitLabel, date, completed: !completed }),
+        body: JSON.stringify({ date, completed: !completed }),
       });
       await load(date);
     }, "Unable to update habit");
@@ -552,24 +550,39 @@ export default function ClientTrackingPage() {
 
           <Section
             className="ui-client-panel ui-client-panel--habits"
-            title="Habits"
-            description={`${habitState.filter((h) => h.completed).length} of ${habitState.length} complete`}
+            title="Today's habits"
+            description={
+              habits.length > 0
+                ? `${habits.filter((h) => h.completed).length} of ${habits.length} complete`
+                : "No habits assigned yet"
+            }
           >
-            <ul className="ui-client-habit-list">
-              {habitState.map((habit) => (
-                <li key={habit.key}>
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={habit.completed}
-                      disabled={busy}
-                      onChange={() => void toggleHabit(habit.key, habit.label, habit.completed)}
-                    />
-                    <span>{habit.label}</span>
-                  </label>
-                </li>
-              ))}
-            </ul>
+            {habits.length === 0 ? (
+              <p className="ui-muted" style={{ margin: 0 }}>
+                Your dietitian can assign daily habits for this practice.
+              </p>
+            ) : (
+              <ul className="ui-client-habit-list">
+                {habits.map((habit) => (
+                  <li key={habit.habitDefinitionId}>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={habit.completed}
+                        disabled={busy}
+                        onChange={() => void toggleHabit(habit.habitDefinitionId, habit.completed)}
+                      />
+                      <span>
+                        {habit.name}
+                        {habit.targetValue != null
+                          ? ` (${habit.targetValue}${habit.targetUnit ? ` ${habit.targetUnit}` : ""})`
+                          : ""}
+                      </span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            )}
           </Section>
 
           <Section title="Weight" description="Saved to your measurement history for this practice.">

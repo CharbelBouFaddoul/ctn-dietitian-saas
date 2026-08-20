@@ -31,6 +31,7 @@ import { FoodOverridesModule } from "../src/food-overrides/food-overrides.module
 import { RecipesModule } from "../src/recipes/recipes.module";
 import { MealPlansModule } from "../src/meal-plans/meal-plans.module";
 import { TrackingModule } from "../src/tracking/tracking.module";
+import { HabitsModule } from "../src/habits/habits.module";
 import { MessagingModule } from "../src/messaging/messaging.module";
 import { RedisIoAdapter } from "../src/messaging/redis-io.adapter";
 import { DocumentsModule } from "../src/documents/documents.module";
@@ -99,6 +100,7 @@ export async function createAuthTestApp(options?: { realtime?: boolean }): Promi
       RecipesModule,
       MealPlansModule,
       TrackingModule,
+      HabitsModule,
       MessagingModule,
       DocumentsModule,
       InvoicesModule,
@@ -162,6 +164,8 @@ export async function resetAuthDatabase(prisma: PrismaService): Promise<void> {
   await prisma.invoiceSequence.deleteMany();
   await prisma.task.deleteMany();
   await prisma.habitLog.deleteMany();
+  await prisma.clientHabitAssignment.deleteMany();
+  await prisma.habitDefinition.deleteMany();
   await prisma.notification.deleteMany();
   await prisma.message.deleteMany();
   await prisma.conversationReadState.deleteMany();
@@ -210,6 +214,7 @@ export async function resetAuthDatabase(prisma: PrismaService): Promise<void> {
   await seedEntitlementCatalog(prisma);
   await seedPlatformAssessmentTemplate(prisma);
   await seedPlatformSettings(prisma);
+  await seedGlobalHabits(prisma);
   // Existing e2e suites rely on self-serve register/org create; Phase 3 gate defaults off.
   await prisma.platformSettings.updateMany({
     data: { registrationEnabled: true, emailNotificationsEnabled: false },
@@ -267,6 +272,68 @@ export const DEFAULT_ORG_SETTINGS = {
   heightUnit: "cm",
   dateFormat: "YYYY_MM_DD",
 } as const;
+
+async function seedGlobalHabits(prisma: PrismaService) {
+  const existing = await prisma.habitDefinition.count({ where: { dietitianAccountId: null } });
+  if (existing > 0) return;
+  const now = new Date();
+  await prisma.habitDefinition.createMany({
+    data: [
+      {
+        name: "Eat vegetables",
+        description: "Include vegetables with at least one meal",
+        category: "nutrition",
+        frequency: "DAILY",
+        active: true,
+        sortOrder: 10,
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        name: "Take a walk",
+        description: "Move for at least 10 minutes",
+        category: "activity",
+        defaultTargetValue: 10,
+        defaultTargetUnit: "min",
+        frequency: "DAILY",
+        active: true,
+        sortOrder: 20,
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        name: "Eat breakfast",
+        description: "Start the day with a planned breakfast",
+        category: "nutrition",
+        frequency: "DAILY",
+        active: true,
+        sortOrder: 30,
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        name: "Drink water goal",
+        description: "Hit your daily water target",
+        category: "hydration",
+        frequency: "DAILY",
+        active: true,
+        sortOrder: 40,
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        name: "Sleep on schedule",
+        description: "Keep a consistent bedtime",
+        category: "sleep",
+        frequency: "DAILY",
+        active: true,
+        sortOrder: 50,
+        createdAt: now,
+        updatedAt: now,
+      },
+    ],
+  });
+}
 
 /** Phase 7: entitlements resolve by dietitianAccountId only. */
 export async function activateSubscription(

@@ -6,7 +6,9 @@ import { requireDietitianAccountId } from "../dietitian/tenant-scope";
 import { TimelineService } from "../timeline/timeline.service";
 import {
   FoodLogNutritionService,
+  foodLogDisplayName,
   parseFoodLogNutritionSnapshot,
+  type FoodLogNutritionSnapshotV2,
 } from "./food-log-nutrition.service";
 
 @Injectable()
@@ -87,6 +89,8 @@ export class FoodLogService {
         dietitianAccountId,
         clientId: client.id,
         foodId: input.foodId,
+        sourceType: "MANUAL",
+        displayName: snapshot.foodName,
         quantity: input.quantity,
         unit: input.unit,
         consumedAt,
@@ -107,6 +111,94 @@ export class FoodLogService {
     return this.toResponse(row);
   }
 
+  async createPlannedMealForClient(
+    client: Client,
+    actorUserId: string,
+    input: {
+      mealId: string;
+      mealName: string;
+      mealPlanVersionId: string;
+      servings: number;
+      servingDescription?: string | null;
+      mealCategory?: MealLogCategory;
+      notes?: string;
+      consumedAt?: string;
+      clientRequestId?: string;
+      snapshot: FoodLogNutritionSnapshotV2;
+    },
+  ) {
+    const dietitianAccountId = requireDietitianAccountId(client);
+    if (input.clientRequestId) {
+      const existing = await this.prisma.foodLog.findFirst({
+        where: {
+          dietitianAccountId,
+          clientId: client.id,
+          clientRequestId: input.clientRequestId,
+        },
+      });
+      if (existing) {
+        return this.toResponse(existing);
+      }
+    }
+
+    const consumedAt = input.consumedAt ? new Date(input.consumedAt) : new Date();
+    if (Number.isNaN(consumedAt.getTime())) {
+      throw new BadRequestException("consumedAt must be a valid timestamp");
+    }
+    const timeZone = await this.timezone.timezoneForClient(client);
+
+    try {
+      const row = await this.prisma.foodLog.create({
+        data: {
+          dietitianAccountId,
+          clientId: client.id,
+          foodId: null,
+          displayName: input.mealName,
+          sourceType: "PLANNED_MEAL",
+          sourceMealId: input.mealId,
+          sourceMealPlanVersionId: input.mealPlanVersionId,
+          servingsLogged: input.servings,
+          servingDescription: input.servingDescription ?? null,
+          clientRequestId: input.clientRequestId ?? null,
+          quantity: input.servings,
+          unit: "serving",
+          consumedAt,
+          trackingDate: this.timezone.trackingDate(consumedAt, timeZone),
+          mealCategory: input.mealCategory ?? null,
+          notes: input.notes ?? null,
+          nutritionSnapshot: input.snapshot as unknown as Prisma.InputJsonValue,
+        },
+      });
+      await this.timeline.record({
+        dietitianAccountId,
+        clientId: client.id,
+        type: "FOOD_LOGGED",
+        actorUserId,
+        targetType: "food_log",
+        targetId: row.id,
+      });
+      return this.toResponse(row);
+    } catch (error) {
+      if (
+        input.clientRequestId &&
+        typeof error === "object" &&
+        error !== null &&
+        "code" in error &&
+        (error as { code?: string }).code === "P2002"
+      ) {
+        const existing = await this.prisma.foodLog.findFirst({
+          where: {
+            dietitianAccountId,
+            clientId: client.id,
+            clientRequestId: input.clientRequestId,
+          },
+        });
+        if (existing) return this.toResponse(existing);
+      }
+      throw error;
+    }
+  }
+
   async updateForClient(
     client: Client,
     logId: string,
@@ -120,6 +212,9 @@ export class FoodLogService {
     },
   ) {
     const row = await this.requireActive(client, logId);
+    if (row.sourceType === "PLANNED_MEAL" || !row.foodId) {
+      throw new BadRequestException("Planned meal logs cannot be edited; archive and re-log instead");
+    }
     const foodId = input.foodId ?? row.foodId;
     const quantity = input.quantity ?? Number(row.quantity);
     const unit = input.unit ?? row.unit;
@@ -138,6 +233,7 @@ export class FoodLogService {
       where: { id: row.id },
       data: {
         foodId,
+        displayName: snapshot.foodName,
         quantity,
         unit,
         consumedAt,
@@ -176,7 +272,12 @@ export class FoodLogService {
 
   private toResponse(row: {
     id: string;
-    foodId: string;
+    foodId: string | null;
+    displayName: string | null;
+    sourceType: string;
+    sourceMealId: string | null;
+    servingsLogged: Prisma.Decimal | null;
+    servingDescription: string | null;
     quantity: Prisma.Decimal;
     unit: string;
     consumedAt: Date;
@@ -192,7 +293,12 @@ export class FoodLogService {
     return {
       id: row.id,
       foodId: row.foodId,
-      foodName: snapshot.foodName,
+      foodName: foodLogDisplayName(snapshot, row.displayName),
+      displayName: row.displayName ?? foodLogDisplayName(snapshot),
+      sourceType: row.sourceType,
+      sourceMealId: row.sourceMealId,
+      servingsLogged: row.servingsLogged === null ? null : Number(row.servingsLogged),
+      servingDescription: row.servingDescription,
       quantity: Number(row.quantity),
       unit: row.unit,
       consumedAt: row.consumedAt.toISOString(),

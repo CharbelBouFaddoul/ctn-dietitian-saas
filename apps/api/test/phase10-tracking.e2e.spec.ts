@@ -209,7 +209,7 @@ describe("phase10 patient tracking progress analytics", () => {
     expect(evolution.body.latest.WEIGHT.value).toBe(72.5);
   });
 
-  it("logs FOOD items from published meal plan and skips recipes", async () => {
+  it("logs published meal plan meals including recipes as one FoodLog", async () => {
     const owner = await registerVerifyLogin();
     const practice = await createPractice(owner.cookie, "Plan Clinic");
     const client = await createClient(owner.cookie, practice.id);
@@ -266,19 +266,22 @@ describe("phase10 patient tracking progress analytics", () => {
       .get("/api/v1/portal/meal-plan")
       .set("Cookie", portal)
       .expect(200);
-    const publishedMealId = portalPlan.body.plan.snapshot.days[0].meals.find(
+    const publishedMeal = portalPlan.body.plan.snapshot.days[0].meals.find(
       (m: { name: string }) => m.name === "Breakfast",
-    ).id as string;
+    );
+    const publishedMealId = publishedMeal.id as string;
+    const expectedKcal = publishedMeal.presented.energyKcal as number;
 
     const logged = await request(ctx.app.getHttpServer())
       .post("/api/v1/portal/tracking/log-planned-meal")
       .set("Cookie", portal)
-      .send({ mealId: publishedMealId })
+      .send({ mealId: publishedMealId, servings: 1 })
       .expect(201);
 
     expect(logged.body.createdCount).toBe(1);
-    expect(logged.body.skippedRecipes).toHaveLength(1);
-    expect(logged.body.created[0].presented.energyKcal).toBe(89);
+    expect(logged.body.skippedRecipes).toHaveLength(0);
+    expect(logged.body.created[0].sourceType).toBe("PLANNED_MEAL");
+    expect(logged.body.created[0].presented.energyKcal).toBe(expectedKcal);
 
     const summary = await request(ctx.app.getHttpServer())
       .get(`/api/v1/portal/tracking/summary?date=${logged.body.created[0].trackingDate}`)
@@ -287,6 +290,7 @@ describe("phase10 patient tracking progress analytics", () => {
     expect(summary.body.food.byMeal.some((m: { category: string }) => m.category === "BREAKFAST")).toBe(
       true,
     );
+    expect(summary.body.plannedMeals.logged).toBe(1);
   });
 
   it("scopes tracking and measurements to activeClientId across practices", async () => {
@@ -410,12 +414,23 @@ describe("phase10 patient tracking progress analytics", () => {
       })
       .expect(201);
 
+    const catalog = await request(ctx.app.getHttpServer())
+      .get(`/api/v1/dietitian/${practice.id}/habits`)
+      .set("Cookie", owner.cookie)
+      .expect(200);
+    const veg = catalog.body.find((h: { name: string }) => /vegetable/i.test(h.name));
+    expect(veg).toBeTruthy();
+
     await request(ctx.app.getHttpServer())
-      .put("/api/v1/portal/tracking/habits")
+      .post(`/api/v1/dietitian/${practice.id}/clients/${client.id}/habits`)
+      .set("Cookie", owner.cookie)
+      .send({ habitDefinitionId: veg.id })
+      .expect(201);
+
+    await request(ctx.app.getHttpServer())
+      .put(`/api/v1/portal/habits/${veg.id}/log`)
       .set("Cookie", portal)
       .send({
-        habitKey: "vegetables",
-        habitLabel: "Eat vegetables",
         date: "2026-08-19",
         completed: true,
       })
@@ -430,5 +445,6 @@ describe("phase10 patient tracking progress analytics", () => {
     expect(summary.body.sleepWeek.averageDurationMinutes).toBe(480);
     expect(summary.body.exercise.entries[0].intensity).toBe("HIGH");
     expect(summary.body.habits.completed).toBe(1);
+    expect(summary.body.habits.total).toBeGreaterThanOrEqual(1);
   });
 });

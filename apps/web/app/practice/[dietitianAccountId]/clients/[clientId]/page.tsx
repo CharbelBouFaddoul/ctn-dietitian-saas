@@ -372,8 +372,16 @@ function ClientWorkspacePage() {
       total: number;
       items: Array<{ habitKey: string; habitLabel: string; completed: boolean }>;
     };
+    plannedMeals?: { logged: number; total: number };
   } | null>(null);
   const [trackingDate, setTrackingDate] = useState("");
+  const [habitCatalog, setHabitCatalog] = useState<
+    Array<{ id: string; name: string; scope: string; defaultTargetValue: number | null; defaultTargetUnit: string | null }>
+  >([]);
+  const [clientHabits, setClientHabits] = useState<
+    Array<{ habitDefinitionId: string; name: string; targetValue: number | null; targetUnit: string | null }>
+  >([]);
+  const [assignHabitId, setAssignHabitId] = useState("");
 
   function shiftTrackingDate(days: number) {
     if (!trackingDate) return;
@@ -509,7 +517,16 @@ function ClientWorkspacePage() {
         if (!trackingDate) setTrackingDate(summary.date);
       })
       .catch((err) => setError(errorMessage(err, "Unable to load tracking")));
-  }, [tab, trackingDate, base]);
+    void Promise.all([
+      api<typeof habitCatalog>(`/api/v1/dietitian/${dietitianAccountId}/habits`),
+      api<typeof clientHabits>(`${base}/habits`),
+    ])
+      .then(([catalog, assigned]) => {
+        setHabitCatalog(catalog);
+        setClientHabits(assigned);
+      })
+      .catch((err) => setError(errorMessage(err, "Unable to load habits")));
+  }, [tab, trackingDate, base, dietitianAccountId]);
 
   useEffect(() => {
     if (tab !== "messages") return;
@@ -1286,9 +1303,17 @@ function ClientWorkspacePage() {
               </Section>
 
               <Section title="Habits">
+                {trackingSummary.plannedMeals ? (
+                  <p className="ui-muted" style={{ marginTop: 0 }}>
+                    Planned meals logged today: {trackingSummary.plannedMeals.logged}
+                    {trackingSummary.plannedMeals.total > 0
+                      ? ` / ${trackingSummary.plannedMeals.total}`
+                      : ""}
+                  </p>
+                ) : null}
                 {trackingSummary.habits.items.length === 0 ? (
                   <p className="ui-muted" style={{ margin: 0 }}>
-                    No habits logged.
+                    No habits assigned.
                   </p>
                 ) : (
                   <ul className="ui-client-chart__list">
@@ -1301,6 +1326,81 @@ function ClientWorkspacePage() {
                     ))}
                   </ul>
                 )}
+                <div className="ui-inline-form" style={{ marginTop: 12 }}>
+                  <Field label="Assign habit">
+                    <Select value={assignHabitId} onChange={(e) => setAssignHabitId(e.target.value)}>
+                      <option value="">Select…</option>
+                      {habitCatalog
+                        .filter((h) => !clientHabits.some((c) => c.habitDefinitionId === h.id))
+                        .map((habit) => (
+                          <option key={habit.id} value={habit.id}>
+                            {habit.name}
+                            {habit.scope === "global" ? " (global)" : ""}
+                          </option>
+                        ))}
+                    </Select>
+                  </Field>
+                  <div className="ui-inline-form__action">
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={!assignHabitId || !allowManage}
+                      onClick={() => {
+                        void api(`${base}/habits`, {
+                          method: "POST",
+                          body: JSON.stringify({ habitDefinitionId: assignHabitId }),
+                        })
+                          .then(() => api<typeof clientHabits>(`${base}/habits`))
+                          .then((rows) => {
+                            setClientHabits(rows);
+                            setAssignHabitId("");
+                            return api<NonNullable<typeof trackingSummary>>(
+                              `${base}/tracking/summary${trackingDate ? `?date=${trackingDate}` : ""}`,
+                            );
+                          })
+                          .then(setTrackingSummary)
+                          .catch((err) => setError(errorMessage(err, "Unable to assign habit")));
+                      }}
+                    >
+                      Assign
+                    </Button>
+                  </div>
+                </div>
+                {clientHabits.length > 0 ? (
+                  <ul className="ui-client-chart__list" style={{ marginTop: 12 }}>
+                    {clientHabits.map((habit) => (
+                      <li key={habit.habitDefinitionId}>
+                        <span>
+                          Assigned: {habit.name}
+                          {habit.targetValue != null
+                            ? ` (${habit.targetValue}${habit.targetUnit ? ` ${habit.targetUnit}` : ""})`
+                            : ""}
+                        </span>
+                        {allowManage ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => {
+                              void api(`${base}/habits/${habit.habitDefinitionId}`, { method: "DELETE" })
+                                .then(() => api<typeof clientHabits>(`${base}/habits`))
+                                .then((rows) => {
+                                  setClientHabits(rows);
+                                  return api<NonNullable<typeof trackingSummary>>(
+                                    `${base}/tracking/summary${trackingDate ? `?date=${trackingDate}` : ""}`,
+                                  );
+                                })
+                                .then(setTrackingSummary)
+                                .catch((err) => setError(errorMessage(err, "Unable to unassign habit")));
+                            }}
+                          >
+                            Remove
+                          </Button>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
               </Section>
             </>
           ) : (

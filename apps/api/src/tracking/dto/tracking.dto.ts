@@ -293,4 +293,15 @@ export class LogPlannedMealDto {
   @IsOptional()
   @IsString()
   date?: string;
+
+  @ApiPropertyOptional({ description: "Serving multiplier (default 1). Supports 0.25, 0.5, 1, 1.5, custom." })
+  @IsOptional()
+  @IsNumber()
+  @Min(0.01)
+  servings?: number;
+
+  @ApiPropertyOptional({ description: "Client-generated UUID for idempotent retries" })
+  @IsOptional()
+  @IsUUID()
+  clientRequestId?: string;
 }

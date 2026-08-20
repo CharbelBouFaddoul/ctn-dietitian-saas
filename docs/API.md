@@ -271,13 +271,28 @@ Authenticated client account only (`Session.activeClientId`). Mutations use `ass
 
 | Method | Path | Description |
 |---|---|---|
-| GET | `/summary` | Daily derived totals (`?date=YYYY-MM-DD`, defaults to practice-local today). Includes `food.byMeal`, water `entries` + optional `targetMl` (from matching `ClientGoal`), exercise `entries`, `sleepWeek` |
-| GET/POST/PATCH/DELETE | `/food-logs` … | Food logging with immutable `nutrition_snapshot`; optional `mealCategory` |
+| GET | `/summary` | Daily derived totals (`?date=YYYY-MM-DD`). Includes `food.byMeal` (with `sourceType`/`displayName`), water `entries` + `targetMl`, exercise `entries`, `sleepWeek`, assignment-based `habits`, `plannedMeals.{logged,total}` |
+| GET/POST/PATCH/DELETE | `/food-logs` … | Food logging with immutable `nutrition_snapshot`; optional `mealCategory`. Planned meal logs use `sourceType=PLANNED_MEAL` and nullable `foodId` |
 | GET/POST/PATCH/DELETE | `/water-logs` … | Water logging (`amount` + `ml`/`l`, stored as ml) |
 | GET/POST/PATCH/DELETE | `/exercise-logs` … | Exercise log (optional intensity) |
 | GET/PUT/DELETE | `/sleep` … | Upsert one sleep row per local date |
-| GET/PUT | `/habits` … | Upsert daily habit completion |
-| POST | `/log-planned-meal` | Log **FOOD** items from a published plan meal (`{ mealId, date? }`). RECIPE items are skipped (documented limitation) |
+| GET/PUT | `/habits` … | Legacy freeform habit upsert (still available) |
+| POST | `/log-planned-meal` | Log a published meal as **one** FoodLog from the plan snapshot (`{ mealId, date?, servings?, clientRequestId? }`). Includes FOOD and RECIPE items; nutrition scaled by `servings` |
+
+### Portal habits (`/api/v1/portal/habits`)
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/` | Assigned habits for active client + today’s completion (`?date=`) |
+| PUT | `/:habitDefinitionId/log` | Complete/undo assigned habit (`{ completed, date? }`) |
+
+### Practice habits
+
+| Method | Path | Description |
+|---|---|---|
+| GET/POST | `/api/v1/dietitian/:dietitianAccountId/habits` | List global+practice catalog / create practice habit |
+| PATCH | `/api/v1/dietitian/:dietitianAccountId/habits/:habitId` | Update practice-owned habit |
+| GET/POST/DELETE | `/api/v1/dietitian/:dietitianAccountId/clients/:clientId/habits` | List / assign / unassign |
 
 ### Portal measurements
 

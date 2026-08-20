@@ -630,7 +630,8 @@ Portal uploads forced SHARED. Org default INTERNAL unless specified.
 - Dietitian reads via `/api/v1/dietitian/:dietitianAccountId/clients/:clientId/tracking/*` (GET only).
 - Deletes → status ARCHIVED + `archivedAt`.
 - Food logs store nutrition snapshot; summary groups `food.byMeal` and may expose `water.targetMl` from `ClientGoal`.
-- `POST /portal/tracking/log-planned-meal` logs FOOD plan items only (recipes skipped).
+- `POST /portal/tracking/log-planned-meal` logs a published meal as one FoodLog from the plan snapshot (FOOD+RECIPE, servings scale). Product Phase 11.
+- Habits: `habit_definitions` + `client_habit_assignments` + `habit_logs`; portal `/portal/habits`.
 - Isolation: `dietitianAccountId` + `clientId` + portal `activeClientId` / ClientAccess.
 
 ---
@@ -1005,6 +1006,7 @@ Only questions that **cannot** be answered from the repository:
 14. **Food catalog + reusable meals:** ✅ Product Phase 8 — curated catalog import, practice custom foods, Recipes as meal library.
 15. **Meal plan composition + nutrition UX:** ✅ Product Phase 9 — foods/recipes → meal → day totals; publish snapshot; portal composition.
 16. **Patient tracking + progress:** ✅ Product Phase 10 — enriched daily summary, portal weight, meal-plan FOOD logging, practice/portal UX; multi-practice via `activeClientId`.
+16b. **Tracking completion:** ✅ Product Phase 11 — planned-meal snapshots (incl. recipes), habit catalog/assignment, summary `plannedMeals` (distinct from historical Phase 11 AI).
 17. **First SUPER_ADMIN bootstrap:** Manual SQL, CLI, or break-glass invite — what is the official ops process?
 18. **Account states required for provisioning era:** e.g. INVITED, ACTIVATION_PENDING, PROVISIONED — which states are mandatory?
 19. **Dietitian leaves practice:** Auto-unassign clients, force reassignment, transfer ownership rules beyond current deactivate?

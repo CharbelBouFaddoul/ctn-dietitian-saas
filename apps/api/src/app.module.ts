@@ -33,6 +33,7 @@ import { AnalyticsModule } from "./analytics/analytics.module";
 import { AiModule } from "./ai/ai.module";
 import { AutomationModule } from "./automation/automation.module";
 import { DietitianAccountsModule } from "./dietitian-accounts/dietitian-accounts.module";
+import { HabitsModule } from "./habits/habits.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { RedisModule } from "./redis/redis.module";
 import { StorageModule } from "./storage/storage.module";
@@ -70,6 +71,7 @@ import { loadEnv } from "./config/env";
     RecipesModule,
     MealPlansModule,
     TrackingModule,
+    HabitsModule,
     MessagingModule,
     DocumentsModule,
     InvoicesModule,

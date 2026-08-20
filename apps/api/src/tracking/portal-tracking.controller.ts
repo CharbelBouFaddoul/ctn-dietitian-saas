@@ -185,7 +185,9 @@ export class PortalTrackingController {
   }
 
   @Post("log-planned-meal")
-  @ApiOperation({ summary: "Log FOOD items from a published meal plan meal (recipes skipped)" })
+  @ApiOperation({
+    summary: "Log a published meal-plan meal as one FoodLog (snapshot nutrition × servings)",
+  })
   logPlannedMeal(
     @CurrentUser() user: AuthenticatedRequestUser,
     @CurrentSession() session: AuthenticatedSession,

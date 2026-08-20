@@ -233,7 +233,8 @@ describe("phase8 food meal database", () => {
       .get(`/api/v1/portal/foods?q=granola`)
       .set("Cookie", portalCookie)
       .expect(200);
-    expect(portalSearch.body.items.some((row: { id: string }) => row.id === customId)).toBe(false);
+    // Product Phase 10+: portal food search includes practice-visible custom foods for activeClientId.
+    expect(portalSearch.body.items.some((row: { id: string }) => row.id === customId)).toBe(true);
 
     await request(ctx.app.getHttpServer())
       .get(`/api/v1/dietitian/${practiceA.id}/foods/${customId}`)

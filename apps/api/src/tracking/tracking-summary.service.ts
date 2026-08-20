@@ -4,7 +4,10 @@ import { roundNutrition, sumNutrition, type NutritionValues } from "@nutrition-s
 import type { Client, MealLogCategory } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { requireDietitianAccountId } from "../dietitian/tenant-scope";
-import { parseFoodLogNutritionSnapshot } from "./food-log-nutrition.service";
+import {
+  foodLogDisplayName,
+  parseFoodLogNutritionSnapshot,
+} from "./food-log-nutrition.service";
 import { TrackingTimezoneService } from "./food-log.service";
 
 const MEAL_ORDER: Array<MealLogCategory | "UNCATEGORIZED"> = [
@@ -15,6 +18,8 @@ const MEAL_ORDER: Array<MealLogCategory | "UNCATEGORIZED"> = [
   "OTHER",
   "UNCATEGORIZED",
 ];
+
+const WEEKDAY_KEYS = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
 
 function resolveWaterTargetMl(
   goals: Array<{ title: string; targetValue: number | null; targetUnit: string | null }>,
@@ -28,7 +33,6 @@ function resolveWaterTargetMl(
     if (!isWaterUnit && !isWaterTitle) continue;
     if (unit === "l") return goal.targetValue * 1000;
     if (unit === "ml") return goal.targetValue;
-    // Title match without clear unit: assume liters if value is small, else ml
     if (goal.targetValue <= 20) return goal.targetValue * 1000;
     return goal.targetValue;
   }
@@ -40,6 +44,17 @@ function shiftDateKey(dateKey: string, days: number): string {
   const shifted = new Date(base.getTime() + days * 24 * 60 * 60 * 1000);
   return shifted.toISOString().slice(0, 10);
 }
+
+type SnapshotDay = {
+  dayNumber: number;
+  weekday: string | null;
+  meals?: Array<{ id: string }>;
+};
+
+type PlanSnapshot = {
+  dayLabelMode?: "NUMBERED" | "WEEKDAY";
+  days?: SnapshotDay[];
+};
 
 @Injectable()
 export class TrackingSummaryService {
@@ -56,7 +71,17 @@ export class TrackingSummaryService {
     const weekStartKey = shiftDateKey(dateKey, -6);
     const weekStart = this.timezone.parseTrackingDate(weekStartKey);
 
-    const [foodLogs, waterLogs, exerciseLogs, sleepLog, habitLogs, goals, weekSleep] = await Promise.all([
+    const [
+      foodLogs,
+      waterLogs,
+      exerciseLogs,
+      sleepLog,
+      habitLogs,
+      goals,
+      weekSleep,
+      assignments,
+      publishedVersion,
+    ] = await Promise.all([
       this.prisma.foodLog.findMany({
         where: { dietitianAccountId, clientId: client.id, trackingDate, status: "ACTIVE" },
         orderBy: { consumedAt: "asc" },
@@ -89,6 +114,24 @@ export class TrackingSummaryService {
         },
         select: { durationMinutes: true },
       }),
+      this.prisma.clientHabitAssignment.findMany({
+        where: { dietitianAccountId, clientId: client.id, active: true },
+        include: { habitDefinition: true },
+        orderBy: [{ habitDefinition: { sortOrder: "asc" } }, { habitDefinition: { name: "asc" } }],
+      }),
+      this.prisma.mealPlanVersion.findFirst({
+        where: {
+          status: "PUBLISHED",
+          dietitianAccountId,
+          mealPlan: {
+            clientId: client.id,
+            status: { not: "ARCHIVED" },
+            dietitianAccountId,
+          },
+        },
+        orderBy: { publishedAt: "desc" },
+        select: { snapshot: true },
+      }),
     ]);
 
     const mappedGoals = goals.map((goal) => ({
@@ -101,7 +144,10 @@ export class TrackingSummaryService {
       const snapshot = parseFoodLogNutritionSnapshot(row.nutritionSnapshot);
       return {
         id: row.id,
-        foodName: snapshot.foodName,
+        foodName: foodLogDisplayName(snapshot, row.displayName),
+        displayName: row.displayName ?? foodLogDisplayName(snapshot),
+        sourceType: row.sourceType,
+        sourceMealId: row.sourceMealId,
         quantity: Number(row.quantity),
         unit: row.unit,
         mealCategory: row.mealCategory,
@@ -122,9 +168,11 @@ export class TrackingSummaryService {
       const mealTotals = sumNutrition(items.map((row) => row.nutrition));
       return {
         category,
-        items: items.map(({ id, foodName, quantity, unit, presented }) => ({
+        items: items.map(({ id, foodName, displayName, sourceType, quantity, unit, presented }) => ({
           id,
           foodName,
+          displayName,
+          sourceType,
           quantity,
           unit,
           presented,
@@ -136,7 +184,30 @@ export class TrackingSummaryService {
     const foodTotals = sumNutrition(foodItems.map((row) => row.nutrition));
     const waterTotalMl = waterLogs.reduce((sum, row) => sum + Number(row.amountMl), 0);
     const exerciseDurationMinutes = exerciseLogs.reduce((sum, row) => sum + row.durationMinutes, 0);
-    const habitsCompleted = habitLogs.filter((row) => row.completed).length;
+
+    const activeAssignments = assignments.filter(
+      (a) => a.habitDefinition.active && !a.habitDefinition.archivedAt,
+    );
+    const logByDef = new Map(
+      habitLogs.filter((l) => l.habitDefinitionId).map((l) => [l.habitDefinitionId!, l]),
+    );
+    const logByKey = new Map(habitLogs.map((l) => [l.habitKey, l]));
+    const habitItems = activeAssignments.map((assignment) => {
+      const def = assignment.habitDefinition;
+      const log = logByDef.get(def.id) ?? logByKey.get(def.id);
+      return {
+        id: log?.id ?? null,
+        habitDefinitionId: def.id,
+        habitKey: def.id,
+        habitLabel: def.name,
+        completed: log?.completed ?? false,
+        value: log?.value === null || log?.value === undefined ? null : Number(log.value),
+      };
+    });
+    const habitsCompleted = habitItems.filter((row) => row.completed).length;
+
+    const plannedMealLogs = foodLogs.filter((row) => row.sourceType === "PLANNED_MEAL");
+    const plannedMealsTotal = this.plannedMealTotalForDate(publishedVersion?.snapshot, dateKey);
 
     const weekDurations = weekSleep
       .map((row) => row.durationMinutes)
@@ -197,15 +268,13 @@ export class TrackingSummaryService {
         : null,
       sleepWeek,
       habits: {
-        total: habitLogs.length,
+        total: habitItems.length,
         completed: habitsCompleted,
-        items: habitLogs.map((row) => ({
-          id: row.id,
-          habitKey: row.habitKey,
-          habitLabel: row.habitLabel,
-          completed: row.completed,
-          value: row.value === null ? null : Number(row.value),
-        })),
+        items: habitItems,
+      },
+      plannedMeals: {
+        logged: plannedMealLogs.length,
+        total: plannedMealsTotal,
       },
       goals: mappedGoals,
     };
@@ -213,5 +282,21 @@ export class TrackingSummaryService {
 
   nutritionFromSnapshots(snapshots: NutritionValues[]): NutritionValues {
     return sumNutrition(snapshots);
+  }
+
+  private plannedMealTotalForDate(snapshotValue: unknown, dateKey: string): number {
+    if (!snapshotValue || typeof snapshotValue !== "object") return 0;
+    const snapshot = snapshotValue as PlanSnapshot;
+    const days = snapshot.days ?? [];
+    if (days.length === 0) return 0;
+
+    if (snapshot.dayLabelMode === "WEEKDAY") {
+      const weekday = WEEKDAY_KEYS[new Date(`${dateKey}T12:00:00.000Z`).getUTCDay()] ?? null;
+      const match = days.find((day) => day.weekday === weekday);
+      if (match) return match.meals?.length ?? 0;
+    }
+
+    const day1 = days.find((day) => day.dayNumber === 1) ?? days[0];
+    return day1?.meals?.length ?? 0;
   }
 }
