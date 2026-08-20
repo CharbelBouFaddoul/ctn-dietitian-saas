@@ -1,8 +1,26 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
+import {
+  Alert,
+  Button,
+  Field,
+  Input,
+  LoadingState,
+  PageHeader,
+  Section,
+  Select,
+  StatusBadge,
+  Table,
+  Td,
+  humanizeLabel,
+} from "@nutrition-saas/ui";
+import { featureLabel, statusLabel } from "../../../../lib/admin-labels";
 import { api } from "../../../../lib/api";
+import { errorMessage } from "../../../../lib/humanize-error";
+
 interface Plan {
   id: string;
   name: string;
@@ -33,6 +51,12 @@ interface OrgDetail {
   entitlements: Entitlement[];
 }
 
+function formatValue(enabled: boolean | null, limit: number | null): string {
+  if (enabled === null && limit === null) return "—";
+  const flag = enabled === null ? "" : enabled ? "On" : "Off";
+  return limit === null ? flag || "—" : `${flag} · ${limit}`.trim();
+}
+
 export default function AdminOrganizationDetailPage() {
   const params = useParams<{ id: string }>();
   const organizationId = params.id;
@@ -41,6 +65,7 @@ export default function AdminOrganizationDetailPage() {
   const [planId, setPlanId] = useState("");
   const [reason, setReason] = useState("Admin override");
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   async function load() {
     try {
@@ -53,7 +78,7 @@ export default function AdminOrganizationDetailPage() {
       setPlanId(detail.subscription?.plan.id ?? catalog.find((plan) => plan.slug === "standard")?.id ?? "");
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to load organization");
+      setError(errorMessage(err, "Unable to load organization"));
     }
   }
 
@@ -61,158 +86,178 @@ export default function AdminOrganizationDetailPage() {
     void load();
   }, [organizationId]);
 
-  async function setOrgStatus(status: "ACTIVE" | "SUSPENDED" | "ARCHIVED") {
-    await api(`/api/v1/admin/organizations/${organizationId}/status`, {
-      method: "PATCH",
-      body: JSON.stringify({ status }),
-    });
-    await load();
+  async function run(action: () => Promise<void>, fallback: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      await action();
+      await load();
+    } catch (err) {
+      setError(errorMessage(err, fallback));
+    } finally {
+      setBusy(false);
+    }
   }
 
-  async function assignPlan(event: FormEvent) {
-    event.preventDefault();
-    await api(`/api/v1/admin/organizations/${organizationId}/subscription`, {
-      method: "PUT",
-      body: JSON.stringify({ planId, status: "ACTIVE" }),
-    });
-    await load();
-  }
-
-  async function setSubStatus(status: "ACTIVE" | "SUSPENDED" | "CANCELLED") {
-    await api(`/api/v1/admin/organizations/${organizationId}/subscription`, {
-      method: "PATCH",
-      body: JSON.stringify({ status }),
-    });
-    await load();
-  }
-
-  async function saveOverride(key: string, enabled: boolean | null, limitValue: number | null) {
-    await api(`/api/v1/admin/organizations/${organizationId}/overrides/${key}`, {
-      method: "PUT",
-      body: JSON.stringify({ enabled, limitValue, reason }),
-    });
-    await load();
-  }
-
-  async function removeOverride(key: string) {
-    await api(`/api/v1/admin/organizations/${organizationId}/overrides/${key}`, { method: "DELETE" });
-    await load();
+  if (!org && !error) {
+    return <LoadingState>Loading organization…</LoadingState>;
   }
 
   if (!org) {
-    return <p>{error ?? "Loading…"}</p>;
+    return (
+      <section>
+        <PageHeader title="Organization" description="Unable to load this organization." />
+        {error ? <Alert tone="danger">{error}</Alert> : null}
+        <Link href="/admin/organizations" className="ui-link">
+          Back to organizations
+        </Link>
+      </section>
+    );
   }
 
   return (
     <section>
-      <h1>{org.name}</h1>
-      <p>
-        {org.slug} · org {org.status} · subscription {org.subscription?.status ?? "none"} ·{" "}
-        {org.subscription?.plan.name ?? "no plan"}
-      </p>
-      {error ? <p style={{ color: "var(--color-danger)" }}>{error}</p> : null}
-      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-        <button type="button" className="ui-btn ui-btn--primary" onClick={() => void setOrgStatus("ACTIVE")}>
-          Activate org
-        </button>
-        <button type="button" className="ui-btn ui-btn--primary" onClick={() => void setOrgStatus("SUSPENDED")}>
-          Suspend org
-        </button>
-        <button type="button" className="ui-btn ui-btn--primary" onClick={() => void setOrgStatus("ARCHIVED")}>
-          Archive org
-        </button>
-      </div>
-      <form onSubmit={(event) => void assignPlan(event)} style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-        <select className="ui-input" value={planId} onChange={(event) => setPlanId(event.target.value)}>
-          {plans.map((plan) => (
-            <option key={plan.id} value={plan.id}>
-              {plan.name}
-            </option>
-          ))}
-        </select>
-        <button type="submit" className="ui-btn ui-btn--primary">
-          Assign plan
-        </button>
-      </form>
-      <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
-        <button type="button" className="ui-btn ui-btn--primary" onClick={() => void setSubStatus("ACTIVE")}>
-          Reactivate subscription
-        </button>
-        <button type="button" className="ui-btn ui-btn--primary" onClick={() => void setSubStatus("SUSPENDED")}>
-          Suspend subscription
-        </button>
-        <button type="button" className="ui-btn ui-btn--primary" onClick={() => void setSubStatus("CANCELLED")}>
-          Cancel subscription
-        </button>
-      </div>
-      <h2>Effective entitlements</h2>
-      <label style={{ display: "block", marginBottom: 12 }}>
-        Override reason
-        <input className="ui-input" style={{marginLeft: 8}} value={reason} onChange={(event) => setReason(event.target.value)} />
-      </label>
-      <table className="ui-table">
-        <thead>
-          <tr>
-            <th>Feature</th>
-            <th>Plan</th>
-            <th>Override</th>
-            <th>Effective</th>
-            <th>Source</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {org.entitlements.map((row) => (
-            <tr key={row.key}>
-              <td>{row.key}</td>
-              <td>
-                {formatValue(row.planEnabled, row.planLimit)}
-              </td>
-              <td>
-                {row.overrideEnabled === null && row.overrideLimit === null
-                  ? "—"
-                  : formatValue(row.overrideEnabled, row.overrideLimit)}
-              </td>
-              <td>{formatValue(row.enabled, row.limit)}</td>
-              <td>{row.source}</td>
-              <td>
-                <button type="button" className="ui-btn ui-btn--primary" onClick={() => void saveOverride(row.key, true, row.valueType === "LIMIT" ? row.limit ?? 0 : null)}>
-                  Enable
-                </button>{" "}
-                <button type="button" className="ui-btn ui-btn--primary" onClick={() => void saveOverride(row.key, false, row.limit)}>
-                  Disable
-                </button>{" "}
-                {row.valueType === "LIMIT" ? (
-                  <button
-                    type="button"
-                    className="ui-btn ui-btn--primary"
-                    onClick={() => {
-                      const next = window.prompt("Limit", String(row.limit ?? 0));
-                      if (next === null) {
-                        return;
-                      }
-                      void saveOverride(row.key, row.enabled, Number(next));
-                    }}
-                  >
-                    Limit
-                  </button>
-                ) : null}{" "}
-                <button type="button" className="ui-btn ui-btn--primary" onClick={() => void removeOverride(row.key)}>
-                  Remove override
-                </button>
-              </td>
+      <PageHeader
+        eyebrow="Platform"
+        title={org.name}
+        description={`${org.slug} · Organization ${statusLabel(org.status)} · ${org.subscription?.plan.name ?? "No plan"}`}
+        actions={
+          <Link href="/admin/organizations" className="ui-btn ui-btn--secondary ui-btn--sm">
+            Back
+          </Link>
+        }
+      />
+      {error ? <Alert tone="danger">{error}</Alert> : null}
+
+      <Section title="Organization status" tone="mint">
+        <div className="ui-row" style={{ marginBottom: 12 }}>
+          <StatusBadge status={org.status} label={statusLabel(org.status)} />
+          {org.subscription ? (
+            <StatusBadge status={org.subscription.status} label={`Subscription · ${statusLabel(org.subscription.status)}`} />
+          ) : null}
+        </div>
+        <div className="ui-admin-actions">
+          <Button disabled={busy} onClick={() => void run(() => api(`/api/v1/admin/organizations/${organizationId}/status`, { method: "PATCH", body: JSON.stringify({ status: "ACTIVE" }) }).then(() => undefined), "Unable to activate")}>
+            Activate
+          </Button>
+          <Button variant="secondary" disabled={busy} onClick={() => void run(() => api(`/api/v1/admin/organizations/${organizationId}/status`, { method: "PATCH", body: JSON.stringify({ status: "SUSPENDED" }) }).then(() => undefined), "Unable to suspend")}>
+            Suspend
+          </Button>
+          <Button variant="secondary" disabled={busy} onClick={() => void run(() => api(`/api/v1/admin/organizations/${organizationId}/status`, { method: "PATCH", body: JSON.stringify({ status: "ARCHIVED" }) }).then(() => undefined), "Unable to archive")}>
+            Archive
+          </Button>
+        </div>
+      </Section>
+
+      <Section title="Subscription">
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            void run(
+              () =>
+                api(`/api/v1/admin/organizations/${organizationId}/subscription`, {
+                  method: "PUT",
+                  body: JSON.stringify({ planId, status: "ACTIVE" }),
+                }).then(() => undefined),
+              "Unable to assign plan",
+            );
+          }}
+          className="ui-admin-toolbar"
+        >
+          <Field label="Plan">
+            <Select value={planId} onChange={(event) => setPlanId(event.target.value)}>
+              {plans.map((plan) => (
+                <option key={plan.id} value={plan.id}>
+                  {plan.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Button type="submit" disabled={busy}>
+            Assign plan
+          </Button>
+        </form>
+        <div className="ui-admin-actions">
+          <Button variant="secondary" disabled={busy} onClick={() => void run(() => api(`/api/v1/admin/organizations/${organizationId}/subscription`, { method: "PATCH", body: JSON.stringify({ status: "ACTIVE" }) }).then(() => undefined), "Unable to reactivate")}>
+            Reactivate subscription
+          </Button>
+          <Button variant="secondary" disabled={busy} onClick={() => void run(() => api(`/api/v1/admin/organizations/${organizationId}/subscription`, { method: "PATCH", body: JSON.stringify({ status: "SUSPENDED" }) }).then(() => undefined), "Unable to suspend subscription")}>
+            Suspend subscription
+          </Button>
+          <Button variant="secondary" disabled={busy} onClick={() => void run(() => api(`/api/v1/admin/organizations/${organizationId}/subscription`, { method: "PATCH", body: JSON.stringify({ status: "CANCELLED" }) }).then(() => undefined), "Unable to cancel subscription")}>
+            Cancel subscription
+          </Button>
+        </div>
+      </Section>
+
+      <Section title="Effective entitlements" description="Plan defaults with optional organization overrides.">
+        <Field label="Override reason">
+          <Input value={reason} onChange={(event) => setReason(event.target.value)} />
+        </Field>
+        <Table>
+          <thead>
+            <tr>
+              <th>Feature</th>
+              <th>Plan</th>
+              <th>Override</th>
+              <th>Effective</th>
+              <th>Source</th>
+              <th>Actions</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {org.entitlements.map((row) => (
+              <tr key={row.key}>
+                <Td label="Feature">
+                  <strong>{row.name || featureLabel(row.key)}</strong>
+                </Td>
+                <Td label="Plan">{formatValue(row.planEnabled, row.planLimit)}</Td>
+                <Td label="Override">
+                  {row.overrideEnabled === null && row.overrideLimit === null
+                    ? "—"
+                    : formatValue(row.overrideEnabled, row.overrideLimit)}
+                </Td>
+                <Td label="Effective">{formatValue(row.enabled, row.limit)}</Td>
+                <Td label="Source">{humanizeLabel(row.source)}</Td>
+                <Td label="Actions">
+                  <div className="ui-admin-actions" style={{ margin: 0 }}>
+                    <Button size="sm" disabled={busy} onClick={() => void run(() => api(`/api/v1/admin/organizations/${organizationId}/overrides/${row.key}`, { method: "PUT", body: JSON.stringify({ enabled: true, limitValue: row.valueType === "LIMIT" ? row.limit ?? 0 : null, reason }) }).then(() => undefined), "Unable to enable")}>
+                      Enable
+                    </Button>
+                    <Button size="sm" variant="secondary" disabled={busy} onClick={() => void run(() => api(`/api/v1/admin/organizations/${organizationId}/overrides/${row.key}`, { method: "PUT", body: JSON.stringify({ enabled: false, limitValue: row.limit, reason }) }).then(() => undefined), "Unable to disable")}>
+                      Disable
+                    </Button>
+                    {row.valueType === "LIMIT" ? (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={busy}
+                        onClick={() => {
+                          const next = window.prompt("Limit", String(row.limit ?? 0));
+                          if (next === null) return;
+                          void run(
+                            () =>
+                              api(`/api/v1/admin/organizations/${organizationId}/overrides/${row.key}`, {
+                                method: "PUT",
+                                body: JSON.stringify({ enabled: row.enabled, limitValue: Number(next), reason }),
+                              }).then(() => undefined),
+                            "Unable to set limit",
+                          );
+                        }}
+                      >
+                        Limit
+                      </Button>
+                    ) : null}
+                    <Button size="sm" variant="ghost" disabled={busy} onClick={() => void run(() => api(`/api/v1/admin/organizations/${organizationId}/overrides/${row.key}`, { method: "DELETE" }).then(() => undefined), "Unable to remove override")}>
+                      Remove
+                    </Button>
+                  </div>
+                </Td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      </Section>
     </section>
   );
-}
-
-function formatValue(enabled: boolean | null, limit: number | null): string {
-  if (enabled === null && limit === null) {
-    return "—";
-  }
-  const flag = enabled === null ? "" : enabled ? "on" : "off";
-  return limit === null ? flag || "—" : `${flag} ${limit}`.trim();
 }

@@ -1,7 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  Alert,
+  EmptyState,
+  LoadingState,
+  PageHeader,
+  Section,
+  StatusBadge,
+  Table,
+  Td,
+} from "@nutrition-saas/ui";
+import { statusLabel } from "../../../lib/admin-labels";
 import { api } from "../../../lib/api";
+import { formatDate } from "../../../lib/format";
+import { errorMessage } from "../../../lib/humanize-error";
+
 interface ImportReport {
   processed?: number;
   imported?: number;
@@ -24,58 +38,82 @@ interface FoodSourceRow {
 }
 
 export default function AdminFoodSourcesPage() {
-  const [rows, setRows] = useState<FoodSourceRow[]>([]);
+  const [rows, setRows] = useState<FoodSourceRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     void api<FoodSourceRow[]>("/api/v1/admin/food-sources")
       .then(setRows)
-      .catch((err) => setError(err instanceof Error ? err.message : "Unable to load food sources"));
+      .catch((err) => setError(errorMessage(err, "Unable to load food sources")));
   }, []);
 
   return (
     <section>
-      <h1>Food sources</h1>
-      <p style={{ color: "var(--color-muted)" }}>
-        Read-only dataset visibility. Global foods are changed by the import command, not by dietitian APIs.
-      </p>
-      {error ? <p style={{ color: "var(--color-danger)" }}>{error}</p> : null}
-      <table className="ui-table">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Version</th>
-            <th>Status</th>
-            <th>Foods</th>
-            <th>Imported</th>
-            <th>Last import</th>
-          </tr>
-        </thead>
-        <tbody>
+      <PageHeader
+        eyebrow="Catalog"
+        title="Food database"
+        description="Read-only dataset visibility. Global foods are changed by the import command, not by dietitian APIs."
+      />
+      {error ? <Alert tone="danger">{error}</Alert> : null}
+
+      <Section title="Food sources">
+        {rows === null ? <LoadingState>Loading food sources…</LoadingState> : null}
+        {rows && rows.length === 0 ? (
+          <EmptyState title="No food sources">Import a dataset to populate the catalog.</EmptyState>
+        ) : null}
+        {rows && rows.length > 0 ? (
+          <Table>
+            <thead>
+              <tr>
+                <th>Source</th>
+                <th>Version</th>
+                <th>Status</th>
+                <th>Foods</th>
+                <th>Imported</th>
+                <th>Last import</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.id}>
+                  <Td label="Source">
+                    <strong>{row.name}</strong>
+                    <div className="ui-muted" style={{ fontSize: 12 }}>
+                      {row.license}
+                    </div>
+                  </Td>
+                  <Td label="Version">{row.datasetVersion}</Td>
+                  <Td label="Status">
+                    <StatusBadge status={row.status} label={statusLabel(row.status)} />
+                  </Td>
+                  <Td label="Foods">{row.foodCount}</Td>
+                  <Td label="Imported">{formatDate(row.importedAt)}</Td>
+                  <Td label="Last import">
+                    {row.lastImportReport
+                      ? `${row.lastImportReport.processed ?? 0} processed · ${row.lastImportReport.imported ?? 0} imported · ${row.lastImportReport.updated ?? 0} updated · ${row.lastImportReport.rejected ?? 0} rejected`
+                      : "—"}
+                  </Td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        ) : null}
+      </Section>
+
+      {rows && rows.length > 0 ? (
+        <Section title="Source details" tone="muted">
           {rows.map((row) => (
-            <tr key={row.id}>
-              <td>
-                <div>{row.name}</div>
-                <div style={{ fontSize: 12, color: "var(--color-muted)" }}>{row.provider}</div>
-              </td>
-              <td>{row.datasetVersion}</td>
-              <td>{row.status}</td>
-              <td>{row.foodCount}</td>
-              <td>{new Date(row.importedAt).toLocaleString()}</td>
-              <td>
-                {row.lastImportReport
-                  ? `${row.lastImportReport.processed ?? 0} processed · ${row.lastImportReport.imported ?? 0} imported · ${row.lastImportReport.updated ?? 0} updated · ${row.lastImportReport.rejected ?? 0} rejected`
-                  : "—"}
-              </td>
-            </tr>
+            <details key={row.id} className="ui-admin-details">
+              <summary>
+                Technical details — {row.name}
+              </summary>
+              <p className="ui-muted" style={{ marginTop: 8 }}>
+                Provider: {row.provider}
+              </p>
+            </details>
           ))}
-        </tbody>
-      </table>
-      {rows.map((row) => (
-        <p key={`${row.id}-license`} style={{ fontSize: 13, color: "var(--color-muted)" }}>
-          {row.name}: {row.license}
-        </p>
-      ))}
+        </Section>
+      ) : null}
     </section>
   );
 }

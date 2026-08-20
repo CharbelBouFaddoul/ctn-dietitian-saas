@@ -4,22 +4,10 @@ import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { AppShell, Button, LoadingState } from "@nutrition-saas/ui";
+import { AppShell, Button, LoadingState, type NavSection } from "@nutrition-saas/ui";
 import { ApiError, api, logout } from "../../lib/api";
 import { loginPathFor, resolveSessionHome } from "../../lib/session-home";
-
-const nav = [
-  { href: "/admin", label: "Overview" },
-  { href: "/admin/organizations", label: "Organizations" },
-  { href: "/admin/users", label: "Users" },
-  { href: "/admin/subscriptions", label: "Subscriptions" },
-  { href: "/admin/plans", label: "Plans" },
-  { href: "/admin/food-sources", label: "Food database" },
-  { href: "/admin/features", label: "Features" },
-  { href: "/admin/site-settings", label: "Site" },
-  { href: "/admin/audit", label: "Audit" },
-  { href: "/admin/health", label: "System health" },
-];
+import { AdminNavIcons } from "./admin-nav-icons";
 
 export function AdminShell({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -63,14 +51,54 @@ export function AdminShell({ children }: { children: ReactNode }) {
     return <LoadingState>Checking platform access…</LoadingState>;
   }
 
+  const navSections: NavSection[] = [
+    {
+      label: "Overview",
+      items: [{ href: "/admin", label: "Dashboard", icon: AdminNavIcons.dashboard, exact: true }],
+    },
+    {
+      label: "Platform",
+      items: [
+        { href: "/admin/organizations", label: "Organizations", icon: AdminNavIcons.organizations },
+        { href: "/admin/users", label: "Users", icon: AdminNavIcons.users },
+      ],
+    },
+    {
+      label: "Commerce",
+      items: [
+        { href: "/admin/subscriptions", label: "Subscriptions", icon: AdminNavIcons.subscriptions },
+        { href: "/admin/plans", label: "Plans", icon: AdminNavIcons.plans },
+      ],
+    },
+    {
+      label: "Catalog",
+      items: [
+        { href: "/admin/food-sources", label: "Food database", icon: AdminNavIcons.foods },
+        { href: "/admin/features", label: "Features", icon: AdminNavIcons.features },
+      ],
+    },
+    {
+      label: "Operations",
+      items: [
+        { href: "/admin/audit", label: "Audit", icon: AdminNavIcons.audit },
+        { href: "/admin/health", label: "System health", icon: AdminNavIcons.health },
+      ],
+    },
+    {
+      label: "Configuration",
+      items: [{ href: "/admin/site-settings", label: "Site", icon: AdminNavIcons.site }],
+    },
+  ];
+
   return (
     <AppShell
       theme="admin"
       brand="Nutrition"
       meta={role === "SUPER_ADMIN" ? "Super admin" : "Admin"}
-      nav={nav}
+      navSections={navSections}
       pathname={pathname}
       linkComponent={Link}
+      collapsible
       footer={
         <Button variant="ghost" size="sm" onClick={() => void onLogout()}>
           Sign out
