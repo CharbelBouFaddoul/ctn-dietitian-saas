@@ -412,6 +412,8 @@ No user
 
 **Product Phase 7 (done):** Evolution API/UI (measurement series, BMI, baseline/current comparison, date filters, SVG charts); assessment schema contract + question editor (add/edit/deactivate/reorder); `Assessment.schemaSnapshot` on start; portal assessments submit + portal evolution; chart tab reorder (Overview → Evolution → Assessments → …). Tenancy “Phase 7” remount remains historical/done separately.
 
+**Product Phase 8 (done):** Curated Foundation food catalog (`usda-foundation-curated.json` + `pnpm food:import` / admin import); `Food.dietitianAccountId` for practice-private custom foods; search `origin` + prefix ranking; Recipes as reusable meal library (no Meal catalog table); portal foods remain catalog-only; nutrition still via `packages/nutrition`. MealPlan editor/publish redesign deferred to Product Phase 9. `Meal` remains a meal-plan day structure only.
+
 **Phase 7 (done):** practice APIs remounted to `/api/v1/dietitian/:dietitianAccountId`; `DietitianGuard` + `DietitianTenantContext`; Organization dual-write stopped; `organizationId` / Organization / OrganizationMember / OrganizationSettings removed after backfill; admin at `/admin/dietitians`; web clients updated. Remount complete — no further Organization tenancy shell.
 
 What must change later (audit only):
@@ -996,11 +998,12 @@ Only questions that **cannot** be answered from the repository:
 11. **CLIENT_LIMIT defaults:** ✅ Phase 4 — standard 25 / pro 100 / premium 300 (seed upsert).
 12. **Which features should become plan-gated next** beyond AI/automation/client limit (messaging? documents? storage?).
 13. **Appointments for patients:** ✅ Product Phase 6 — portal `/api/v1/portal/appointments` (list/detail/cancel/propose/accept/reject) scoped by `activeClientId`; practice month/week/day calendar; reschedule proposal workflow (`RESCHEDULE_PENDING`); overlap checks; `APPOINTMENT_RESCHEDULE_*` notifications.
-14. **First SUPER_ADMIN bootstrap:** Manual SQL, CLI, or break-glass invite — what is the official ops process?
-15. **Account states required for provisioning era:** e.g. INVITED, ACTIVATION_PENDING, PROVISIONED — which states are mandatory?
-16. **Dietitian leaves practice:** Auto-unassign clients, force reassignment, transfer ownership rules beyond current deactivate?
-17. **Payment collection:** Stay manual “mark paid”, or integrate a PSP?
-18. **Product email default:** ✅ Phase 5 — `emailNotificationsEnabled` defaults false; admin toggle; auth emails unaffected.
+14. **Food catalog + reusable meals:** ✅ Product Phase 8 — curated catalog import, practice custom foods, Recipes as meal library; MealPlan UX remains Phase 9.
+15. **First SUPER_ADMIN bootstrap:** Manual SQL, CLI, or break-glass invite — what is the official ops process?
+16. **Account states required for provisioning era:** e.g. INVITED, ACTIVATION_PENDING, PROVISIONED — which states are mandatory?
+17. **Dietitian leaves practice:** Auto-unassign clients, force reassignment, transfer ownership rules beyond current deactivate?
+18. **Payment collection:** Stay manual “mark paid”, or integrate a PSP?
+19. **Product email default:** ✅ Phase 5 — `emailNotificationsEnabled` defaults false; admin toggle; auth emails unaffected.
 
 ---
 

@@ -48,6 +48,8 @@ interface EffectiveFood {
   referenceQuantity: number;
   referenceUnit: string;
   sourceFoodId: string;
+  origin?: "catalog" | "custom";
+  dietitianAccountId?: string | null;
   source: {
     name: string;
     provider: string;
@@ -108,6 +110,8 @@ export default function FoodDetailPage() {
     setError(null);
     const detail = await api<EffectiveFood>(`/api/v1/dietitian/${dietitianAccountId}/foods/${foodId}`);
     setFood(detail);
+    setQuantity(String(detail.referenceQuantity));
+    setUnit(detail.referenceUnit);
     const next = { ...draft };
     for (const item of NUTRIENTS) {
       const overridden = detail.overriddenFields.includes(item.key);
@@ -198,6 +202,8 @@ export default function FoodDetailPage() {
   if (food.servingDescription) metaParts.push(food.servingDescription);
   if (food.category) metaParts.push(food.category);
 
+  const isCustom = food.origin === "custom";
+
   return (
     <section>
       <Breadcrumbs
@@ -211,10 +217,12 @@ export default function FoodDetailPage() {
         title={food.name}
         description={metaParts.join(" · ")}
         actions={
-          food.override ? (
-            <Badge tone="accent">Practice food</Badge>
+          isCustom ? (
+            <Badge tone="accent">Custom</Badge>
+          ) : food.override ? (
+            <Badge tone="warning">Overridden</Badge>
           ) : (
-            <Badge tone="neutral">Catalog food</Badge>
+            <Badge tone="neutral">Catalog</Badge>
           )
         }
       />
@@ -226,11 +234,56 @@ export default function FoodDetailPage() {
       <Section
         title="Nutrition values"
         description={
-          canOverride
-            ? "Practice overrides replace catalog values for this food in all recipes and meal plans in your practice."
-            : "Effective values are sourced from the catalog. Staff cannot create overrides."
+          isCustom
+            ? "Practice-private custom food. Nutrients live on the food row (no FoodOverride merge)."
+            : canOverride
+              ? "Practice overrides replace catalog values for this food in recipes and meal plans in your practice."
+              : "Effective values are sourced from the catalog. Staff cannot create overrides."
         }
       >
+        {isCustom ? (
+          <div className="ui-stack">
+            <Table>
+              <thead>
+                <tr>
+                  <th>Nutrient</th>
+                  <th>Value</th>
+                </tr>
+              </thead>
+              <tbody>
+                {NUTRIENTS.map((item) => (
+                  <tr key={item.key}>
+                    <Td label="Nutrient">
+                      {item.label}{" "}
+                      <span className="ui-muted" style={{ fontSize: 12 }}>
+                        ({item.unit})
+                      </span>
+                    </Td>
+                    <Td label="Value">
+                      <strong>{fmtVal(food.presentedEffectiveNutrition[item.key])}</strong>
+                    </Td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+            {canOverride ? (
+              <Button
+                variant="danger"
+                onClick={() => {
+                  void api(`/api/v1/dietitian/${dietitianAccountId}/foods/${foodId}/archive`, {
+                    method: "POST",
+                  })
+                    .then(() => {
+                      setNotice("Custom food archived.");
+                    })
+                    .catch((err) => setError(errorMessage(err, "Unable to archive")));
+                }}
+              >
+                Archive custom food
+              </Button>
+            ) : null}
+          </div>
+        ) : (
         <form onSubmit={(event) => void saveOverride(event)}>
           <Table>
             <thead>
@@ -306,12 +359,13 @@ export default function FoodDetailPage() {
             </p>
           )}
         </form>
+        )}
       </Section>
 
       {/* Quantity calculator */}
       <Section
         title="Quantity calculator"
-        description="Calculate nutrition for any amount using effective values."
+        description="Calculate nutrition for any amount using effective values (g/ml via the nutrition package)."
       >
         <form
           onSubmit={(event) => void calculate(event)}
@@ -340,6 +394,11 @@ export default function FoodDetailPage() {
             <Button type="submit">Calculate</Button>
           </div>
         </form>
+        {food.servingDescription ? (
+          <p className="ui-muted" style={{ marginTop: 8, fontSize: 13 }}>
+            Serving: {food.servingDescription}
+          </p>
+        ) : null}
 
         {calculated ? (
           <div className="ui-row" style={{ marginTop: 12, flexWrap: "wrap" }}>

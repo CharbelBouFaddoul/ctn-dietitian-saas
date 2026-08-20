@@ -1,10 +1,26 @@
-import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post, Query, UseGuards } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from "@nestjs/common";
 import { ApiCookieAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { SessionGuard } from "../auth/guards/session.guard";
 import { CurrentTenant } from "../dietitian/decorators/current-tenant.decorator";
 import { DietitianGuard } from "../dietitian/guards/dietitian.guard";
 import type { DietitianTenantContext } from "../dietitian/dietitian.types";
-import { CalculateFoodDto, ListFoodsQueryDto } from "./dto/food.dto";
+import {
+  CalculateFoodDto,
+  CreateCustomFoodDto,
+  ListFoodsQueryDto,
+  UpdateCustomFoodDto,
+} from "./dto/food.dto";
 import { FoodService } from "./food.service";
 
 @ApiTags("foods")
@@ -15,25 +31,47 @@ export class FoodController {
   constructor(private readonly foods: FoodService) {}
 
   @Get()
-  @ApiOperation({ summary: "Search global foods (server-side pagination and filters)" })
+  @ApiOperation({ summary: "Search catalog + practice custom foods (server-side pagination and filters)" })
   search(@CurrentTenant() tenant: DietitianTenantContext, @Query() query: ListFoodsQueryDto) {
     return this.foods.search(tenant.dietitianAccountId, query);
   }
 
   @Get("categories")
-  @ApiOperation({ summary: "List distinct food categories from the active catalog" })
-  categories() {
-    return this.foods.listCategories();
+  @ApiOperation({ summary: "List distinct food categories from catalog + own custom foods" })
+  categories(@CurrentTenant() tenant: DietitianTenantContext) {
+    return this.foods.listCategories(tenant.dietitianAccountId);
+  }
+
+  @Post()
+  @ApiOperation({ summary: "Create a practice-private custom food" })
+  create(@CurrentTenant() tenant: DietitianTenantContext, @Body() body: CreateCustomFoodDto) {
+    return this.foods.createCustom(tenant.dietitianAccountId, tenant.userId, body);
   }
 
   @Get(":foodId")
   @ApiOperation({
-    summary: "Get effective food for this organization",
+    summary: "Get effective food for this practice",
     description:
-      "Returns global values, the organization override if any, and merged effective nutrition. Does not mutate global foods.",
+      "Catalog foods merge FoodOverride. Custom foods return own nutrients. Other practices' customs are not visible.",
   })
   getEffective(@CurrentTenant() tenant: DietitianTenantContext, @Param("foodId", ParseUUIDPipe) foodId: string) {
     return this.foods.getEffective(tenant.dietitianAccountId, foodId);
+  }
+
+  @Patch(":foodId")
+  @ApiOperation({ summary: "Update a practice-private custom food (global foods rejected)" })
+  update(
+    @CurrentTenant() tenant: DietitianTenantContext,
+    @Param("foodId", ParseUUIDPipe) foodId: string,
+    @Body() body: UpdateCustomFoodDto,
+  ) {
+    return this.foods.updateCustom(tenant.dietitianAccountId, foodId, body);
+  }
+
+  @Post(":foodId/archive")
+  @ApiOperation({ summary: "Soft-archive a practice-private custom food" })
+  archive(@CurrentTenant() tenant: DietitianTenantContext, @Param("foodId", ParseUUIDPipe) foodId: string) {
+    return this.foods.archiveCustom(tenant.dietitianAccountId, foodId);
   }
 
   @Post(":foodId/calculate")

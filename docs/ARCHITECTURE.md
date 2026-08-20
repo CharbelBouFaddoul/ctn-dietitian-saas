@@ -149,6 +149,7 @@ Tenant-scoped queries via dietitianAccountId (tenantWhere)
 - Phase 6 client portfolio: `GET …/clients/:clientId/portfolio` composes identity, profile, latest measurements/BMI, goals, assessment, meal plan, appointment, messages, small recent timeline, and missing/alerts. Portal profile is read-only lightweight fields for the active connection.
 - Phase 7 (tenancy remount): canonical tenant key is `dietitianAccountId`. Admin manages accounts at `/api/v1/admin/dietitians`. Portal remains `ClientAccount` + `activeClientId`.
 - **Product Phase 7 (portfolio / evolution / assessments):** practice chart adds Evolution (`GET …/evolution` + SVG charts), assessment question editor + `schemaSnapshot`, portal `/assessments` + `/evolution`. Distinct from tenancy Phase 7 above.
+- **Product Phase 8 (food + reusable meals):** curated catalog, `Food.dietitianAccountId` custom foods, Recipes as meal library. Distinct from older “Phase 8 tracking” docs.
 ---
 
 ## 3. Authorization
@@ -341,33 +342,52 @@ packages/nutrition calculateFoodNutrition
 
 V1 import source is **USDA FoodData Central Foundation Foods** (US government work; public domain in the U.S.; commercial use permitted). Attribution is stored on `food_sources`. This repository does not claim USDA endorsement.
 
-The checked-in file `apps/api/food-data/usda-foundation-sample.json` is a **pipeline sample** (format-stable). A larger USDA-mapped JSON can be imported with the same command.
+- Pipeline sample: `apps/api/food-data/usda-foundation-sample.json` (format-stable; used by import unit tests).
+- Curated catalog (hundreds of common ACTIVE foods): `apps/api/food-data/usda-foundation-curated.json`.
 
-Import: `pnpm food:import` (optional path). Idempotent upsert on `(food_source_id, source_food_id)`. Duplicate IDs in one file: first wins, later rows skipped. Similar names are never merged.
+Import (existing importer only):
+
+```bash
+pnpm food:import --file=apps/api/food-data/usda-foundation-curated.json
+```
+
+Platform admin may also run `POST /api/v1/admin/food-sources/import` (bundled curated file; no remote URL fetch). Idempotent upsert on `(food_source_id, source_food_id)`. Duplicate IDs in one file: first wins, later rows skipped. Similar names are never merged.
+
+### Ownership (Product Phase 8)
+
+```text
+Food.dietitianAccountId = null     → global catalog
+Food.dietitianAccountId = <uuid>   → practice-private custom food
+```
+
+Custom foods use FoodSource key `practice-custom` with `sourceFoodId = UUID`. Patients and other practices never receive another practice’s customs. Portal food search is `catalogOnly`.
 
 ### Overrides
 
-Organization-scoped only. Member-specific override rows are not implemented. Spec language “dietitian/practice” is the organization.
+Practice-scoped (`dietitianAccountId`) on **catalog** foods only. Custom foods do not use FoodOverride — their nutrients are on the Food row.
 
 ```text
-global food → organization override (ACTIVE) → effective food
+catalog: global food → FoodOverride (ACTIVE) → effective food
+custom:  Food row nutrients → effective food
 ```
 
-Dietitian APIs have no `PATCH /foods/:id`. OWNER/DIETITIAN may create/update/deactivate `food_overrides`. STAFF may read.
+Dietitian `PATCH /foods/:id` updates **custom** foods only. Global catalog mutation remains import-only. OWNER/DIETITIAN may create/update/deactivate `food_overrides` on catalog foods.
 
 ### Engine
 
-Pure logic lives in `packages/nutrition` (no Prisma). Calculations use g / ml / kcal. Serving text is display-only. Missing nutrients stay `null`; `0` means zero. Round only at API/presentation (`NUTRITION_ROUNDING`). Atwater `P×4 + C×4 + F×9` flags gaps > 25% relative; source kcal is never overwritten.
+Pure logic lives in `packages/nutrition` (no Prisma). Calculations use g / ml / kcal. Serving text is display-only. Missing nutrients stay `null`; `0` means zero. Round only at API/presentation (`NUTRITION_ROUNDING`). Atwater `P×4 + C×4 + F×9` flags gaps > 25% relative; source kcal is never overwritten. `FoodService.calculate` remains the API entry point.
 
 ### Search
 
-Server-side `ILIKE` on `name` / `name_normalized` with `pg_trgm` GIN, plus category and source filters. Pagination max page size 50. No Elasticsearch.
+Server-side `ILIKE` / `contains` on `name` / `name_normalized` (prefix preferred over contains), plus category, source, and `origin` (`catalog` | `custom` | `all`) filters. Pagination max page size 50. No Elasticsearch.
 
 ### Entitlements
 
 The master spec does not define a food-database feature key. Phase 6 does **not** invent `FOOD_DATABASE`. `EntitlementService` remains the only gate for existing keys (`AI`, `CLIENT_LIMIT`, …).
 
-### Recipes and meal plans (Phase 7)
+### Recipes as reusable meal database (Product Phase 8)
+
+Historical docs called “Phase 7 — Recipes + meal plans.” **Product Phase 8** treats existing `Recipe` as the reusable meal / meal library. There is **no** MealCatalog / ReusableMeal / SavedMeal table. `Meal` inside a MealPlan remains a plan-day structure only.
 
 ```text
 FoodService.getEffective()
@@ -383,19 +403,23 @@ meal_plan_versions.snapshot       # written once at publish
 
 There is **one** calculation path. Controllers and React do not reimplement food lookup, override resolution, calories, macros, unit conversion, or rounding.
 
-**Recipes** belong to an organization (`ACTIVE` / `ARCHIVED`). Ingredient quantities are whole-recipe mass/volume amounts. Total = sum of ingredients (`null` stays `null`; empty recipe is known zero). Per serving = total / `servings`. Meal items use `unit = serving`; `quantity` is the number of servings (`perServing × quantity`).
+**Recipes** belong to a `DietitianAccount` (`ACTIVE` / `ARCHIVED`). Ingredient quantities are whole-recipe mass/volume amounts. Ingredients may reference global catalog foods or this practice’s custom foods only. Total = sum of ingredients (`null` stays `null`; empty recipe is known zero). Per serving = total / `servings`. Meal items use `unit = serving`; `quantity` is the number of servings (`perServing × quantity`).
 
-**Meal plans** belong to organization + client. Plan status (`DRAFT` / `ACTIVE` / `ARCHIVED`) is not version publication status. Versions: `DRAFT` → `PUBLISHED`; the previous published version becomes `SUPERSEDED` and is retained. Publishing is transactional: validate, write snapshot, supersede, mark published, set plan `ACTIVE`.
+**Meal plans** belong to dietitian account + client. Plan status (`DRAFT` / `ACTIVE` / `ARCHIVED`) is not version publication status. Versions: `DRAFT` → `PUBLISHED`; the previous published version becomes `SUPERSEDED` and is retained. Publishing is transactional: validate, write snapshot, supersede, mark published, set plan `ACTIVE`.
 
 **Draft vs published:** drafts use current effective foods and current recipes. After publication, GET returns the stored snapshot (`immutable: true`). Later override or recipe edits must not change published/client payloads. A new draft clones the latest version’s structure and recalculates live.
 
-**Authorization:** recipes are org-scoped (OWNER/DIETITIAN write; STAFF read). Meal plans use `ClientAccessService` (`read` / `manageRecords`). Portal `GET /api/v1/portal/meal-plan` returns only that client’s current `PUBLISHED` snapshot (latest `publishedAt` among non-archived plans). Clients never see drafts, superseded versions, or other clients.
+**Authorization:** recipes are tenant-scoped via `DietitianGuard`. Meal plans use `ClientAccessService` (`read` / `manageRecords`). Portal `GET /api/v1/portal/meal-plan` returns only that client’s current `PUBLISHED` snapshot. Clients never see private recipe libraries, drafts, superseded versions, or other clients.
+
+**MealPlan editor / publish / versioning UX redesign** is **Product Phase 9** (out of scope for Phase 8).
 
 **Nutrition targets:** reuse Phase 5 `client_goals`. No separate target table.
 
 **Entitlements:** no `RECIPES` / `MEAL_PLANS` feature key is defined in the master spec; none was invented.
 
-### Client tracking (Phase 8)
+### Client tracking (historical Phase 8 in older docs)
+
+Product Phase 8 in this codebase is food/custom foods/recipes-as-meals (above). Older “Phase 8 — Client tracking” content refers to food/water/exercise logs:
 
 ```text
 Client portal / dietitian review

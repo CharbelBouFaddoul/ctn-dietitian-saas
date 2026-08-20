@@ -339,6 +339,12 @@ describe("Phase 6 foods and organization overrides", () => {
     expect(sources.body[0].foodCount).toBe(1);
     expect(sources.body[0].datasetVersion).toBe("test-1");
 
+    const catalog = await request(ctx.app.getHttpServer())
+      .get("/api/v1/admin/food-sources/foods?q=chicken")
+      .set("Cookie", admin.cookie)
+      .expect(200);
+    expect(catalog.body.items.some((row: { id: string }) => row.id === food.id)).toBe(true);
+
     await request(ctx.app.getHttpServer())
       .patch(`/api/v1/admin/foods/${food.id}`)
       .set("Cookie", admin.cookie)

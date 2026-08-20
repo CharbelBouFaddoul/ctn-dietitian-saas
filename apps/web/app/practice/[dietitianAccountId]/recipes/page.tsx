@@ -76,8 +76,8 @@ export default function RecipesPage() {
   return (
     <section>
       <PageHeader
-        title="Recipes"
-        description="Practice recipes. Nutrition is calculated from effective foods."
+        title="Meal library"
+        description="Reusable meals (recipes) for your practice. Nutrition is calculated from catalog and custom foods. Meal-plan day structure is separate."
         actions={
           <Link href={`/practice/${dietitianAccountId}/recipes/new`} className="ui-btn ui-btn--secondary">
             New recipe
@@ -116,7 +116,7 @@ export default function RecipesPage() {
 
       {items.length === 0 ? (
         <EmptyState
-          title={q ? "No recipes match this search" : "No recipes yet"}
+          title={q ? "No reusable meals match this search" : "No reusable meals yet"}
           action={
             !q ? (
               <Link href={`/practice/${dietitianAccountId}/recipes/new`} className="ui-btn ui-btn--primary">
@@ -125,7 +125,9 @@ export default function RecipesPage() {
             ) : undefined
           }
         >
-          {q ? "Try a different search term." : "Create your first recipe to get started."}
+          {q
+            ? "Try a different search term."
+            : "Build your meal library from catalog and custom foods. Meal plans will reuse these in Phase 9."}
         </EmptyState>
       ) : (
         <Table>

@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import {
   Alert,
+  Badge,
   Breadcrumbs,
   Button,
   EmptyState,
@@ -27,6 +28,16 @@ interface Nutrition {
   carbohydrateG: number | null;
   fatG: number | null;
   fiberG: number | null;
+}
+
+interface FoodHit {
+  id: string;
+  name: string;
+  origin?: "catalog" | "custom";
+  servingDescription?: string | null;
+  referenceQuantity?: number;
+  referenceUnit?: string;
+  hasOverride?: boolean;
 }
 
 interface RecipeDetail {
@@ -63,9 +74,10 @@ export default function RecipeDetailPage() {
   const [description, setDescription] = useState("");
   const [instructions, setInstructions] = useState("");
   const [foodQuery, setFoodQuery] = useState("");
-  const [foodHits, setFoodHits] = useState<Array<{ id: string; name: string }>>([]);
+  const [foodHits, setFoodHits] = useState<FoodHit[]>([]);
   const [quantity, setQuantity] = useState("100");
   const [unit, setUnit] = useState("g");
+  const [servingHint, setServingHint] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [saveBusy, setSaveBusy] = useState(false);
@@ -105,7 +117,7 @@ export default function RecipeDetailPage() {
   async function searchFoods() {
     setError(null);
     try {
-      const result = await api<{ items: Array<{ id: string; name: string }> }>(
+      const result = await api<{ items: FoodHit[] }>(
         `/api/v1/dietitian/${dietitianAccountId}/foods?q=${encodeURIComponent(foodQuery)}&pageSize=8`,
       );
       setFoodHits(result.items);
@@ -114,16 +126,18 @@ export default function RecipeDetailPage() {
     }
   }
 
-  async function addFood(foodId: string) {
+  async function addFood(hit: FoodHit) {
     if (!recipe) return;
     setError(null);
+    const qty = hit.referenceQuantity ?? Number(quantity);
+    const u = hit.referenceUnit ?? unit;
     const ingredients = recipe.nutrition.ingredients.map((row) => ({
       foodId: row.foodId,
       quantity: row.quantity,
       unit: row.unit,
       displayNote: row.displayNote,
     }));
-    ingredients.push({ foodId, quantity: Number(quantity), unit, displayNote: null });
+    ingredients.push({ foodId: hit.id, quantity: qty, unit: u, displayNote: null });
     try {
       await api(`/api/v1/dietitian/${dietitianAccountId}/recipes/${recipeId}/ingredients`, {
         method: "PUT",
@@ -131,6 +145,7 @@ export default function RecipeDetailPage() {
       });
       setFoodHits([]);
       setFoodQuery("");
+      setServingHint(null);
       await load();
     } catch (err) {
       setError(errorMessage(err, "Could not add ingredient"));
@@ -174,14 +189,14 @@ export default function RecipeDetailPage() {
     <section>
       <Breadcrumbs
         items={[
-          { href: `/practice/${dietitianAccountId}/recipes`, label: "Recipes" },
+          { href: `/practice/${dietitianAccountId}/recipes`, label: "Meal library" },
           { label: recipe.name },
         ]}
       />
 
       <PageHeader
         title={recipe.name}
-        description={`${recipe.servings} serving${recipe.servings !== 1 ? "s" : ""}`}
+        description={`Reusable meal · ${recipe.servings} serving${recipe.servings !== 1 ? "s" : ""} · live totals from API`}
         actions={
           <>
             <Button
@@ -343,7 +358,7 @@ export default function RecipeDetailPage() {
               <Input
                 value={foodQuery}
                 onChange={(event) => setFoodQuery(event.target.value)}
-                placeholder="Food name…"
+                placeholder="Catalog or custom food…"
               />
             </Field>
             <Field label="Amount">
@@ -368,12 +383,39 @@ export default function RecipeDetailPage() {
               </Button>
             </div>
           </div>
+          {servingHint ? (
+            <p className="ui-muted" style={{ marginTop: 8, fontSize: 13 }}>
+              {servingHint}
+            </p>
+          ) : null}
           {foodHits.length > 0 ? (
-            <div className="ui-row" style={{ marginTop: 8, flexWrap: "wrap" }}>
+            <div className="ui-stack" style={{ marginTop: 8, gap: 6 }}>
               {foodHits.map((hit) => (
-                <Button key={hit.id} variant="secondary" size="sm" onClick={() => void addFood(hit.id)}>
-                  + {hit.name}
-                </Button>
+                <div key={hit.id} className="ui-row" style={{ alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      if (hit.referenceQuantity != null) setQuantity(String(hit.referenceQuantity));
+                      if (hit.referenceUnit) setUnit(hit.referenceUnit);
+                      setServingHint(hit.servingDescription ?? null);
+                      void addFood(hit);
+                    }}
+                  >
+                    + {hit.name}
+                  </Button>
+                  {hit.origin === "custom" ? (
+                    <Badge tone="accent">Custom</Badge>
+                  ) : (
+                    <Badge tone="neutral">Catalog</Badge>
+                  )}
+                  {hit.hasOverride ? <Badge tone="warning">Overridden</Badge> : null}
+                  {hit.servingDescription ? (
+                    <span className="ui-muted" style={{ fontSize: 12 }}>
+                      {hit.servingDescription}
+                    </span>
+                  ) : null}
+                </div>
               ))}
             </div>
           ) : null}

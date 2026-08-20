@@ -43,14 +43,14 @@ export default function NewRecipePage() {
     <section>
       <Breadcrumbs
         items={[
-          { href: `/practice/${params.dietitianAccountId}/recipes`, label: "Recipes" },
-          { label: "New recipe" },
+          { href: `/practice/${params.dietitianAccountId}/recipes`, label: "Meal library" },
+          { label: "New reusable meal" },
         ]}
       />
 
       <PageHeader
-        title="New recipe"
-        description="Nutrition is calculated automatically from your food database when you add ingredients."
+        title="New reusable meal"
+        description="Recipes are your meal library. Nutrition is calculated from catalog and custom foods when you add ingredients. Meal-plan day editing remains Phase 9."
       />
 
       {error ? <Alert tone="danger">{error}</Alert> : null}

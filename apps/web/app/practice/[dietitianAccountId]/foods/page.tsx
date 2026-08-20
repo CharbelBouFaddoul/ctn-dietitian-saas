@@ -30,8 +30,10 @@ interface FoodRow {
   id: string;
   name: string;
   category: string | null;
+  servingDescription: string | null;
   referenceQuantity: number;
   referenceUnit: string;
+  origin: "catalog" | "custom";
   hasOverride: boolean;
   presentedNutrition: NutritionValues;
   source: { name: string };
@@ -59,6 +61,7 @@ export default function FoodsPage() {
   const [q, setQ] = useState("");
   const [category, setCategory] = useState("");
   const [sourceId, setSourceId] = useState("");
+  const [origin, setOrigin] = useState("all");
   const [page, setPage] = useState(1);
   const [data, setData] = useState<ListResponse | null>(null);
   const [categories, setCategories] = useState<string[]>([]);
@@ -70,10 +73,11 @@ export default function FoodsPage() {
     if (q) p.set("q", q);
     if (category) p.set("category", category);
     if (sourceId) p.set("sourceId", sourceId);
+    if (origin && origin !== "all") p.set("origin", origin);
     p.set("page", String(page));
-    p.set("pageSize", "20");
+    p.set("pageSize", "25");
     return p.toString();
-  }, [q, category, sourceId, page]);
+  }, [q, category, sourceId, origin, page]);
 
   async function load() {
     setError(null);
@@ -108,12 +112,17 @@ export default function FoodsPage() {
     <section>
       <PageHeader
         title="Food database"
-        description="Search the internal catalog. Editing a food creates a practice override — the global record is never changed."
+        description="Search the global catalog and your practice custom foods. Catalog overrides never change the shared dataset."
+        actions={
+          <Link href={`/practice/${dietitianAccountId}/foods/new`} className="ui-btn ui-btn--primary ui-btn--sm">
+            New custom food
+          </Link>
+        }
       />
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
 
-      <form onSubmit={onSearch} className="ui-grid" style={{ margin: "20px 0", alignItems: "end" }}>
+      <form onSubmit={onSearch} className="ui-inline-form" style={{ margin: "20px 0" }}>
         <Field label="Search">
           <input
             className="ui-input"
@@ -121,6 +130,19 @@ export default function FoodsPage() {
             onChange={(event) => setQ(event.target.value)}
             placeholder="Food name…"
           />
+        </Field>
+        <Field label="Origin">
+          <Select
+            value={origin}
+            onChange={(event) => {
+              setOrigin(event.target.value);
+              setPage(1);
+            }}
+          >
+            <option value="all">All</option>
+            <option value="catalog">Catalog</option>
+            <option value="custom">Custom</option>
+          </Select>
         </Field>
         <Field label="Category">
           <Select
@@ -154,7 +176,7 @@ export default function FoodsPage() {
             ))}
           </Select>
         </Field>
-        <div>
+        <div className="ui-inline-form__action">
           <Button type="submit">Apply filters</Button>
         </div>
       </form>
@@ -172,8 +194,7 @@ export default function FoodsPage() {
               <th>Reference</th>
               <th>Calories</th>
               <th>Protein</th>
-              <th>Source</th>
-              <th>Values</th>
+              <th>Type</th>
             </tr>
           </thead>
           <tbody>
@@ -183,23 +204,25 @@ export default function FoodsPage() {
                   <Link href={`/practice/${dietitianAccountId}/foods/${row.id}`} className="ui-link">
                     {row.name}
                   </Link>
+                  {row.servingDescription ? (
+                    <div className="ui-muted" style={{ fontSize: 12 }}>
+                      {row.servingDescription}
+                    </div>
+                  ) : null}
                 </Td>
                 <Td label="Category">{row.category ?? "—"}</Td>
                 <Td label="Reference">
                   {row.referenceQuantity} {unitLabel(row.referenceUnit)}
                 </Td>
-                <Td label="Calories">
-                  {fmtNutrient(row.presentedNutrition.energyKcal)} kcal
-                </Td>
+                <Td label="Calories">{fmtNutrient(row.presentedNutrition.energyKcal)} kcal</Td>
                 <Td label="Protein">{fmtNutrient(row.presentedNutrition.proteinG)}g</Td>
-                <Td label="Source">
-                  <span className="ui-muted">{row.source.name}</span>
-                </Td>
-                <Td label="Values">
-                  {row.hasOverride ? (
-                    <Badge tone="accent">Practice food</Badge>
+                <Td label="Type">
+                  {row.origin === "custom" ? (
+                    <Badge tone="accent">Custom</Badge>
+                  ) : row.hasOverride ? (
+                    <Badge tone="warning">Overridden</Badge>
                   ) : (
-                    <Badge tone="neutral">Catalog food</Badge>
+                    <Badge tone="neutral">Catalog</Badge>
                   )}
                 </Td>
               </tr>
@@ -212,12 +235,7 @@ export default function FoodsPage() {
         <span className="ui-muted">
           Page {data?.page ?? page} of {totalPages} ({data?.total ?? 0} foods)
         </span>
-        <Button
-          variant="secondary"
-          size="sm"
-          disabled={page <= 1}
-          onClick={() => setPage((p) => p - 1)}
-        >
+        <Button variant="secondary" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
           Previous
         </Button>
         <Button

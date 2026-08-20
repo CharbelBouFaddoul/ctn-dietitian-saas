@@ -193,22 +193,27 @@ Session + `TenantGuard`. Client-scoped routes also run `ClientAccessGuard` / `Cl
 | POST | `/appointments/:appointmentId/accept-reschedule` | manageRecords | Non-proposer only; applies proposed times → `SCHEDULED` |
 | POST | `/appointments/:appointmentId/reject-reschedule` | manageRecords | Non-proposer only; discards proposal → `SCHEDULED` |
 | GET/POST/PATCH | `/clients/:clientId/appointments` | Read / manageRecords | Per-client list/create; status PATCH (`SCHEDULED`/`COMPLETED`/`CANCELLED`/`NO_SHOW`). Create accepts `category` |
-| GET | `/foods` | Member | Server-side search (`q`, `category`, `sourceId`, `page`, `pageSize` ≤ 50) |
-| GET | `/foods/categories` | Member | Distinct active categories |
-| GET | `/foods/:foodId` | Member | Effective food: global + org override + `overriddenFields` |
+| GET | `/foods` | Member | Server-side search (`q`, `category`, `sourceId`, `origin=catalog\|custom\|all`, `page`, `pageSize` ≤ 50). Returns catalog + own custom foods. Each item has `origin` and `hasOverride` |
+| GET | `/foods/categories` | Member | Distinct active categories (catalog + own customs) |
+| POST | `/foods` | OWNER/DIETITIAN | Create practice-private custom food (`dietitianAccountId` = tenant; never global) |
+| GET | `/foods/:foodId` | Member | Effective food. Catalog: global + FoodOverride. Custom: own nutrients. Other practices’ customs → 404 |
+| PATCH | `/foods/:foodId` | OWNER/DIETITIAN | Update own custom food only. Global catalog → 404 |
+| POST | `/foods/:foodId/archive` | OWNER/DIETITIAN | Soft-archive custom food (`INACTIVE`) |
 | POST | `/foods/:foodId/calculate` | Member | `{ quantity, unit }` via `packages/nutrition`; returns raw + `presented` |
-| GET | `/foods/:foodId/override` | Member | This org’s active override, or 404 |
-| PUT | `/foods/:foodId/override` | OWNER/DIETITIAN | Create/update nullable nutrient overrides. Does not PATCH global foods |
+| GET | `/foods/:foodId/override` | Member | This practice’s active override on a **catalog** food, or 404 |
+| PUT | `/foods/:foodId/override` | OWNER/DIETITIAN | Create/update nullable nutrient overrides on catalog foods only |
 | DELETE | `/foods/:foodId/override` | OWNER/DIETITIAN | Deactivate override; effective values return to global |
 | GET | `/food-sources` | Member | Active datasets (version, attribution, food count) |
 
-There is **no** dietitian `PATCH /foods/:id` or `DELETE /foods/:id`. Global catalog changes are import-only (`pnpm food:import`).
+Global catalog foods are never mutated by dietitian `PATCH`. Import-only via `pnpm food:import --file=…` or platform admin `POST /api/v1/admin/food-sources/import` (bundled curated dataset; no remote URL fetch).
+
+**Product Phase 8:** `Food.dietitianAccountId` — `null` = global catalog; non-null = practice custom. Recipes remain the reusable meal database (no separate Meal catalog table). `Meal` inside meal plans is still a plan-day structure only. Meal-plan editor/publish redesign is Phase 9.
 
 Calculate units: mass foods `g` / `kg` / `oz` / `lb`; volume foods `ml` / `l` / `fl_oz`. Presentation rounding: kcal and sodium 0 decimals; macros 1 decimal. Engine math is unrounded.
 
-### Recipes (`/organizations/:organizationId/recipes`)
+### Recipes (`/api/v1/dietitian/:dietitianAccountId/recipes`) — reusable meal library
 
-Organization-scoped. STAFF may list/get. OWNER/DIETITIAN create, update, archive, duplicate, and replace ingredients. Nutrition is calculated via `FoodService.getEffective()`; it is never accepted as an authoritative client field.
+Practice-scoped reusable meals. Ingredient foods may be global ACTIVE catalog foods or this practice’s custom foods only. Nutrition is calculated via `FoodService.getEffective()` / `packages/nutrition`; never accepted as an authoritative client field. Patients have no private recipe-library endpoint.
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
@@ -260,7 +265,7 @@ Portal cookies cannot call dietitian meal-plan routes.
 
 ### Client tracking — portal (`/api/v1/portal/tracking`)
 
-Authenticated client account only. Mutations use `assertPortalAccess`. Food search for logging: `GET /api/v1/portal/foods`.
+Authenticated client account only. Mutations use `assertPortalAccess`. Food search for logging: `GET /api/v1/portal/foods` (**catalog only** — no practice custom foods).
 
 | Method | Path | Description |
 |---|---|---|
@@ -470,7 +475,9 @@ Requires a session **and** `users.platform_role` of `ADMIN` or `SUPER_ADMIN`. Or
 | PATCH | `/api/v1/admin/features/:featureId` | Platform admin | Name/description/global status |
 | GET | `/api/v1/admin/subscriptions` | Platform admin | All organization subscriptions |
 | GET | `/api/v1/admin/audit` | Platform admin | Audit log list/search |
-| GET | `/api/v1/admin/food-sources` | Platform admin | Read-only dataset/version/count/last import report |
+| GET | `/api/v1/admin/food-sources` | Platform admin | Read-only catalog sources (excludes `practice-custom`) |
+| GET | `/api/v1/admin/food-sources/foods` | Platform admin | Browse global catalog foods (`q`, `sourceId`, pagination) |
+| POST | `/api/v1/admin/food-sources/import` | Platform admin | Import bundled curated Foundation dataset via existing importer (no remote URL) |
 
 There is no payment, billing portal, or subscription invoice API. Impersonation is not implemented.
 

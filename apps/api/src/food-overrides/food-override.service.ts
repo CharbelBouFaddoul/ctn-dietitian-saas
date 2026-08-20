@@ -16,7 +16,7 @@ export class FoodOverrideService {
   ) {}
 
   async upsert(tenant: DietitianTenantContext, foodId: string, input: OverrideInput) {
-    await this.requireFood(foodId);
+    await this.requireCatalogFood(foodId);
 
     const data = this.nutrientData(input);
     const existing = await this.prisma.foodOverride.findUnique({
@@ -77,9 +77,9 @@ export class FoodOverrideService {
     return this.foods.getEffective(tenant.dietitianAccountId, foodId);
   }
 
-  private async requireFood(foodId: string) {
+  private async requireCatalogFood(foodId: string) {
     const food = await this.prisma.food.findFirst({
-      where: { id: foodId, status: "ACTIVE" },
+      where: { id: foodId, status: "ACTIVE", dietitianAccountId: null },
     });
     if (!food) {
       throw new NotFoundException("Food not found");

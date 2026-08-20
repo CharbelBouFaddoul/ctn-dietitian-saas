@@ -9,9 +9,11 @@ config({ path: resolve(process.cwd(), ".env") });
 config({ path: resolve(process.cwd(), "../../.env") });
 
 async function main(): Promise<void> {
+  const fileFlag = process.argv.find((arg) => arg.startsWith("--file="));
   const fileArg =
+    (fileFlag ? fileFlag.slice("--file=".length) : undefined) ??
     process.argv.find((arg) => arg.endsWith(".json") && !arg.includes("package")) ??
-    "food-data/usda-foundation-sample.json";
+    "food-data/usda-foundation-curated.json";
   const filePath = resolve(process.cwd(), fileArg);
   const dataset = JSON.parse(readFileSync(filePath, "utf8")) as FoodDatasetFile;
   if (!dataset.source?.key || !Array.isArray(dataset.foods)) {

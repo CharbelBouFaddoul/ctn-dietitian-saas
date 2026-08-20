@@ -19,10 +19,10 @@ export class PortalFoodController {
   ) {}
 
   @Get()
-  @ApiOperation({ summary: "Search foods for client food logging (organization effective values)" })
+  @ApiOperation({ summary: "Search global catalog foods for client food logging (no practice customs)" })
   async search(@CurrentUser() user: AuthenticatedRequestUser,
     @CurrentSession() session: AuthenticatedSession, @Query() query: ListFoodsQueryDto) {
     const client = await this.access.assertPortalAccess(user.id, { activeClientId: session.activeClientId });
-    return this.foods.search(requireDietitianAccountId(client), query);
+    return this.foods.search(requireDietitianAccountId(client), { ...query, catalogOnly: true });
   }
 }

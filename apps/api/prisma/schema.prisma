@@ -230,6 +230,7 @@ model DietitianAccount {
   appointments           Appointment[]
   invitationTokens       InvitationToken[]
   foodOverrides          FoodOverride[]
+  foods                  Food[]
   recipes                Recipe[]
   recipeIngredients      RecipeIngredient[]
   mealPlans              MealPlan[]
@@ -1002,6 +1003,8 @@ model Food {
   id                 String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   foodSourceId       String            @map("food_source_id") @db.Uuid
   sourceFoodId       String            @map("source_food_id")
+  /// null = global catalog; set = practice-private custom food
+  dietitianAccountId String?           @map("dietitian_account_id") @db.Uuid
   name               String
   nameNormalized     String            @map("name_normalized")
   category           String?
@@ -1022,6 +1025,7 @@ model Food {
   updatedAt          DateTime          @updatedAt @map("updated_at") @db.Timestamptz
 
   source            FoodSource         @relation(fields: [foodSourceId], references: [id], onDelete: Restrict)
+  dietitianAccount  DietitianAccount?  @relation(fields: [dietitianAccountId], references: [id], onDelete: Cascade)
   overrides         FoodOverride[]
   recipeIngredients RecipeIngredient[]
   mealItems         MealItem[]
@@ -1031,6 +1035,7 @@ model Food {
   @@index([status, nameNormalized])
   @@index([category])
   @@index([foodSourceId, status])
+  @@index([dietitianAccountId, status, nameNormalized])
   @@map("foods")
 }
 
