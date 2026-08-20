@@ -21,7 +21,7 @@ export class AdminDietitiansController {
   @ApiOperation({
     summary: "Provision a dietitian account",
     description:
-      "Creates a user, DietitianAccount (dual-write org), optional ACTIVE subscription, and sends a DIETITIAN_ACTIVATION invitation email.",
+      "Creates a user, DietitianAccount + DietitianSettings, optional ACTIVE subscription, and sends a DIETITIAN_ACTIVATION invitation email.",
   })
   provision(
     @CurrentUser() user: AuthenticatedRequestUser,

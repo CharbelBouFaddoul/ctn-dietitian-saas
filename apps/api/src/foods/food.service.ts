@@ -22,7 +22,7 @@ export class FoodService {
   constructor(private readonly prisma: PrismaService) {}
 
   async search(
-    organizationId: string,
+    dietitianAccountId: string,
     query: {
       q?: string;
       category?: string;
@@ -61,7 +61,7 @@ export class FoodService {
 
     const overrideRows = await this.prisma.foodOverride.findMany({
       where: {
-        dietitianAccountId: organizationId,
+        dietitianAccountId,
         status: "ACTIVE",
         foodId: { in: rows.map((row) => row.id) },
       },
@@ -86,15 +86,15 @@ export class FoodService {
     };
   }
 
-  async getEffective(organizationId: string, foodId: string) {
+  async getEffective(dietitianAccountId: string, foodId: string) {
     const food = await this.loadFood(foodId);
     const override = await this.prisma.foodOverride.findUnique({
-      where: { dietitianAccountId_foodId: { dietitianAccountId: organizationId, foodId } },
+      where: { dietitianAccountId_foodId: { dietitianAccountId, foodId } },
     });
     return this.toEffective(food, override);
   }
 
-  async getEffectiveMany(organizationId: string, foodIds: string[]) {
+  async getEffectiveMany(dietitianAccountId: string, foodIds: string[]) {
     const unique = [...new Set(foodIds)];
     if (unique.length === 0) {
       return new Map<string, Awaited<ReturnType<FoodService["getEffective"]>>>();
@@ -107,7 +107,7 @@ export class FoodService {
       throw new NotFoundException("Food not found");
     }
     const overrides = await this.prisma.foodOverride.findMany({
-      where: { dietitianAccountId: organizationId, foodId: { in: unique } },
+      where: { dietitianAccountId, foodId: { in: unique } },
     });
     const overrideByFood = new Map(overrides.map((row) => [row.foodId, row]));
     const result = new Map<string, Awaited<ReturnType<FoodService["getEffective"]>>>();
@@ -153,8 +153,8 @@ export class FoodService {
     return food;
   }
 
-  async calculate(organizationId: string, foodId: string, quantity: number, unit: FoodQuantityUnit) {
-    const effective = await this.getEffective(organizationId, foodId);
+  async calculate(dietitianAccountId: string, foodId: string, quantity: number, unit: FoodQuantityUnit) {
+    const effective = await this.getEffective(dietitianAccountId, foodId);
     try {
       const nutrition = calculateFoodNutrition(
         {

@@ -16,7 +16,7 @@ interface Usage {
 }
 
 interface AiPanelProps {
-  organizationId: string;
+  dietitianAccountId: string;
   clientId: string;
   action:
     | "client-summary"
@@ -214,7 +214,7 @@ function renderResult(result: Record<string, unknown>): ReactNode {
 }
 
 export function AiPanel({
-  organizationId,
+  dietitianAccountId,
   clientId,
   action,
   title,
@@ -231,10 +231,10 @@ export function AiPanel({
   const [meta, setMeta] = useState<{ provider?: string; model?: string } | null>(null);
 
   useEffect(() => {
-    void api<Usage>(`/api/v1/organizations/${organizationId}/ai/usage`)
+    void api<Usage>(`/api/v1/dietitian/${dietitianAccountId}/ai/usage`)
       .then(setUsage)
       .catch(() => setUsage(null));
-  }, [organizationId]);
+  }, [dietitianAccountId]);
 
   async function generate() {
     setLoading(true);
@@ -247,7 +247,7 @@ export function AiPanel({
         model: string;
         generatedAt: string;
         usage: Usage;
-      }>(`/api/v1/organizations/${organizationId}/clients/${clientId}/ai/${action}`, {
+      }>(`/api/v1/dietitian/${dietitianAccountId}/clients/${clientId}/ai/${action}`, {
         method: "POST",
         body: JSON.stringify({ prompt, ...(foodQuery ? { foodQuery: food } : {}) }),
       });

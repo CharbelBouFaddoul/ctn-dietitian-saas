@@ -10,6 +10,7 @@ import { EntitlementsModule } from "./entitlements/entitlements.module";
 import { HealthModule } from "./health/health.module";
 import { PlatformSettingsModule } from "./platform-settings/platform-settings.module";
 import { OrganizationModule } from "./organizations/organization.module";
+import { DietitianModule } from "./dietitian/dietitian.module";
 import { TimelineModule } from "./timeline/timeline.module";
 import { ClientsModule } from "./clients/clients.module";
 import { ClientAccountsModule } from "./client-accounts/client-accounts.module";
@@ -55,6 +56,7 @@ import { loadEnv } from "./config/env";
     AuthModule,
     EntitlementsModule,
     OrganizationModule,
+    DietitianModule,
     AdminModule,
     TimelineModule,
     ClientsModule,

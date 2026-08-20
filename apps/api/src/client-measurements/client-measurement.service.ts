@@ -3,8 +3,8 @@ import { INTERNAL_UNITS } from "@nutrition-saas/config";
 import type { MeasurementType } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { SecurityEventLogger } from "../auth/security-event.logger";
-import type { TenantContext } from "../organizations/tenant.types";
-import { legacyOrganizationId, tenantWhere } from "../organizations/tenant-scope";
+import type { DietitianTenantContext } from "../dietitian/dietitian.types";
+import { tenantWhere } from "../dietitian/tenant-scope";
 import { TimelineService } from "../timeline/timeline.service";
 import { ClientAccessService } from "../clients/client-access.service";
 
@@ -26,17 +26,17 @@ export class ClientMeasurementService {
     private readonly security: SecurityEventLogger,
   ) {}
 
-  async list(tenant: TenantContext, clientId: string) {
+  async list(tenant: DietitianTenantContext, clientId: string) {
     await this.access.assertCanAccess(tenant, clientId, "read");
     const rows = await this.prisma.clientMeasurement.findMany({
-      where: { clientId, ...tenantWhere(tenant.organizationId) },
+      where: { clientId, ...tenantWhere(tenant.dietitianAccountId) },
       orderBy: { measuredAt: "desc" },
     });
     return rows.map((row) => this.toResponse(row));
   }
 
   async create(
-    tenant: TenantContext,
+    tenant: DietitianTenantContext,
     clientId: string,
     input: { type: MeasurementType; value: number; unit: string; measuredAt: string; notes?: string },
   ) {
@@ -45,8 +45,7 @@ export class ClientMeasurementService {
     const value = this.toInternal(input.type, input.value, input.unit);
     const row = await this.prisma.clientMeasurement.create({
       data: {
-        dietitianAccountId: tenant.organizationId,
-        organizationId: legacyOrganizationId(tenant),
+        dietitianAccountId: tenant.dietitianAccountId,
         clientId,
         type: input.type,
         value,
@@ -57,8 +56,7 @@ export class ClientMeasurementService {
       },
     });
     await this.timeline.record({
-      organizationId: tenant.organizationId,
-      legacyOrganizationId: legacyOrganizationId(tenant),
+      dietitianAccountId: tenant.dietitianAccountId,
       clientId,
       type: "MEASUREMENT_ADDED",
       actorUserId: tenant.userId,
@@ -70,8 +68,7 @@ export class ClientMeasurementService {
       type: "measurement_added",
       outcome: "success",
       userId: tenant.userId,
-      organizationId: tenant.organizationId,
-      dietitianAccountId: tenant.organizationId,
+      dietitianAccountId: tenant.dietitianAccountId,
       targetType: "measurement",
       targetId: row.id,
       metadata: { measurementType: input.type },

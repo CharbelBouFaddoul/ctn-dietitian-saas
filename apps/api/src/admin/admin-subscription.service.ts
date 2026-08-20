@@ -5,7 +5,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { SecurityEventLogger } from "../auth/security-event.logger";
 import { SubscriptionLifecycleService } from "../entitlements/subscription-lifecycle.service";
 import { NotificationService } from "../notifications/notification.service";
-import { tenantWhere } from "../organizations/tenant-scope";
+import { tenantWhere } from "../dietitian/tenant-scope";
 import type { AdminActor } from "./admin-actor";
 import { ADMIN_MESSAGES } from "./admin.messages";
 
@@ -90,7 +90,7 @@ export class AdminSubscriptionService {
   }
 
   async assign(organizationId: string, input: AssignSubscriptionInput, actor: AdminActor) {
-    const account = await this.requireAccount(organizationId);
+    await this.requireAccount(organizationId);
     const plan = await this.prisma.plan.findUnique({ where: { id: input.planId } });
     if (!plan) {
       throw new NotFoundException(ADMIN_MESSAGES.planNotFound);
@@ -126,7 +126,6 @@ export class AdminSubscriptionService {
       : await this.prisma.subscription.create({
           data: {
             dietitianAccountId: organizationId,
-            organizationId: account.legacyOrganizationId ?? organizationId,
             planId: input.planId,
             status,
             startedAt: status === "ACTIVE" ? now : null,
@@ -141,7 +140,6 @@ export class AdminSubscriptionService {
       type: existing ? "subscription_changed" : "subscription_assigned",
       outcome: "success",
       userId: actor.userId,
-      organizationId,
       dietitianAccountId: organizationId,
       ipAddress: actor.ipAddress,
       userAgent: actor.userAgent,
@@ -207,7 +205,6 @@ export class AdminSubscriptionService {
       type: "subscription_renewed",
       outcome: "success",
       userId: actor.userId,
-      organizationId,
       dietitianAccountId: organizationId,
       ipAddress: actor.ipAddress,
       userAgent: actor.userAgent,
@@ -250,7 +247,6 @@ export class AdminSubscriptionService {
       type: this.statusAction(status),
       outcome: "success",
       userId: actor.userId,
-      organizationId,
       dietitianAccountId: organizationId,
       ipAddress: actor.ipAddress,
       userAgent: actor.userAgent,
@@ -365,7 +361,6 @@ export class AdminSubscriptionService {
 
   private async toResponse(subscription: {
     id: string;
-    organizationId: string | null;
     dietitianAccountId?: string | null;
     planId: string;
     status: string;
@@ -390,7 +385,6 @@ export class AdminSubscriptionService {
 
     return {
       id: subscription.id,
-      organizationId: subscription.dietitianAccountId ?? subscription.organizationId,
       status: subscription.status,
       accessState: enriched.accessState,
       startedAt: subscription.startedAt?.toISOString() ?? null,

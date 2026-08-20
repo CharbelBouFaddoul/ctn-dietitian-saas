@@ -1,5 +1,5 @@
 import type { AuthenticatedRequestUser, AuthenticatedSession } from "../auth/auth.types";
-import type { TenantContext } from "../organizations/tenant.types";
+import type { DietitianTenantContext } from "../dietitian/dietitian.types";
 import type { Client } from "@prisma/client";
 
 declare global {
@@ -7,7 +7,7 @@ declare global {
     interface Request {
       user?: AuthenticatedRequestUser;
       authSession?: AuthenticatedSession;
-      tenant?: TenantContext;
+      tenant?: DietitianTenantContext;
       requestId?: string;
       client?: Client;
     }

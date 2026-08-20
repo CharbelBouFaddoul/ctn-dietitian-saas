@@ -9,14 +9,7 @@ export class AdminAuditService {
   async list(filters: { q?: string; action?: string; organizationId?: string }) {
     const where: Prisma.AuditLogWhereInput = {
       ...(filters.action ? { action: filters.action } : {}),
-      ...(filters.organizationId
-        ? {
-            OR: [
-              { dietitianAccountId: filters.organizationId },
-              { organizationId: filters.organizationId },
-            ],
-          }
-        : {}),
+      ...(filters.organizationId ? { dietitianAccountId: filters.organizationId } : {}),
       ...(filters.q
         ? {
             OR: [

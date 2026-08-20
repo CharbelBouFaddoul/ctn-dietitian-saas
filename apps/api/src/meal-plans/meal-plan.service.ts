@@ -16,8 +16,8 @@ import {
 import { PrismaService } from "../prisma/prisma.service";
 import { SecurityEventLogger } from "../auth/security-event.logger";
 import { ClientAccessService } from "../clients/client-access.service";
-import type { TenantContext } from "../organizations/tenant.types";
-import { legacyOrganizationId, tenantWhere } from "../organizations/tenant-scope";
+import type { DietitianTenantContext } from "../dietitian/dietitian.types";
+import { requireDietitianAccountId, tenantWhere } from "../dietitian/tenant-scope";
 import { TimelineService } from "../timeline/timeline.service";
 import { RecipeNutritionService, isFoodQuantityUnit, type EffectiveFood } from "../recipes/recipe-nutrition.service";
 import { RecipeService } from "../recipes/recipe.service";
@@ -79,13 +79,13 @@ export class MealPlanService {
   ) {}
 
   async list(
-    tenant: TenantContext,
+    tenant: DietitianTenantContext,
     query: { clientId?: string; status?: "DRAFT" | "ACTIVE" | "ARCHIVED"; page?: number; pageSize?: number },
   ) {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 20;
     const where: Prisma.MealPlanWhereInput = {
-      ...tenantWhere(tenant.organizationId),
+      ...tenantWhere(tenant.dietitianAccountId),
       client: this.access.visibleWhere(tenant),
       ...(query.clientId ? { clientId: query.clientId } : {}),
       ...(query.status ? { status: query.status } : { status: { not: "ARCHIVED" } }),
@@ -123,13 +123,12 @@ export class MealPlanService {
     };
   }
 
-  async create(tenant: TenantContext, clientId: string, input: { name: string; description?: string | null }) {
+  async create(tenant: DietitianTenantContext, clientId: string, input: { name: string; description?: string | null }) {
     await this.access.assertCanAccess(tenant, clientId, "manageRecords");
     const created = await this.prisma.$transaction(async (tx) => {
       const plan = await tx.mealPlan.create({
         data: {
-          dietitianAccountId: tenant.organizationId,
-          organizationId: legacyOrganizationId(tenant),
+          dietitianAccountId: tenant.dietitianAccountId,
           clientId,
           name: input.name.trim(),
           description: input.description ?? null,
@@ -138,8 +137,7 @@ export class MealPlanService {
       });
       const version = await tx.mealPlanVersion.create({
         data: {
-          dietitianAccountId: tenant.organizationId,
-          organizationId: legacyOrganizationId(tenant),
+          dietitianAccountId: tenant.dietitianAccountId,
           mealPlanId: plan.id,
           versionNumber: 1,
           createdById: tenant.userId,
@@ -147,8 +145,7 @@ export class MealPlanService {
       });
       const day = await tx.mealPlanDay.create({
         data: {
-          dietitianAccountId: tenant.organizationId,
-          organizationId: legacyOrganizationId(tenant),
+          dietitianAccountId: tenant.dietitianAccountId,
           mealPlanVersionId: version.id,
           dayNumber: 1,
           title: "Day 1",
@@ -156,8 +153,7 @@ export class MealPlanService {
       });
       await tx.meal.createMany({
         data: DEFAULT_MEALS.map((name, index) => ({
-          dietitianAccountId: tenant.organizationId,
-          organizationId: legacyOrganizationId(tenant),
+          dietitianAccountId: tenant.dietitianAccountId,
           mealPlanDayId: day.id,
           name,
           sortOrder: index,
@@ -169,15 +165,13 @@ export class MealPlanService {
       type: "meal_plan_created",
       outcome: "success",
       userId: tenant.userId,
-      organizationId: tenant.organizationId,
-      dietitianAccountId: tenant.organizationId,
+      dietitianAccountId: tenant.dietitianAccountId,
       targetType: "meal_plan",
       targetId: created.plan.id,
       metadata: { clientId },
     });
     await this.timeline.record({
-      organizationId: tenant.organizationId,
-      legacyOrganizationId: legacyOrganizationId(tenant),
+      dietitianAccountId: tenant.dietitianAccountId,
       clientId,
       type: "MEAL_PLAN_CREATED",
       actorUserId: tenant.userId,
@@ -187,10 +181,10 @@ export class MealPlanService {
     return this.get(tenant, created.plan.id);
   }
 
-  async get(tenant: TenantContext, planId: string) {
+  async get(tenant: DietitianTenantContext, planId: string) {
     const plan = await this.requirePlan(tenant, planId, "read");
     const versions = await this.prisma.mealPlanVersion.findMany({
-      where: { mealPlanId: plan.id, ...tenantWhere(tenant.organizationId) },
+      where: { mealPlanId: plan.id, ...tenantWhere(tenant.dietitianAccountId) },
       orderBy: { versionNumber: "desc" },
       select: { id: true, versionNumber: true, status: true, publishedAt: true, createdAt: true },
     });
@@ -205,7 +199,7 @@ export class MealPlanService {
     };
   }
 
-  async update(tenant: TenantContext, planId: string, input: { name?: string; description?: string | null }) {
+  async update(tenant: DietitianTenantContext, planId: string, input: { name?: string; description?: string | null }) {
     const plan = await this.requirePlan(tenant, planId, "manageRecords");
     if (plan.status === "ARCHIVED") {
       throw new BadRequestException("Archived meal plans cannot be edited");
@@ -221,15 +215,14 @@ export class MealPlanService {
       type: "meal_plan_updated",
       outcome: "success",
       userId: tenant.userId,
-      organizationId: tenant.organizationId,
-      dietitianAccountId: tenant.organizationId,
+      dietitianAccountId: tenant.dietitianAccountId,
       targetType: "meal_plan",
       targetId: plan.id,
     });
     return this.get(tenant, plan.id);
   }
 
-  async archive(tenant: TenantContext, planId: string) {
+  async archive(tenant: DietitianTenantContext, planId: string) {
     const plan = await this.requirePlan(tenant, planId, "manageRecords");
     await this.prisma.mealPlan.update({
       where: { id: plan.id },
@@ -239,15 +232,14 @@ export class MealPlanService {
       type: "meal_plan_archived",
       outcome: "success",
       userId: tenant.userId,
-      organizationId: tenant.organizationId,
-      dietitianAccountId: tenant.organizationId,
+      dietitianAccountId: tenant.dietitianAccountId,
       targetType: "meal_plan",
       targetId: plan.id,
     });
     return this.get(tenant, plan.id);
   }
 
-  async getVersion(tenant: TenantContext, planId: string, versionId: string) {
+  async getVersion(tenant: DietitianTenantContext, planId: string, versionId: string) {
     const version = await this.requireVersion(tenant, planId, versionId, "read");
     if (version.status !== "DRAFT") {
       return {
@@ -259,7 +251,7 @@ export class MealPlanService {
         snapshot: version.snapshot,
       };
     }
-    const live = await this.calculateLive(tenant.organizationId, version);
+    const live = await this.calculateLive(tenant.dietitianAccountId, version);
     return {
       id: version.id,
       versionNumber: version.versionNumber,
@@ -270,19 +262,19 @@ export class MealPlanService {
     };
   }
 
-  async createDraftVersion(tenant: TenantContext, planId: string) {
+  async createDraftVersion(tenant: DietitianTenantContext, planId: string) {
     const plan = await this.requirePlan(tenant, planId, "manageRecords");
     if (plan.status === "ARCHIVED") {
       throw new BadRequestException("Archived meal plans cannot be edited");
     }
     const existingDraft = await this.prisma.mealPlanVersion.findFirst({
-      where: { mealPlanId: plan.id, status: "DRAFT", ...tenantWhere(tenant.organizationId) },
+      where: { mealPlanId: plan.id, status: "DRAFT", ...tenantWhere(tenant.dietitianAccountId) },
     });
     if (existingDraft) {
       throw new ConflictException("A draft version already exists");
     }
     const latest = await this.prisma.mealPlanVersion.findFirst({
-      where: { mealPlanId: plan.id, ...tenantWhere(tenant.organizationId) },
+      where: { mealPlanId: plan.id, ...tenantWhere(tenant.dietitianAccountId) },
       orderBy: { versionNumber: "desc" },
       include: { days: { include: { meals: { include: { items: true } } }, orderBy: { dayNumber: "asc" } } },
     });
@@ -292,8 +284,7 @@ export class MealPlanService {
     const created = await this.prisma.$transaction(async (tx) => {
       const version = await tx.mealPlanVersion.create({
         data: {
-          dietitianAccountId: tenant.organizationId,
-          organizationId: legacyOrganizationId(tenant),
+          dietitianAccountId: tenant.dietitianAccountId,
           mealPlanId: plan.id,
           versionNumber: latest.versionNumber + 1,
           createdById: tenant.userId,
@@ -302,8 +293,7 @@ export class MealPlanService {
       for (const day of latest.days) {
         const newDay = await tx.mealPlanDay.create({
           data: {
-            dietitianAccountId: tenant.organizationId,
-            organizationId: legacyOrganizationId(tenant),
+            dietitianAccountId: tenant.dietitianAccountId,
             mealPlanVersionId: version.id,
             dayNumber: day.dayNumber,
             weekday: day.weekday,
@@ -314,8 +304,7 @@ export class MealPlanService {
         for (const meal of day.meals) {
           const newMeal = await tx.meal.create({
             data: {
-              dietitianAccountId: tenant.organizationId,
-              organizationId: legacyOrganizationId(tenant),
+              dietitianAccountId: tenant.dietitianAccountId,
               mealPlanDayId: newDay.id,
               name: meal.name,
               sortOrder: meal.sortOrder,
@@ -325,8 +314,7 @@ export class MealPlanService {
           if (meal.items.length > 0) {
             await tx.mealItem.createMany({
               data: meal.items.map((item) => ({
-                dietitianAccountId: tenant.organizationId,
-                organizationId: legacyOrganizationId(tenant),
+                dietitianAccountId: tenant.dietitianAccountId,
                 mealId: newMeal.id,
                 itemType: item.itemType,
                 foodId: item.foodId,
@@ -345,17 +333,17 @@ export class MealPlanService {
     return this.getVersion(tenant, plan.id, created.id);
   }
 
-  async publish(tenant: TenantContext, planId: string, versionId: string) {
+  async publish(tenant: DietitianTenantContext, planId: string, versionId: string) {
     const version = await this.requireVersion(tenant, planId, versionId, "manageRecords");
     if (version.status !== "DRAFT") {
       throw new BadRequestException("Only draft versions can be published");
     }
-    const snapshot = await this.calculateLive(tenant.organizationId, version);
+    const snapshot = await this.calculateLive(tenant.dietitianAccountId, version);
     this.assertPublishable(snapshot);
 
     const published = await this.prisma.$transaction(async (tx) => {
       const previous = await tx.mealPlanVersion.findMany({
-        where: { mealPlanId: version.mealPlanId, status: "PUBLISHED", ...tenantWhere(tenant.organizationId) },
+        where: { mealPlanId: version.mealPlanId, status: "PUBLISHED", ...tenantWhere(tenant.dietitianAccountId) },
       });
       for (const row of previous) {
         await tx.mealPlanVersion.update({
@@ -382,8 +370,7 @@ export class MealPlanService {
       type: "meal_plan_published",
       outcome: "success",
       userId: tenant.userId,
-      organizationId: tenant.organizationId,
-      dietitianAccountId: tenant.organizationId,
+      dietitianAccountId: tenant.dietitianAccountId,
       targetType: "meal_plan_version",
       targetId: published.next.id,
       metadata: { mealPlanId: version.mealPlanId, versionNumber: version.versionNumber },
@@ -393,16 +380,14 @@ export class MealPlanService {
         type: "meal_plan_version_superseded",
         outcome: "success",
         userId: tenant.userId,
-        organizationId: tenant.organizationId,
-        dietitianAccountId: tenant.organizationId,
+        dietitianAccountId: tenant.dietitianAccountId,
         targetType: "meal_plan_version",
         targetId: published.supersededIds[0],
         metadata: { mealPlanId: version.mealPlanId, count: published.supersededIds.length },
       });
     }
     await this.timeline.record({
-      organizationId: tenant.organizationId,
-      legacyOrganizationId: legacyOrganizationId(tenant),
+      dietitianAccountId: tenant.dietitianAccountId,
       clientId: version.mealPlan.clientId,
       type: "MEAL_PLAN_PUBLISHED",
       actorUserId: tenant.userId,
@@ -413,7 +398,7 @@ export class MealPlanService {
   }
 
   async addDay(
-    tenant: TenantContext,
+    tenant: DietitianTenantContext,
     planId: string,
     versionId: string,
     input: { title?: string | null; weekday?: string | null; notes?: string | null },
@@ -425,8 +410,7 @@ export class MealPlanService {
     });
     const day = await this.prisma.mealPlanDay.create({
       data: {
-        dietitianAccountId: tenant.organizationId,
-        organizationId: legacyOrganizationId(tenant),
+        dietitianAccountId: tenant.dietitianAccountId,
         mealPlanVersionId: version.id,
         dayNumber: (last._max.dayNumber ?? 0) + 1,
         title: input.title ?? `Day ${(last._max.dayNumber ?? 0) + 1}`,
@@ -436,8 +420,7 @@ export class MealPlanService {
     });
     await this.prisma.meal.createMany({
       data: DEFAULT_MEALS.map((name, index) => ({
-        dietitianAccountId: tenant.organizationId,
-        organizationId: legacyOrganizationId(tenant),
+        dietitianAccountId: tenant.dietitianAccountId,
         mealPlanDayId: day.id,
         name,
         sortOrder: index,
@@ -447,14 +430,14 @@ export class MealPlanService {
   }
 
   async updateDay(
-    tenant: TenantContext,
+    tenant: DietitianTenantContext,
     planId: string,
     versionId: string,
     dayId: string,
     input: { title?: string | null; weekday?: string | null; notes?: string | null },
   ) {
     await this.assertDraft(tenant, planId, versionId);
-    await this.requireDay(tenant.organizationId, versionId, dayId);
+    await this.requireDay(tenant.dietitianAccountId, versionId, dayId);
     await this.prisma.mealPlanDay.update({
       where: { id: dayId },
       data: {
@@ -466,24 +449,23 @@ export class MealPlanService {
     return this.getVersion(tenant, planId, versionId);
   }
 
-  async deleteDay(tenant: TenantContext, planId: string, versionId: string, dayId: string) {
+  async deleteDay(tenant: DietitianTenantContext, planId: string, versionId: string, dayId: string) {
     await this.assertDraft(tenant, planId, versionId);
-    await this.requireDay(tenant.organizationId, versionId, dayId);
+    await this.requireDay(tenant.dietitianAccountId, versionId, dayId);
     await this.prisma.mealPlanDay.delete({ where: { id: dayId } });
     return this.getVersion(tenant, planId, versionId);
   }
 
-  async addMeal(tenant: TenantContext, planId: string, versionId: string, dayId: string, input: { name: string; notes?: string }) {
+  async addMeal(tenant: DietitianTenantContext, planId: string, versionId: string, dayId: string, input: { name: string; notes?: string }) {
     await this.assertDraft(tenant, planId, versionId);
-    await this.requireDay(tenant.organizationId, versionId, dayId);
+    await this.requireDay(tenant.dietitianAccountId, versionId, dayId);
     const last = await this.prisma.meal.aggregate({
       where: { mealPlanDayId: dayId },
       _max: { sortOrder: true },
     });
     await this.prisma.meal.create({
       data: {
-        dietitianAccountId: tenant.organizationId,
-        organizationId: legacyOrganizationId(tenant),
+        dietitianAccountId: tenant.dietitianAccountId,
         mealPlanDayId: dayId,
         name: input.name.trim(),
         notes: input.notes ?? null,
@@ -494,14 +476,14 @@ export class MealPlanService {
   }
 
   async updateMeal(
-    tenant: TenantContext,
+    tenant: DietitianTenantContext,
     planId: string,
     versionId: string,
     mealId: string,
     input: { name?: string; notes?: string | null; sortOrder?: number },
   ) {
     await this.assertDraft(tenant, planId, versionId);
-    await this.requireMeal(tenant.organizationId, versionId, mealId);
+    await this.requireMeal(tenant.dietitianAccountId, versionId, mealId);
     await this.prisma.meal.update({
       where: { id: mealId },
       data: {
@@ -513,15 +495,15 @@ export class MealPlanService {
     return this.getVersion(tenant, planId, versionId);
   }
 
-  async deleteMeal(tenant: TenantContext, planId: string, versionId: string, mealId: string) {
+  async deleteMeal(tenant: DietitianTenantContext, planId: string, versionId: string, mealId: string) {
     await this.assertDraft(tenant, planId, versionId);
-    await this.requireMeal(tenant.organizationId, versionId, mealId);
+    await this.requireMeal(tenant.dietitianAccountId, versionId, mealId);
     await this.prisma.meal.delete({ where: { id: mealId } });
     return this.getVersion(tenant, planId, versionId);
   }
 
   async addItem(
-    tenant: TenantContext,
+    tenant: DietitianTenantContext,
     planId: string,
     versionId: string,
     mealId: string,
@@ -535,16 +517,15 @@ export class MealPlanService {
     },
   ) {
     await this.assertDraft(tenant, planId, versionId);
-    await this.requireMeal(tenant.organizationId, versionId, mealId);
-    await this.validateItem(tenant.organizationId, input);
+    await this.requireMeal(tenant.dietitianAccountId, versionId, mealId);
+    await this.validateItem(tenant.dietitianAccountId, input);
     const last = await this.prisma.mealItem.aggregate({
       where: { mealId },
       _max: { sortOrder: true },
     });
     await this.prisma.mealItem.create({
       data: {
-        dietitianAccountId: tenant.organizationId,
-        organizationId: legacyOrganizationId(tenant),
+        dietitianAccountId: tenant.dietitianAccountId,
         mealId,
         itemType: input.itemType,
         foodId: input.itemType === "FOOD" ? input.foodId : null,
@@ -559,17 +540,17 @@ export class MealPlanService {
   }
 
   async updateItem(
-    tenant: TenantContext,
+    tenant: DietitianTenantContext,
     planId: string,
     versionId: string,
     itemId: string,
     input: { quantity?: number; unit?: QuantityUnit; notes?: string | null; sortOrder?: number },
   ) {
     await this.assertDraft(tenant, planId, versionId);
-    const item = await this.requireItem(tenant.organizationId, versionId, itemId);
+    const item = await this.requireItem(tenant.dietitianAccountId, versionId, itemId);
     const quantity = input.quantity ?? Number(item.quantity);
     const unit = input.unit ?? item.unit;
-    await this.validateItem(tenant.organizationId, {
+    await this.validateItem(tenant.dietitianAccountId, {
       itemType: item.itemType,
       foodId: item.foodId ?? undefined,
       recipeId: item.recipeId ?? undefined,
@@ -588,9 +569,9 @@ export class MealPlanService {
     return this.getVersion(tenant, planId, versionId);
   }
 
-  async deleteItem(tenant: TenantContext, planId: string, versionId: string, itemId: string) {
+  async deleteItem(tenant: DietitianTenantContext, planId: string, versionId: string, itemId: string) {
     await this.assertDraft(tenant, planId, versionId);
-    const item = await this.requireItem(tenant.organizationId, versionId, itemId);
+    const item = await this.requireItem(tenant.dietitianAccountId, versionId, itemId);
     await this.prisma.mealItem.delete({ where: { id: item.id } });
     return this.getVersion(tenant, planId, versionId);
   }
@@ -600,8 +581,8 @@ export class MealPlanService {
     const version = await this.prisma.mealPlanVersion.findFirst({
       where: {
         status: "PUBLISHED",
-        dietitianAccountId: client.dietitianAccountId ?? client.organizationId,
-        mealPlan: { clientId: client.id, status: { not: "ARCHIVED" }, dietitianAccountId: client.dietitianAccountId ?? client.organizationId },
+        dietitianAccountId: requireDietitianAccountId(client),
+        mealPlan: { clientId: client.id, status: { not: "ARCHIVED" }, dietitianAccountId: client.dietitianAccountId },
       },
       orderBy: { publishedAt: "desc" },
       include: { mealPlan: { select: { id: true, name: true, description: true } } },
@@ -621,7 +602,7 @@ export class MealPlanService {
     };
   }
 
-  private async calculateLive(organizationId: string, version: VersionGraph): Promise<MealPlanSnapshot> {
+  private async calculateLive(dietitianAccountId: string, version: VersionGraph): Promise<MealPlanSnapshot> {
     const foodIds = new Set<string>();
     const recipeIds = new Set<string>();
     for (const day of version.days) {
@@ -633,7 +614,7 @@ export class MealPlanService {
       }
     }
     const recipes = await this.prisma.recipe.findMany({
-      where: { id: { in: [...recipeIds] }, organizationId },
+      where: { id: { in: [...recipeIds] }, dietitianAccountId },
       include: { ingredients: true },
     });
     for (const recipe of recipes) {
@@ -641,10 +622,10 @@ export class MealPlanService {
         foodIds.add(ingredient.foodId);
       }
     }
-    const foodMap = await this.recipeNutrition.loadFoods(organizationId, [...foodIds]);
+    const foodMap = await this.recipeNutrition.loadFoods(dietitianAccountId, [...foodIds]);
     const recipeMap = new Map(
       await Promise.all(
-        recipes.map(async (recipe) => [recipe.id, await this.recipeNutrition.calculate(organizationId, recipe, recipe.ingredients, foodMap)] as const),
+        recipes.map(async (recipe) => [recipe.id, await this.recipeNutrition.calculate(dietitianAccountId, recipe, recipe.ingredients, foodMap)] as const),
       ),
     );
 
@@ -761,7 +742,7 @@ export class MealPlanService {
   }
 
   private async validateItem(
-    organizationId: string,
+    dietitianAccountId: string,
     input: { itemType: MealItemType; foodId?: string; recipeId?: string; quantity: number; unit: QuantityUnit },
   ) {
     if (!(input.quantity > 0)) {
@@ -774,7 +755,7 @@ export class MealPlanService {
       if (!isFoodQuantityUnit(input.unit)) {
         throw new BadRequestException("Food items must use a mass or volume unit");
       }
-      await this.recipeNutrition.loadFoods(organizationId, [input.foodId]);
+      await this.recipeNutrition.loadFoods(dietitianAccountId, [input.foodId]);
       return;
     }
     if (!input.recipeId || input.foodId) {
@@ -783,12 +764,12 @@ export class MealPlanService {
     if (input.unit !== "serving") {
       throw new BadRequestException("Recipe quantities are servings");
     }
-    await this.recipes.requireActive(organizationId, input.recipeId);
+    await this.recipes.requireActive(dietitianAccountId, input.recipeId);
   }
 
-  private async requirePlan(tenant: TenantContext, planId: string, action: "read" | "manageRecords") {
+  private async requirePlan(tenant: DietitianTenantContext, planId: string, action: "read" | "manageRecords") {
     const plan = await this.prisma.mealPlan.findFirst({
-      where: { id: planId, ...tenantWhere(tenant.organizationId) },
+      where: { id: planId, ...tenantWhere(tenant.dietitianAccountId) },
     });
     if (!plan) {
       throw new NotFoundException("Meal plan not found");
@@ -797,10 +778,10 @@ export class MealPlanService {
     return plan;
   }
 
-  private async requireVersion(tenant: TenantContext, planId: string, versionId: string, action: "read" | "manageRecords") {
+  private async requireVersion(tenant: DietitianTenantContext, planId: string, versionId: string, action: "read" | "manageRecords") {
     await this.requirePlan(tenant, planId, action);
     const version = await this.prisma.mealPlanVersion.findFirst({
-      where: { id: versionId, mealPlanId: planId, ...tenantWhere(tenant.organizationId) },
+      where: { id: versionId, mealPlanId: planId, ...tenantWhere(tenant.dietitianAccountId) },
       include: {
         mealPlan: true,
         days: { include: { meals: { include: { items: true } } }, orderBy: { dayNumber: "asc" } },
@@ -812,7 +793,7 @@ export class MealPlanService {
     return version;
   }
 
-  private async assertDraft(tenant: TenantContext, planId: string, versionId: string) {
+  private async assertDraft(tenant: DietitianTenantContext, planId: string, versionId: string) {
     const version = await this.requireVersion(tenant, planId, versionId, "manageRecords");
     if (version.status !== "DRAFT") {
       throw new BadRequestException("Published versions cannot be modified");

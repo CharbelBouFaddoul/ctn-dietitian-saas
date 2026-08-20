@@ -2,8 +2,7 @@ import { Injectable, NotFoundException } from "@nestjs/common";
 import { NUTRIENT_KEYS, type NutritionValues } from "@nutrition-saas/nutrition";
 import { PrismaService } from "../prisma/prisma.service";
 import { SecurityEventLogger } from "../auth/security-event.logger";
-import type { TenantContext } from "../organizations/tenant.types";
-import { legacyOrganizationId } from "../organizations/tenant-scope";
+import type { DietitianTenantContext } from "../dietitian/dietitian.types";
 import { FoodService } from "../foods/food.service";
 
 export type OverrideInput = Partial<NutritionValues>;
@@ -16,13 +15,13 @@ export class FoodOverrideService {
     private readonly security: SecurityEventLogger,
   ) {}
 
-  async upsert(tenant: TenantContext, foodId: string, input: OverrideInput) {
+  async upsert(tenant: DietitianTenantContext, foodId: string, input: OverrideInput) {
     await this.requireFood(foodId);
 
     const data = this.nutrientData(input);
     const existing = await this.prisma.foodOverride.findUnique({
       where: {
-        dietitianAccountId_foodId: { dietitianAccountId: tenant.organizationId, foodId },
+        dietitianAccountId_foodId: { dietitianAccountId: tenant.dietitianAccountId, foodId },
       },
     });
 
@@ -33,8 +32,7 @@ export class FoodOverrideService {
         })
       : await this.prisma.foodOverride.create({
           data: {
-            dietitianAccountId: tenant.organizationId,
-            organizationId: legacyOrganizationId(tenant),
+            dietitianAccountId: tenant.dietitianAccountId,
             foodId,
             createdById: tenant.userId,
             ...data,
@@ -45,20 +43,19 @@ export class FoodOverrideService {
       type: existing ? "food_override_updated" : "food_override_created",
       outcome: "success",
       userId: tenant.userId,
-      organizationId: tenant.organizationId,
-      dietitianAccountId: tenant.organizationId,
+      dietitianAccountId: tenant.dietitianAccountId,
       targetType: "food_override",
       targetId: row.id,
       metadata: { foodId, fields: Object.keys(input) },
     });
 
-    return this.foods.getEffective(tenant.organizationId, foodId);
+    return this.foods.getEffective(tenant.dietitianAccountId, foodId);
   }
 
-  async remove(tenant: TenantContext, foodId: string) {
+  async remove(tenant: DietitianTenantContext, foodId: string) {
     const existing = await this.prisma.foodOverride.findUnique({
       where: {
-        dietitianAccountId_foodId: { dietitianAccountId: tenant.organizationId, foodId },
+        dietitianAccountId_foodId: { dietitianAccountId: tenant.dietitianAccountId, foodId },
       },
     });
     if (!existing) {
@@ -72,13 +69,12 @@ export class FoodOverrideService {
       type: "food_override_removed",
       outcome: "success",
       userId: tenant.userId,
-      organizationId: tenant.organizationId,
-      dietitianAccountId: tenant.organizationId,
+      dietitianAccountId: tenant.dietitianAccountId,
       targetType: "food_override",
       targetId: existing.id,
       metadata: { foodId },
     });
-    return this.foods.getEffective(tenant.organizationId, foodId);
+    return this.foods.getEffective(tenant.dietitianAccountId, foodId);
   }
 
   private async requireFood(foodId: string) {

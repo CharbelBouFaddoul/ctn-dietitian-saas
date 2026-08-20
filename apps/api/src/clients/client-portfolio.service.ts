@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
-import type { TenantContext } from "../organizations/tenant.types";
-import { tenantWhere } from "../organizations/tenant-scope";
+import type { DietitianTenantContext } from "../dietitian/dietitian.types";
+import { tenantWhere } from "../dietitian/tenant-scope";
 import { ClientService } from "./client.service";
 
 const RECENT_TIMELINE_LIMIT = 6;
@@ -15,9 +15,9 @@ export class ClientPortfolioService {
   ) {}
 
   /** Read/composition-only aggregate — no mutations. */
-  async get(tenant: TenantContext, clientId: string) {
+  async get(tenant: DietitianTenantContext, clientId: string) {
     const client = await this.clients.get(tenant, clientId);
-    const orgId = tenant.organizationId;
+    const orgId = tenant.dietitianAccountId;
 
     const [
       goals,
@@ -199,7 +199,6 @@ export class ClientPortfolioService {
     return {
       client: {
         id: client.id,
-        organizationId: client.organizationId,
         firstName: client.firstName,
         lastName: client.lastName,
         displayName: client.displayName,

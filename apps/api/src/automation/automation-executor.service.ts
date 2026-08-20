@@ -32,7 +32,11 @@ export class AutomationExecutorService {
   ) {}
 
   async executeCandidate(rule: AutomationRule, candidate: AutomationCandidate): Promise<void> {
-    const dietitianAccountId = rule.dietitianAccountId ?? rule.organizationId;
+    const dietitianAccountId = rule.dietitianAccountId;
+    if (!dietitianAccountId) {
+      await this.skipRun(rule, candidate.triggerKey, "missing_dietitian_account");
+      return;
+    }
     const account = await this.prisma.dietitianAccount.findUnique({
       where: { id: dietitianAccountId },
       include: { settings: true },
@@ -103,7 +107,6 @@ export class AutomationExecutorService {
         const created = await this.prisma.automationRun.create({
           data: {
             dietitianAccountId,
-            organizationId: account.legacyOrganizationId ?? dietitianAccountId,
             automationRuleId: rule.id,
             triggerKey: candidate.triggerKey,
             status: "RUNNING",
@@ -164,7 +167,7 @@ export class AutomationExecutorService {
     switch (rule.actionType) {
       case "SEND_IN_APP_NOTIFICATION":
         await this.notifications.create({
-          organizationId: dietitianAccountId,
+          dietitianAccountId,
           userId: context.recipientUserId,
           clientId: candidate.clientId,
           type: "AUTOMATION",
@@ -177,7 +180,7 @@ export class AutomationExecutorService {
         break;
       case "CREATE_CLIENT_NOTIFICATION":
         await this.notifications.create({
-          organizationId: dietitianAccountId,
+          dietitianAccountId,
           userId: context.recipientUserId,
           clientId: candidate.clientId,
           type: "AUTOMATION",
@@ -202,7 +205,7 @@ export class AutomationExecutorService {
       }
       case "CREATE_TASK":
         await this.tasks.createFromAutomation({
-          organizationId: dietitianAccountId,
+          dietitianAccountId,
           createdById: rule.createdById,
           clientId: candidate.clientId,
           assignedUserId: context.assignedUserId,
@@ -317,12 +320,11 @@ export class AutomationExecutorService {
   }
 
   private async skipRun(rule: AutomationRule, triggerKey: string, reason: string): Promise<void> {
-    const dietitianAccountId = rule.dietitianAccountId ?? rule.organizationId;
+    const dietitianAccountId = rule.dietitianAccountId;
     try {
       await this.prisma.automationRun.create({
         data: {
           dietitianAccountId,
-          organizationId: rule.organizationId,
           automationRuleId: rule.id,
           triggerKey,
           status: "SKIPPED",

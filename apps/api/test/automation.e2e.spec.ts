@@ -12,8 +12,7 @@ import {
   resetAuthDatabase,
   type AuthTestContext,
 } from "./app";
-import { MULTI_MEMBER_UNSUPPORTED } from "../src/organizations/organization.service";
-import { ORGANIZATION_ACCESS_DENIED } from "../src/organizations/tenant.types";
+import { DIETITIAN_ACCESS_DENIED } from "../src/dietitian/dietitian.types";
 
 const PASSWORD = "ValidPass12";
 const SETTINGS = {
@@ -75,7 +74,7 @@ describe("Phase 12 automation", () => {
 
   async function createOrg(cookie: string, name: string, planSlug: "standard" | "pro" | "premium" = "pro") {
     const created = await request(ctx.app.getHttpServer())
-      .post("/api/v1/organizations")
+      .post("/api/v1/dietitian")
       .set("Cookie", cookie)
       .send({ name, settings: SETTINGS })
       .expect(201);
@@ -85,7 +84,7 @@ describe("Phase 12 automation", () => {
 
   async function createClient(cookie: string, organizationId: string) {
     const res = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${organizationId}/clients`)
+      .post(`/api/v1/dietitian/${organizationId}/clients`)
       .set("Cookie", cookie)
       .send({ firstName: "Pat", lastName: "Client", email: email("client") })
       .expect(201);
@@ -94,7 +93,7 @@ describe("Phase 12 automation", () => {
 
   function createRule(cookie: string, organizationId: string, overrides: Record<string, unknown> = {}) {
     return request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${organizationId}/automations`)
+      .post(`/api/v1/dietitian/${organizationId}/automations`)
       .set("Cookie", cookie)
       .send({
         name: "Inactive follow-up",
@@ -116,18 +115,11 @@ describe("Phase 12 automation", () => {
     await createRule(standardOwner.cookie, standardOrg.id).expect(403);
     await createRule(proOwner.cookie, proOrg.id).expect(201);
 
-    const add = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${proOrg.id}/members`)
-      .set("Cookie", proOwner.cookie)
-      .send({ email: outsider.address, role: "STAFF" });
-    expect(add.status).toBe(400);
-    expect(add.body.message).toBe(MULTI_MEMBER_UNSUPPORTED);
-
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${proOrg.id}/automations`)
+      .get(`/api/v1/dietitian/${proOrg.id}/automations`)
       .set("Cookie", outsider.cookie)
       .expect(403)
-      .expect((res) => expect(res.body.message).toBe(ORGANIZATION_ACCESS_DENIED));
+      .expect((res) => expect(res.body.message).toBe(DIETITIAN_ACCESS_DENIED));
   });
 
   it("isolates automation rules between organizations", async () => {
@@ -139,12 +131,12 @@ describe("Phase 12 automation", () => {
     const created = await createRule(ownerA.cookie, orgA.id).expect(201);
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${orgB.id}/automations/${created.body.id}`)
+      .get(`/api/v1/dietitian/${orgB.id}/automations/${created.body.id}`)
       .set("Cookie", ownerB.cookie)
       .expect(404);
 
     await request(ctx.app.getHttpServer())
-      .patch(`/api/v1/organizations/${orgB.id}/automations/${created.body.id}`)
+      .patch(`/api/v1/dietitian/${orgB.id}/automations/${created.body.id}`)
       .set("Cookie", ownerB.cookie)
       .send({ name: "Hacked" })
       .expect(404);
@@ -157,7 +149,7 @@ describe("Phase 12 automation", () => {
 
     const ruleRes = await createRule(owner.cookie, org.id).expect(201);
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/automations/${ruleRes.body.id}/activate`)
+      .post(`/api/v1/dietitian/${org.id}/automations/${ruleRes.body.id}/activate`)
       .set("Cookie", owner.cookie)
       .expect(201);
 
@@ -168,11 +160,11 @@ describe("Phase 12 automation", () => {
     await executor.executeCandidate(rule, { triggerKey, clientId: client.id });
     await executor.executeCandidate(rule, { triggerKey, clientId: client.id });
 
-    const runs = await ctx.prisma.automationRun.findMany({ where: { organizationId: org.id } });
+    const runs = await ctx.prisma.automationRun.findMany({ where: { dietitianAccountId: org.id } });
     const succeeded = runs.filter((r) => r.status === "SUCCEEDED");
     expect(succeeded).toHaveLength(1);
 
-    const tasks = await ctx.prisma.task.findMany({ where: { organizationId: org.id, clientId: client.id } });
+    const tasks = await ctx.prisma.task.findMany({ where: { dietitianAccountId: org.id, clientId: client.id } });
     expect(tasks).toHaveLength(1);
     expect(tasks[0]?.title).toContain("Pat");
   });
@@ -184,7 +176,7 @@ describe("Phase 12 automation", () => {
 
     const ruleRes = await createRule(owner.cookie, org.id).expect(201);
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/automations/${ruleRes.body.id}/activate`)
+      .post(`/api/v1/dietitian/${org.id}/automations/${ruleRes.body.id}/activate`)
       .set("Cookie", owner.cookie)
       .expect(201);
 
@@ -195,7 +187,7 @@ describe("Phase 12 automation", () => {
       clientId: client.id,
     });
 
-    let run = await ctx.prisma.automationRun.findFirst({ where: { organizationId: org.id } });
+    let run = await ctx.prisma.automationRun.findFirst({ where: { dietitianAccountId: org.id } });
     expect(run?.status).toBe("SKIPPED");
 
     await ctx.prisma.client.update({ where: { id: client.id }, data: { status: "ACTIVE", archivedAt: null } });
@@ -208,7 +200,7 @@ describe("Phase 12 automation", () => {
       clientId: client.id,
     });
     run = await ctx.prisma.automationRun.findFirst({
-      where: { organizationId: org.id, triggerKey: `client-inactive:${client.id}:2026-08-19` },
+      where: { dietitianAccountId: org.id, triggerKey: `client-inactive:${client.id}:2026-08-19` },
     });
     expect(run?.status).toBe("SKIPPED");
     expect(run?.errorCode).toBe("organization_inactive");
@@ -229,7 +221,6 @@ describe("Phase 12 automation", () => {
     const appointment = await ctx.prisma.appointment.create({
       data: {
         dietitianAccountId: org.id,
-        organizationId: org.id,
         clientId: client.id,
         title: "Consult",
         startAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
@@ -270,7 +261,6 @@ describe("Phase 12 automation", () => {
     await ctx.prisma.featureOverride.create({
       data: {
         dietitianAccountId: org.id,
-        organizationId: org.id,
         featureId: feature.id,
         enabled: true,
         limitValue: 1,
@@ -281,7 +271,7 @@ describe("Phase 12 automation", () => {
 
     const ruleRes = await createRule(owner.cookie, org.id).expect(201);
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/automations/${ruleRes.body.id}/activate`)
+      .post(`/api/v1/dietitian/${org.id}/automations/${ruleRes.body.id}/activate`)
       .set("Cookie", owner.cookie)
       .expect(201);
 
@@ -290,14 +280,14 @@ describe("Phase 12 automation", () => {
     await executor.executeCandidate(rule, { triggerKey: `client-inactive:${client.id}:d2`, clientId: client.id });
 
     const skipped = await ctx.prisma.automationRun.findFirst({
-      where: { organizationId: org.id, errorCode: "execution_limit" },
+      where: { dietitianAccountId: org.id, errorCode: "execution_limit" },
     });
     expect(skipped?.status).toBe("SKIPPED");
 
     await ctx.prisma.feature.update({ where: { key: FEATURE_KEYS.AUTOMATION }, data: { status: "INACTIVE" } });
     await executor.executeCandidate(rule, { triggerKey: `client-inactive:${client.id}:d3`, clientId: client.id });
     const denied = await ctx.prisma.automationRun.findFirst({
-      where: { organizationId: org.id, triggerKey: `client-inactive:${client.id}:d3` },
+      where: { dietitianAccountId: org.id, triggerKey: `client-inactive:${client.id}:d3` },
     });
     expect(denied?.status).toBe("SKIPPED");
     expect(denied?.errorCode).toBe("entitlement_denied");
@@ -310,9 +300,9 @@ describe("Phase 12 automation", () => {
     const clientEmail = (await ctx.prisma.client.findUniqueOrThrow({ where: { id: client.id } })).email!;
     const portalCookie = await connectClientPortal(ctx, owner.cookie, org.id, { id: client.id, email: clientEmail });
 
-    await request(ctx.app.getHttpServer()).get(`/api/v1/organizations/${org.id}/automations`).expect(401);
+    await request(ctx.app.getHttpServer()).get(`/api/v1/dietitian/${org.id}/automations`).expect(401);
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/automations`)
+      .get(`/api/v1/dietitian/${org.id}/automations`)
       .set("Cookie", portalCookie)
       .expect(403);
   });

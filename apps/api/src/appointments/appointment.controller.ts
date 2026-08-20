@@ -2,9 +2,9 @@ import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, UseGuards } f
 import { ApiCookieAuth, ApiProperty, ApiPropertyOptional, ApiTags } from "@nestjs/swagger";
 import { IsDateString, IsEnum, IsOptional, IsString, IsUUID, MaxLength, MinLength } from "class-validator";
 import { SessionGuard } from "../auth/guards/session.guard";
-import { CurrentTenant } from "../organizations/decorators/current-tenant.decorator";
-import { TenantGuard } from "../organizations/guards/tenant.guard";
-import type { TenantContext } from "../organizations/tenant.types";
+import { CurrentTenant } from "../dietitian/decorators/current-tenant.decorator";
+import { DietitianGuard } from "../dietitian/guards/dietitian.guard";
+import type { DietitianTenantContext } from "../dietitian/dietitian.types";
 import { ClientActionRequired } from "../clients/decorators/client-action.decorator";
 import { ClientAccessGuard } from "../clients/guards/client-access.guard";
 import { AppointmentService } from "./appointment.service";
@@ -27,7 +27,7 @@ class CreateAppointmentDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsUUID()
-  assignedMemberId?: string;
+  assignedUserId?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -50,19 +50,19 @@ class UpdateAppointmentStatusDto {
 
 @ApiTags("appointments")
 @ApiCookieAuth()
-@UseGuards(SessionGuard, TenantGuard)
-@Controller("api/v1/organizations/:organizationId")
+@UseGuards(SessionGuard, DietitianGuard)
+@Controller("api/v1/dietitian/:dietitianAccountId")
 export class AppointmentController {
   constructor(private readonly appointments: AppointmentService) {}
 
   @Get("appointments")
-  upcoming(@CurrentTenant() tenant: TenantContext) {
+  upcoming(@CurrentTenant() tenant: DietitianTenantContext) {
     return this.appointments.listUpcoming(tenant);
   }
 
   @Get("clients/:clientId/appointments")
   @UseGuards(ClientAccessGuard)
-  list(@CurrentTenant() tenant: TenantContext, @Param("clientId", ParseUUIDPipe) clientId: string) {
+  list(@CurrentTenant() tenant: DietitianTenantContext, @Param("clientId", ParseUUIDPipe) clientId: string) {
     return this.appointments.listForClient(tenant, clientId);
   }
 
@@ -70,7 +70,7 @@ export class AppointmentController {
   @UseGuards(ClientAccessGuard)
   @ClientActionRequired("manageRecords")
   create(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("clientId", ParseUUIDPipe) clientId: string,
     @Body() body: CreateAppointmentDto,
   ) {
@@ -81,7 +81,7 @@ export class AppointmentController {
   @UseGuards(ClientAccessGuard)
   @ClientActionRequired("manageRecords")
   updateStatus(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("clientId", ParseUUIDPipe) clientId: string,
     @Param("appointmentId", ParseUUIDPipe) appointmentId: string,
     @Body() body: UpdateAppointmentStatusDto,

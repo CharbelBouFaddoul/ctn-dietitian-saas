@@ -9,8 +9,7 @@ import {
   resetAuthDatabase,
   type AuthTestContext,
 } from "./app";
-import { MULTI_MEMBER_UNSUPPORTED } from "../src/organizations/organization.service";
-import { ORGANIZATION_ACCESS_DENIED } from "../src/organizations/tenant.types";
+import { DIETITIAN_ACCESS_DENIED } from "../src/dietitian/dietitian.types";
 
 const PASSWORD = "ValidPass12";
 const SETTINGS = {
@@ -63,7 +62,7 @@ describe("Phase 9 messaging and documents", () => {
 
   async function createOrg(cookie: string, name: string) {
     const created = await request(ctx.app.getHttpServer())
-      .post("/api/v1/organizations")
+      .post("/api/v1/dietitian")
       .set("Cookie", cookie)
       .send({ name, settings: SETTINGS })
       .expect(201);
@@ -73,7 +72,7 @@ describe("Phase 9 messaging and documents", () => {
 
   async function createClient(cookie: string, organizationId: string, body: Record<string, unknown> = {}) {
     return request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${organizationId}/clients`)
+      .post(`/api/v1/dietitian/${organizationId}/clients`)
       .set("Cookie", cookie)
       .send({ firstName: "Pat", lastName: "Client", email: email("client"), ...body });
   }
@@ -94,19 +93,19 @@ describe("Phase 9 messaging and documents", () => {
       .expect(201);
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${orgB.id}/clients/${clientB.body.id}/conversation/messages`)
+      .get(`/api/v1/dietitian/${orgB.id}/clients/${clientB.body.id}/conversation/messages`)
       .set("Cookie", ownerA.cookie)
       .expect(403);
 
     const internal = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${orgA.id}/clients/${clientA.body.id}/documents`)
+      .post(`/api/v1/dietitian/${orgA.id}/clients/${clientA.body.id}/documents`)
       .set("Cookie", ownerA.cookie)
       .attach("file", PDF_BUFFER, { filename: "lab.pdf", contentType: "application/pdf" })
       .field("visibility", "INTERNAL")
       .expect(201);
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${orgB.id}/clients/${clientB.body.id}/documents/${internal.body.id}/download`)
+      .get(`/api/v1/dietitian/${orgB.id}/clients/${clientB.body.id}/documents/${internal.body.id}/download`)
       .set("Cookie", ownerB.cookie)
       .expect(404);
 
@@ -120,12 +119,6 @@ describe("Phase 9 messaging and documents", () => {
     const owner = await registerVerifyLogin();
     const outsider = await registerVerifyLogin();
     const org = await createOrg(owner.cookie, "Practice");
-    const add = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/members`)
-      .set("Cookie", owner.cookie)
-      .send({ email: outsider.address, role: "DIETITIAN" });
-    expect(add.status).toBe(400);
-    expect(add.body.message).toBe(MULTI_MEMBER_UNSUPPORTED);
 
     const assigned = await createClient(owner.cookie, org.id);
     const unassigned = await createClient(owner.cookie, org.id);
@@ -133,7 +126,7 @@ describe("Phase 9 messaging and documents", () => {
     const portalOther = await connectClientPortal(ctx, owner.cookie, org.id, unassigned.body);
 
     const shared = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${assigned.body.id}/documents`)
+      .post(`/api/v1/dietitian/${org.id}/clients/${assigned.body.id}/documents`)
       .set("Cookie", owner.cookie)
       .attach("file", PDF_BUFFER, { filename: "plan.pdf", contentType: "application/pdf" })
       .field("visibility", "SHARED")
@@ -150,13 +143,13 @@ describe("Phase 9 messaging and documents", () => {
       .expect(404);
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/clients/${unassigned.body.id}/conversation/messages`)
+      .get(`/api/v1/dietitian/${org.id}/clients/${unassigned.body.id}/conversation/messages`)
       .set("Cookie", outsider.cookie)
       .expect(403)
-      .expect((res) => expect(res.body.message).toBe(ORGANIZATION_ACCESS_DENIED));
+      .expect((res) => expect(res.body.message).toBe(DIETITIAN_ACCESS_DENIED));
 
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${assigned.body.id}/conversation/messages`)
+      .post(`/api/v1/dietitian/${org.id}/clients/${assigned.body.id}/conversation/messages`)
       .set("Cookie", owner.cookie)
       .send({ body: "Follow up on labs" })
       .expect(201);
@@ -175,20 +168,20 @@ describe("Phase 9 messaging and documents", () => {
     const portal = await connectClientPortal(ctx, owner.cookie, org.id, client.body);
 
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${client.body.id}/documents`)
+      .post(`/api/v1/dietitian/${org.id}/clients/${client.body.id}/documents`)
       .set("Cookie", owner.cookie)
       .attach("file", Buffer.from("not a real pdf"), { filename: "bad.pdf", contentType: "application/pdf" })
       .expect(415);
 
     const doc = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${client.body.id}/documents`)
+      .post(`/api/v1/dietitian/${org.id}/clients/${client.body.id}/documents`)
       .set("Cookie", owner.cookie)
       .attach("file", PDF_BUFFER, { filename: "shared.pdf", contentType: "application/pdf" })
       .field("visibility", "SHARED")
       .expect(201);
 
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${client.body.id}/documents/${doc.body.id}/archive`)
+      .post(`/api/v1/dietitian/${org.id}/clients/${client.body.id}/documents/${doc.body.id}/archive`)
       .set("Cookie", owner.cookie)
       .expect(201);
 
@@ -198,7 +191,7 @@ describe("Phase 9 messaging and documents", () => {
       .expect(404);
 
     const timeline = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/clients/${client.body.id}/timeline`)
+      .get(`/api/v1/dietitian/${org.id}/clients/${client.body.id}/timeline`)
       .set("Cookie", owner.cookie)
       .expect(200);
     const types = timeline.body.map((row: { type: string }) => row.type);

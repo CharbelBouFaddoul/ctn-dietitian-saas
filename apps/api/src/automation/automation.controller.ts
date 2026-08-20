@@ -20,9 +20,9 @@ import {
 } from "class-validator";
 import type { AutomationActionType, AutomationTriggerType } from "@prisma/client";
 import { SessionGuard } from "../auth/guards/session.guard";
-import { CurrentTenant } from "../organizations/decorators/current-tenant.decorator";
-import { TenantGuard } from "../organizations/guards/tenant.guard";
-import type { TenantContext } from "../organizations/tenant.types";
+import { CurrentTenant } from "../dietitian/decorators/current-tenant.decorator";
+import { DietitianGuard } from "../dietitian/guards/dietitian.guard";
+import type { DietitianTenantContext } from "../dietitian/dietitian.types";
 import { AutomationService } from "./automation.service";
 
 class CreateAutomationDto {
@@ -121,29 +121,29 @@ class UpdateAutomationDto {
 
 @ApiTags("automations")
 @ApiCookieAuth()
-@UseGuards(SessionGuard, TenantGuard)
-@Controller("api/v1/organizations/:organizationId/automations")
+@UseGuards(SessionGuard, DietitianGuard)
+@Controller("api/v1/dietitian/:dietitianAccountId/automations")
 export class AutomationsController {
   constructor(private readonly automation: AutomationService) {}
 
   @Get()
-  list(@CurrentTenant() tenant: TenantContext) {
+  list(@CurrentTenant() tenant: DietitianTenantContext) {
     return this.automation.list(tenant);
   }
 
   @Get("usage/summary")
-  usage(@CurrentTenant() tenant: TenantContext) {
+  usage(@CurrentTenant() tenant: DietitianTenantContext) {
     return this.automation.getUsage(tenant);
   }
 
   @Post()
-  create(@CurrentTenant() tenant: TenantContext, @Body() body: CreateAutomationDto) {
+  create(@CurrentTenant() tenant: DietitianTenantContext, @Body() body: CreateAutomationDto) {
     return this.automation.create(tenant, body);
   }
 
   @Get(":automationId")
   get(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("automationId", ParseUUIDPipe) automationId: string,
   ) {
     return this.automation.get(tenant, automationId);
@@ -151,7 +151,7 @@ export class AutomationsController {
 
   @Patch(":automationId")
   update(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("automationId", ParseUUIDPipe) automationId: string,
     @Body() body: UpdateAutomationDto,
   ) {
@@ -160,7 +160,7 @@ export class AutomationsController {
 
   @Post(":automationId/activate")
   activate(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("automationId", ParseUUIDPipe) automationId: string,
   ) {
     return this.automation.activate(tenant, automationId);
@@ -168,7 +168,7 @@ export class AutomationsController {
 
   @Post(":automationId/pause")
   pause(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("automationId", ParseUUIDPipe) automationId: string,
   ) {
     return this.automation.pause(tenant, automationId);
@@ -176,7 +176,7 @@ export class AutomationsController {
 
   @Post(":automationId/archive")
   archive(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("automationId", ParseUUIDPipe) automationId: string,
   ) {
     return this.automation.archive(tenant, automationId);
@@ -184,7 +184,7 @@ export class AutomationsController {
 
   @Get(":automationId/runs")
   listRuleRuns(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("automationId", ParseUUIDPipe) automationId: string,
     @Query("limit") limit?: string,
   ) {
@@ -194,13 +194,13 @@ export class AutomationsController {
 
 @ApiTags("automations")
 @ApiCookieAuth()
-@UseGuards(SessionGuard, TenantGuard)
-@Controller("api/v1/organizations/:organizationId/automation-runs")
+@UseGuards(SessionGuard, DietitianGuard)
+@Controller("api/v1/dietitian/:dietitianAccountId/automation-runs")
 export class AutomationRunsController {
   constructor(private readonly automation: AutomationService) {}
 
   @Get()
-  list(@CurrentTenant() tenant: TenantContext, @Query("limit") limit?: string) {
+  list(@CurrentTenant() tenant: DietitianTenantContext, @Query("limit") limit?: string) {
     return this.automation.listRuns(tenant, limit ? Number(limit) : 50);
   }
 }

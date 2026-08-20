@@ -48,7 +48,7 @@ export default function AdminHomePage() {
       setLoading(true);
       try {
         const [orgList, userList, subList] = await Promise.all([
-          api<ListResponse | unknown[]>("/api/v1/admin/organizations"),
+          api<ListResponse | unknown[]>("/api/v1/admin/dietitians"),
           api<ListResponse | unknown[]>("/api/v1/admin/users"),
           api<ListResponse | unknown[]>("/api/v1/admin/subscriptions"),
         ]);
@@ -94,7 +94,7 @@ export default function AdminHomePage() {
             <div className="ui-admin-metric">
               <span className="ui-admin-metric__label">Organizations</span>
               <strong className="ui-admin-metric__value">{orgs ?? "—"}</strong>
-              <Link href="/admin/organizations" className="ui-link" style={{ fontSize: 13 }}>
+              <Link href="/admin/dietitians" className="ui-link" style={{ fontSize: 13 }}>
                 Manage
               </Link>
             </div>

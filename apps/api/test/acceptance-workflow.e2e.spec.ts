@@ -1,7 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import { FEATURE_KEYS } from "@nutrition-saas/config";
-import { PLATFORM_ASSESSMENT_TEMPLATE_ID } from "../src/assessments/platform-template.seed";
 import {
   connectClientPortal,
   cookieValue,
@@ -103,78 +102,84 @@ describe("§87 end-to-end acceptance workflow", () => {
 
     const dietitian = await registerVerifyLogin(nextEmail("dietitian"));
     const org = await request(ctx.app.getHttpServer())
-      .post("/api/v1/organizations")
+      .post("/api/v1/dietitian")
       .set("Cookie", dietitian.cookie)
       .send({ name: "Pro Practice", settings: SETTINGS })
       .expect(201);
     const proPlan = await ctx.prisma.plan.findUniqueOrThrow({ where: { slug: "pro" } });
     await request(ctx.app.getHttpServer())
-      .put(`/api/v1/admin/organizations/${org.body.id}/subscription`)
+      .put(`/api/v1/admin/dietitians/${org.body.id}/subscription`)
       .set("Cookie", admin.cookie)
       .send({ planId: proPlan.id })
       .expect(200);
     expect(await ctx.entitlements.can(org.body.id, FEATURE_KEYS.AI)).toBe(true);
 
     const client = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.body.id}/clients`)
+      .post(`/api/v1/dietitian/${org.body.id}/clients`)
       .set("Cookie", dietitian.cookie)
       .send({ firstName: "Alex", lastName: "Client", email: nextEmail("client") })
       .expect(201);
 
     const clientCookie = await connectClientPortal(ctx, dietitian.cookie, org.body.id, client.body);
 
-    const assessment = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.body.id}/clients/${client.body.id}/assessments`)
+    const template = await request(ctx.app.getHttpServer())
+      .post(`/api/v1/dietitian/${org.body.id}/assessment-templates`)
       .set("Cookie", dietitian.cookie)
-      .send({ templateId: PLATFORM_ASSESSMENT_TEMPLATE_ID })
+      .send({ name: "Intake", schema: { sections: [] } })
+      .expect(201);
+
+    const assessment = await request(ctx.app.getHttpServer())
+      .post(`/api/v1/dietitian/${org.body.id}/clients/${client.body.id}/assessments`)
+      .set("Cookie", dietitian.cookie)
+      .send({ templateId: template.body.id })
       .expect(201);
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.body.id}/clients/${client.body.id}/assessments/${assessment.body.id}/complete`)
+      .post(`/api/v1/dietitian/${org.body.id}/clients/${client.body.id}/assessments/${assessment.body.id}/complete`)
       .set("Cookie", dietitian.cookie)
       .send({ responses: { goal: "energy" } })
       .expect(201);
 
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.body.id}/clients/${client.body.id}/measurements`)
+      .post(`/api/v1/dietitian/${org.body.id}/clients/${client.body.id}/measurements`)
       .set("Cookie", dietitian.cookie)
       .send({ type: "WEIGHT", value: 72.5, unit: "kg", measuredAt: new Date().toISOString() })
       .expect(201);
 
     const food = await seedFood();
     await request(ctx.app.getHttpServer())
-      .put(`/api/v1/organizations/${org.body.id}/foods/${food.id}/override`)
+      .put(`/api/v1/dietitian/${org.body.id}/foods/${food.id}/override`)
       .set("Cookie", dietitian.cookie)
       .send({ energyKcal: 170 })
       .expect(200);
 
     const plan = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.body.id}/meal-plans`)
+      .post(`/api/v1/dietitian/${org.body.id}/meal-plans`)
       .set("Cookie", dietitian.cookie)
       .send({ clientId: client.body.id, name: "Week 1" })
       .expect(201);
     const draftId = plan.body.versions[0].id as string;
     const draft = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.body.id}/meal-plans/${plan.body.id}/versions/${draftId}`)
+      .get(`/api/v1/dietitian/${org.body.id}/meal-plans/${plan.body.id}/versions/${draftId}`)
       .set("Cookie", dietitian.cookie)
       .expect(200);
     const breakfast = draft.body.snapshot.days[0].meals[0];
     await request(ctx.app.getHttpServer())
       .post(
-        `/api/v1/organizations/${org.body.id}/meal-plans/${plan.body.id}/versions/${draftId}/meals/${breakfast.id}/items`,
+        `/api/v1/dietitian/${org.body.id}/meal-plans/${plan.body.id}/versions/${draftId}/meals/${breakfast.id}/items`,
       )
       .set("Cookie", dietitian.cookie)
       .send({ itemType: "FOOD", foodId: food.id, quantity: 120, unit: "g" })
       .expect(201);
 
     const ai = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.body.id}/clients/${client.body.id}/ai/client-summary`)
+      .post(`/api/v1/dietitian/${org.body.id}/clients/${client.body.id}/ai/client-summary`)
       .set("Cookie", dietitian.cookie)
       .send({ prompt: "Summarize client readiness" })
       .expect(201);
     expect(ai.body.result.overview).toBeTruthy();
 
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.body.id}/meal-plans/${plan.body.id}/versions/${draftId}/publish`)
+      .post(`/api/v1/dietitian/${org.body.id}/meal-plans/${plan.body.id}/versions/${draftId}/publish`)
       .set("Cookie", dietitian.cookie)
       .expect(201);
 
@@ -195,19 +200,19 @@ describe("§87 end-to-end acceptance workflow", () => {
       .send({ amount: 500, unit: "ml", loggedAt: new Date().toISOString() })
       .expect(201);
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.body.id}/clients/${client.body.id}/measurements`)
+      .post(`/api/v1/dietitian/${org.body.id}/clients/${client.body.id}/measurements`)
       .set("Cookie", dietitian.cookie)
       .send({ type: "WEIGHT", value: 72.2, unit: "kg", measuredAt: new Date().toISOString() })
       .expect(201);
 
     const progress = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.body.id}/clients/${client.body.id}/tracking/summary`)
+      .get(`/api/v1/dietitian/${org.body.id}/clients/${client.body.id}/tracking/summary`)
       .set("Cookie", dietitian.cookie)
       .expect(200);
     expect(progress.body.food.logCount).toBeGreaterThan(0);
 
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.body.id}/clients/${client.body.id}/conversation/messages`)
+      .post(`/api/v1/dietitian/${org.body.id}/clients/${client.body.id}/conversation/messages`)
       .set("Cookie", dietitian.cookie)
       .send({ body: "Great progress this week." })
       .expect(201);
@@ -215,37 +220,37 @@ describe("§87 end-to-end acceptance workflow", () => {
     const startAt = new Date(Date.now() + 86_400_000).toISOString();
     const endAt = new Date(Date.now() + 86_400_000 + 45 * 60_000).toISOString();
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.body.id}/clients/${client.body.id}/appointments`)
+      .post(`/api/v1/dietitian/${org.body.id}/clients/${client.body.id}/appointments`)
       .set("Cookie", dietitian.cookie)
       .send({ title: "Follow-up visit", startAt, endAt })
       .expect(201);
 
     const invoice = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.body.id}/clients/${client.body.id}/invoices`)
+      .post(`/api/v1/dietitian/${org.body.id}/clients/${client.body.id}/invoices`)
       .set("Cookie", dietitian.cookie)
       .send({
         items: [{ description: "Consultation", quantity: 1, unitPrice: 80 }],
       })
       .expect(201);
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.body.id}/invoices/${invoice.body.id}/issue`)
+      .post(`/api/v1/dietitian/${org.body.id}/invoices/${invoice.body.id}/issue`)
       .set("Cookie", dietitian.cookie)
       .expect(201);
 
     const timeline = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.body.id}/clients/${client.body.id}/timeline`)
+      .get(`/api/v1/dietitian/${org.body.id}/clients/${client.body.id}/timeline`)
       .set("Cookie", dietitian.cookie)
       .expect(200);
     expect(timeline.body.length).toBeGreaterThan(0);
 
     const auditCount = await ctx.prisma.auditLog.count({
-      where: { organizationId: org.body.id },
+      where: { dietitianAccountId: org.body.id },
     });
     expect(auditCount).toBeGreaterThan(0);
 
     const other = await registerVerifyLogin();
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.body.id}/clients/${client.body.id}`)
+      .get(`/api/v1/dietitian/${org.body.id}/clients/${client.body.id}`)
       .set("Cookie", other.cookie)
       .expect(403);
   });

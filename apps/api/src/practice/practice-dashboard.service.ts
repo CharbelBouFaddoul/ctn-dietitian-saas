@@ -1,11 +1,11 @@
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
-import type { TenantContext } from "../organizations/tenant.types";
+import type { DietitianTenantContext } from "../dietitian/dietitian.types";
 import { ClientAccessService } from "../clients/client-access.service";
 import { AnalyticsService } from "../analytics/analytics.service";
 import { ConversationService } from "../messaging/conversation.service";
 import { NotificationService } from "../notifications/notification.service";
-import { tenantWhere } from "../organizations/tenant-scope";
+import { tenantWhere } from "../dietitian/tenant-scope";
 
 @Injectable()
 export class PracticeDashboardService {
@@ -17,7 +17,7 @@ export class PracticeDashboardService {
     private readonly notifications: NotificationService,
   ) {}
 
-  async get(tenant: TenantContext) {
+  async get(tenant: DietitianTenantContext) {
     const visible = this.access.visibleWhere(tenant);
     const now = new Date();
     const startOfToday = new Date(now);
@@ -43,7 +43,7 @@ export class PracticeDashboardService {
       this.prisma.client.count({ where: { ...visible, status: "ACTIVE" } }),
       this.prisma.appointment.findMany({
         where: {
-          ...tenantWhere(tenant.organizationId),
+          ...tenantWhere(tenant.dietitianAccountId),
           status: "SCHEDULED",
           startAt: { gte: startOfToday, lte: endOfToday },
           client: visible,
@@ -54,7 +54,7 @@ export class PracticeDashboardService {
       }),
       this.prisma.appointment.findMany({
         where: {
-          ...tenantWhere(tenant.organizationId),
+          ...tenantWhere(tenant.dietitianAccountId),
           status: "SCHEDULED",
           startAt: { gt: endOfToday },
           client: visible,
@@ -64,14 +64,14 @@ export class PracticeDashboardService {
         take: 8,
       }),
       this.prisma.timelineEvent.findMany({
-        where: { ...tenantWhere(tenant.organizationId), client: visible },
+        where: { ...tenantWhere(tenant.dietitianAccountId), client: visible },
         include: { client: true },
         orderBy: { occurredAt: "desc" },
         take: 10,
       }),
       this.prisma.task.count({
         where: {
-          ...tenantWhere(tenant.organizationId),
+          ...tenantWhere(tenant.dietitianAccountId),
           archivedAt: null,
           assignedUserId: tenant.userId,
           status: { in: ["TODO", "IN_PROGRESS"] },
@@ -79,7 +79,7 @@ export class PracticeDashboardService {
       }),
       this.prisma.task.count({
         where: {
-          ...tenantWhere(tenant.organizationId),
+          ...tenantWhere(tenant.dietitianAccountId),
           archivedAt: null,
           assignedUserId: tenant.userId,
           status: { in: ["TODO", "IN_PROGRESS"] },
@@ -93,7 +93,7 @@ export class PracticeDashboardService {
     ]);
 
     const inbox = await this.conversations.listInbox(
-      tenant.organizationId,
+      tenant.dietitianAccountId,
       visibleClients.map((row) => row.id),
     );
     const topConversations = inbox.slice(0, 5);
@@ -102,8 +102,8 @@ export class PracticeDashboardService {
       topConversations.map((row) => row.id),
     );
     const [recentNotifications, unreadNotificationCount] = await Promise.all([
-      this.notifications.listRecentPreferUnread(tenant.userId, tenant.organizationId, 5),
-      this.notifications.unreadCount(tenant.userId, tenant.organizationId),
+      this.notifications.listRecentPreferUnread(tenant.userId, tenant.dietitianAccountId, 5),
+      this.notifications.unreadCount(tenant.userId, tenant.dietitianAccountId),
     ]);
 
     const mapAppointment = (row: (typeof todayAppointments)[number]) => ({

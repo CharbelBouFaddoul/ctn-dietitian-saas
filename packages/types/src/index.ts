@@ -41,13 +41,9 @@ export type HeightUnit = "cm" | "in";
 export type DateFormat = "YYYY_MM_DD" | "DD_MM_YYYY" | "MM_DD_YYYY";
 
 export interface TenantContextView {
-  organizationId: string;
-  organizationName: string;
-  organizationStatus: OrganizationStatus;
-  /** Synthetic: DietitianAccount.id (API compatibility; not used for auth). */
-  membershipId: string;
-  /** Synthetic: always OWNER (API compatibility; not used for auth). */
-  role: OrganizationRole;
+  dietitianAccountId: string;
+  displayName: string;
+  accountStatus: OrganizationStatus;
 }
 
 export interface PublicOrganization {
@@ -55,8 +51,6 @@ export interface PublicOrganization {
   name: string;
   slug: string;
   status: OrganizationStatus;
-  role: OrganizationRole;
-  membershipStatus: MembershipStatus;
   createdAt: string;
 }
 

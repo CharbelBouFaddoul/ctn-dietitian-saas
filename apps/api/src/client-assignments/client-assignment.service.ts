@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
-import type { TenantContext } from "../organizations/tenant.types";
+import type { DietitianTenantContext } from "../dietitian/dietitian.types";
 import { ClientAccessService } from "../clients/client-access.service";
 import { MULTI_MEMBER_UNSUPPORTED } from "../organizations/organization.service";
 
@@ -11,10 +11,10 @@ export class ClientAssignmentService {
     private readonly access: ClientAccessService,
   ) {}
 
-  async list(tenant: TenantContext, clientId: string) {
+  async list(tenant: DietitianTenantContext, clientId: string) {
     await this.access.assertCanAccess(tenant, clientId, "read");
     const account = await this.prisma.dietitianAccount.findUnique({
-      where: { id: tenant.organizationId },
+      where: { id: tenant.dietitianAccountId },
       include: { user: true },
     });
     if (!account) {
@@ -32,7 +32,7 @@ export class ClientAssignmentService {
     ];
   }
 
-  async assign(_tenant: TenantContext, _clientId: string, _organizationMemberId: string) {
+  async assign(_tenant: DietitianTenantContext, _clientId: string, _organizationMemberId: string) {
     throw new BadRequestException(MULTI_MEMBER_UNSUPPORTED);
   }
 }

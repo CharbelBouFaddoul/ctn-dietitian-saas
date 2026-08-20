@@ -16,7 +16,7 @@ export interface NotificationItem {
 }
 
 type Mode =
-  | { kind: "practice"; organizationId: string }
+  | { kind: "practice"; dietitianAccountId: string }
   | { kind: "portal" };
 
 const POLL_MS = 45_000;
@@ -56,11 +56,11 @@ export function useNotifications(mode: Mode, enabled = true) {
   const [loading, setLoading] = useState(false);
   const base =
     mode.kind === "practice"
-      ? `/api/v1/organizations/${mode.organizationId}/notifications`
+      ? `/api/v1/dietitian/${mode.dietitianAccountId}/notifications`
       : "/api/v1/portal/notifications";
   const listHref =
     mode.kind === "practice"
-      ? `/practice/${mode.organizationId}/notifications`
+      ? `/practice/${mode.dietitianAccountId}/notifications`
       : "/client/notifications";
 
   const refresh = useCallback(async () => {

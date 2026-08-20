@@ -61,7 +61,6 @@ export class AutomationUsageService {
           where: { dietitianAccountId_periodKey: { dietitianAccountId, periodKey } },
           create: {
             dietitianAccountId,
-            organizationId: dietitianAccountId,
             periodKey,
             executionCount: 1,
           },

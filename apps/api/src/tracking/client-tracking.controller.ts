@@ -3,9 +3,9 @@ import { ApiCookieAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { localDateKey } from "@nutrition-saas/utilities";
 import { SessionGuard } from "../auth/guards/session.guard";
 import { ClientAccessService } from "../clients/client-access.service";
-import { CurrentTenant } from "../organizations/decorators/current-tenant.decorator";
-import { TenantGuard } from "../organizations/guards/tenant.guard";
-import type { TenantContext } from "../organizations/tenant.types";
+import { CurrentTenant } from "../dietitian/decorators/current-tenant.decorator";
+import { DietitianGuard } from "../dietitian/guards/dietitian.guard";
+import type { DietitianTenantContext } from "../dietitian/dietitian.types";
 import { TrackingDateQueryDto } from "./dto/tracking.dto";
 import { FoodLogService, TrackingTimezoneService } from "./food-log.service";
 import { TrackingSummaryService } from "./tracking-summary.service";
@@ -18,8 +18,8 @@ import {
 
 @ApiTags("client-tracking")
 @ApiCookieAuth()
-@UseGuards(SessionGuard, TenantGuard)
-@Controller("api/v1/organizations/:organizationId/clients/:clientId/tracking")
+@UseGuards(SessionGuard, DietitianGuard)
+@Controller("api/v1/dietitian/:dietitianAccountId/clients/:clientId/tracking")
 export class ClientTrackingController {
   constructor(
     private readonly access: ClientAccessService,
@@ -35,7 +35,7 @@ export class ClientTrackingController {
   @Get("summary")
   @ApiOperation({ summary: "Daily tracking summary for a client (read-only)" })
   async getSummary(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("clientId", ParseUUIDPipe) clientId: string,
     @Query() query: TrackingDateQueryDto,
   ) {
@@ -46,7 +46,7 @@ export class ClientTrackingController {
 
   @Get("food-logs")
   async listFood(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("clientId", ParseUUIDPipe) clientId: string,
     @Query() query: TrackingDateQueryDto,
   ) {
@@ -56,7 +56,7 @@ export class ClientTrackingController {
 
   @Get("water-logs")
   async listWater(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("clientId", ParseUUIDPipe) clientId: string,
     @Query() query: TrackingDateQueryDto,
   ) {
@@ -66,7 +66,7 @@ export class ClientTrackingController {
 
   @Get("exercise-logs")
   async listExercise(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("clientId", ParseUUIDPipe) clientId: string,
     @Query() query: TrackingDateQueryDto,
   ) {
@@ -76,7 +76,7 @@ export class ClientTrackingController {
 
   @Get("sleep")
   async getSleep(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("clientId", ParseUUIDPipe) clientId: string,
     @Query() query: TrackingDateQueryDto,
   ) {
@@ -86,7 +86,7 @@ export class ClientTrackingController {
 
   @Get("habits")
   async listHabits(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("clientId", ParseUUIDPipe) clientId: string,
     @Query() query: TrackingDateQueryDto,
   ) {

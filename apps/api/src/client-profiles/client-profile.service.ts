@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { SecurityEventLogger } from "../auth/security-event.logger";
-import type { TenantContext } from "../organizations/tenant.types";
+import type { DietitianTenantContext } from "../dietitian/dietitian.types";
 import { ClientAccessService } from "../clients/client-access.service";
 import { CLIENT_ACCESS_DENIED } from "../clients/client.messages";
 
@@ -25,7 +25,7 @@ export class ClientProfileService {
     private readonly security: SecurityEventLogger,
   ) {}
 
-  async get(tenant: TenantContext, clientId: string) {
+  async get(tenant: DietitianTenantContext, clientId: string) {
     await this.access.assertCanAccess(tenant, clientId, "read");
     const profile = await this.prisma.clientProfile.findUnique({ where: { clientId } });
     if (!profile) {
@@ -34,7 +34,7 @@ export class ClientProfileService {
     return profile;
   }
 
-  async update(tenant: TenantContext, clientId: string, input: ProfileInput) {
+  async update(tenant: DietitianTenantContext, clientId: string, input: ProfileInput) {
     await this.access.assertCanAccess(tenant, clientId, "update");
     const profile = await this.prisma.clientProfile.update({
       where: { clientId },
@@ -54,8 +54,7 @@ export class ClientProfileService {
       type: "client_profile_updated",
       outcome: "success",
       userId: tenant.userId,
-      organizationId: tenant.organizationId,
-      dietitianAccountId: tenant.organizationId,
+      dietitianAccountId: tenant.dietitianAccountId,
       targetType: "client",
       targetId: clientId,
     });

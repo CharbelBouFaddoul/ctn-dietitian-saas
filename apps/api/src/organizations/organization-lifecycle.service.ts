@@ -4,6 +4,9 @@ import { PrismaService } from "../prisma/prisma.service";
 import { SecurityEventLogger } from "../auth/security-event.logger";
 import { ORGANIZATION_UNAVAILABLE } from "./tenant.types";
 
+/**
+ * @deprecated Prefer DietitianLifecycleService. Kept for test harness compatibility.
+ */
 @Injectable()
 export class OrganizationLifecycleService {
   constructor(
@@ -37,21 +40,9 @@ export class OrganizationLifecycleService {
       data,
     });
 
-    if (account.legacyOrganizationId) {
-      await this.prisma.organization.updateMany({
-        where: { id: account.legacyOrganizationId },
-        data: {
-          status,
-          archivedAt: data.archivedAt,
-          suspendedAt: data.suspendedAt,
-        },
-      });
-    }
-
     await this.security.record({
-      type: "organization_status_changed",
+      type: "dietitian_account_status_changed",
       outcome: "success",
-      organizationId: dietitianAccountId,
       dietitianAccountId,
       userId: actorUserId,
       reason: status,

@@ -10,8 +10,7 @@ import {
   resetAuthDatabase,
   type AuthTestContext,
 } from "./app";
-import { MULTI_MEMBER_UNSUPPORTED } from "../src/organizations/organization.service";
-import { ORGANIZATION_ACCESS_DENIED } from "../src/organizations/tenant.types";
+import { DIETITIAN_ACCESS_DENIED } from "../src/dietitian/dietitian.types";
 
 const PASSWORD = "ValidPass12";
 const SETTINGS = {
@@ -61,7 +60,7 @@ describe("Phase 10 invoices, tasks, and analytics", () => {
 
   async function createOrg(cookie: string, name: string) {
     const created = await request(ctx.app.getHttpServer())
-      .post("/api/v1/organizations")
+      .post("/api/v1/dietitian")
       .set("Cookie", cookie)
       .send({ name, settings: SETTINGS })
       .expect(201);
@@ -71,7 +70,7 @@ describe("Phase 10 invoices, tasks, and analytics", () => {
 
   async function createClient(cookie: string, organizationId: string, body: Record<string, unknown> = {}) {
     return request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${organizationId}/clients`)
+      .post(`/api/v1/dietitian/${organizationId}/clients`)
       .set("Cookie", cookie)
       .send({ firstName: "Pat", lastName: "Client", email: email("client"), ...body });
   }
@@ -83,7 +82,7 @@ describe("Phase 10 invoices, tasks, and analytics", () => {
     const portal = await connectClientPortal(ctx, owner.cookie, org.id, client.body);
 
     const draft = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${client.body.id}/invoices`)
+      .post(`/api/v1/dietitian/${org.id}/clients/${client.body.id}/invoices`)
       .set("Cookie", owner.cookie)
       .send({
         items: [
@@ -103,14 +102,14 @@ describe("Phase 10 invoices, tasks, and analytics", () => {
       .expect((res) => expect(res.body).toHaveLength(0));
 
     const issued = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/invoices/${draft.body.id}/issue`)
+      .post(`/api/v1/dietitian/${org.id}/invoices/${draft.body.id}/issue`)
       .set("Cookie", owner.cookie)
       .expect(201);
 
     expect(issued.body.invoiceNumber).toBe("INV-000001");
 
     const secondDraft = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/invoices`)
+      .post(`/api/v1/dietitian/${org.id}/invoices`)
       .set("Cookie", owner.cookie)
       .send({
         clientId: client.body.id,
@@ -119,14 +118,14 @@ describe("Phase 10 invoices, tasks, and analytics", () => {
       .expect(201);
 
     const secondIssued = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/invoices/${secondDraft.body.id}/issue`)
+      .post(`/api/v1/dietitian/${org.id}/invoices/${secondDraft.body.id}/issue`)
       .set("Cookie", owner.cookie)
       .expect(201);
 
     expect(secondIssued.body.invoiceNumber).toBe("INV-000002");
 
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/invoices/${issued.body.id}/send`)
+      .post(`/api/v1/dietitian/${org.id}/invoices/${issued.body.id}/send`)
       .set("Cookie", owner.cookie)
       .expect(201);
 
@@ -137,13 +136,13 @@ describe("Phase 10 invoices, tasks, and analytics", () => {
     expect(portalList.body.some((row: { id: string }) => row.id === issued.body.id)).toBe(true);
 
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/invoices/${issued.body.id}/pay`)
+      .post(`/api/v1/dietitian/${org.id}/invoices/${issued.body.id}/pay`)
       .set("Cookie", owner.cookie)
       .expect(201)
       .expect((res) => expect(res.body.status).toBe("PAID"));
 
     await request(ctx.app.getHttpServer())
-      .patch(`/api/v1/organizations/${org.id}/invoices/${issued.body.id}`)
+      .patch(`/api/v1/dietitian/${org.id}/invoices/${issued.body.id}`)
       .set("Cookie", owner.cookie)
       .send({ notes: "Should fail" })
       .expect(400);
@@ -155,47 +154,41 @@ describe("Phase 10 invoices, tasks, and analytics", () => {
     const outsider = await registerVerifyLogin();
     const orgA = await createOrg(ownerA.cookie, "Org A");
     const orgB = await createOrg(ownerB.cookie, "Org B");
-    const add = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${orgA.id}/members`)
-      .set("Cookie", ownerA.cookie)
-      .send({ email: outsider.address, role: "DIETITIAN" });
-    expect(add.status).toBe(400);
-    expect(add.body.message).toBe(MULTI_MEMBER_UNSUPPORTED);
 
     const clientA = await createClient(ownerA.cookie, orgA.id);
     const clientB = await createClient(ownerB.cookie, orgB.id);
 
     const invoiceA = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${orgA.id}/clients/${clientA.body.id}/invoices`)
+      .post(`/api/v1/dietitian/${orgA.id}/clients/${clientA.body.id}/invoices`)
       .set("Cookie", ownerA.cookie)
       .send({ items: [{ description: "Service", quantity: 1, unitPrice: 10 }] })
       .expect(201);
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${orgB.id}/invoices/${invoiceA.body.id}`)
+      .get(`/api/v1/dietitian/${orgB.id}/invoices/${invoiceA.body.id}`)
       .set("Cookie", ownerB.cookie)
       .expect(404);
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${orgA.id}/clients/${clientB.body.id}/invoices`)
+      .get(`/api/v1/dietitian/${orgA.id}/clients/${clientB.body.id}/invoices`)
       .set("Cookie", ownerA.cookie)
       .expect(403)
       .expect((res) => expect(res.body.message).toBe(CLIENT_ACCESS_DENIED));
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${orgA.id}/clients/${clientA.body.id}/invoices`)
+      .get(`/api/v1/dietitian/${orgA.id}/clients/${clientA.body.id}/invoices`)
       .set("Cookie", outsider.cookie)
       .expect(403)
-      .expect((res) => expect(res.body.message).toBe(ORGANIZATION_ACCESS_DENIED));
+      .expect((res) => expect(res.body.message).toBe(DIETITIAN_ACCESS_DENIED));
 
     const task = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${orgA.id}/tasks`)
+      .post(`/api/v1/dietitian/${orgA.id}/tasks`)
       .set("Cookie", ownerA.cookie)
       .send({ title: "Call client", clientId: clientA.body.id })
       .expect(201);
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${orgB.id}/tasks/${task.body.id}`)
+      .get(`/api/v1/dietitian/${orgB.id}/tasks/${task.body.id}`)
       .set("Cookie", ownerB.cookie)
       .expect(404);
   });
@@ -209,29 +202,29 @@ describe("Phase 10 invoices, tasks, and analytics", () => {
     await createClient(ownerB.cookie, orgB.id);
 
     const draft = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${orgA.id}/clients/${clientA.body.id}/invoices`)
+      .post(`/api/v1/dietitian/${orgA.id}/clients/${clientA.body.id}/invoices`)
       .set("Cookie", ownerA.cookie)
       .send({ items: [{ description: "Session", quantity: 1, unitPrice: 120 }] })
       .expect(201);
 
     const issued = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${orgA.id}/invoices/${draft.body.id}/issue`)
+      .post(`/api/v1/dietitian/${orgA.id}/invoices/${draft.body.id}/issue`)
       .set("Cookie", ownerA.cookie)
       .expect(201);
 
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${orgA.id}/invoices/${issued.body.id}/pay`)
+      .post(`/api/v1/dietitian/${orgA.id}/invoices/${issued.body.id}/pay`)
       .set("Cookie", ownerA.cookie)
       .expect(201);
 
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${orgA.id}/tasks`)
+      .post(`/api/v1/dietitian/${orgA.id}/tasks`)
       .set("Cookie", ownerA.cookie)
       .send({ title: "Prepare report", clientId: clientA.body.id })
       .expect(201);
 
     const overviewA = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${orgA.id}/analytics/overview?period=this_month`)
+      .get(`/api/v1/dietitian/${orgA.id}/analytics/overview?period=this_month`)
       .set("Cookie", ownerA.cookie)
       .expect(200);
 
@@ -239,7 +232,7 @@ describe("Phase 10 invoices, tasks, and analytics", () => {
     expect(overviewA.body.paidAmount).toBeGreaterThanOrEqual(120);
 
     const overviewB = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${orgB.id}/analytics/overview?period=this_month`)
+      .get(`/api/v1/dietitian/${orgB.id}/analytics/overview?period=this_month`)
       .set("Cookie", ownerB.cookie)
       .expect(200);
 

@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import { FEATURE_KEYS } from "@nutrition-saas/config";
-import { ORGANIZATION_ACCESS_DENIED } from "../src/organizations/tenant.types";
+import { DIETITIAN_ACCESS_DENIED } from "../src/dietitian/dietitian.types";
 import {
   activateStandardSubscription,
   connectClientPortal,
@@ -11,7 +11,6 @@ import {
   resetAuthDatabase,
   type AuthTestContext,
 } from "./app";
-import { MULTI_MEMBER_UNSUPPORTED } from "../src/organizations/organization.service";
 
 const PASSWORD = "ValidPass12";
 const SETTINGS = {
@@ -61,7 +60,7 @@ describe("Phase 8 client tracking", () => {
 
   async function createOrg(cookie: string, name: string, timezone = "UTC") {
     const created = await request(ctx.app.getHttpServer())
-      .post("/api/v1/organizations")
+      .post("/api/v1/dietitian")
       .set("Cookie", cookie)
       .send({ name, settings: { ...SETTINGS, timezone } })
       .expect(201);
@@ -71,7 +70,7 @@ describe("Phase 8 client tracking", () => {
 
   async function createClient(cookie: string, organizationId: string, body: Record<string, unknown> = {}) {
     return request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${organizationId}/clients`)
+      .post(`/api/v1/dietitian/${organizationId}/clients`)
       .set("Cookie", cookie)
       .send({ firstName: "Pat", lastName: "Client", email: email("client"), ...body });
   }
@@ -127,7 +126,7 @@ describe("Phase 8 client tracking", () => {
     expect(created.body.nutrition.energyKcal).toBe(330);
 
     await request(ctx.app.getHttpServer())
-      .put(`/api/v1/organizations/${orgA.id}/foods/${food.id}/override`)
+      .put(`/api/v1/dietitian/${orgA.id}/foods/${food.id}/override`)
       .set("Cookie", ownerA.cookie)
       .send({ energyKcal: 180 })
       .expect(200);
@@ -146,7 +145,7 @@ describe("Phase 8 client tracking", () => {
     expect(edited.body.nutrition.energyKcal).toBe(180);
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${orgB.id}/clients/${clientB.body.id}/tracking/summary`)
+      .get(`/api/v1/dietitian/${orgB.id}/clients/${clientB.body.id}/tracking/summary`)
       .set("Cookie", ownerA.cookie)
       .expect(403);
 
@@ -161,12 +160,6 @@ describe("Phase 8 client tracking", () => {
     const owner = await registerVerifyLogin();
     const outsider = await registerVerifyLogin();
     const org = await createOrg(owner.cookie, "Practice");
-    const add = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/members`)
-      .set("Cookie", owner.cookie)
-      .send({ email: outsider.address, role: "DIETITIAN" });
-    expect(add.status).toBe(400);
-    expect(add.body.message).toBe(MULTI_MEMBER_UNSUPPORTED);
 
     const client = await createClient(owner.cookie, org.id);
     const other = await createClient(owner.cookie, org.id);
@@ -180,13 +173,13 @@ describe("Phase 8 client tracking", () => {
       .expect(201);
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/clients/${client.body.id}/tracking/summary`)
+      .get(`/api/v1/dietitian/${org.id}/clients/${client.body.id}/tracking/summary`)
       .set("Cookie", outsider.cookie)
       .expect(403)
-      .expect((res) => expect(res.body.message).toBe(ORGANIZATION_ACCESS_DENIED));
+      .expect((res) => expect(res.body.message).toBe(DIETITIAN_ACCESS_DENIED));
 
     const ownerSummary = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/clients/${client.body.id}/tracking/summary`)
+      .get(`/api/v1/dietitian/${org.id}/clients/${client.body.id}/tracking/summary`)
       .set("Cookie", owner.cookie)
       .expect(200);
     expect(ownerSummary.body.food.presented.energyKcal).toBe(248);
@@ -251,7 +244,7 @@ describe("Phase 8 client tracking", () => {
     expect(summary.body.habits.completed).toBe(1);
 
     const timeline = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/clients/${client.body.id}/timeline`)
+      .get(`/api/v1/dietitian/${org.id}/clients/${client.body.id}/timeline`)
       .set("Cookie", owner.cookie)
       .expect(200);
     const types = timeline.body.map((row: { type: string }) => row.type);

@@ -3,7 +3,7 @@ import request from "supertest";
 import { Prisma } from "@prisma/client";
 import { FEATURE_KEYS } from "@nutrition-saas/config";
 import { ADMIN_MESSAGES } from "../src/admin/admin.messages";
-import { ORGANIZATION_ACCESS_DENIED } from "../src/organizations/tenant.types";
+import { DIETITIAN_ACCESS_DENIED } from "../src/dietitian/dietitian.types";
 import {
   activateStandardSubscription,
   createAuthTestApp,
@@ -70,7 +70,7 @@ describe("platform admin, entitlements, and audit", () => {
 
   async function createOrg(cookie: string, name: string) {
     const created = await request(ctx.app.getHttpServer())
-      .post("/api/v1/organizations")
+      .post("/api/v1/dietitian")
       .set("Cookie", cookie)
       .send({ name, settings: SETTINGS })
       .expect(201);
@@ -107,25 +107,25 @@ describe("platform admin, entitlements, and audit", () => {
     expect(asUser.body.message).toBe(ADMIN_MESSAGES.forbidden);
 
     const asOwnerOrgs = await request(ctx.app.getHttpServer())
-      .get("/api/v1/admin/organizations")
+      .get("/api/v1/admin/dietitians")
       .set("Cookie", owner.cookie);
     expect(asOwnerOrgs.status).toBe(403);
   });
 
-  it("allows ADMIN to manage organizations and subscriptions, but not platform roles", async () => {
+  it("allows ADMIN to manage dietitians and subscriptions, but not platform roles", async () => {
     const admin = await makePlatformUser("ADMIN");
     const owner = await registerVerifyLogin();
     const org = await createOrg(owner.cookie, "Admin Managed");
     const pro = await planBySlug("pro");
 
     const listed = await request(ctx.app.getHttpServer())
-      .get("/api/v1/admin/organizations")
+      .get("/api/v1/admin/dietitians")
       .set("Cookie", admin.cookie)
       .expect(200);
     expect(listed.body.some((row: { id: string }) => row.id === org.id)).toBe(true);
 
     await request(ctx.app.getHttpServer())
-      .put(`/api/v1/admin/organizations/${org.id}/subscription`)
+      .put(`/api/v1/admin/dietitians/${org.id}/subscription`)
       .set("Cookie", admin.cookie)
       .send({ planId: pro.id })
       .expect(200);
@@ -158,13 +158,13 @@ describe("platform admin, entitlements, and audit", () => {
     await activateStandardSubscription(ctx.prisma, orgB.id);
 
     const cross = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${orgB.id}/entitlements`)
+      .get(`/api/v1/dietitian/${orgB.id}/entitlements`)
       .set("Cookie", a.cookie);
     expect(cross.status).toBe(403);
-    expect(cross.body.message).toBe(ORGANIZATION_ACCESS_DENIED);
+    expect(cross.body.message).toBe(DIETITIAN_ACCESS_DENIED);
 
     const own = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${orgA.id}/entitlements`)
+      .get(`/api/v1/dietitian/${orgA.id}/entitlements`)
       .set("Cookie", a.cookie)
       .expect(200);
     expect(Array.isArray(own.body)).toBe(true);
@@ -193,12 +193,12 @@ describe("platform admin, entitlements, and audit", () => {
     const premium = await planBySlug("premium");
 
     await request(ctx.app.getHttpServer())
-      .put(`/api/v1/admin/organizations/${orgA.id}/subscription`)
+      .put(`/api/v1/admin/dietitians/${orgA.id}/subscription`)
       .set("Cookie", admin.cookie)
       .send({ planId: standard.id })
       .expect(200);
     await request(ctx.app.getHttpServer())
-      .put(`/api/v1/admin/organizations/${orgB.id}/subscription`)
+      .put(`/api/v1/admin/dietitians/${orgB.id}/subscription`)
       .set("Cookie", admin.cookie)
       .send({ planId: pro.id })
       .expect(200);
@@ -208,7 +208,7 @@ describe("platform admin, entitlements, and audit", () => {
     expect(await ctx.entitlements.limit(orgB.id, FEATURE_KEYS.AI_REQUEST_LIMIT)).toBe(300);
 
     await request(ctx.app.getHttpServer())
-      .put(`/api/v1/admin/organizations/${orgA.id}/subscription`)
+      .put(`/api/v1/admin/dietitians/${orgA.id}/subscription`)
       .set("Cookie", admin.cookie)
       .send({ planId: premium.id })
       .expect(200);
@@ -218,7 +218,7 @@ describe("platform admin, entitlements, and audit", () => {
     expect(await ctx.entitlements.limit(orgB.id, FEATURE_KEYS.AI_REQUEST_LIMIT)).toBe(300);
 
     await request(ctx.app.getHttpServer())
-      .put(`/api/v1/admin/organizations/${orgA.id}/overrides/${FEATURE_KEYS.AI_REQUEST_LIMIT}`)
+      .put(`/api/v1/admin/dietitians/${orgA.id}/overrides/${FEATURE_KEYS.AI_REQUEST_LIMIT}`)
       .set("Cookie", admin.cookie)
       .send({ enabled: true, limitValue: 50, reason: "Pilot quota" })
       .expect(200);
@@ -228,7 +228,7 @@ describe("platform admin, entitlements, and audit", () => {
     expect(await ctx.entitlements.limit(orgB.id, FEATURE_KEYS.AI_REQUEST_LIMIT)).toBe(300);
 
     await request(ctx.app.getHttpServer())
-      .delete(`/api/v1/admin/organizations/${orgA.id}/overrides/${FEATURE_KEYS.AI_REQUEST_LIMIT}`)
+      .delete(`/api/v1/admin/dietitians/${orgA.id}/overrides/${FEATURE_KEYS.AI_REQUEST_LIMIT}`)
       .set("Cookie", admin.cookie)
       .expect(200);
 
@@ -243,21 +243,21 @@ describe("platform admin, entitlements, and audit", () => {
     const pro = await planBySlug("pro");
 
     await request(ctx.app.getHttpServer())
-      .put(`/api/v1/admin/organizations/${org.id}/subscription`)
+      .put(`/api/v1/admin/dietitians/${org.id}/subscription`)
       .set("Cookie", admin.cookie)
       .send({ planId: pro.id })
       .expect(200);
     expect(await ctx.entitlements.can(org.id, FEATURE_KEYS.AI)).toBe(true);
 
     await request(ctx.app.getHttpServer())
-      .patch(`/api/v1/admin/organizations/${org.id}/subscription`)
+      .patch(`/api/v1/admin/dietitians/${org.id}/subscription`)
       .set("Cookie", admin.cookie)
       .send({ status: "SUSPENDED" })
       .expect(200);
     expect(await ctx.entitlements.can(org.id, FEATURE_KEYS.AI)).toBe(false);
 
     const clientEnable = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/entitlements`)
+      .post(`/api/v1/dietitian/${org.id}/entitlements`)
       .set("Cookie", owner.cookie)
       .send({ key: FEATURE_KEYS.AI, enabled: true });
     expect(clientEnable.status).toBeGreaterThanOrEqual(400);
@@ -276,7 +276,7 @@ describe("platform admin, entitlements, and audit", () => {
     const pro = await planBySlug("pro");
 
     await request(ctx.app.getHttpServer())
-      .put(`/api/v1/admin/organizations/${org.id}/subscription`)
+      .put(`/api/v1/admin/dietitians/${org.id}/subscription`)
       .set("Cookie", admin.cookie)
       .send({ planId: pro.id })
       .expect(200);
@@ -300,13 +300,13 @@ describe("platform admin, entitlements, and audit", () => {
     const standard = await planBySlug("standard");
 
     await request(ctx.app.getHttpServer())
-      .put(`/api/v1/admin/organizations/${org.id}/subscription`)
+      .put(`/api/v1/admin/dietitians/${org.id}/subscription`)
       .set("Cookie", admin.cookie)
       .send({ planId: standard.id })
       .expect(200);
 
     const assigned = await ctx.prisma.auditLog.findFirst({
-      where: { action: "subscription_assigned", organizationId: org.id },
+      where: { action: "subscription_assigned", dietitianAccountId: org.id },
     });
     expect(assigned).toBeTruthy();
     expect(assigned?.actorUserId).toBe(admin.id);
@@ -343,7 +343,7 @@ describe("platform admin, entitlements, and audit", () => {
     const ai = await ctx.prisma.feature.findUniqueOrThrow({ where: { key: FEATURE_KEYS.AI } });
 
     await request(ctx.app.getHttpServer())
-      .put(`/api/v1/admin/organizations/${org.id}/subscription`)
+      .put(`/api/v1/admin/dietitians/${org.id}/subscription`)
       .set("Cookie", admin.cookie)
       .send({ planId: pro.id })
       .expect(200);
@@ -355,7 +355,7 @@ describe("platform admin, entitlements, and audit", () => {
       .expect(200);
 
     await request(ctx.app.getHttpServer())
-      .put(`/api/v1/admin/organizations/${org.id}/overrides/${FEATURE_KEYS.AI}`)
+      .put(`/api/v1/admin/dietitians/${org.id}/overrides/${FEATURE_KEYS.AI}`)
       .set("Cookie", admin.cookie)
       .send({ enabled: true, reason: "Should not bypass global disable" })
       .expect(200);
@@ -373,7 +373,6 @@ describe("platform admin, entitlements, and audit", () => {
     await ctx.prisma.subscription.create({
       data: {
         dietitianAccountId: org.id,
-        organizationId: org.id,
         planId: standard.id,
         status: "ACTIVE",
       },
@@ -383,7 +382,6 @@ describe("platform admin, entitlements, and audit", () => {
       ctx.prisma.subscription.create({
         data: {
           dietitianAccountId: org.id,
-          organizationId: org.id,
           planId: pro.id,
           status: "ACTIVE",
         },

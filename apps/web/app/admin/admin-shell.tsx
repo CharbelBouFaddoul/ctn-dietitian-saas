@@ -59,7 +59,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
     {
       label: "Platform",
       items: [
-        { href: "/admin/organizations", label: "Organizations", icon: AdminNavIcons.organizations },
+        { href: "/admin/dietitians", label: "Organizations", icon: AdminNavIcons.organizations },
         { href: "/admin/users", label: "Users", icon: AdminNavIcons.users },
       ],
     },

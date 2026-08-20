@@ -23,9 +23,10 @@ import type { AuthenticatedRequestUser, AuthenticatedSession } from "../auth/aut
 import { ClientAccessService } from "../clients/client-access.service";
 import { DocumentService } from "./document.service";
 import { UpdateDocumentVisibilityDto } from "../messaging/dto/messaging.dto";
-import { CurrentTenant } from "../organizations/decorators/current-tenant.decorator";
-import { TenantGuard } from "../organizations/guards/tenant.guard";
-import type { TenantContext } from "../organizations/tenant.types";
+import { CurrentTenant } from "../dietitian/decorators/current-tenant.decorator";
+import { DietitianGuard } from "../dietitian/guards/dietitian.guard";
+import type { DietitianTenantContext } from "../dietitian/dietitian.types";
+import { requireDietitianAccountId } from "../dietitian/tenant-scope";
 
 interface UploadedFilePayload {
   buffer: Buffer;
@@ -66,7 +67,7 @@ export class PortalDocumentsController {
       res.setHeader("Cache-Control", "private, no-store");
       file.stream.pipe(res);
     } catch {
-      await this.documents.recordDownloadDenied(user.id, client.organizationId, documentId);
+      await this.documents.recordDownloadDenied(user.id, requireDietitianAccountId(client), documentId);
       throw new NotFoundException("Document not found");
     }
   }
@@ -96,8 +97,8 @@ export class PortalDocumentsController {
 
 @ApiTags("organizations")
 @ApiCookieAuth()
-@UseGuards(SessionGuard, TenantGuard)
-@Controller("api/v1/organizations/:organizationId/clients/:clientId/documents")
+@UseGuards(SessionGuard, DietitianGuard)
+@Controller("api/v1/dietitian/:dietitianAccountId/clients/:clientId/documents")
 export class ClientDocumentsController {
   constructor(
     private readonly access: ClientAccessService,
@@ -105,7 +106,7 @@ export class ClientDocumentsController {
   ) {}
 
   @Get()
-  async list(@CurrentTenant() tenant: TenantContext, @Param("clientId", ParseUUIDPipe) clientId: string) {
+  async list(@CurrentTenant() tenant: DietitianTenantContext, @Param("clientId", ParseUUIDPipe) clientId: string) {
     const client = await this.access.assertCanAccess(tenant, clientId, "read");
     return this.documents.listForOrg(client, true);
   }
@@ -116,7 +117,7 @@ export class ClientDocumentsController {
   @UseGuards(ThrottlerGuard)
   @Throttle({ [THROTTLE_NAMES.UPLOAD]: {} })
   async upload(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("clientId", ParseUUIDPipe) clientId: string,
     @CurrentUser() user: AuthenticatedRequestUser,
     @UploadedFile() file: UploadedFilePayload,
@@ -138,7 +139,7 @@ export class ClientDocumentsController {
 
   @Get(":documentId/download")
   async download(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("clientId", ParseUUIDPipe) clientId: string,
     @Param("documentId", ParseUUIDPipe) documentId: string,
     @Res() res: Response,
@@ -154,7 +155,7 @@ export class ClientDocumentsController {
 
   @Patch(":documentId/visibility")
   async visibility(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("clientId", ParseUUIDPipe) clientId: string,
     @Param("documentId", ParseUUIDPipe) documentId: string,
     @CurrentUser() user: AuthenticatedRequestUser,
@@ -167,7 +168,7 @@ export class ClientDocumentsController {
   @Post(":documentId/archive")
   @ApiOperation({ summary: "Archive a client document" })
   async archive(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("clientId", ParseUUIDPipe) clientId: string,
     @Param("documentId", ParseUUIDPipe) documentId: string,
     @CurrentUser() user: AuthenticatedRequestUser,

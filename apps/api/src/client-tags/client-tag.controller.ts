@@ -2,9 +2,9 @@ import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Put, UseGuards } fro
 import { ApiCookieAuth, ApiProperty, ApiPropertyOptional, ApiTags } from "@nestjs/swagger";
 import { IsArray, IsOptional, IsString, IsUUID, MaxLength, MinLength } from "class-validator";
 import { SessionGuard } from "../auth/guards/session.guard";
-import { CurrentTenant } from "../organizations/decorators/current-tenant.decorator";
-import { TenantGuard } from "../organizations/guards/tenant.guard";
-import type { TenantContext } from "../organizations/tenant.types";
+import { CurrentTenant } from "../dietitian/decorators/current-tenant.decorator";
+import { DietitianGuard } from "../dietitian/guards/dietitian.guard";
+import type { DietitianTenantContext } from "../dietitian/dietitian.types";
 import { ClientActionRequired } from "../clients/decorators/client-action.decorator";
 import { ClientAccessGuard } from "../clients/guards/client-access.guard";
 import { ClientTagService } from "./client-tag.service";
@@ -32,18 +32,18 @@ class SetClientTagsDto {
 
 @ApiTags("tags")
 @ApiCookieAuth()
-@UseGuards(SessionGuard, TenantGuard)
-@Controller("api/v1/organizations/:organizationId")
+@UseGuards(SessionGuard, DietitianGuard)
+@Controller("api/v1/dietitian/:dietitianAccountId")
 export class ClientTagController {
   constructor(private readonly tags: ClientTagService) {}
 
   @Get("tags")
-  list(@CurrentTenant() tenant: TenantContext) {
+  list(@CurrentTenant() tenant: DietitianTenantContext) {
     return this.tags.listTags(tenant);
   }
 
   @Post("tags")
-  create(@CurrentTenant() tenant: TenantContext, @Body() body: CreateTagDto) {
+  create(@CurrentTenant() tenant: DietitianTenantContext, @Body() body: CreateTagDto) {
     return this.tags.createTag(tenant, body.name, body.color);
   }
 
@@ -51,7 +51,7 @@ export class ClientTagController {
   @UseGuards(ClientAccessGuard)
   @ClientActionRequired("update")
   setClientTags(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("clientId", ParseUUIDPipe) clientId: string,
     @Body() body: SetClientTagsDto,
   ) {

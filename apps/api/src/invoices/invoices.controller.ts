@@ -35,9 +35,9 @@ import type { AuthenticatedRequestUser, AuthenticatedSession } from "../auth/aut
 import { ClientAccessService } from "../clients/client-access.service";
 import { ClientAccessGuard } from "../clients/guards/client-access.guard";
 import { ClientActionRequired } from "../clients/decorators/client-action.decorator";
-import { CurrentTenant } from "../organizations/decorators/current-tenant.decorator";
-import { TenantGuard } from "../organizations/guards/tenant.guard";
-import type { TenantContext } from "../organizations/tenant.types";
+import { CurrentTenant } from "../dietitian/decorators/current-tenant.decorator";
+import { DietitianGuard } from "../dietitian/guards/dietitian.guard";
+import type { DietitianTenantContext } from "../dietitian/dietitian.types";
 import { InvoiceService } from "./invoice.service";
 
 class InvoiceItemDto {
@@ -152,14 +152,14 @@ export class PortalInvoicesController {
 
 @ApiTags("organizations")
 @ApiCookieAuth()
-@UseGuards(SessionGuard, TenantGuard)
-@Controller("api/v1/organizations/:organizationId")
+@UseGuards(SessionGuard, DietitianGuard)
+@Controller("api/v1/dietitian/:dietitianAccountId")
 export class OrganizationInvoicesController {
   constructor(private readonly invoices: InvoiceService) {}
 
   @Get("invoices")
   list(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Query("clientId") clientId?: string,
     @Query("status") status?: InvoiceStatus,
     @Query("overdue") overdue?: string,
@@ -178,12 +178,12 @@ export class OrganizationInvoicesController {
   }
 
   @Get("invoices/:invoiceId")
-  get(@CurrentTenant() tenant: TenantContext, @Param("invoiceId", ParseUUIDPipe) invoiceId: string) {
+  get(@CurrentTenant() tenant: DietitianTenantContext, @Param("invoiceId", ParseUUIDPipe) invoiceId: string) {
     return this.invoices.getForOrg(tenant, invoiceId);
   }
 
   @Get("invoices/:invoiceId/print")
-  print(@CurrentTenant() tenant: TenantContext, @Param("invoiceId", ParseUUIDPipe) invoiceId: string) {
+  print(@CurrentTenant() tenant: DietitianTenantContext, @Param("invoiceId", ParseUUIDPipe) invoiceId: string) {
     return this.invoices.getPrintPayload(tenant, invoiceId);
   }
 
@@ -191,7 +191,7 @@ export class OrganizationInvoicesController {
   @UseGuards(ClientAccessGuard)
   @ClientActionRequired("manageRecords")
   create(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("clientId", ParseUUIDPipe) clientId: string,
     @Body() body: CreateInvoiceDto,
   ) {
@@ -200,12 +200,12 @@ export class OrganizationInvoicesController {
 
   @Get("clients/:clientId/invoices")
   @UseGuards(ClientAccessGuard)
-  listForClient(@CurrentTenant() tenant: TenantContext, @Param("clientId", ParseUUIDPipe) clientId: string) {
+  listForClient(@CurrentTenant() tenant: DietitianTenantContext, @Param("clientId", ParseUUIDPipe) clientId: string) {
     return this.invoices.listForClient(tenant, clientId);
   }
 
   @Post("invoices")
-  createWithClient(@CurrentTenant() tenant: TenantContext, @Body() body: CreateInvoiceDto) {
+  createWithClient(@CurrentTenant() tenant: DietitianTenantContext, @Body() body: CreateInvoiceDto) {
     if (!body.clientId) {
       throw new BadRequestException("clientId is required");
     }
@@ -214,7 +214,7 @@ export class OrganizationInvoicesController {
 
   @Patch("invoices/:invoiceId")
   update(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("invoiceId", ParseUUIDPipe) invoiceId: string,
     @Body() body: UpdateInvoiceDto,
   ) {
@@ -222,27 +222,27 @@ export class OrganizationInvoicesController {
   }
 
   @Post("invoices/:invoiceId/issue")
-  issue(@CurrentTenant() tenant: TenantContext, @Param("invoiceId", ParseUUIDPipe) invoiceId: string) {
+  issue(@CurrentTenant() tenant: DietitianTenantContext, @Param("invoiceId", ParseUUIDPipe) invoiceId: string) {
     return this.invoices.issue(tenant, invoiceId);
   }
 
   @Post("invoices/:invoiceId/send")
-  send(@CurrentTenant() tenant: TenantContext, @Param("invoiceId", ParseUUIDPipe) invoiceId: string) {
+  send(@CurrentTenant() tenant: DietitianTenantContext, @Param("invoiceId", ParseUUIDPipe) invoiceId: string) {
     return this.invoices.send(tenant, invoiceId);
   }
 
   @Post("invoices/:invoiceId/pay")
-  pay(@CurrentTenant() tenant: TenantContext, @Param("invoiceId", ParseUUIDPipe) invoiceId: string) {
+  pay(@CurrentTenant() tenant: DietitianTenantContext, @Param("invoiceId", ParseUUIDPipe) invoiceId: string) {
     return this.invoices.markPaid(tenant, invoiceId);
   }
 
   @Post("invoices/:invoiceId/cancel")
-  cancel(@CurrentTenant() tenant: TenantContext, @Param("invoiceId", ParseUUIDPipe) invoiceId: string) {
+  cancel(@CurrentTenant() tenant: DietitianTenantContext, @Param("invoiceId", ParseUUIDPipe) invoiceId: string) {
     return this.invoices.cancel(tenant, invoiceId);
   }
 
   @Post("invoices/:invoiceId/archive")
-  archive(@CurrentTenant() tenant: TenantContext, @Param("invoiceId", ParseUUIDPipe) invoiceId: string) {
+  archive(@CurrentTenant() tenant: DietitianTenantContext, @Param("invoiceId", ParseUUIDPipe) invoiceId: string) {
     return this.invoices.archive(tenant, invoiceId);
   }
 }

@@ -3,9 +3,9 @@ import { ApiCookieAuth, ApiPropertyOptional, ApiTags } from "@nestjs/swagger";
 import { Type } from "class-transformer";
 import { IsDateString, IsInt, IsOptional, Max, Min } from "class-validator";
 import { SessionGuard } from "../auth/guards/session.guard";
-import { CurrentTenant } from "../organizations/decorators/current-tenant.decorator";
-import { TenantGuard } from "../organizations/guards/tenant.guard";
-import type { TenantContext } from "../organizations/tenant.types";
+import { CurrentTenant } from "../dietitian/decorators/current-tenant.decorator";
+import { DietitianGuard } from "../dietitian/guards/dietitian.guard";
+import type { DietitianTenantContext } from "../dietitian/dietitian.types";
 import { ClientAccessGuard } from "../clients/guards/client-access.guard";
 import { TimelineService } from "./timeline.service";
 
@@ -26,18 +26,18 @@ class TimelineQueryDto {
 
 @ApiTags("timeline")
 @ApiCookieAuth()
-@UseGuards(SessionGuard, TenantGuard, ClientAccessGuard)
-@Controller("api/v1/organizations/:organizationId/clients/:clientId/timeline")
+@UseGuards(SessionGuard, DietitianGuard, ClientAccessGuard)
+@Controller("api/v1/dietitian/:dietitianAccountId/clients/:clientId/timeline")
 export class TimelineController {
   constructor(private readonly timeline: TimelineService) {}
 
   @Get()
   list(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("clientId", ParseUUIDPipe) clientId: string,
     @Query() query: TimelineQueryDto,
   ) {
-    return this.timeline.list(tenant.organizationId, clientId, {
+    return this.timeline.list(tenant.dietitianAccountId, clientId, {
       before: query.before,
       limit: query.limit,
     });

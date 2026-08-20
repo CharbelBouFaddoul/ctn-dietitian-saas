@@ -12,7 +12,7 @@ import { AdminCatalogService } from "./admin-catalog.service";
 import { AdminFoodsController } from "./admin-foods.controller";
 import { AdminListsController } from "./admin-lists.controller";
 import { AdminMeController } from "./admin-me.controller";
-import { AdminOrganizationsController } from "./admin-organizations.controller";
+import { AdminDietitiansManageController } from "./admin-dietitians-manage.controller";
 import { AdminOrganizationService } from "./admin-organization.service";
 import { AdminOverrideService } from "./admin-override.service";
 import { AdminSubscriptionService } from "./admin-subscription.service";
@@ -34,7 +34,7 @@ import { PlatformRolesGuard } from "./guards/platform-roles.guard";
   ],
   controllers: [
     AdminMeController,
-    AdminOrganizationsController,
+    AdminDietitiansManageController,
     AdminUsersController,
     AdminDietitiansController,
     AdminCatalogController,

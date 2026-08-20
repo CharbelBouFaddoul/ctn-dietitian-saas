@@ -6,7 +6,7 @@ import { ConversationService } from "../messaging/conversation.service";
 import { MealPlanService } from "../meal-plans/meal-plan.service";
 import { NotificationService } from "../notifications/notification.service";
 import { TrackingSummaryService } from "../tracking/tracking-summary.service";
-import { requireDietitianAccountId, tenantWhere } from "../organizations/tenant-scope";
+import { requireDietitianAccountId, tenantWhere } from "../dietitian/tenant-scope";
 
 @Injectable()
 export class PortalDashboardService {

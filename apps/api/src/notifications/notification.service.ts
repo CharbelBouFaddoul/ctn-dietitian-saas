@@ -7,10 +7,7 @@ export class NotificationService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(input: {
-    /** DietitianAccount.id (Phase 1 path/tenant id). */
-    organizationId: string;
-    dietitianAccountId?: string;
-    legacyOrganizationId?: string | null;
+    dietitianAccountId: string;
     userId: string;
     clientId?: string;
     type: NotificationType;
@@ -20,11 +17,9 @@ export class NotificationService {
     targetId?: string;
     metadata?: Prisma.InputJsonObject;
   }) {
-    const dietitianAccountId = input.dietitianAccountId ?? input.organizationId;
     return this.prisma.notification.create({
       data: {
-        dietitianAccountId,
-        organizationId: input.legacyOrganizationId ?? dietitianAccountId,
+        dietitianAccountId: input.dietitianAccountId,
         userId: input.userId,
         clientId: input.clientId ?? null,
         type: input.type,
@@ -37,11 +32,11 @@ export class NotificationService {
     });
   }
 
-  async listForUser(userId: string, organizationId?: string, limit = 50) {
+  async listForUser(userId: string, dietitianAccountId?: string, limit = 50) {
     const rows = await this.prisma.notification.findMany({
       where: {
         userId,
-        ...(organizationId ? { dietitianAccountId: organizationId } : {}),
+        ...(dietitianAccountId ? { dietitianAccountId } : {}),
       },
       orderBy: { createdAt: "desc" },
       take: limit,
@@ -49,12 +44,12 @@ export class NotificationService {
     return rows.map((row) => this.toResponse(row));
   }
 
-  async unreadCount(userId: string, organizationId?: string): Promise<number> {
+  async unreadCount(userId: string, dietitianAccountId?: string): Promise<number> {
     return this.prisma.notification.count({
       where: {
         userId,
         readAt: null,
-        ...(organizationId ? { dietitianAccountId: organizationId } : {}),
+        ...(dietitianAccountId ? { dietitianAccountId } : {}),
       },
     });
   }
@@ -71,12 +66,12 @@ export class NotificationService {
     return this.toResponse(updated);
   }
 
-  async markAllRead(userId: string, organizationId?: string): Promise<{ count: number }> {
+  async markAllRead(userId: string, dietitianAccountId?: string): Promise<{ count: number }> {
     const result = await this.prisma.notification.updateMany({
       where: {
         userId,
         readAt: null,
-        ...(organizationId ? { dietitianAccountId: organizationId } : {}),
+        ...(dietitianAccountId ? { dietitianAccountId } : {}),
       },
       data: { readAt: new Date() },
     });
@@ -104,7 +99,7 @@ export class NotificationService {
 
     const account = await this.prisma.dietitianAccount.findUnique({
       where: { id: input.dietitianAccountId },
-      select: { userId: true, legacyOrganizationId: true },
+      select: { userId: true },
     });
     if (!account) return;
 
@@ -125,14 +120,14 @@ export class NotificationService {
       SUBSCRIPTION_LOCKED: "Practice is locked",
     } as const;
     const bodies = {
-      SUBSCRIPTION_GRACE: "Your subscription period ended. Contact an administrator to renew while grace remains.",
+      SUBSCRIPTION_GRACE:
+        "Your subscription period ended. Contact an administrator to renew while grace remains.",
       SUBSCRIPTION_READ_ONLY: "Your practice is read-only until the subscription is renewed.",
       SUBSCRIPTION_LOCKED: "Your practice is locked. Contact an administrator to restore access.",
     } as const;
 
     await this.create({
-      organizationId: input.dietitianAccountId,
-      legacyOrganizationId: account.legacyOrganizationId,
+      dietitianAccountId: input.dietitianAccountId,
       userId: account.userId,
       type,
       title: titles[type],
@@ -143,9 +138,9 @@ export class NotificationService {
     });
   }
 
-  async listRecentPreferUnread(userId: string, organizationId: string, limit = 5) {
+  async listRecentPreferUnread(userId: string, dietitianAccountId: string, limit = 5) {
     const unread = await this.prisma.notification.findMany({
-      where: { userId, dietitianAccountId: organizationId, readAt: null },
+      where: { userId, dietitianAccountId, readAt: null },
       orderBy: { createdAt: "desc" },
       take: limit,
     });
@@ -155,7 +150,7 @@ export class NotificationService {
     const rest = await this.prisma.notification.findMany({
       where: {
         userId,
-        dietitianAccountId: organizationId,
+        dietitianAccountId,
         id: { notIn: unread.map((row) => row.id) },
       },
       orderBy: { createdAt: "desc" },
@@ -166,8 +161,7 @@ export class NotificationService {
 
   private toResponse(row: {
     id: string;
-    organizationId: string;
-    dietitianAccountId?: string | null;
+    dietitianAccountId: string;
     userId: string;
     clientId: string | null;
     type: NotificationType;
@@ -181,7 +175,6 @@ export class NotificationService {
   }) {
     return {
       id: row.id,
-      organizationId: row.dietitianAccountId ?? row.organizationId,
       userId: row.userId,
       clientId: row.clientId,
       type: row.type,

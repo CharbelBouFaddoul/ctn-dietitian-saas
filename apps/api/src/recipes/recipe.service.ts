@@ -6,8 +6,8 @@ import {
 import type { Prisma, QuantityUnit } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { SecurityEventLogger } from "../auth/security-event.logger";
-import type { TenantContext } from "../organizations/tenant.types";
-import { legacyOrganizationId, tenantWhere } from "../organizations/tenant-scope";
+import type { DietitianTenantContext } from "../dietitian/dietitian.types";
+import { tenantWhere } from "../dietitian/tenant-scope";
 import { RecipeNutritionService } from "./recipe-nutrition.service";
 import { isFoodQuantityUnit } from "./recipe-nutrition.service";
 
@@ -35,13 +35,13 @@ export class RecipeService {
   ) {}
 
   async list(
-    tenant: TenantContext,
+    tenant: DietitianTenantContext,
     query: { q?: string; status?: "ACTIVE" | "ARCHIVED"; page?: number; pageSize?: number },
   ) {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 20;
     const where: Prisma.RecipeWhereInput = {
-      ...tenantWhere(tenant.organizationId),
+      ...tenantWhere(tenant.dietitianAccountId),
       ...(query.status ? { status: query.status } : { status: "ACTIVE" }),
       ...(query.q ? { name: { contains: query.q.trim(), mode: "insensitive" } } : {}),
     };
@@ -71,13 +71,13 @@ export class RecipeService {
     };
   }
 
-  async get(tenant: TenantContext, recipeId: string) {
-    const recipe = await this.requireRecipe(tenant.organizationId, recipeId);
+  async get(tenant: DietitianTenantContext, recipeId: string) {
+    const recipe = await this.requireRecipe(tenant.dietitianAccountId, recipeId);
     const ingredients = await this.prisma.recipeIngredient.findMany({
-      where: { recipeId, ...tenantWhere(tenant.organizationId) },
+      where: { recipeId, ...tenantWhere(tenant.dietitianAccountId) },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
     });
-    const calculated = await this.nutrition.calculate(tenant.organizationId, recipe, ingredients);
+    const calculated = await this.nutrition.calculate(tenant.dietitianAccountId, recipe, ingredients);
     return {
       id: recipe.id,
       name: recipe.name,
@@ -92,13 +92,12 @@ export class RecipeService {
     };
   }
 
-  async create(tenant: TenantContext, input: RecipeWriteInput & { name: string; servings: number }) {
+  async create(tenant: DietitianTenantContext, input: RecipeWriteInput & { name: string; servings: number }) {
     this.assertCanManage(tenant);
     this.assertServings(input.servings);
     const recipe = await this.prisma.recipe.create({
       data: {
-        dietitianAccountId: tenant.organizationId,
-        organizationId: legacyOrganizationId(tenant),
+        dietitianAccountId: tenant.dietitianAccountId,
         name: input.name.trim(),
         description: input.description ?? null,
         instructions: input.instructions ?? null,
@@ -110,8 +109,7 @@ export class RecipeService {
       type: "recipe_created",
       outcome: "success",
       userId: tenant.userId,
-      organizationId: tenant.organizationId,
-      dietitianAccountId: tenant.organizationId,
+      dietitianAccountId: tenant.dietitianAccountId,
       targetType: "recipe",
       targetId: recipe.id,
       metadata: { name: recipe.name },
@@ -119,9 +117,9 @@ export class RecipeService {
     return this.get(tenant, recipe.id);
   }
 
-  async update(tenant: TenantContext, recipeId: string, input: RecipeWriteInput) {
+  async update(tenant: DietitianTenantContext, recipeId: string, input: RecipeWriteInput) {
     this.assertCanManage(tenant);
-    const recipe = await this.requireRecipe(tenant.organizationId, recipeId);
+    const recipe = await this.requireRecipe(tenant.dietitianAccountId, recipeId);
     if (recipe.status === "ARCHIVED") {
       throw new BadRequestException("Archived recipes cannot be edited");
     }
@@ -141,17 +139,16 @@ export class RecipeService {
       type: "recipe_updated",
       outcome: "success",
       userId: tenant.userId,
-      organizationId: tenant.organizationId,
-      dietitianAccountId: tenant.organizationId,
+      dietitianAccountId: tenant.dietitianAccountId,
       targetType: "recipe",
       targetId: recipe.id,
     });
     return this.get(tenant, recipe.id);
   }
 
-  async archive(tenant: TenantContext, recipeId: string) {
+  async archive(tenant: DietitianTenantContext, recipeId: string) {
     this.assertCanManage(tenant);
-    const recipe = await this.requireRecipe(tenant.organizationId, recipeId);
+    const recipe = await this.requireRecipe(tenant.dietitianAccountId, recipeId);
     await this.prisma.recipe.update({
       where: { id: recipe.id },
       data: { status: "ARCHIVED", archivedAt: new Date() },
@@ -160,26 +157,24 @@ export class RecipeService {
       type: "recipe_archived",
       outcome: "success",
       userId: tenant.userId,
-      organizationId: tenant.organizationId,
-      dietitianAccountId: tenant.organizationId,
+      dietitianAccountId: tenant.dietitianAccountId,
       targetType: "recipe",
       targetId: recipe.id,
     });
     return this.get(tenant, recipe.id);
   }
 
-  async duplicate(tenant: TenantContext, recipeId: string) {
+  async duplicate(tenant: DietitianTenantContext, recipeId: string) {
     this.assertCanManage(tenant);
-    const recipe = await this.requireRecipe(tenant.organizationId, recipeId);
+    const recipe = await this.requireRecipe(tenant.dietitianAccountId, recipeId);
     const ingredients = await this.prisma.recipeIngredient.findMany({
-      where: { recipeId: recipe.id, ...tenantWhere(tenant.organizationId) },
+      where: { recipeId: recipe.id, ...tenantWhere(tenant.dietitianAccountId) },
       orderBy: { sortOrder: "asc" },
     });
     const copy = await this.prisma.$transaction(async (tx) => {
       const created = await tx.recipe.create({
         data: {
-          dietitianAccountId: tenant.organizationId,
-          organizationId: legacyOrganizationId(tenant),
+          dietitianAccountId: tenant.dietitianAccountId,
           name: `${recipe.name} (copy)`,
           description: recipe.description,
           instructions: recipe.instructions,
@@ -190,8 +185,7 @@ export class RecipeService {
       if (ingredients.length > 0) {
         await tx.recipeIngredient.createMany({
           data: ingredients.map((row) => ({
-            dietitianAccountId: tenant.organizationId,
-            organizationId: legacyOrganizationId(tenant),
+            dietitianAccountId: tenant.dietitianAccountId,
             recipeId: created.id,
             foodId: row.foodId,
             quantity: row.quantity,
@@ -207,8 +201,7 @@ export class RecipeService {
       type: "recipe_created",
       outcome: "success",
       userId: tenant.userId,
-      organizationId: tenant.organizationId,
-      dietitianAccountId: tenant.organizationId,
+      dietitianAccountId: tenant.dietitianAccountId,
       targetType: "recipe",
       targetId: copy.id,
       metadata: { duplicatedFrom: recipe.id },
@@ -216,9 +209,9 @@ export class RecipeService {
     return this.get(tenant, copy.id);
   }
 
-  async replaceIngredients(tenant: TenantContext, recipeId: string, items: IngredientWriteInput[]) {
+  async replaceIngredients(tenant: DietitianTenantContext, recipeId: string, items: IngredientWriteInput[]) {
     this.assertCanManage(tenant);
-    const recipe = await this.requireRecipe(tenant.organizationId, recipeId);
+    const recipe = await this.requireRecipe(tenant.dietitianAccountId, recipeId);
     if (recipe.status === "ARCHIVED") {
       throw new BadRequestException("Archived recipes cannot be edited");
     }
@@ -231,17 +224,16 @@ export class RecipeService {
       }
     }
     const foodIds = [...new Set(items.map((item) => item.foodId))];
-    await this.nutrition.loadFoods(tenant.organizationId, foodIds);
+    await this.nutrition.loadFoods(tenant.dietitianAccountId, foodIds);
 
     await this.prisma.$transaction(async (tx) => {
       await tx.recipeIngredient.deleteMany({
-        where: { recipeId: recipe.id, ...tenantWhere(tenant.organizationId) },
+        where: { recipeId: recipe.id, ...tenantWhere(tenant.dietitianAccountId) },
       });
       if (items.length > 0) {
         await tx.recipeIngredient.createMany({
           data: items.map((item, index) => ({
-            dietitianAccountId: tenant.organizationId,
-            organizationId: legacyOrganizationId(tenant),
+            dietitianAccountId: tenant.dietitianAccountId,
             recipeId: recipe.id,
             foodId: item.foodId,
             quantity: item.quantity,
@@ -256,8 +248,7 @@ export class RecipeService {
       type: "recipe_updated",
       outcome: "success",
       userId: tenant.userId,
-      organizationId: tenant.organizationId,
-      dietitianAccountId: tenant.organizationId,
+      dietitianAccountId: tenant.dietitianAccountId,
       targetType: "recipe",
       targetId: recipe.id,
       metadata: { fields: ["ingredients"] },
@@ -283,7 +274,7 @@ export class RecipeService {
     return recipe;
   }
 
-  private assertCanManage(_tenant: TenantContext) {
+  private assertCanManage(_tenant: DietitianTenantContext) {
   }
 
   private assertServings(servings: number) {

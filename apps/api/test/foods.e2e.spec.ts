@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import { FEATURE_KEYS } from "@nutrition-saas/config";
-import { ORGANIZATION_ACCESS_DENIED } from "../src/organizations/tenant.types";
+import { DIETITIAN_ACCESS_DENIED } from "../src/dietitian/dietitian.types";
 import {
   activateStandardSubscription,
   cookieValue,
@@ -10,7 +10,6 @@ import {
   resetAuthDatabase,
   type AuthTestContext,
 } from "./app";
-import { MULTI_MEMBER_UNSUPPORTED } from "../src/organizations/organization.service";
 
 const PASSWORD = "ValidPass12";
 const SETTINGS = {
@@ -63,7 +62,7 @@ describe("Phase 6 foods and organization overrides", () => {
 
   async function createOrg(cookie: string, name: string) {
     const created = await request(ctx.app.getHttpServer())
-      .post("/api/v1/organizations")
+      .post("/api/v1/dietitian")
       .set("Cookie", cookie)
       .send({ name, settings: SETTINGS })
       .expect(201);
@@ -111,20 +110,20 @@ describe("Phase 6 foods and organization overrides", () => {
     const food = await seedFood();
 
     const listed = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/foods?q=chicken`)
+      .get(`/api/v1/dietitian/${org.id}/foods?q=chicken`)
       .set("Cookie", owner.cookie)
       .expect(200);
     expect(listed.body.items).toHaveLength(1);
     expect(listed.body.items[0].id).toBe(food.id);
 
     await request(ctx.app.getHttpServer())
-      .patch(`/api/v1/organizations/${org.id}/foods/${food.id}`)
+      .patch(`/api/v1/dietitian/${org.id}/foods/${food.id}`)
       .set("Cookie", owner.cookie)
       .send({ energyKcal: 1 })
       .expect(404);
 
     await request(ctx.app.getHttpServer())
-      .delete(`/api/v1/organizations/${org.id}/foods/${food.id}`)
+      .delete(`/api/v1/dietitian/${org.id}/foods/${food.id}`)
       .set("Cookie", owner.cookie)
       .expect(404);
 
@@ -142,7 +141,7 @@ describe("Phase 6 foods and organization overrides", () => {
     const food = await seedFood();
 
     const created = await request(ctx.app.getHttpServer())
-      .put(`/api/v1/organizations/${orgA.id}/foods/${food.id}/override`)
+      .put(`/api/v1/dietitian/${orgA.id}/foods/${food.id}/override`)
       .set("Cookie", alice.cookie)
       .send({ energyKcal: 180 })
       .expect(200);
@@ -152,26 +151,26 @@ describe("Phase 6 foods and organization overrides", () => {
     expect(created.body.globalNutrition.energyKcal).toBe(165);
 
     const orgBView = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${orgB.id}/foods/${food.id}`)
+      .get(`/api/v1/dietitian/${orgB.id}/foods/${food.id}`)
       .set("Cookie", bob.cookie)
       .expect(200);
     expect(orgBView.body.effectiveNutrition.energyKcal).toBe(165);
     expect(orgBView.body.override).toBeNull();
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${orgA.id}/foods/${food.id}/override`)
+      .get(`/api/v1/dietitian/${orgA.id}/foods/${food.id}/override`)
       .set("Cookie", bob.cookie)
       .expect(403)
-      .expect((res) => expect(res.body.message).toBe(ORGANIZATION_ACCESS_DENIED));
+      .expect((res) => expect(res.body.message).toBe(DIETITIAN_ACCESS_DENIED));
 
     await request(ctx.app.getHttpServer())
-      .put(`/api/v1/organizations/${orgA.id}/foods/${food.id}/override`)
+      .put(`/api/v1/dietitian/${orgA.id}/foods/${food.id}/override`)
       .set("Cookie", bob.cookie)
       .send({ energyKcal: 999 })
       .expect(403);
 
     await request(ctx.app.getHttpServer())
-      .put(`/api/v1/organizations/${orgB.id}/foods/${food.id}/override`)
+      .put(`/api/v1/dietitian/${orgB.id}/foods/${food.id}/override`)
       .set("Cookie", alice.cookie)
       .send({ energyKcal: 999 })
       .expect(403);
@@ -180,7 +179,7 @@ describe("Phase 6 foods and organization overrides", () => {
     expect(Number(stillGlobal.energyKcal)).toBe(165);
 
     await request(ctx.app.getHttpServer())
-      .delete(`/api/v1/organizations/${orgA.id}/foods/${food.id}/override`)
+      .delete(`/api/v1/dietitian/${orgA.id}/foods/${food.id}/override`)
       .set("Cookie", alice.cookie)
       .expect(200)
       .expect((res) => {
@@ -195,7 +194,7 @@ describe("Phase 6 foods and organization overrides", () => {
     const food = await seedFood({ fiberG: null });
 
     const at100 = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/foods/${food.id}/calculate`)
+      .post(`/api/v1/dietitian/${org.id}/foods/${food.id}/calculate`)
       .set("Cookie", owner.cookie)
       .send({ quantity: 100, unit: "g" })
       .expect(200);
@@ -204,7 +203,7 @@ describe("Phase 6 foods and organization overrides", () => {
     expect(at100.body.nutrition.carbohydrateG).toBe(0);
 
     const at250 = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/foods/${food.id}/calculate`)
+      .post(`/api/v1/dietitian/${org.id}/foods/${food.id}/calculate`)
       .set("Cookie", owner.cookie)
       .send({ quantity: 250, unit: "g" })
       .expect(200);
@@ -213,27 +212,27 @@ describe("Phase 6 foods and organization overrides", () => {
     expect(at250.body.nutrition.fiberG).toBeNull();
 
     const decimal = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/foods/${food.id}/calculate`)
+      .post(`/api/v1/dietitian/${org.id}/foods/${food.id}/calculate`)
       .set("Cookie", owner.cookie)
       .send({ quantity: 33.3, unit: "g" })
       .expect(200);
     expect(decimal.body.nutrition.energyKcal).toBeCloseTo(54.945, 5);
 
     const ounces = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/foods/${food.id}/calculate`)
+      .post(`/api/v1/dietitian/${org.id}/foods/${food.id}/calculate`)
       .set("Cookie", owner.cookie)
       .send({ quantity: 1, unit: "oz" })
       .expect(200);
     expect(ounces.body.nutrition.energyKcal).toBeCloseTo(46.77671315625, 6);
 
     await request(ctx.app.getHttpServer())
-      .put(`/api/v1/organizations/${org.id}/foods/${food.id}/override`)
+      .put(`/api/v1/dietitian/${org.id}/foods/${food.id}/override`)
       .set("Cookie", owner.cookie)
       .send({ energyKcal: 180 })
       .expect(200);
 
     const overridden = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/foods/${food.id}/calculate`)
+      .post(`/api/v1/dietitian/${org.id}/foods/${food.id}/calculate`)
       .set("Cookie", owner.cookie)
       .send({ quantity: 100, unit: "g" })
       .expect(200);
@@ -241,7 +240,7 @@ describe("Phase 6 foods and organization overrides", () => {
     expect(overridden.body.nutrition.proteinG).toBe(31);
 
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/foods/${food.id}/calculate`)
+      .post(`/api/v1/dietitian/${org.id}/foods/${food.id}/calculate`)
       .set("Cookie", owner.cookie)
       .send({ quantity: 100, unit: "ml" })
       .expect(400);
@@ -251,41 +250,35 @@ describe("Phase 6 foods and organization overrides", () => {
     const owner = await registerVerifyLogin();
     const outsider = await registerVerifyLogin();
     const org = await createOrg(owner.cookie, "Clinic");
-    const add = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/members`)
-      .set("Cookie", owner.cookie)
-      .send({ email: outsider.address, role: "STAFF" });
-    expect(add.status).toBe(400);
-    expect(add.body.message).toBe(MULTI_MEMBER_UNSUPPORTED);
 
     const food = await seedFood();
 
     await request(ctx.app.getHttpServer())
-      .put(`/api/v1/organizations/${org.id}/foods/${food.id}/override`)
+      .put(`/api/v1/dietitian/${org.id}/foods/${food.id}/override`)
       .set("Cookie", outsider.cookie)
       .send({ energyKcal: 180 })
       .expect(403);
 
     await request(ctx.app.getHttpServer())
-      .put(`/api/v1/organizations/${org.id}/foods/${food.id}/override`)
+      .put(`/api/v1/dietitian/${org.id}/foods/${food.id}/override`)
       .set("Cookie", owner.cookie)
       .send({ energyKcal: 180, password: "secret" })
       .expect(400);
 
     await request(ctx.app.getHttpServer())
-      .put(`/api/v1/organizations/${org.id}/foods/${food.id}/override`)
+      .put(`/api/v1/dietitian/${org.id}/foods/${food.id}/override`)
       .set("Cookie", owner.cookie)
       .send({ energyKcal: 180 })
       .expect(200);
 
     await request(ctx.app.getHttpServer())
-      .put(`/api/v1/organizations/${org.id}/foods/${food.id}/override`)
+      .put(`/api/v1/dietitian/${org.id}/foods/${food.id}/override`)
       .set("Cookie", owner.cookie)
       .send({ proteinG: 40 })
       .expect(200);
 
     await request(ctx.app.getHttpServer())
-      .delete(`/api/v1/organizations/${org.id}/foods/${food.id}/override`)
+      .delete(`/api/v1/dietitian/${org.id}/foods/${food.id}/override`)
       .set("Cookie", owner.cookie)
       .expect(200);
 
@@ -312,7 +305,7 @@ describe("Phase 6 foods and organization overrides", () => {
     await ctx.prisma.food.createMany({ data: extra });
 
     const page = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/foods?page=1&pageSize=20`)
+      .get(`/api/v1/dietitian/${org.id}/foods?page=1&pageSize=20`)
       .set("Cookie", owner.cookie)
       .expect(200);
     expect(page.body.items).toHaveLength(20);
@@ -320,7 +313,7 @@ describe("Phase 6 foods and organization overrides", () => {
 
     const started = Date.now();
     const searched = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/foods?q=chicken`)
+      .get(`/api/v1/dietitian/${org.id}/foods?q=chicken`)
       .set("Cookie", owner.cookie)
       .expect(200);
     expect(Date.now() - started).toBeLessThan(1500);
@@ -328,7 +321,7 @@ describe("Phase 6 foods and organization overrides", () => {
 
     expect(await ctx.entitlements.can(org.id, FEATURE_KEYS.AI)).toBe(false);
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/foods`)
+      .get(`/api/v1/dietitian/${org.id}/foods`)
       .set("Cookie", owner.cookie)
       .expect(200);
   });

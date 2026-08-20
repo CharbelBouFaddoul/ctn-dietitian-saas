@@ -16,7 +16,7 @@ import { randomUUID } from "node:crypto";
 import { SecurityEventLogger } from "../auth/security-event.logger";
 import { EntitlementService } from "../entitlements/entitlement.service";
 import { PrismaService } from "../prisma/prisma.service";
-import type { TenantContext } from "../organizations/tenant.types";
+import type { DietitianTenantContext } from "../dietitian/dietitian.types";
 import { AI_PROVIDER, type AiProvider } from "./ai.provider";
 import { AiContextService } from "./ai-context.service";
 import {
@@ -29,7 +29,6 @@ import {
 } from "./ai-output.schemas";
 import { AI_PROMPT_VERSIONS, buildSystemPrompt, buildUserPrompt } from "./ai-prompts";
 import { AiUsageService } from "./ai-usage.service";
-import { legacyOrganizationId } from "../organizations/tenant-scope";
 
 export interface AiGenerationResult<T> {
   requestId: string;
@@ -78,7 +77,7 @@ export class AiService {
     };
   }
 
-  async generateClientSummary(tenant: TenantContext, clientId: string, userInput?: string) {
+  async generateClientSummary(tenant: DietitianTenantContext, clientId: string, userInput?: string) {
     const context = await this.context.buildClientContext(tenant, clientId);
     return this.generate({
       tenant,
@@ -90,7 +89,7 @@ export class AiService {
     });
   }
 
-  async generateMealPlanAssistance(tenant: TenantContext, clientId: string, userInput?: string) {
+  async generateMealPlanAssistance(tenant: DietitianTenantContext, clientId: string, userInput?: string) {
     const context = await this.context.buildClientContext(tenant, clientId);
     return this.generate({
       tenant,
@@ -102,7 +101,7 @@ export class AiService {
     });
   }
 
-  async generateNutritionAssistance(tenant: TenantContext, clientId: string, foodQuery?: string, userInput?: string) {
+  async generateNutritionAssistance(tenant: DietitianTenantContext, clientId: string, foodQuery?: string, userInput?: string) {
     const context = await this.context.buildNutritionContext(tenant, clientId, foodQuery);
     return this.generate({
       tenant,
@@ -114,7 +113,7 @@ export class AiService {
     });
   }
 
-  async generateConsultationSummary(tenant: TenantContext, clientId: string, userInput?: string) {
+  async generateConsultationSummary(tenant: DietitianTenantContext, clientId: string, userInput?: string) {
     const context = await this.context.buildClientContext(tenant, clientId);
     return this.generate({
       tenant,
@@ -126,7 +125,7 @@ export class AiService {
     });
   }
 
-  async generateMessageDraft(tenant: TenantContext, clientId: string, userInput?: string) {
+  async generateMessageDraft(tenant: DietitianTenantContext, clientId: string, userInput?: string) {
     const context = await this.context.buildMessageContext(tenant, clientId);
     return this.generate({
       tenant,
@@ -139,14 +138,14 @@ export class AiService {
   }
 
   private async generate<T>(input: {
-    tenant: TenantContext;
+    tenant: DietitianTenantContext;
     clientId: string;
     action: AiAction;
     context: unknown;
     userInput?: string;
     schema: z.ZodSchema<T>;
   }): Promise<AiGenerationResult<T>> {
-    const organizationId = input.tenant.organizationId;
+    const organizationId = input.tenant.dietitianAccountId;
     const promptVersion = AI_PROMPT_VERSIONS[input.action];
     const correlationId = randomUUID();
 
@@ -158,7 +157,6 @@ export class AiService {
     if (!aiEnabled) {
       await this.recordRejected({
         organizationId,
-        legacyOrganizationId: legacyOrganizationId(input.tenant),
         userId: input.tenant.userId,
         clientId: input.clientId,
         action: input.action,
@@ -170,7 +168,7 @@ export class AiService {
         type: "ai_request_denied",
         outcome: "failure",
         userId: input.tenant.userId,
-        organizationId,
+        dietitianAccountId: organizationId,
         targetType: "client",
         targetId: input.clientId,
         reason: "entitlement_denied",
@@ -182,7 +180,6 @@ export class AiService {
     if (limit === null || limit <= 0) {
       await this.recordRejected({
         organizationId,
-        legacyOrganizationId: legacyOrganizationId(input.tenant),
         userId: input.tenant.userId,
         clientId: input.clientId,
         action: input.action,
@@ -197,7 +194,6 @@ export class AiService {
     if (!reservation.allowed) {
       await this.recordRejected({
         organizationId,
-        legacyOrganizationId: legacyOrganizationId(input.tenant),
         userId: input.tenant.userId,
         clientId: input.clientId,
         action: input.action,
@@ -209,7 +205,7 @@ export class AiService {
         type: "ai_request_denied",
         outcome: "failure",
         userId: input.tenant.userId,
-        organizationId,
+        dietitianAccountId: organizationId,
         targetType: "client",
         targetId: input.clientId,
         reason: "limit_exceeded",
@@ -220,7 +216,6 @@ export class AiService {
     const request = await this.prisma.aiRequest.create({
       data: {
         dietitianAccountId: organizationId,
-        organizationId: legacyOrganizationId(input.tenant),
         userId: input.tenant.userId,
         clientId: input.clientId,
         action: input.action,
@@ -289,7 +284,7 @@ export class AiService {
           type: "ai_generation_failed",
           outcome: "failure",
           userId: input.tenant.userId,
-          organizationId,
+          dietitianAccountId: organizationId,
           targetType: "ai_request",
           targetId: request.id,
           reason: category,
@@ -331,7 +326,6 @@ export class AiService {
     await this.prisma.aiRequest.create({
       data: {
         dietitianAccountId: input.organizationId,
-        organizationId: input.legacyOrganizationId ?? input.organizationId,
         userId: input.userId,
         clientId: input.clientId,
         action: input.action,

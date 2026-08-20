@@ -10,7 +10,7 @@ import { ConversationService } from "./conversation.service";
 import { MessagingRecipientService } from "./messaging-recipient.service";
 import { NotificationService } from "../notifications/notification.service";
 import { MarkConversationReadDto, MessagePaginationQueryDto, SendMessageDto } from "./dto/messaging.dto";
-import { requireDietitianAccountId } from "../organizations/tenant-scope";
+import { requireDietitianAccountId } from "../dietitian/tenant-scope";
 
 @ApiTags("portal")
 @ApiCookieAuth()

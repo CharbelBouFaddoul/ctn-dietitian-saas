@@ -38,7 +38,7 @@ export default function PracticeIndexPage() {
           router.replace(home.path);
           return;
         }
-        const orgs = await api<Org[]>("/api/v1/organizations");
+        const orgs = await api<Org[]>("/api/v1/dietitian");
         if (cancelled) return;
         const first = orgs[0];
         if (first) {

@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { SecurityEventLogger } from "../auth/security-event.logger";
-import { OrganizationLifecycleService } from "../organizations/organization-lifecycle.service";
+import { DietitianLifecycleService } from "../dietitian/dietitian-lifecycle.service";
 import { EntitlementService } from "../entitlements/entitlement.service";
 import type { AdminActor } from "./admin-actor";
 import { ADMIN_MESSAGES } from "./admin.messages";
@@ -9,12 +9,12 @@ import { AdminSubscriptionService } from "./admin-subscription.service";
 
 type AccountStatus = "ACTIVE" | "SUSPENDED" | "ARCHIVED";
 
-/** Phase 1 admin APIs: organizationId path param is DietitianAccount.id */
+/** Admin APIs: dietitianAccountId path param is DietitianAccount.id */
 @Injectable()
 export class AdminOrganizationService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly lifecycle: OrganizationLifecycleService,
+    private readonly lifecycle: DietitianLifecycleService,
     private readonly entitlements: EntitlementService,
     private readonly subscriptions: AdminSubscriptionService,
     private readonly security: SecurityEventLogger,
@@ -85,7 +85,6 @@ export class AdminOrganizationService {
       type: "admin_organization_status_changed",
       outcome: "success",
       userId: actor.userId,
-      organizationId,
       dietitianAccountId: organizationId,
       ipAddress: actor.ipAddress,
       userAgent: actor.userAgent,

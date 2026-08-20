@@ -33,7 +33,6 @@ export class AiUsageService {
           where: { dietitianAccountId_periodKey: { dietitianAccountId, periodKey } },
           create: {
             dietitianAccountId,
-            organizationId: dietitianAccountId,
             periodKey,
             requestCount: 1,
           },

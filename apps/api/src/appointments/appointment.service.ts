@@ -2,8 +2,8 @@ import { BadRequestException, Injectable, NotFoundException } from "@nestjs/comm
 import type { AppointmentStatus, NotificationType } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { SecurityEventLogger } from "../auth/security-event.logger";
-import type { TenantContext } from "../organizations/tenant.types";
-import { legacyOrganizationId, tenantWhere } from "../organizations/tenant-scope";
+import type { DietitianTenantContext } from "../dietitian/dietitian.types";
+import { tenantWhere } from "../dietitian/tenant-scope";
 import { TimelineService } from "../timeline/timeline.service";
 import { ClientAccessService } from "../clients/client-access.service";
 import { NotificationService } from "../notifications/notification.service";
@@ -18,22 +18,22 @@ export class AppointmentService {
     private readonly notifications: NotificationService,
   ) {}
 
-  async listForClient(tenant: TenantContext, clientId: string) {
+  async listForClient(tenant: DietitianTenantContext, clientId: string) {
     await this.access.assertCanAccess(tenant, clientId, "read");
     const rows = await this.prisma.appointment.findMany({
-      where: { clientId, ...tenantWhere(tenant.organizationId) },
+      where: { clientId, ...tenantWhere(tenant.dietitianAccountId) },
       orderBy: { startAt: "asc" },
     });
     return rows.map((row) => this.toResponse(row));
   }
 
-  async listUpcoming(tenant: TenantContext) {
+  async listUpcoming(tenant: DietitianTenantContext) {
     const visible = this.access.visibleWhere(tenant);
     const from = new Date();
     from.setDate(from.getDate() - 30);
     const rows = await this.prisma.appointment.findMany({
       where: {
-        ...tenantWhere(tenant.organizationId),
+        ...tenantWhere(tenant.dietitianAccountId),
         startAt: { gte: from },
         status: { not: "CANCELLED" },
         client: visible,
@@ -55,12 +55,17 @@ export class AppointmentService {
   }
 
   async create(
-    tenant: TenantContext,
+    tenant: DietitianTenantContext,
     clientId: string,
-    input: { title: string; startAt: string; endAt: string; assignedMemberId?: string; notes?: string },
+    input: {
+      title: string;
+      startAt: string;
+      endAt: string;
+      assignedUserId?: string;
+      notes?: string;
+    },
   ) {
     await this.access.assertCanAccess(tenant, clientId, "manageRecords");
-    void input.assignedMemberId;
     const startAt = new Date(input.startAt);
     const endAt = new Date(input.endAt);
     if (!(startAt.getTime() < endAt.getTime())) {
@@ -68,21 +73,18 @@ export class AppointmentService {
     }
     const appointment = await this.prisma.appointment.create({
       data: {
-        dietitianAccountId: tenant.organizationId,
-        organizationId: legacyOrganizationId(tenant),
+        dietitianAccountId: tenant.dietitianAccountId,
         clientId,
         title: input.title.trim(),
         startAt,
         endAt,
-        assignedUserId: tenant.userId,
-        assignedMemberId: null,
+        assignedUserId: input.assignedUserId ?? tenant.userId,
         notes: input.notes?.trim() ?? null,
         createdById: tenant.userId,
       },
     });
     await this.timeline.record({
-      organizationId: tenant.organizationId,
-      legacyOrganizationId: legacyOrganizationId(tenant),
+      dietitianAccountId: tenant.dietitianAccountId,
       clientId,
       type: "APPOINTMENT_CREATED",
       actorUserId: tenant.userId,
@@ -94,8 +96,7 @@ export class AppointmentService {
       type: "appointment_created",
       outcome: "success",
       userId: tenant.userId,
-      organizationId: tenant.organizationId,
-      dietitianAccountId: tenant.organizationId,
+      dietitianAccountId: tenant.dietitianAccountId,
       targetType: "appointment",
       targetId: appointment.id,
     });
@@ -112,7 +113,7 @@ export class AppointmentService {
   }
 
   async updateStatus(
-    tenant: TenantContext,
+    tenant: DietitianTenantContext,
     clientId: string,
     appointmentId: string,
     status: AppointmentStatus,
@@ -120,7 +121,7 @@ export class AppointmentService {
   ) {
     await this.access.assertCanAccess(tenant, clientId, "manageRecords");
     const existing = await this.prisma.appointment.findFirst({
-      where: { id: appointmentId, clientId, ...tenantWhere(tenant.organizationId) },
+      where: { id: appointmentId, clientId, ...tenantWhere(tenant.dietitianAccountId) },
     });
     if (!existing) {
       throw new NotFoundException("Appointment not found");
@@ -136,8 +137,7 @@ export class AppointmentService {
           ? "APPOINTMENT_CANCELLED"
           : "APPOINTMENT_UPDATED";
     await this.timeline.record({
-      organizationId: tenant.organizationId,
-      legacyOrganizationId: legacyOrganizationId(tenant),
+      dietitianAccountId: tenant.dietitianAccountId,
       clientId,
       type: timelineType,
       actorUserId: tenant.userId,
@@ -149,8 +149,7 @@ export class AppointmentService {
       type: "appointment_changed",
       outcome: "success",
       userId: tenant.userId,
-      organizationId: tenant.organizationId,
-      dietitianAccountId: tenant.organizationId,
+      dietitianAccountId: tenant.dietitianAccountId,
       targetType: "appointment",
       targetId: appointment.id,
       metadata: { status },
@@ -174,7 +173,7 @@ export class AppointmentService {
   }
 
   private async notifyAppointmentParties(input: {
-    tenant: TenantContext;
+    tenant: DietitianTenantContext;
     clientId: string;
     appointmentId: string;
     title: string;
@@ -183,7 +182,7 @@ export class AppointmentService {
     excludeUserId?: string;
   }) {
     const account = await this.prisma.dietitianAccount.findUnique({
-      where: { id: input.tenant.organizationId },
+      where: { id: input.tenant.dietitianAccountId },
       select: { userId: true },
     });
     const portal = await this.prisma.clientAccount.findUnique({
@@ -198,8 +197,7 @@ export class AppointmentService {
     await Promise.all(
       [...recipients].map((userId) =>
         this.notifications.create({
-          organizationId: input.tenant.organizationId,
-          legacyOrganizationId: legacyOrganizationId(input.tenant),
+          dietitianAccountId: input.tenant.dietitianAccountId,
           userId,
           clientId: input.clientId,
           type: input.type,
@@ -219,8 +217,7 @@ export class AppointmentService {
     endAt: Date;
     status: string;
     notes: string | null;
-    assignedMemberId: string | null;
-    assignedUserId?: string | null;
+    assignedUserId: string | null;
   }) {
     return {
       id: row.id,
@@ -229,8 +226,7 @@ export class AppointmentService {
       endAt: row.endAt.toISOString(),
       status: row.status,
       notes: row.notes,
-      assignedMemberId: row.assignedMemberId,
-      assignedUserId: row.assignedUserId ?? null,
+      assignedUserId: row.assignedUserId,
     };
   }
 }

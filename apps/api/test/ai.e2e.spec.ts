@@ -10,8 +10,7 @@ import {
   resetAuthDatabase,
   type AuthTestContext,
 } from "./app";
-import { MULTI_MEMBER_UNSUPPORTED } from "../src/organizations/organization.service";
-import { ORGANIZATION_ACCESS_DENIED } from "../src/organizations/tenant.types";
+import { DIETITIAN_ACCESS_DENIED } from "../src/dietitian/dietitian.types";
 
 const PASSWORD = "ValidPass12";
 const SETTINGS = {
@@ -63,7 +62,7 @@ describe("Phase 11 AI assistance", () => {
 
   async function createOrg(cookie: string, name: string, planSlug: "standard" | "pro" | "premium" = "pro") {
     const created = await request(ctx.app.getHttpServer())
-      .post("/api/v1/organizations")
+      .post("/api/v1/dietitian")
       .set("Cookie", cookie)
       .send({ name, settings: SETTINGS })
       .expect(201);
@@ -73,7 +72,7 @@ describe("Phase 11 AI assistance", () => {
 
   async function createClient(cookie: string, organizationId: string, body: Record<string, unknown> = {}) {
     return request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${organizationId}/clients`)
+      .post(`/api/v1/dietitian/${organizationId}/clients`)
       .set("Cookie", cookie)
       .send({ firstName: "Pat", lastName: "Client", email: email("client"), ...body });
   }
@@ -87,13 +86,13 @@ describe("Phase 11 AI assistance", () => {
     const proClient = await createClient(proOwner.cookie, proOrg.id);
 
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${standardOrg.id}/clients/${standardClient.body.id}/ai/client-summary`)
+      .post(`/api/v1/dietitian/${standardOrg.id}/clients/${standardClient.body.id}/ai/client-summary`)
       .set("Cookie", standardOwner.cookie)
       .send({})
       .expect(403);
 
     const ok = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${proOrg.id}/clients/${proClient.body.id}/ai/client-summary`)
+      .post(`/api/v1/dietitian/${proOrg.id}/clients/${proClient.body.id}/ai/client-summary`)
       .set("Cookie", proOwner.cookie)
       .send({})
       .expect(201);
@@ -110,7 +109,6 @@ describe("Phase 11 AI assistance", () => {
     await ctx.prisma.featureOverride.create({
       data: {
         dietitianAccountId: org.id,
-        organizationId: org.id,
         featureId: feature.id,
         enabled: true,
         limitValue: 1,
@@ -119,13 +117,13 @@ describe("Phase 11 AI assistance", () => {
     });
 
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${client.body.id}/ai/client-summary`)
+      .post(`/api/v1/dietitian/${org.id}/clients/${client.body.id}/ai/client-summary`)
       .set("Cookie", owner.cookie)
       .send({})
       .expect(201);
 
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${client.body.id}/ai/client-summary`)
+      .post(`/api/v1/dietitian/${org.id}/clients/${client.body.id}/ai/client-summary`)
       .set("Cookie", owner.cookie)
       .send({})
       .expect(429);
@@ -137,34 +135,28 @@ describe("Phase 11 AI assistance", () => {
     const outsider = await registerVerifyLogin();
     const orgA = await createOrg(ownerA.cookie, "Org A", "pro");
     const orgB = await createOrg(ownerB.cookie, "Org B", "pro");
-    const add = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${orgA.id}/members`)
-      .set("Cookie", ownerA.cookie)
-      .send({ email: outsider.address, role: "DIETITIAN" });
-    expect(add.status).toBe(400);
-    expect(add.body.message).toBe(MULTI_MEMBER_UNSUPPORTED);
 
     const clientA = await createClient(ownerA.cookie, orgA.id);
     const clientB = await createClient(ownerB.cookie, orgB.id);
 
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${orgB.id}/clients/${clientB.body.id}/ai/client-summary`)
+      .post(`/api/v1/dietitian/${orgB.id}/clients/${clientB.body.id}/ai/client-summary`)
       .set("Cookie", ownerA.cookie)
       .send({})
       .expect(403);
 
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${orgA.id}/clients/${clientB.body.id}/ai/client-summary`)
+      .post(`/api/v1/dietitian/${orgA.id}/clients/${clientB.body.id}/ai/client-summary`)
       .set("Cookie", ownerA.cookie)
       .send({})
       .expect(403);
 
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${orgA.id}/clients/${clientA.body.id}/ai/client-summary`)
+      .post(`/api/v1/dietitian/${orgA.id}/clients/${clientA.body.id}/ai/client-summary`)
       .set("Cookie", outsider.cookie)
       .send({})
       .expect(403)
-      .expect((res) => expect(res.body.message).toBe(ORGANIZATION_ACCESS_DENIED));
+      .expect((res) => expect(res.body.message).toBe(DIETITIAN_ACCESS_DENIED));
   });
 
   it("blocks client portal users from dietitian AI endpoints", async () => {
@@ -174,7 +166,7 @@ describe("Phase 11 AI assistance", () => {
     const portal = await connectClientPortal(ctx, owner.cookie, org.id, client.body);
 
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${client.body.id}/ai/client-summary`)
+      .post(`/api/v1/dietitian/${org.id}/clients/${client.body.id}/ai/client-summary`)
       .set("Cookie", portal)
       .send({})
       .expect(403);
@@ -186,13 +178,13 @@ describe("Phase 11 AI assistance", () => {
     const client = await createClient(owner.cookie, org.id);
 
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${client.body.id}/ai/meal-plan-assistance`)
+      .post(`/api/v1/dietitian/${org.id}/clients/${client.body.id}/ai/meal-plan-assistance`)
       .set("Cookie", owner.cookie)
       .send({ prompt: "Suggest breakfast variety" })
       .expect(201);
 
     const usage = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/ai/usage`)
+      .get(`/api/v1/dietitian/${org.id}/ai/usage`)
       .set("Cookie", owner.cookie)
       .expect(200);
 
@@ -208,7 +200,7 @@ describe("Phase 11 AI assistance", () => {
     await ctx.prisma.feature.update({ where: { key: FEATURE_KEYS.AI }, data: { status: "INACTIVE" } });
 
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${client.body.id}/ai/client-summary`)
+      .post(`/api/v1/dietitian/${org.id}/clients/${client.body.id}/ai/client-summary`)
       .set("Cookie", owner.cookie)
       .send({})
       .expect(403);

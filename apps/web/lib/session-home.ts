@@ -69,7 +69,7 @@ export async function resolveSessionHome(audience?: SessionAudience): Promise<Se
 
   let organizationIds: string[] = [];
   try {
-    const orgs = await api<OrgRow[]>("/api/v1/organizations");
+    const orgs = await api<OrgRow[]>("/api/v1/dietitian");
     organizationIds = orgs.map((org) => org.id);
   } catch (err) {
     if (!(err instanceof ApiError && (err.status === 401 || err.status === 403))) {

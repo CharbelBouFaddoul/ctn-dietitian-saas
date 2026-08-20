@@ -12,9 +12,9 @@ import {
 } from "@nestjs/common";
 import { ApiCookieAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { SessionGuard } from "../auth/guards/session.guard";
-import { CurrentTenant } from "../organizations/decorators/current-tenant.decorator";
-import { TenantGuard } from "../organizations/guards/tenant.guard";
-import type { TenantContext } from "../organizations/tenant.types";
+import { CurrentTenant } from "../dietitian/decorators/current-tenant.decorator";
+import { DietitianGuard } from "../dietitian/guards/dietitian.guard";
+import type { DietitianTenantContext } from "../dietitian/dietitian.types";
 import {
   CreateMealDto,
   CreateMealItemDto,
@@ -29,31 +29,31 @@ import { MealPlanService } from "./meal-plan.service";
 
 @ApiTags("meal-plans")
 @ApiCookieAuth()
-@UseGuards(SessionGuard, TenantGuard)
-@Controller("api/v1/organizations/:organizationId/meal-plans")
+@UseGuards(SessionGuard, DietitianGuard)
+@Controller("api/v1/dietitian/:dietitianAccountId/meal-plans")
 export class MealPlanController {
   constructor(private readonly plans: MealPlanService) {}
 
   @Get()
   @ApiOperation({ summary: "List meal plans visible to the current member" })
-  list(@CurrentTenant() tenant: TenantContext, @Query() query: ListMealPlansQueryDto) {
+  list(@CurrentTenant() tenant: DietitianTenantContext, @Query() query: ListMealPlansQueryDto) {
     return this.plans.list(tenant, query);
   }
 
   @Post()
   @ApiOperation({ summary: "Create a meal plan and draft version 1" })
-  create(@CurrentTenant() tenant: TenantContext, @Body() body: CreateMealPlanDto) {
+  create(@CurrentTenant() tenant: DietitianTenantContext, @Body() body: CreateMealPlanDto) {
     return this.plans.create(tenant, body.clientId, body);
   }
 
   @Get(":planId")
-  get(@CurrentTenant() tenant: TenantContext, @Param("planId", ParseUUIDPipe) planId: string) {
+  get(@CurrentTenant() tenant: DietitianTenantContext, @Param("planId", ParseUUIDPipe) planId: string) {
     return this.plans.get(tenant, planId);
   }
 
   @Patch(":planId")
   update(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("planId", ParseUUIDPipe) planId: string,
     @Body() body: UpdateMealPlanDto,
   ) {
@@ -61,18 +61,18 @@ export class MealPlanController {
   }
 
   @Post(":planId/archive")
-  archive(@CurrentTenant() tenant: TenantContext, @Param("planId", ParseUUIDPipe) planId: string) {
+  archive(@CurrentTenant() tenant: DietitianTenantContext, @Param("planId", ParseUUIDPipe) planId: string) {
     return this.plans.archive(tenant, planId);
   }
 
   @Post(":planId/versions")
-  createDraft(@CurrentTenant() tenant: TenantContext, @Param("planId", ParseUUIDPipe) planId: string) {
+  createDraft(@CurrentTenant() tenant: DietitianTenantContext, @Param("planId", ParseUUIDPipe) planId: string) {
     return this.plans.createDraftVersion(tenant, planId);
   }
 
   @Get(":planId/versions/:versionId")
   getVersion(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("planId", ParseUUIDPipe) planId: string,
     @Param("versionId", ParseUUIDPipe) versionId: string,
   ) {
@@ -81,7 +81,7 @@ export class MealPlanController {
 
   @Post(":planId/versions/:versionId/publish")
   publish(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("planId", ParseUUIDPipe) planId: string,
     @Param("versionId", ParseUUIDPipe) versionId: string,
   ) {
@@ -90,7 +90,7 @@ export class MealPlanController {
 
   @Post(":planId/versions/:versionId/days")
   addDay(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("planId", ParseUUIDPipe) planId: string,
     @Param("versionId", ParseUUIDPipe) versionId: string,
     @Body() body: UpdateDayDto,
@@ -100,7 +100,7 @@ export class MealPlanController {
 
   @Patch(":planId/versions/:versionId/days/:dayId")
   updateDay(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("planId", ParseUUIDPipe) planId: string,
     @Param("versionId", ParseUUIDPipe) versionId: string,
     @Param("dayId", ParseUUIDPipe) dayId: string,
@@ -111,7 +111,7 @@ export class MealPlanController {
 
   @Delete(":planId/versions/:versionId/days/:dayId")
   deleteDay(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("planId", ParseUUIDPipe) planId: string,
     @Param("versionId", ParseUUIDPipe) versionId: string,
     @Param("dayId", ParseUUIDPipe) dayId: string,
@@ -121,7 +121,7 @@ export class MealPlanController {
 
   @Post(":planId/versions/:versionId/days/:dayId/meals")
   addMeal(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("planId", ParseUUIDPipe) planId: string,
     @Param("versionId", ParseUUIDPipe) versionId: string,
     @Param("dayId", ParseUUIDPipe) dayId: string,
@@ -132,7 +132,7 @@ export class MealPlanController {
 
   @Patch(":planId/versions/:versionId/meals/:mealId")
   updateMeal(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("planId", ParseUUIDPipe) planId: string,
     @Param("versionId", ParseUUIDPipe) versionId: string,
     @Param("mealId", ParseUUIDPipe) mealId: string,
@@ -143,7 +143,7 @@ export class MealPlanController {
 
   @Delete(":planId/versions/:versionId/meals/:mealId")
   deleteMeal(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("planId", ParseUUIDPipe) planId: string,
     @Param("versionId", ParseUUIDPipe) versionId: string,
     @Param("mealId", ParseUUIDPipe) mealId: string,
@@ -153,7 +153,7 @@ export class MealPlanController {
 
   @Post(":planId/versions/:versionId/meals/:mealId/items")
   addItem(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("planId", ParseUUIDPipe) planId: string,
     @Param("versionId", ParseUUIDPipe) versionId: string,
     @Param("mealId", ParseUUIDPipe) mealId: string,
@@ -164,7 +164,7 @@ export class MealPlanController {
 
   @Patch(":planId/versions/:versionId/items/:itemId")
   updateItem(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("planId", ParseUUIDPipe) planId: string,
     @Param("versionId", ParseUUIDPipe) versionId: string,
     @Param("itemId", ParseUUIDPipe) itemId: string,
@@ -175,7 +175,7 @@ export class MealPlanController {
 
   @Delete(":planId/versions/:versionId/items/:itemId")
   deleteItem(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("planId", ParseUUIDPipe) planId: string,
     @Param("versionId", ParseUUIDPipe) versionId: string,
     @Param("itemId", ParseUUIDPipe) itemId: string,

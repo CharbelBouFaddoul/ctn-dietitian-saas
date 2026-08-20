@@ -51,13 +51,12 @@ model User {
   invitationsCreated      InvitationToken[]        @relation("InvitationCreatedBy")
   invitationsUsed         InvitationToken[]        @relation("InvitationUsedBy")
   consents                Consent[]
-  memberships             OrganizationMember[]
-  organizationsCreated    Organization[]           @relation("OrganizationCreatedBy")
   featureOverridesCreated FeatureOverride[]        @relation("FeatureOverrideCreatedBy")
   auditLogs               AuditLog[]               @relation("AuditLogActor")
   dietitianAccount        DietitianAccount?
   clientAccounts          ClientAccount[]
   clientsCreated          Client[]                 @relation("ClientCreatedBy")
+  clientAssignments       ClientAssignment[]       @relation("ClientAssignmentUser")
   assignmentsMade         ClientAssignment[]       @relation("AssignmentAssignedBy")
   goalsCreated            ClientGoal[]             @relation("GoalCreatedBy")
   measurementsRecorded    ClientMeasurement[]      @relation("MeasurementRecordedBy")
@@ -71,16 +70,16 @@ model User {
   mealPlansCreated        MealPlan[]               @relation("MealPlanCreatedBy")
   mealPlanVersionsCreated MealPlanVersion[]        @relation("MealPlanVersionCreatedBy")
   messagesSent            Message[]
-  documentsUploaded       Document[]                 @relation("DocumentUploadedBy")
-  documentsShared         Document[]                 @relation("DocumentSharedBy")
+  documentsUploaded       Document[]               @relation("DocumentUploadedBy")
+  documentsShared         Document[]               @relation("DocumentSharedBy")
   notifications           Notification[]
   conversationReadStates  ConversationReadState[]
-  invoicesCreated         Invoice[]                  @relation("InvoiceCreatedBy")
-  tasksCreated            Task[]                     @relation("TaskCreatedBy")
-  tasksAssigned           Task[]                     @relation("TaskAssignedUser")
+  invoicesCreated         Invoice[]                @relation("InvoiceCreatedBy")
+  tasksCreated            Task[]                   @relation("TaskCreatedBy")
+  tasksAssigned           Task[]                   @relation("TaskAssignedUser")
   aiRequests              AiRequest[]
-  automationRulesCreated  AutomationRule[]           @relation("AutomationRuleCreatedBy")
-  automationRulesUpdated  AutomationRule[]           @relation("AutomationRuleUpdatedBy")
+  automationRulesCreated  AutomationRule[]         @relation("AutomationRuleCreatedBy")
+  automationRulesUpdated  AutomationRule[]         @relation("AutomationRuleUpdatedBy")
 
   @@map("users")
 }
@@ -135,18 +134,17 @@ model PasswordResetToken {
 }
 
 model InvitationToken {
-  id              String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tokenHash       String             @unique @map("token_hash")
-  purpose         InvitationPurpose
-  emailNormalized String?            @map("email_normalized")
-  createdById     String?            @map("created_by_id") @db.Uuid
-  usedById        String?            @map("used_by_id") @db.Uuid
-  clientId        String?            @map("client_id") @db.Uuid
-  organizationId      String?            @map("organization_id") @db.Uuid
-  dietitianAccountId  String?            @map("dietitian_account_id") @db.Uuid
-  expiresAt           DateTime           @map("expires_at") @db.Timestamptz
-  usedAt              DateTime?          @map("used_at") @db.Timestamptz
-  createdAt           DateTime           @default(now()) @map("created_at") @db.Timestamptz
+  id                 String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tokenHash          String            @unique @map("token_hash")
+  purpose            InvitationPurpose
+  emailNormalized    String?           @map("email_normalized")
+  createdById        String?           @map("created_by_id") @db.Uuid
+  usedById           String?           @map("used_by_id") @db.Uuid
+  clientId           String?           @map("client_id") @db.Uuid
+  dietitianAccountId String?           @map("dietitian_account_id") @db.Uuid
+  expiresAt          DateTime          @map("expires_at") @db.Timestamptz
+  usedAt             DateTime?         @map("used_at") @db.Timestamptz
+  createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamptz
 
   createdBy        User?             @relation("InvitationCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   usedBy           User?             @relation("InvitationUsedBy", fields: [usedById], references: [id], onDelete: SetNull)
@@ -174,24 +172,6 @@ model Consent {
   @@map("consents")
 }
 
-enum OrganizationStatus {
-  PENDING
-  ACTIVE
-  SUSPENDED
-  ARCHIVED
-}
-
-enum OrganizationRole {
-  OWNER
-  DIETITIAN
-  STAFF
-}
-
-enum MembershipStatus {
-  ACTIVE
-  DEACTIVATED
-}
-
 enum WeightUnit {
   kg
   lb
@@ -208,82 +188,6 @@ enum DateFormat {
   MM_DD_YYYY
 }
 
-model Organization {
-  id          String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name        String
-  slug        String             @unique
-  status      OrganizationStatus @default(ACTIVE)
-  createdById String?            @map("created_by_id") @db.Uuid
-  createdAt   DateTime           @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt   DateTime           @updatedAt @map("updated_at") @db.Timestamptz
-  archivedAt  DateTime?          @map("archived_at") @db.Timestamptz
-  suspendedAt DateTime?          @map("suspended_at") @db.Timestamptz
-
-  /// Legacy tenant root — kept for forensics/rollback. Runtime tenancy uses DietitianAccount.
-  createdBy User?                 @relation("OrganizationCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  settings  OrganizationSettings?
-  members   OrganizationMember[]
-
-  @@map("organizations")
-}
-
-model OrganizationSettings {
-  id                       String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId           String     @unique @map("organization_id") @db.Uuid
-  timezone                 String
-  locale                   String
-  currency                 String
-  weightUnit               WeightUnit @map("weight_unit")
-  heightUnit               HeightUnit @map("height_unit")
-  dateFormat               DateFormat @map("date_format")
-  practiceName             String?    @map("practice_name")
-  logoStorageKey           String?    @map("logo_storage_key")
-  contactEmail             String?    @map("contact_email")
-  contactPhone             String?    @map("contact_phone")
-  addressLine1             String?    @map("address_line1")
-  addressLine2             String?    @map("address_line2")
-  city                     String?
-  region                   String?
-  postalCode               String?    @map("postal_code")
-  country                  String?
-  defaultAppointmentMinutes Int       @default(60) @map("default_appointment_minutes")
-  reminderEmailEnabled     Boolean    @default(true) @map("reminder_email_enabled")
-  reminderHoursBefore      Int        @default(24) @map("reminder_hours_before")
-  invoiceDefaultDueDays    Int        @default(14) @map("invoice_default_due_days")
-  invoiceFooter            String?    @map("invoice_footer") @db.Text
-  emailFromName            String?    @map("email_from_name")
-  emailReplyTo             String?    @map("email_reply_to")
-  createdAt                DateTime   @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt                DateTime   @updatedAt @map("updated_at") @db.Timestamptz
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-
-  @@map("organization_settings")
-}
-
-model OrganizationMember {
-  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId String           @map("organization_id") @db.Uuid
-  userId         String           @map("user_id") @db.Uuid
-  role           OrganizationRole
-  status         MembershipStatus @default(ACTIVE)
-  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt      DateTime         @updatedAt @map("updated_at") @db.Timestamptz
-  joinedAt       DateTime         @default(now()) @map("joined_at") @db.Timestamptz
-  deactivatedAt  DateTime?        @map("deactivated_at") @db.Timestamptz
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  assignments  ClientAssignment[]
-  appointments Appointment[]
-  tasksAssigned Task[]
-
-  @@unique([organizationId, userId])
-  @@index([userId])
-  @@index([organizationId, status])
-  @@map("organization_members")
-}
-
 enum DietitianAccountStatus {
   ACTIVE
   SUSPENDED
@@ -291,69 +195,67 @@ enum DietitianAccountStatus {
 }
 
 model DietitianAccount {
-  id                   String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId               String                 @unique @map("user_id") @db.Uuid
-  displayName          String                 @map("display_name")
-  slug                 String                 @unique
-  status               DietitianAccountStatus @default(ACTIVE)
-  phone                String?
-  professionalTitle    String?                @map("professional_title")
-  specialization       String?
-  country              String?
-  photoStorageKey      String?                @map("photo_storage_key")
-  legacyOrganizationId String?                @map("legacy_organization_id") @db.Uuid
-  createdAt            DateTime               @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt            DateTime               @updatedAt @map("updated_at") @db.Timestamptz
-  archivedAt           DateTime?              @map("archived_at") @db.Timestamptz
-  suspendedAt          DateTime?              @map("suspended_at") @db.Timestamptz
+  id                String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId            String                 @unique @map("user_id") @db.Uuid
+  displayName       String                 @map("display_name")
+  slug              String                 @unique
+  status            DietitianAccountStatus @default(ACTIVE)
+  phone             String?
+  professionalTitle String?                @map("professional_title")
+  specialization    String?
+  country           String?
+  photoStorageKey   String?                @map("photo_storage_key")
+  createdAt         DateTime               @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime               @updatedAt @map("updated_at") @db.Timestamptz
+  archivedAt        DateTime?              @map("archived_at") @db.Timestamptz
+  suspendedAt       DateTime?              @map("suspended_at") @db.Timestamptz
 
-  user                User                 @relation(fields: [userId], references: [id], onDelete: Restrict)
-  settings            DietitianSettings?
-  subscription        Subscription?
-  featureOverrides    FeatureOverride[]
-  auditLogs           AuditLog[]
-  clients             Client[]
-  clientAccounts      ClientAccount[]
-  clientAssignments   ClientAssignment[]
-  clientProfiles      ClientProfile[]
-  clientGoals         ClientGoal[]
-  clientTags          ClientTag[]
-  clientMeasurements  ClientMeasurement[]
-  tags                Tag[]
-  timelineEvents      TimelineEvent[]
-  assessmentTemplates AssessmentTemplate[]
-  assessments         Assessment[]
-  appointments        Appointment[]
-  invitationTokens    InvitationToken[]
-  foodOverrides       FoodOverride[]
-  recipes             Recipe[]
-  recipeIngredients   RecipeIngredient[]
-  mealPlans           MealPlan[]
-  mealPlanVersions    MealPlanVersion[]
-  mealPlanDays        MealPlanDay[]
-  meals               Meal[]
-  mealItems           MealItem[]
-  foodLogs            FoodLog[]
-  waterLogs           WaterLog[]
-  exerciseLogs        ExerciseLog[]
-  sleepLogs           SleepLog[]
-  habitLogs           HabitLog[]
-  conversations       Conversation[]
-  messages            Message[]
+  user                   User                    @relation(fields: [userId], references: [id], onDelete: Restrict)
+  settings               DietitianSettings?
+  subscription           Subscription?
+  featureOverrides       FeatureOverride[]
+  auditLogs              AuditLog[]
+  clients                Client[]
+  clientAccounts         ClientAccount[]
+  clientAssignments      ClientAssignment[]
+  clientProfiles         ClientProfile[]
+  clientGoals            ClientGoal[]
+  clientTags             ClientTag[]
+  clientMeasurements     ClientMeasurement[]
+  tags                   Tag[]
+  timelineEvents         TimelineEvent[]
+  assessmentTemplates    AssessmentTemplate[]
+  assessments            Assessment[]
+  appointments           Appointment[]
+  invitationTokens       InvitationToken[]
+  foodOverrides          FoodOverride[]
+  recipes                Recipe[]
+  recipeIngredients      RecipeIngredient[]
+  mealPlans              MealPlan[]
+  mealPlanVersions       MealPlanVersion[]
+  mealPlanDays           MealPlanDay[]
+  meals                  Meal[]
+  mealItems              MealItem[]
+  foodLogs               FoodLog[]
+  waterLogs              WaterLog[]
+  exerciseLogs           ExerciseLog[]
+  sleepLogs              SleepLog[]
+  habitLogs              HabitLog[]
+  conversations          Conversation[]
+  messages               Message[]
   conversationReadStates ConversationReadState[]
-  documents           Document[]
-  notifications       Notification[]
-  invoices            Invoice[]
-  invoiceItems        InvoiceItem[]
-  invoiceSequence     InvoiceSequence?
-  tasks               Task[]
-  aiRequests          AiRequest[]
-  aiUsage             AiUsage[]
-  automationRules     AutomationRule[]
-  automationRuns      AutomationRun[]
-  automationUsage     AutomationUsage[]
+  documents              Document[]
+  notifications          Notification[]
+  invoices               Invoice[]
+  invoiceItems           InvoiceItem[]
+  invoiceSequence        InvoiceSequence?
+  tasks                  Task[]
+  aiRequests             AiRequest[]
+  aiUsage                AiUsage[]
+  automationRules        AutomationRule[]
+  automationRuns         AutomationRun[]
+  automationUsage        AutomationUsage[]
 
-  @@index([legacyOrganizationId])
   @@index([status])
   @@map("dietitian_accounts")
 }
@@ -391,7 +293,6 @@ model DietitianSettings {
 
   @@map("dietitian_settings")
 }
-
 
 enum CatalogStatus {
   ACTIVE
@@ -454,14 +355,14 @@ model Feature {
 }
 
 model PlanFeature {
-  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  planId         String   @map("plan_id") @db.Uuid
-  featureId      String   @map("feature_id") @db.Uuid
-  enabled        Boolean  @default(false)
-  limitValue     Int?     @map("limit_value")
-  configuration  Json?
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  planId        String   @map("plan_id") @db.Uuid
+  featureId     String   @map("feature_id") @db.Uuid
+  enabled       Boolean  @default(false)
+  limitValue    Int?     @map("limit_value")
+  configuration Json?
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   plan    Plan    @relation(fields: [planId], references: [id], onDelete: Restrict)
   feature Feature @relation(fields: [featureId], references: [id], onDelete: Restrict)
@@ -473,8 +374,7 @@ model PlanFeature {
 
 model Subscription {
   id                 String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  dietitianAccountId String?            @unique @map("dietitian_account_id") @db.Uuid
-  organizationId     String?            @map("organization_id") @db.Uuid
+  dietitianAccountId String             @unique @map("dietitian_account_id") @db.Uuid
   planId             String             @map("plan_id") @db.Uuid
   status             SubscriptionStatus @default(PENDING)
   startedAt          DateTime?          @map("started_at") @db.Timestamptz
@@ -490,10 +390,9 @@ model Subscription {
   createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamptz
   updatedAt          DateTime           @updatedAt @map("updated_at") @db.Timestamptz
 
-  dietitianAccount DietitianAccount? @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
-  plan             Plan              @relation(fields: [planId], references: [id], onDelete: Restrict)
+  dietitianAccount DietitianAccount @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
+  plan             Plan             @relation(fields: [planId], references: [id], onDelete: Restrict)
 
-  @@index([organizationId])
   @@index([planId])
   @@index([status])
   @@map("subscriptions")
@@ -501,8 +400,7 @@ model Subscription {
 
 model FeatureOverride {
   id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  dietitianAccountId String?  @map("dietitian_account_id") @db.Uuid
-  organizationId     String   @map("organization_id") @db.Uuid
+  dietitianAccountId String   @map("dietitian_account_id") @db.Uuid
   featureId          String   @map("feature_id") @db.Uuid
   enabled            Boolean?
   limitValue         Int?     @map("limit_value")
@@ -512,11 +410,10 @@ model FeatureOverride {
   createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
-  dietitianAccount DietitianAccount? @relation(fields: [dietitianAccountId], references: [id], onDelete: Cascade)
-  feature          Feature           @relation(fields: [featureId], references: [id], onDelete: Restrict)
-  createdBy        User?             @relation("FeatureOverrideCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  dietitianAccount DietitianAccount @relation(fields: [dietitianAccountId], references: [id], onDelete: Cascade)
+  feature          Feature          @relation(fields: [featureId], references: [id], onDelete: Restrict)
+  createdBy        User?            @relation("FeatureOverrideCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 
-  @@unique([organizationId, featureId])
   @@unique([dietitianAccountId, featureId])
   @@index([featureId])
   @@index([dietitianAccountId])
@@ -526,7 +423,6 @@ model FeatureOverride {
 model AuditLog {
   id                 String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   actorUserId        String?     @map("actor_user_id") @db.Uuid
-  organizationId     String?     @map("organization_id") @db.Uuid
   dietitianAccountId String?     @map("dietitian_account_id") @db.Uuid
   action             String
   targetType         String?     @map("target_type")
@@ -542,7 +438,6 @@ model AuditLog {
   dietitianAccount DietitianAccount? @relation(fields: [dietitianAccountId], references: [id], onDelete: SetNull)
 
   @@index([actorUserId])
-  @@index([organizationId])
   @@index([dietitianAccountId])
   @@index([action])
   @@index([createdAt])
@@ -773,8 +668,7 @@ enum AutomationRunStatus {
 
 model Client {
   id                 String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  dietitianAccountId String?      @map("dietitian_account_id") @db.Uuid
-  organizationId     String       @map("organization_id") @db.Uuid
+  dietitianAccountId String       @map("dietitian_account_id") @db.Uuid
   code               String?
   firstName          String       @map("first_name")
   lastName           String       @map("last_name")
@@ -789,8 +683,8 @@ model Client {
   updatedAt          DateTime     @updatedAt @map("updated_at") @db.Timestamptz
   archivedAt         DateTime?    @map("archived_at") @db.Timestamptz
 
-  dietitianAccount DietitianAccount? @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
-  createdBy        User?             @relation("ClientCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  dietitianAccount DietitianAccount    @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
+  createdBy        User?               @relation("ClientCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   account          ClientAccount?
   profile          ClientProfile?
   assignments      ClientAssignment[]
@@ -814,12 +708,9 @@ model Client {
   aiRequests       AiRequest[]
   activeSessions   Session[]
 
-  @@index([organizationId, status])
-  @@index([organizationId, lastName])
+  @@unique([dietitianAccountId, code])
   @@index([dietitianAccountId, status])
   @@index([dietitianAccountId, lastName])
-  @@unique([organizationId, code])
-  @@unique([dietitianAccountId, code])
   @@map("clients")
 }
 
@@ -827,93 +718,85 @@ model ClientAccount {
   id                 String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId             String              @map("user_id") @db.Uuid
   clientId           String              @unique @map("client_id") @db.Uuid
-  dietitianAccountId String?             @map("dietitian_account_id") @db.Uuid
-  organizationId     String              @map("organization_id") @db.Uuid
+  dietitianAccountId String              @map("dietitian_account_id") @db.Uuid
   status             ClientAccountStatus @default(PENDING)
   createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamptz
   activatedAt        DateTime?           @map("activated_at") @db.Timestamptz
   deactivatedAt      DateTime?           @map("deactivated_at") @db.Timestamptz
 
-  user             User              @relation(fields: [userId], references: [id], onDelete: Restrict)
-  client           Client            @relation(fields: [clientId], references: [id], onDelete: Restrict)
-  dietitianAccount DietitianAccount? @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
+  user             User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  client           Client           @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  dietitianAccount DietitianAccount @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
 
   @@unique([userId, dietitianAccountId])
   @@index([userId])
-  @@index([organizationId])
   @@index([dietitianAccountId])
   @@map("client_accounts")
 }
 
 model ClientAssignment {
-  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  dietitianAccountId   String?   @map("dietitian_account_id") @db.Uuid
-  organizationId       String    @map("organization_id") @db.Uuid
-  clientId             String    @map("client_id") @db.Uuid
-  organizationMemberId String    @map("organization_member_id") @db.Uuid
-  assignedById         String?   @map("assigned_by_id") @db.Uuid
-  assignedAt           DateTime  @default(now()) @map("assigned_at") @db.Timestamptz
-  unassignedAt         DateTime? @map("unassigned_at") @db.Timestamptz
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  dietitianAccountId String    @map("dietitian_account_id") @db.Uuid
+  clientId           String    @map("client_id") @db.Uuid
+  userId             String    @map("user_id") @db.Uuid
+  assignedById       String?   @map("assigned_by_id") @db.Uuid
+  assignedAt         DateTime  @default(now()) @map("assigned_at") @db.Timestamptz
+  unassignedAt       DateTime? @map("unassigned_at") @db.Timestamptz
 
-  client             Client              @relation(fields: [clientId], references: [id], onDelete: Restrict)
-  organizationMember OrganizationMember  @relation(fields: [organizationMemberId], references: [id], onDelete: Restrict)
-  assignedBy         User?               @relation("AssignmentAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
-  dietitianAccount   DietitianAccount?   @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
+  client           Client           @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  user             User             @relation("ClientAssignmentUser", fields: [userId], references: [id], onDelete: Restrict)
+  assignedBy       User?            @relation("AssignmentAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+  dietitianAccount DietitianAccount @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
 
-  @@index([organizationId, clientId])
   @@index([dietitianAccountId, clientId])
-  @@index([organizationMemberId, unassignedAt])
+  @@index([userId, unassignedAt])
   @@index([clientId, unassignedAt])
   @@map("client_assignments")
 }
 
 model ClientProfile {
-  id                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  dietitianAccountId   String?  @map("dietitian_account_id") @db.Uuid
-  organizationId       String   @map("organization_id") @db.Uuid
-  clientId             String   @unique @map("client_id") @db.Uuid
-  nutritionContext     String?  @map("nutrition_context") @db.Text
-  preferences          String?  @db.Text
-  dietaryPreferences   String?  @map("dietary_preferences") @db.Text
-  allergies            String?  @db.Text
-  intolerances         String?  @db.Text
-  lifestyle            String?  @db.Text
-  notes                String?  @db.Text
-  emergencyContactName String?  @map("emergency_contact_name")
-  emergencyContactPhone String? @map("emergency_contact_phone")
-  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt            DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  dietitianAccountId    String   @map("dietitian_account_id") @db.Uuid
+  clientId              String   @unique @map("client_id") @db.Uuid
+  nutritionContext      String?  @map("nutrition_context") @db.Text
+  preferences           String?  @db.Text
+  dietaryPreferences    String?  @map("dietary_preferences") @db.Text
+  allergies             String?  @db.Text
+  intolerances          String?  @db.Text
+  lifestyle             String?  @db.Text
+  notes                 String?  @db.Text
+  emergencyContactName  String?  @map("emergency_contact_name")
+  emergencyContactPhone String?  @map("emergency_contact_phone")
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt             DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
-  client           Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  dietitianAccount DietitianAccount? @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
+  client           Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  dietitianAccount DietitianAccount @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
 
-  @@index([organizationId])
   @@index([dietitianAccountId])
   @@map("client_profiles")
 }
 
 model ClientGoal {
   id                 String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  dietitianAccountId String?    @map("dietitian_account_id") @db.Uuid
-  organizationId     String     @map("organization_id") @db.Uuid
+  dietitianAccountId String     @map("dietitian_account_id") @db.Uuid
   clientId           String     @map("client_id") @db.Uuid
-  title          String
-  description    String?    @db.Text
-  status         GoalStatus @default(ACTIVE)
-  targetValue    Decimal?   @map("target_value") @db.Decimal(12, 3)
-  targetUnit     String?    @map("target_unit")
-  startDate      DateTime?  @map("start_date") @db.Date
-  targetDate     DateTime?  @map("target_date") @db.Date
-  completedAt    DateTime?  @map("completed_at") @db.Timestamptz
-  createdById    String?    @map("created_by_id") @db.Uuid
-  createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt      DateTime   @updatedAt @map("updated_at") @db.Timestamptz
+  title              String
+  description        String?    @db.Text
+  status             GoalStatus @default(ACTIVE)
+  targetValue        Decimal?   @map("target_value") @db.Decimal(12, 3)
+  targetUnit         String?    @map("target_unit")
+  startDate          DateTime?  @map("start_date") @db.Date
+  targetDate         DateTime?  @map("target_date") @db.Date
+  completedAt        DateTime?  @map("completed_at") @db.Timestamptz
+  createdById        String?    @map("created_by_id") @db.Uuid
+  createdAt          DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime   @updatedAt @map("updated_at") @db.Timestamptz
 
-  client           Client            @relation(fields: [clientId], references: [id], onDelete: Restrict)
-  createdBy        User?             @relation("GoalCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  dietitianAccount DietitianAccount? @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
+  client           Client           @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  createdBy        User?            @relation("GoalCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  dietitianAccount DietitianAccount @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
 
-  @@index([organizationId, clientId])
   @@index([dietitianAccountId, clientId])
   @@index([clientId, status])
   @@map("client_goals")
@@ -921,43 +804,38 @@ model ClientGoal {
 
 model Tag {
   id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  dietitianAccountId String?  @map("dietitian_account_id") @db.Uuid
-  organizationId     String   @map("organization_id") @db.Uuid
+  dietitianAccountId String   @map("dietitian_account_id") @db.Uuid
   name               String
   color              String?
   createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
-  dietitianAccount DietitianAccount? @relation(fields: [dietitianAccountId], references: [id], onDelete: Cascade)
+  dietitianAccount DietitianAccount @relation(fields: [dietitianAccountId], references: [id], onDelete: Cascade)
   clients          ClientTag[]
 
-  @@unique([organizationId, name])
   @@unique([dietitianAccountId, name])
   @@map("tags")
 }
 
 model ClientTag {
   id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  dietitianAccountId String?  @map("dietitian_account_id") @db.Uuid
-  organizationId     String   @map("organization_id") @db.Uuid
+  dietitianAccountId String   @map("dietitian_account_id") @db.Uuid
   clientId           String   @map("client_id") @db.Uuid
   tagId              String   @map("tag_id") @db.Uuid
   createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  client           Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  tag              Tag               @relation(fields: [tagId], references: [id], onDelete: Cascade)
-  dietitianAccount DietitianAccount? @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
+  client           Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  tag              Tag              @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  dietitianAccount DietitianAccount @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
 
   @@unique([clientId, tagId])
-  @@index([organizationId, tagId])
   @@index([dietitianAccountId, tagId])
   @@map("client_tags")
 }
 
 model TimelineEvent {
   id                 String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  dietitianAccountId String?           @map("dietitian_account_id") @db.Uuid
-  organizationId     String            @map("organization_id") @db.Uuid
+  dietitianAccountId String            @map("dietitian_account_id") @db.Uuid
   clientId           String            @map("client_id") @db.Uuid
   type               TimelineEventType
   targetType         String?           @map("target_type")
@@ -967,11 +845,10 @@ model TimelineEvent {
   metadata           Json?
   createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamptz
 
-  dietitianAccount DietitianAccount? @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
-  client           Client            @relation(fields: [clientId], references: [id], onDelete: Restrict)
-  actor            User?             @relation("TimelineActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  dietitianAccount DietitianAccount @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
+  client           Client           @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  actor            User?            @relation("TimelineActor", fields: [actorUserId], references: [id], onDelete: SetNull)
 
-  @@index([organizationId, clientId, occurredAt])
   @@index([dietitianAccountId, clientId, occurredAt])
   @@index([clientId, occurredAt])
   @@map("timeline_events")
@@ -979,8 +856,7 @@ model TimelineEvent {
 
 model AssessmentTemplate {
   id                 String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  dietitianAccountId String?        @map("dietitian_account_id") @db.Uuid
-  organizationId     String?        @map("organization_id") @db.Uuid
+  dietitianAccountId String         @map("dietitian_account_id") @db.Uuid
   name               String
   description        String?        @db.Text
   status             TemplateStatus @default(ACTIVE)
@@ -990,19 +866,17 @@ model AssessmentTemplate {
   createdAt          DateTime       @default(now()) @map("created_at") @db.Timestamptz
   updatedAt          DateTime       @updatedAt @map("updated_at") @db.Timestamptz
 
-  dietitianAccount DietitianAccount? @relation(fields: [dietitianAccountId], references: [id], onDelete: SetNull)
-  createdBy        User?             @relation("TemplateCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  dietitianAccount DietitianAccount @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
+  createdBy        User?            @relation("TemplateCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   assessments      Assessment[]
 
-  @@index([organizationId, status])
   @@index([dietitianAccountId, status])
   @@map("assessment_templates")
 }
 
 model Assessment {
   id                 String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  dietitianAccountId String?          @map("dietitian_account_id") @db.Uuid
-  organizationId     String           @map("organization_id") @db.Uuid
+  dietitianAccountId String           @map("dietitian_account_id") @db.Uuid
   clientId           String           @map("client_id") @db.Uuid
   templateId         String           @map("template_id") @db.Uuid
   templateVersion    Int              @map("template_version")
@@ -1014,12 +888,11 @@ model Assessment {
   createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamptz
   updatedAt          DateTime         @updatedAt @map("updated_at") @db.Timestamptz
 
-  dietitianAccount DietitianAccount?  @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
+  dietitianAccount DietitianAccount   @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
   client           Client             @relation(fields: [clientId], references: [id], onDelete: Restrict)
   template         AssessmentTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
   createdBy        User?              @relation("AssessmentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 
-  @@index([organizationId, clientId])
   @@index([dietitianAccountId, clientId])
   @@index([clientId, status])
   @@map("assessments")
@@ -1027,8 +900,7 @@ model Assessment {
 
 model ClientMeasurement {
   id                 String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  dietitianAccountId String?         @map("dietitian_account_id") @db.Uuid
-  organizationId     String          @map("organization_id") @db.Uuid
+  dietitianAccountId String          @map("dietitian_account_id") @db.Uuid
   clientId           String          @map("client_id") @db.Uuid
   type               MeasurementType
   value              Decimal         @db.Decimal(12, 3)
@@ -1038,40 +910,34 @@ model ClientMeasurement {
   notes              String?         @db.Text
   createdAt          DateTime        @default(now()) @map("created_at") @db.Timestamptz
 
-  client           Client            @relation(fields: [clientId], references: [id], onDelete: Restrict)
-  recordedBy       User?             @relation("MeasurementRecordedBy", fields: [recordedById], references: [id], onDelete: SetNull)
-  dietitianAccount DietitianAccount? @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
+  client           Client           @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  recordedBy       User?            @relation("MeasurementRecordedBy", fields: [recordedById], references: [id], onDelete: SetNull)
+  dietitianAccount DietitianAccount @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
 
-  @@index([organizationId, clientId])
   @@index([dietitianAccountId, clientId])
   @@index([clientId, measuredAt])
   @@map("client_measurements")
 }
 
 model Appointment {
-  id                   String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  dietitianAccountId   String?           @map("dietitian_account_id") @db.Uuid
-  organizationId       String            @map("organization_id") @db.Uuid
-  clientId             String            @map("client_id") @db.Uuid
-  assignedMemberId     String?           @map("assigned_member_id") @db.Uuid
-  assignedUserId       String?           @map("assigned_user_id") @db.Uuid
-  title                String
-  startAt              DateTime          @map("start_at") @db.Timestamptz
-  endAt                DateTime          @map("end_at") @db.Timestamptz
-  status               AppointmentStatus @default(SCHEDULED)
-  notes                String?           @db.Text
-  createdById          String?           @map("created_by_id") @db.Uuid
-  createdAt            DateTime          @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt            DateTime          @updatedAt @map("updated_at") @db.Timestamptz
+  id                 String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  dietitianAccountId String            @map("dietitian_account_id") @db.Uuid
+  clientId           String            @map("client_id") @db.Uuid
+  assignedUserId     String?           @map("assigned_user_id") @db.Uuid
+  title              String
+  startAt            DateTime          @map("start_at") @db.Timestamptz
+  endAt              DateTime          @map("end_at") @db.Timestamptz
+  status             AppointmentStatus @default(SCHEDULED)
+  notes              String?           @db.Text
+  createdById        String?           @map("created_by_id") @db.Uuid
+  createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime          @updatedAt @map("updated_at") @db.Timestamptz
 
-  dietitianAccount DietitianAccount?   @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
-  client           Client              @relation(fields: [clientId], references: [id], onDelete: Restrict)
-  assignedMember   OrganizationMember? @relation(fields: [assignedMemberId], references: [id], onDelete: SetNull)
-  assignedUser     User?               @relation("AppointmentAssignedUser", fields: [assignedUserId], references: [id], onDelete: SetNull)
-  createdBy        User?               @relation("AppointmentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  dietitianAccount DietitianAccount @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
+  client           Client           @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  assignedUser     User?            @relation("AppointmentAssignedUser", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  createdBy        User?            @relation("AppointmentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 
-  @@index([organizationId, startAt])
-  @@index([organizationId, clientId])
   @@index([dietitianAccountId, startAt])
   @@index([dietitianAccountId, clientId])
   @@index([clientId, startAt])
@@ -1090,20 +956,20 @@ enum FoodOverrideStatus {
 }
 
 model FoodSource {
-  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  key            String        @unique
-  name           String
-  provider       String
-  datasetVersion String        @map("dataset_version")
-  license        String        @db.Text
-  attribution    String        @db.Text
-  homepage       String?
-  importedAt     DateTime      @map("imported_at") @db.Timestamptz
-  metadata       Json?
-  lastImportReport Json?       @map("last_import_report")
-  status         CatalogStatus @default(ACTIVE)
-  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+  id               String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  key              String        @unique
+  name             String
+  provider         String
+  datasetVersion   String        @map("dataset_version")
+  license          String        @db.Text
+  attribution      String        @db.Text
+  homepage         String?
+  importedAt       DateTime      @map("imported_at") @db.Timestamptz
+  metadata         Json?
+  lastImportReport Json?         @map("last_import_report")
+  status           CatalogStatus @default(ACTIVE)
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime      @updatedAt @map("updated_at") @db.Timestamptz
 
   foods Food[]
 
@@ -1112,33 +978,33 @@ model FoodSource {
 }
 
 model Food {
-  id                  String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  foodSourceId        String            @map("food_source_id") @db.Uuid
-  sourceFoodId        String            @map("source_food_id")
-  name                String
-  nameNormalized      String            @map("name_normalized")
-  category            String?
-  servingDescription  String?           @map("serving_description")
-  referenceQuantity   Decimal           @map("reference_quantity") @db.Decimal(12, 4)
-  referenceUnit       FoodReferenceUnit @map("reference_unit")
-  energyKcal          Decimal?          @map("energy_kcal") @db.Decimal(12, 4)
-  proteinG            Decimal?          @map("protein_g") @db.Decimal(12, 4)
-  carbohydrateG       Decimal?          @map("carbohydrate_g") @db.Decimal(12, 4)
-  fatG                Decimal?          @map("fat_g") @db.Decimal(12, 4)
-  fiberG              Decimal?          @map("fiber_g") @db.Decimal(12, 4)
-  sugarG              Decimal?          @map("sugar_g") @db.Decimal(12, 4)
-  sodiumMg            Decimal?          @map("sodium_mg") @db.Decimal(12, 4)
-  extraNutrients      Json?             @map("extra_nutrients")
-  status              CatalogStatus     @default(ACTIVE)
-  importedAt          DateTime          @map("imported_at") @db.Timestamptz
-  createdAt           DateTime          @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt           DateTime          @updatedAt @map("updated_at") @db.Timestamptz
+  id                 String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  foodSourceId       String            @map("food_source_id") @db.Uuid
+  sourceFoodId       String            @map("source_food_id")
+  name               String
+  nameNormalized     String            @map("name_normalized")
+  category           String?
+  servingDescription String?           @map("serving_description")
+  referenceQuantity  Decimal           @map("reference_quantity") @db.Decimal(12, 4)
+  referenceUnit      FoodReferenceUnit @map("reference_unit")
+  energyKcal         Decimal?          @map("energy_kcal") @db.Decimal(12, 4)
+  proteinG           Decimal?          @map("protein_g") @db.Decimal(12, 4)
+  carbohydrateG      Decimal?          @map("carbohydrate_g") @db.Decimal(12, 4)
+  fatG               Decimal?          @map("fat_g") @db.Decimal(12, 4)
+  fiberG             Decimal?          @map("fiber_g") @db.Decimal(12, 4)
+  sugarG             Decimal?          @map("sugar_g") @db.Decimal(12, 4)
+  sodiumMg           Decimal?          @map("sodium_mg") @db.Decimal(12, 4)
+  extraNutrients     Json?             @map("extra_nutrients")
+  status             CatalogStatus     @default(ACTIVE)
+  importedAt         DateTime          @map("imported_at") @db.Timestamptz
+  createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime          @updatedAt @map("updated_at") @db.Timestamptz
 
-  source             FoodSource          @relation(fields: [foodSourceId], references: [id], onDelete: Restrict)
-  overrides          FoodOverride[]
-  recipeIngredients  RecipeIngredient[]
-  mealItems          MealItem[]
-  foodLogs           FoodLog[]
+  source            FoodSource         @relation(fields: [foodSourceId], references: [id], onDelete: Restrict)
+  overrides         FoodOverride[]
+  recipeIngredients RecipeIngredient[]
+  mealItems         MealItem[]
+  foodLogs          FoodLog[]
 
   @@unique([foodSourceId, sourceFoodId])
   @@index([status, nameNormalized])
@@ -1149,8 +1015,7 @@ model Food {
 
 model FoodOverride {
   id                 String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  dietitianAccountId String?            @map("dietitian_account_id") @db.Uuid
-  organizationId     String             @map("organization_id") @db.Uuid
+  dietitianAccountId String             @map("dietitian_account_id") @db.Uuid
   foodId             String             @map("food_id") @db.Uuid
   status             FoodOverrideStatus @default(ACTIVE)
   energyKcal         Decimal?           @map("energy_kcal") @db.Decimal(12, 4)
@@ -1165,13 +1030,11 @@ model FoodOverride {
   updatedAt          DateTime           @updatedAt @map("updated_at") @db.Timestamptz
   deactivatedAt      DateTime?          @map("deactivated_at") @db.Timestamptz
 
-  dietitianAccount DietitianAccount? @relation(fields: [dietitianAccountId], references: [id], onDelete: Cascade)
-  food             Food              @relation(fields: [foodId], references: [id], onDelete: Restrict)
-  createdBy        User?             @relation("FoodOverrideCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  dietitianAccount DietitianAccount @relation(fields: [dietitianAccountId], references: [id], onDelete: Cascade)
+  food             Food             @relation(fields: [foodId], references: [id], onDelete: Restrict)
+  createdBy        User?            @relation("FoodOverrideCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 
-  @@unique([organizationId, foodId])
   @@unique([dietitianAccountId, foodId])
-  @@index([organizationId, status])
   @@index([dietitianAccountId, status])
   @@index([foodId])
   @@map("food_overrides")
@@ -1212,8 +1075,7 @@ enum QuantityUnit {
 
 model Recipe {
   id                 String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  dietitianAccountId String?      @map("dietitian_account_id") @db.Uuid
-  organizationId     String       @map("organization_id") @db.Uuid
+  dietitianAccountId String       @map("dietitian_account_id") @db.Uuid
   name               String
   description        String?      @db.Text
   instructions       String?      @db.Text
@@ -1224,20 +1086,18 @@ model Recipe {
   updatedAt          DateTime     @updatedAt @map("updated_at") @db.Timestamptz
   archivedAt         DateTime?    @map("archived_at") @db.Timestamptz
 
-  dietitianAccount DietitianAccount?  @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
+  dietitianAccount DietitianAccount   @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
   createdBy        User?              @relation("RecipeCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   ingredients      RecipeIngredient[]
   mealItems        MealItem[]
 
-  @@index([organizationId, status, name])
   @@index([dietitianAccountId, status, name])
   @@map("recipes")
 }
 
 model RecipeIngredient {
   id                 String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  dietitianAccountId String?      @map("dietitian_account_id") @db.Uuid
-  organizationId     String       @map("organization_id") @db.Uuid
+  dietitianAccountId String       @map("dietitian_account_id") @db.Uuid
   recipeId           String       @map("recipe_id") @db.Uuid
   foodId             String       @map("food_id") @db.Uuid
   quantity           Decimal      @db.Decimal(12, 4)
@@ -1247,11 +1107,10 @@ model RecipeIngredient {
   createdAt          DateTime     @default(now()) @map("created_at") @db.Timestamptz
   updatedAt          DateTime     @updatedAt @map("updated_at") @db.Timestamptz
 
-  dietitianAccount DietitianAccount? @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
-  recipe           Recipe            @relation(fields: [recipeId], references: [id], onDelete: Cascade)
-  food             Food              @relation(fields: [foodId], references: [id], onDelete: Restrict)
+  dietitianAccount DietitianAccount @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
+  recipe           Recipe           @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  food             Food             @relation(fields: [foodId], references: [id], onDelete: Restrict)
 
-  @@index([organizationId, recipeId])
   @@index([dietitianAccountId, recipeId])
   @@index([recipeId, sortOrder])
   @@map("recipe_ingredients")
@@ -1259,8 +1118,7 @@ model RecipeIngredient {
 
 model MealPlan {
   id                 String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  dietitianAccountId String?        @map("dietitian_account_id") @db.Uuid
-  organizationId     String         @map("organization_id") @db.Uuid
+  dietitianAccountId String         @map("dietitian_account_id") @db.Uuid
   clientId           String         @map("client_id") @db.Uuid
   name               String
   description        String?        @db.Text
@@ -1270,46 +1128,41 @@ model MealPlan {
   updatedAt          DateTime       @updatedAt @map("updated_at") @db.Timestamptz
   archivedAt         DateTime?      @map("archived_at") @db.Timestamptz
 
-  dietitianAccount DietitianAccount? @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
+  dietitianAccount DietitianAccount  @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
   client           Client            @relation(fields: [clientId], references: [id], onDelete: Restrict)
   createdBy        User?             @relation("MealPlanCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   versions         MealPlanVersion[]
 
-  @@index([organizationId, clientId, status])
-  @@index([organizationId, status])
   @@index([dietitianAccountId, clientId, status])
   @@index([dietitianAccountId, status])
   @@map("meal_plans")
 }
 
 model MealPlanVersion {
-  id                 String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  dietitianAccountId String?                @map("dietitian_account_id") @db.Uuid
-  organizationId     String                 @map("organization_id") @db.Uuid
-  mealPlanId         String                 @map("meal_plan_id") @db.Uuid
-  versionNumber      Int                    @map("version_number")
-  status             MealPlanVersionStatus  @default(DRAFT)
+  id                 String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  dietitianAccountId String                @map("dietitian_account_id") @db.Uuid
+  mealPlanId         String                @map("meal_plan_id") @db.Uuid
+  versionNumber      Int                   @map("version_number")
+  status             MealPlanVersionStatus @default(DRAFT)
   snapshot           Json?
-  createdById        String?                @map("created_by_id") @db.Uuid
-  createdAt          DateTime               @default(now()) @map("created_at") @db.Timestamptz
-  publishedAt        DateTime?              @map("published_at") @db.Timestamptz
-  archivedAt         DateTime?              @map("archived_at") @db.Timestamptz
+  createdById        String?               @map("created_by_id") @db.Uuid
+  createdAt          DateTime              @default(now()) @map("created_at") @db.Timestamptz
+  publishedAt        DateTime?             @map("published_at") @db.Timestamptz
+  archivedAt         DateTime?             @map("archived_at") @db.Timestamptz
 
-  dietitianAccount DietitianAccount? @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
-  mealPlan         MealPlan          @relation(fields: [mealPlanId], references: [id], onDelete: Restrict)
-  createdBy        User?             @relation("MealPlanVersionCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  dietitianAccount DietitianAccount @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
+  mealPlan         MealPlan         @relation(fields: [mealPlanId], references: [id], onDelete: Restrict)
+  createdBy        User?            @relation("MealPlanVersionCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   days             MealPlanDay[]
 
   @@unique([mealPlanId, versionNumber])
-  @@index([organizationId, mealPlanId, status])
   @@index([dietitianAccountId, mealPlanId, status])
   @@map("meal_plan_versions")
 }
 
 model MealPlanDay {
   id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  dietitianAccountId String?  @map("dietitian_account_id") @db.Uuid
-  organizationId     String   @map("organization_id") @db.Uuid
+  dietitianAccountId String   @map("dietitian_account_id") @db.Uuid
   mealPlanVersionId  String   @map("meal_plan_version_id") @db.Uuid
   dayNumber          Int      @map("day_number")
   weekday            String?
@@ -1318,20 +1171,18 @@ model MealPlanDay {
   createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
-  dietitianAccount DietitianAccount? @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
-  version          MealPlanVersion   @relation(fields: [mealPlanVersionId], references: [id], onDelete: Cascade)
+  dietitianAccount DietitianAccount @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
+  version          MealPlanVersion  @relation(fields: [mealPlanVersionId], references: [id], onDelete: Cascade)
   meals            Meal[]
 
   @@unique([mealPlanVersionId, dayNumber])
-  @@index([organizationId, mealPlanVersionId])
   @@index([dietitianAccountId, mealPlanVersionId])
   @@map("meal_plan_days")
 }
 
 model Meal {
   id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  dietitianAccountId String?  @map("dietitian_account_id") @db.Uuid
-  organizationId     String   @map("organization_id") @db.Uuid
+  dietitianAccountId String   @map("dietitian_account_id") @db.Uuid
   mealPlanDayId      String   @map("meal_plan_day_id") @db.Uuid
   name               String
   sortOrder          Int      @default(0) @map("sort_order")
@@ -1339,19 +1190,17 @@ model Meal {
   createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
-  dietitianAccount DietitianAccount? @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
-  day              MealPlanDay       @relation(fields: [mealPlanDayId], references: [id], onDelete: Cascade)
+  dietitianAccount DietitianAccount @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
+  day              MealPlanDay      @relation(fields: [mealPlanDayId], references: [id], onDelete: Cascade)
   items            MealItem[]
 
-  @@index([organizationId, mealPlanDayId, sortOrder])
   @@index([dietitianAccountId, mealPlanDayId, sortOrder])
   @@map("meals")
 }
 
 model MealItem {
   id                 String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  dietitianAccountId String?      @map("dietitian_account_id") @db.Uuid
-  organizationId     String       @map("organization_id") @db.Uuid
+  dietitianAccountId String       @map("dietitian_account_id") @db.Uuid
   mealId             String       @map("meal_id") @db.Uuid
   itemType           MealItemType @map("item_type")
   foodId             String?      @map("food_id") @db.Uuid
@@ -1363,12 +1212,11 @@ model MealItem {
   createdAt          DateTime     @default(now()) @map("created_at") @db.Timestamptz
   updatedAt          DateTime     @updatedAt @map("updated_at") @db.Timestamptz
 
-  dietitianAccount DietitianAccount? @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
-  meal             Meal              @relation(fields: [mealId], references: [id], onDelete: Cascade)
-  food             Food?             @relation(fields: [foodId], references: [id], onDelete: Restrict)
-  recipe           Recipe?           @relation(fields: [recipeId], references: [id], onDelete: Restrict)
+  dietitianAccount DietitianAccount @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
+  meal             Meal             @relation(fields: [mealId], references: [id], onDelete: Cascade)
+  food             Food?            @relation(fields: [foodId], references: [id], onDelete: Restrict)
+  recipe           Recipe?          @relation(fields: [recipeId], references: [id], onDelete: Restrict)
 
-  @@index([organizationId, mealId, sortOrder])
   @@index([dietitianAccountId, mealId, sortOrder])
   @@index([foodId])
   @@index([recipeId])
@@ -1377,8 +1225,7 @@ model MealItem {
 
 model FoodLog {
   id                 String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  dietitianAccountId String?           @map("dietitian_account_id") @db.Uuid
-  organizationId     String            @map("organization_id") @db.Uuid
+  dietitianAccountId String            @map("dietitian_account_id") @db.Uuid
   clientId           String            @map("client_id") @db.Uuid
   foodId             String            @map("food_id") @db.Uuid
   quantity           Decimal           @db.Decimal(12, 4)
@@ -1393,12 +1240,10 @@ model FoodLog {
   updatedAt          DateTime          @updatedAt @map("updated_at") @db.Timestamptz
   archivedAt         DateTime?         @map("archived_at") @db.Timestamptz
 
-  dietitianAccount DietitianAccount? @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
-  client           Client            @relation(fields: [clientId], references: [id], onDelete: Restrict)
-  food             Food              @relation(fields: [foodId], references: [id], onDelete: Restrict)
+  dietitianAccount DietitianAccount @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
+  client           Client           @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  food             Food             @relation(fields: [foodId], references: [id], onDelete: Restrict)
 
-  @@index([organizationId, clientId, trackingDate])
-  @@index([organizationId, clientId, consumedAt])
   @@index([dietitianAccountId, clientId, trackingDate])
   @@index([dietitianAccountId, clientId, consumedAt])
   @@map("food_logs")
@@ -1406,8 +1251,7 @@ model FoodLog {
 
 model WaterLog {
   id                 String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  dietitianAccountId String?           @map("dietitian_account_id") @db.Uuid
-  organizationId     String            @map("organization_id") @db.Uuid
+  dietitianAccountId String            @map("dietitian_account_id") @db.Uuid
   clientId           String            @map("client_id") @db.Uuid
   amountMl           Decimal           @map("amount_ml") @db.Decimal(12, 4)
   loggedAt           DateTime          @map("logged_at") @db.Timestamptz
@@ -1418,18 +1262,16 @@ model WaterLog {
   updatedAt          DateTime          @updatedAt @map("updated_at") @db.Timestamptz
   archivedAt         DateTime?         @map("archived_at") @db.Timestamptz
 
-  dietitianAccount DietitianAccount? @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
-  client           Client            @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  dietitianAccount DietitianAccount @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
+  client           Client           @relation(fields: [clientId], references: [id], onDelete: Restrict)
 
-  @@index([organizationId, clientId, trackingDate])
   @@index([dietitianAccountId, clientId, trackingDate])
   @@map("water_logs")
 }
 
 model ExerciseLog {
   id                 String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  dietitianAccountId String?            @map("dietitian_account_id") @db.Uuid
-  organizationId     String             @map("organization_id") @db.Uuid
+  dietitianAccountId String             @map("dietitian_account_id") @db.Uuid
   clientId           String             @map("client_id") @db.Uuid
   activityType       String             @map("activity_type")
   durationMinutes    Int                @map("duration_minutes")
@@ -1443,18 +1285,16 @@ model ExerciseLog {
   updatedAt          DateTime           @updatedAt @map("updated_at") @db.Timestamptz
   archivedAt         DateTime?          @map("archived_at") @db.Timestamptz
 
-  dietitianAccount DietitianAccount? @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
-  client           Client            @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  dietitianAccount DietitianAccount @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
+  client           Client           @relation(fields: [clientId], references: [id], onDelete: Restrict)
 
-  @@index([organizationId, clientId, trackingDate])
   @@index([dietitianAccountId, clientId, trackingDate])
   @@map("exercise_logs")
 }
 
 model SleepLog {
   id                 String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  dietitianAccountId String?           @map("dietitian_account_id") @db.Uuid
-  organizationId     String            @map("organization_id") @db.Uuid
+  dietitianAccountId String            @map("dietitian_account_id") @db.Uuid
   clientId           String            @map("client_id") @db.Uuid
   date               DateTime          @db.Date
   bedtime            DateTime?         @db.Timestamptz
@@ -1467,20 +1307,17 @@ model SleepLog {
   updatedAt          DateTime          @updatedAt @map("updated_at") @db.Timestamptz
   archivedAt         DateTime?         @map("archived_at") @db.Timestamptz
 
-  dietitianAccount DietitianAccount? @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
-  client           Client            @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  dietitianAccount DietitianAccount @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
+  client           Client           @relation(fields: [clientId], references: [id], onDelete: Restrict)
 
-  @@unique([organizationId, clientId, date])
   @@unique([dietitianAccountId, clientId, date])
-  @@index([organizationId, clientId, date])
   @@index([dietitianAccountId, clientId, date])
   @@map("sleep_logs")
 }
 
 model HabitLog {
   id                 String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  dietitianAccountId String?           @map("dietitian_account_id") @db.Uuid
-  organizationId     String            @map("organization_id") @db.Uuid
+  dietitianAccountId String            @map("dietitian_account_id") @db.Uuid
   clientId           String            @map("client_id") @db.Uuid
   habitKey           String            @map("habit_key")
   habitLabel         String            @map("habit_label")
@@ -1493,20 +1330,17 @@ model HabitLog {
   updatedAt          DateTime          @updatedAt @map("updated_at") @db.Timestamptz
   archivedAt         DateTime?         @map("archived_at") @db.Timestamptz
 
-  dietitianAccount DietitianAccount? @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
-  client           Client            @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  dietitianAccount DietitianAccount @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
+  client           Client           @relation(fields: [clientId], references: [id], onDelete: Restrict)
 
-  @@unique([organizationId, clientId, habitKey, logDate])
   @@unique([dietitianAccountId, clientId, habitKey, logDate])
-  @@index([organizationId, clientId, logDate])
   @@index([dietitianAccountId, clientId, logDate])
   @@map("habit_logs")
 }
 
 model Conversation {
   id                 String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  dietitianAccountId String?            @map("dietitian_account_id") @db.Uuid
-  organizationId     String             @map("organization_id") @db.Uuid
+  dietitianAccountId String             @map("dietitian_account_id") @db.Uuid
   clientId           String             @unique @map("client_id") @db.Uuid
   status             ConversationStatus @default(ACTIVE)
   lastMessageAt      DateTime?          @map("last_message_at") @db.Timestamptz
@@ -1516,15 +1350,12 @@ model Conversation {
   updatedAt          DateTime           @updatedAt @map("updated_at") @db.Timestamptz
   archivedAt         DateTime?          @map("archived_at") @db.Timestamptz
 
-  dietitianAccount DietitianAccount?       @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
+  dietitianAccount DietitianAccount        @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
   client           Client                  @relation(fields: [clientId], references: [id], onDelete: Restrict)
   messages         Message[]
   readStates       ConversationReadState[]
 
-  @@unique([organizationId, clientId])
   @@unique([dietitianAccountId, clientId])
-  @@index([organizationId, lastMessageAt])
-  @@index([organizationId, clientId, status])
   @@index([dietitianAccountId, lastMessageAt])
   @@index([dietitianAccountId, clientId, status])
   @@map("conversations")
@@ -1532,8 +1363,7 @@ model Conversation {
 
 model Message {
   id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  dietitianAccountId String?   @map("dietitian_account_id") @db.Uuid
-  organizationId     String    @map("organization_id") @db.Uuid
+  dietitianAccountId String    @map("dietitian_account_id") @db.Uuid
   conversationId     String    @map("conversation_id") @db.Uuid
   clientId           String    @map("client_id") @db.Uuid
   senderUserId       String    @map("sender_user_id") @db.Uuid
@@ -1542,11 +1372,10 @@ model Message {
   editedAt           DateTime? @map("edited_at") @db.Timestamptz
   deletedAt          DateTime? @map("deleted_at") @db.Timestamptz
 
-  conversation     Conversation      @relation(fields: [conversationId], references: [id], onDelete: Restrict)
-  sender           User              @relation(fields: [senderUserId], references: [id], onDelete: Restrict)
-  dietitianAccount DietitianAccount? @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
+  conversation     Conversation     @relation(fields: [conversationId], references: [id], onDelete: Restrict)
+  sender           User             @relation(fields: [senderUserId], references: [id], onDelete: Restrict)
+  dietitianAccount DietitianAccount @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
 
-  @@index([organizationId, clientId, createdAt])
   @@index([dietitianAccountId, clientId, createdAt])
   @@index([conversationId, createdAt])
   @@map("messages")
@@ -1554,27 +1383,24 @@ model Message {
 
 model ConversationReadState {
   id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  dietitianAccountId String?  @map("dietitian_account_id") @db.Uuid
-  organizationId     String   @map("organization_id") @db.Uuid
+  dietitianAccountId String   @map("dietitian_account_id") @db.Uuid
   conversationId     String   @map("conversation_id") @db.Uuid
   readerUserId       String   @map("reader_user_id") @db.Uuid
   lastReadAt         DateTime @map("last_read_at") @db.Timestamptz
   updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
-  conversation     Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  reader           User              @relation(fields: [readerUserId], references: [id], onDelete: Cascade)
-  dietitianAccount DietitianAccount? @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
+  conversation     Conversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  reader           User             @relation(fields: [readerUserId], references: [id], onDelete: Cascade)
+  dietitianAccount DietitianAccount @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
 
   @@unique([conversationId, readerUserId])
-  @@index([organizationId, readerUserId])
   @@index([dietitianAccountId, readerUserId])
   @@map("conversation_read_states")
 }
 
 model Document {
   id                 String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  dietitianAccountId String?            @map("dietitian_account_id") @db.Uuid
-  organizationId     String             @map("organization_id") @db.Uuid
+  dietitianAccountId String             @map("dietitian_account_id") @db.Uuid
   clientId           String             @map("client_id") @db.Uuid
   uploadedByUserId   String             @map("uploaded_by_user_id") @db.Uuid
   filename           String
@@ -1590,15 +1416,12 @@ model Document {
   sharedAt           DateTime?          @map("shared_at") @db.Timestamptz
   sharedByUserId     String?            @map("shared_by_user_id") @db.Uuid
 
-  dietitianAccount DietitianAccount? @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
-  client           Client            @relation(fields: [clientId], references: [id], onDelete: Restrict)
-  uploadedBy       User              @relation("DocumentUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: Restrict)
-  sharedBy         User?             @relation("DocumentSharedBy", fields: [sharedByUserId], references: [id], onDelete: SetNull)
+  dietitianAccount DietitianAccount @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
+  client           Client           @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  uploadedBy       User             @relation("DocumentUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: Restrict)
+  sharedBy         User?            @relation("DocumentSharedBy", fields: [sharedByUserId], references: [id], onDelete: SetNull)
 
-  @@unique([organizationId, storageKey])
   @@unique([dietitianAccountId, storageKey])
-  @@index([organizationId, clientId, status, createdAt])
-  @@index([organizationId, clientId, visibility, status])
   @@index([dietitianAccountId, clientId, status, createdAt])
   @@index([dietitianAccountId, clientId, visibility, status])
   @@map("documents")
@@ -1606,8 +1429,7 @@ model Document {
 
 model Notification {
   id                 String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  dietitianAccountId String?          @map("dietitian_account_id") @db.Uuid
-  organizationId     String           @map("organization_id") @db.Uuid
+  dietitianAccountId String           @map("dietitian_account_id") @db.Uuid
   userId             String           @map("user_id") @db.Uuid
   clientId           String?          @map("client_id") @db.Uuid
   type               NotificationType
@@ -1619,10 +1441,9 @@ model Notification {
   readAt             DateTime?        @map("read_at") @db.Timestamptz
   createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamptz
 
-  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  dietitianAccount DietitianAccount? @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dietitianAccount DietitianAccount @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
 
-  @@index([organizationId, userId, readAt, createdAt])
   @@index([dietitianAccountId, userId, readAt, createdAt])
   @@index([userId, readAt, createdAt])
   @@map("notifications")
@@ -1630,20 +1451,17 @@ model Notification {
 
 model InvoiceSequence {
   dietitianAccountId String   @id @map("dietitian_account_id") @db.Uuid
-  organizationId     String?  @map("organization_id") @db.Uuid
   nextNumber         Int      @default(1) @map("next_number")
   updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   dietitianAccount DietitianAccount @relation(fields: [dietitianAccountId], references: [id], onDelete: Cascade)
 
-  @@index([organizationId])
   @@map("invoice_sequences")
 }
 
 model Invoice {
   id                 String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  dietitianAccountId String?       @map("dietitian_account_id") @db.Uuid
-  organizationId     String        @map("organization_id") @db.Uuid
+  dietitianAccountId String        @map("dietitian_account_id") @db.Uuid
   clientId           String        @map("client_id") @db.Uuid
   invoiceNumber      String?       @map("invoice_number")
   status             InvoiceStatus @default(DRAFT)
@@ -1662,16 +1480,12 @@ model Invoice {
   updatedAt          DateTime      @updatedAt @map("updated_at") @db.Timestamptz
   archivedAt         DateTime?     @map("archived_at") @db.Timestamptz
 
-  dietitianAccount DietitianAccount? @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
-  client           Client            @relation(fields: [clientId], references: [id], onDelete: Restrict)
-  createdBy        User?             @relation("InvoiceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  dietitianAccount DietitianAccount @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
+  client           Client           @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  createdBy        User?            @relation("InvoiceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   items            InvoiceItem[]
 
-  @@unique([organizationId, invoiceNumber])
   @@unique([dietitianAccountId, invoiceNumber])
-  @@index([organizationId])
-  @@index([organizationId, status])
-  @@index([organizationId, clientId])
   @@index([dietitianAccountId])
   @@index([dietitianAccountId, status])
   @@index([dietitianAccountId, clientId])
@@ -1684,8 +1498,7 @@ model Invoice {
 
 model InvoiceItem {
   id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  dietitianAccountId String?  @map("dietitian_account_id") @db.Uuid
-  organizationId     String   @map("organization_id") @db.Uuid
+  dietitianAccountId String   @map("dietitian_account_id") @db.Uuid
   invoiceId          String   @map("invoice_id") @db.Uuid
   description        String
   quantity           Decimal  @db.Decimal(12, 4)
@@ -1694,21 +1507,18 @@ model InvoiceItem {
   sortOrder          Int      @default(0) @map("sort_order")
   createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  dietitianAccount DietitianAccount? @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
-  invoice          Invoice           @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  dietitianAccount DietitianAccount @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
+  invoice          Invoice          @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
   @@index([invoiceId])
-  @@index([organizationId])
   @@index([dietitianAccountId])
   @@map("invoice_items")
 }
 
 model Task {
   id                 String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  dietitianAccountId String?      @map("dietitian_account_id") @db.Uuid
-  organizationId     String       @map("organization_id") @db.Uuid
+  dietitianAccountId String       @map("dietitian_account_id") @db.Uuid
   clientId           String?      @map("client_id") @db.Uuid
-  assignedMemberId   String?      @map("assigned_member_id") @db.Uuid
   assignedUserId     String?      @map("assigned_user_id") @db.Uuid
   createdById        String       @map("created_by_id") @db.Uuid
   title              String
@@ -1721,20 +1531,15 @@ model Task {
   updatedAt          DateTime     @updatedAt @map("updated_at") @db.Timestamptz
   archivedAt         DateTime?    @map("archived_at") @db.Timestamptz
 
-  dietitianAccount DietitianAccount?   @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
-  client           Client?             @relation(fields: [clientId], references: [id], onDelete: Restrict)
-  assignedMember   OrganizationMember? @relation(fields: [assignedMemberId], references: [id], onDelete: SetNull)
-  assignedUser     User?               @relation("TaskAssignedUser", fields: [assignedUserId], references: [id], onDelete: SetNull)
-  createdBy        User                @relation("TaskCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  dietitianAccount DietitianAccount @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
+  client           Client?          @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  assignedUser     User?            @relation("TaskAssignedUser", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  createdBy        User             @relation("TaskCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
 
-  @@index([organizationId])
-  @@index([organizationId, status])
-  @@index([organizationId, assignedMemberId])
   @@index([dietitianAccountId])
   @@index([dietitianAccountId, status])
   @@index([dietitianAccountId, assignedUserId])
   @@index([clientId])
-  @@index([assignedMemberId])
   @@index([assignedUserId])
   @@index([status])
   @@index([priority])
@@ -1744,7 +1549,6 @@ model Task {
 
 model AiUsage {
   dietitianAccountId String   @map("dietitian_account_id") @db.Uuid
-  organizationId     String?  @map("organization_id") @db.Uuid
   periodKey          String   @map("period_key")
   requestCount       Int      @default(0) @map("request_count")
   updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz
@@ -1753,14 +1557,12 @@ model AiUsage {
 
   @@id([dietitianAccountId, periodKey])
   @@index([dietitianAccountId])
-  @@index([organizationId])
   @@map("ai_usage")
 }
 
 model AiRequest {
   id                 String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  dietitianAccountId String?         @map("dietitian_account_id") @db.Uuid
-  organizationId     String          @map("organization_id") @db.Uuid
+  dietitianAccountId String          @map("dietitian_account_id") @db.Uuid
   userId             String          @map("user_id") @db.Uuid
   clientId           String?         @map("client_id") @db.Uuid
   action             AiAction
@@ -1776,12 +1578,10 @@ model AiRequest {
   requestedAt        DateTime        @default(now()) @map("requested_at") @db.Timestamptz
   completedAt        DateTime?       @map("completed_at") @db.Timestamptz
 
-  dietitianAccount DietitianAccount? @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
-  user             User              @relation(fields: [userId], references: [id], onDelete: Restrict)
-  client           Client?           @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  dietitianAccount DietitianAccount @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
+  user             User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  client           Client?          @relation(fields: [clientId], references: [id], onDelete: Restrict)
 
-  @@index([organizationId, requestedAt])
-  @@index([organizationId, status, requestedAt])
   @@index([dietitianAccountId, requestedAt])
   @@index([dietitianAccountId, status, requestedAt])
   @@index([userId, requestedAt])
@@ -1790,31 +1590,27 @@ model AiRequest {
 }
 
 model AutomationRule {
-  id                 String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  dietitianAccountId String?                @map("dietitian_account_id") @db.Uuid
-  organizationId     String                 @map("organization_id") @db.Uuid
+  id                 String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  dietitianAccountId String                @map("dietitian_account_id") @db.Uuid
   name               String
-  description        String?                @db.Text
-  status             AutomationRuleStatus   @default(PAUSED)
-  triggerType        AutomationTriggerType  @map("trigger_type")
-  actionType         AutomationActionType   @map("action_type")
+  description        String?               @db.Text
+  status             AutomationRuleStatus  @default(PAUSED)
+  triggerType        AutomationTriggerType @map("trigger_type")
+  actionType         AutomationActionType  @map("action_type")
   configuration      Json
   conditions         Json?
-  createdById        String                 @map("created_by_id") @db.Uuid
-  updatedById        String?                @map("updated_by_id") @db.Uuid
-  lastRunAt          DateTime?              @map("last_run_at") @db.Timestamptz
-  archivedAt         DateTime?              @map("archived_at") @db.Timestamptz
-  createdAt          DateTime               @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt          DateTime               @updatedAt @map("updated_at") @db.Timestamptz
+  createdById        String                @map("created_by_id") @db.Uuid
+  updatedById        String?               @map("updated_by_id") @db.Uuid
+  lastRunAt          DateTime?             @map("last_run_at") @db.Timestamptz
+  archivedAt         DateTime?             @map("archived_at") @db.Timestamptz
+  createdAt          DateTime              @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime              @updatedAt @map("updated_at") @db.Timestamptz
 
-  dietitianAccount DietitianAccount? @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
-  createdBy        User              @relation("AutomationRuleCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  updatedBy        User?             @relation("AutomationRuleUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  dietitianAccount DietitianAccount @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
+  createdBy        User             @relation("AutomationRuleCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy        User?            @relation("AutomationRuleUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
   runs             AutomationRun[]
 
-  @@index([organizationId])
-  @@index([organizationId, status])
-  @@index([organizationId, triggerType])
   @@index([dietitianAccountId])
   @@index([dietitianAccountId, status])
   @@index([dietitianAccountId, triggerType])
@@ -1823,8 +1619,7 @@ model AutomationRule {
 
 model AutomationRun {
   id                 String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  dietitianAccountId String?             @map("dietitian_account_id") @db.Uuid
-  organizationId     String              @map("organization_id") @db.Uuid
+  dietitianAccountId String              @map("dietitian_account_id") @db.Uuid
   automationRuleId   String              @map("automation_rule_id") @db.Uuid
   status             AutomationRunStatus @default(QUEUED)
   triggerKey         String              @map("trigger_key")
@@ -1837,15 +1632,12 @@ model AutomationRun {
   resultMetadata     Json?               @map("result_metadata")
   createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamptz
 
-  dietitianAccount DietitianAccount? @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
-  rule             AutomationRule    @relation(fields: [automationRuleId], references: [id], onDelete: Restrict)
+  dietitianAccount DietitianAccount @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
+  rule             AutomationRule   @relation(fields: [automationRuleId], references: [id], onDelete: Restrict)
 
-  @@unique([organizationId, triggerKey])
   @@unique([dietitianAccountId, triggerKey])
-  @@index([organizationId])
   @@index([dietitianAccountId])
   @@index([automationRuleId])
-  @@index([organizationId, status])
   @@index([dietitianAccountId, status])
   @@index([scheduledAt])
   @@index([createdAt])
@@ -1854,7 +1646,6 @@ model AutomationRun {
 
 model AutomationUsage {
   dietitianAccountId String   @map("dietitian_account_id") @db.Uuid
-  organizationId     String?  @map("organization_id") @db.Uuid
   periodKey          String   @map("period_key")
   executionCount     Int      @default(0) @map("execution_count")
   updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz
@@ -1863,7 +1654,6 @@ model AutomationUsage {
 
   @@id([dietitianAccountId, periodKey])
   @@index([dietitianAccountId])
-  @@index([organizationId])
   @@map("automation_usage")
 }
 
@@ -1875,28 +1665,28 @@ enum BrandDisplayMode {
 
 /// Singleton platform-wide settings for the public marketing website.
 model PlatformSettings {
-  id                     String           @id @db.Uuid
-  brandText              String           @map("brand_text")
-  logoUrl                String?          @map("logo_url")
-  brandDisplay           BrandDisplayMode @default(TEXT) @map("brand_display")
-  navItems               Json             @map("nav_items")
-  ctaText                String           @map("cta_text")
-  ctaHref                String           @map("cta_href")
-  ctaVisible             Boolean          @default(true) @map("cta_visible")
-  dietitianSignInLabel   String           @map("dietitian_sign_in_label")
-  patientSignInLabel     String           @map("patient_sign_in_label")
-  footerDescription      String           @map("footer_description") @db.Text
-  footerGroups           Json             @map("footer_groups")
-  copyrightText          String           @map("copyright_text")
-  socialLinks            Json             @map("social_links")
-  contactEmail           String?          @map("contact_email")
-  contactPhone           String?          @map("contact_phone")
-  contactAddress         String?          @map("contact_address") @db.Text
-  contactHours           String?          @map("contact_hours")
-  registrationEnabled    Boolean          @default(false) @map("registration_enabled")
-  emailNotificationsEnabled Boolean       @default(false) @map("email_notifications_enabled")
-  createdAt              DateTime         @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt              DateTime         @updatedAt @map("updated_at") @db.Timestamptz
+  id                        String           @id @db.Uuid
+  brandText                 String           @map("brand_text")
+  logoUrl                   String?          @map("logo_url")
+  brandDisplay              BrandDisplayMode @default(TEXT) @map("brand_display")
+  navItems                  Json             @map("nav_items")
+  ctaText                   String           @map("cta_text")
+  ctaHref                   String           @map("cta_href")
+  ctaVisible                Boolean          @default(true) @map("cta_visible")
+  dietitianSignInLabel      String           @map("dietitian_sign_in_label")
+  patientSignInLabel        String           @map("patient_sign_in_label")
+  footerDescription         String           @map("footer_description") @db.Text
+  footerGroups              Json             @map("footer_groups")
+  copyrightText             String           @map("copyright_text")
+  socialLinks               Json             @map("social_links")
+  contactEmail              String?          @map("contact_email")
+  contactPhone              String?          @map("contact_phone")
+  contactAddress            String?          @map("contact_address") @db.Text
+  contactHours              String?          @map("contact_hours")
+  registrationEnabled       Boolean          @default(false) @map("registration_enabled")
+  emailNotificationsEnabled Boolean          @default(false) @map("email_notifications_enabled")
+  createdAt                 DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                 DateTime         @updatedAt @map("updated_at") @db.Timestamptz
 
   @@map("platform_settings")
 }

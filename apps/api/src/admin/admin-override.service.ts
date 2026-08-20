@@ -34,7 +34,6 @@ export class AdminOverrideService {
       },
       create: {
         dietitianAccountId: organizationId,
-        organizationId: account.legacyOrganizationId ?? organizationId,
         featureId: feature.id,
         enabled: input.enabled ?? null,
         limitValue: input.limitValue ?? null,
@@ -52,7 +51,6 @@ export class AdminOverrideService {
       type: "feature_override_upserted",
       outcome: "success",
       userId: actor.userId,
-      organizationId,
       dietitianAccountId: organizationId,
       ipAddress: actor.ipAddress,
       userAgent: actor.userAgent,
@@ -96,7 +94,6 @@ export class AdminOverrideService {
       type: "feature_override_removed",
       outcome: "success",
       userId: actor.userId,
-      organizationId,
       dietitianAccountId: organizationId,
       ipAddress: actor.ipAddress,
       userAgent: actor.userAgent,

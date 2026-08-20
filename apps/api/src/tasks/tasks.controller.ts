@@ -22,9 +22,9 @@ import {
 import type { TaskPriority, TaskStatus } from "@prisma/client";
 import { SessionGuard } from "../auth/guards/session.guard";
 import { ClientAccessGuard } from "../clients/guards/client-access.guard";
-import { CurrentTenant } from "../organizations/decorators/current-tenant.decorator";
-import { TenantGuard } from "../organizations/guards/tenant.guard";
-import type { TenantContext } from "../organizations/tenant.types";
+import { CurrentTenant } from "../dietitian/decorators/current-tenant.decorator";
+import { DietitianGuard } from "../dietitian/guards/dietitian.guard";
+import type { DietitianTenantContext } from "../dietitian/dietitian.types";
 import { TaskService, type TaskView } from "./task.service";
 
 class CreateTaskDto {
@@ -48,7 +48,7 @@ class CreateTaskDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsUUID()
-  assignedMemberId?: string;
+  assignedUserId?: string;
 
   @ApiPropertyOptional({ enum: ["LOW", "NORMAL", "HIGH", "URGENT"] })
   @IsOptional()
@@ -83,7 +83,7 @@ class UpdateTaskDto {
   @ApiPropertyOptional({ nullable: true })
   @IsOptional()
   @IsUUID()
-  assignedMemberId?: string | null;
+  assignedUserId?: string | null;
 
   @ApiPropertyOptional({ enum: ["TODO", "IN_PROGRESS", "COMPLETED", "CANCELLED"] })
   @IsOptional()
@@ -103,19 +103,19 @@ class UpdateTaskDto {
 
 @ApiTags("organizations")
 @ApiCookieAuth()
-@UseGuards(SessionGuard, TenantGuard)
-@Controller("api/v1/organizations/:organizationId/tasks")
+@UseGuards(SessionGuard, DietitianGuard)
+@Controller("api/v1/dietitian/:dietitianAccountId/tasks")
 export class TasksController {
   constructor(private readonly tasks: TaskService) {}
 
   @Get()
   list(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Query("view") view?: TaskView,
     @Query("status") status?: TaskStatus,
     @Query("priority") priority?: TaskPriority,
     @Query("clientId") clientId?: string,
-    @Query("assignedMemberId") assignedMemberId?: string,
+    @Query("assignedUserId") assignedUserId?: string,
     @Query("search") search?: string,
     @Query("page") page?: string,
     @Query("limit") limit?: string,
@@ -125,7 +125,7 @@ export class TasksController {
       status,
       priority,
       clientId,
-      assignedMemberId,
+      assignedUserId,
       search,
       page: page ? Number(page) : undefined,
       limit: limit ? Number(limit) : undefined,
@@ -133,18 +133,18 @@ export class TasksController {
   }
 
   @Get(":taskId")
-  get(@CurrentTenant() tenant: TenantContext, @Param("taskId", ParseUUIDPipe) taskId: string) {
+  get(@CurrentTenant() tenant: DietitianTenantContext, @Param("taskId", ParseUUIDPipe) taskId: string) {
     return this.tasks.get(tenant, taskId);
   }
 
   @Post()
-  create(@CurrentTenant() tenant: TenantContext, @Body() body: CreateTaskDto) {
+  create(@CurrentTenant() tenant: DietitianTenantContext, @Body() body: CreateTaskDto) {
     return this.tasks.create(tenant, body);
   }
 
   @Patch(":taskId")
   update(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("taskId", ParseUUIDPipe) taskId: string,
     @Body() body: UpdateTaskDto,
   ) {
@@ -152,30 +152,30 @@ export class TasksController {
   }
 
   @Post(":taskId/complete")
-  complete(@CurrentTenant() tenant: TenantContext, @Param("taskId", ParseUUIDPipe) taskId: string) {
+  complete(@CurrentTenant() tenant: DietitianTenantContext, @Param("taskId", ParseUUIDPipe) taskId: string) {
     return this.tasks.complete(tenant, taskId);
   }
 
   @Post(":taskId/cancel")
-  cancel(@CurrentTenant() tenant: TenantContext, @Param("taskId", ParseUUIDPipe) taskId: string) {
+  cancel(@CurrentTenant() tenant: DietitianTenantContext, @Param("taskId", ParseUUIDPipe) taskId: string) {
     return this.tasks.cancel(tenant, taskId);
   }
 
   @Post(":taskId/archive")
-  archive(@CurrentTenant() tenant: TenantContext, @Param("taskId", ParseUUIDPipe) taskId: string) {
+  archive(@CurrentTenant() tenant: DietitianTenantContext, @Param("taskId", ParseUUIDPipe) taskId: string) {
     return this.tasks.archive(tenant, taskId);
   }
 }
 
 @ApiTags("organizations")
 @ApiCookieAuth()
-@UseGuards(SessionGuard, TenantGuard, ClientAccessGuard)
-@Controller("api/v1/organizations/:organizationId/clients/:clientId/tasks")
+@UseGuards(SessionGuard, DietitianGuard, ClientAccessGuard)
+@Controller("api/v1/dietitian/:dietitianAccountId/clients/:clientId/tasks")
 export class ClientTasksController {
   constructor(private readonly tasks: TaskService) {}
 
   @Get()
-  list(@CurrentTenant() tenant: TenantContext, @Param("clientId", ParseUUIDPipe) clientId: string) {
+  list(@CurrentTenant() tenant: DietitianTenantContext, @Param("clientId", ParseUUIDPipe) clientId: string) {
     return this.tasks.listForClient(tenant, clientId);
   }
 }

@@ -2,9 +2,9 @@ import { Injectable } from "@nestjs/common";
 import type { Client } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { ClientAccessService } from "../clients/client-access.service";
-import type { TenantContext } from "../organizations/tenant.types";
+import type { DietitianTenantContext } from "../dietitian/dietitian.types";
 import { TrackingSummaryService } from "../tracking/tracking-summary.service";
-import { tenantWhere } from "../organizations/tenant-scope";
+import { tenantWhere } from "../dietitian/tenant-scope";
 
 @Injectable()
 export class AiContextService {
@@ -14,34 +14,34 @@ export class AiContextService {
     private readonly trackingSummary: TrackingSummaryService,
   ) {}
 
-  async buildClientContext(tenant: TenantContext, clientId: string) {
+  async buildClientContext(tenant: DietitianTenantContext, clientId: string) {
     const client = await this.access.assertCanAccess(tenant, clientId, "read");
     const [profile, goals, measurements, assessments, appointments, mealPlan, timeline, tracking] =
       await Promise.all([
         this.prisma.clientProfile.findUnique({ where: { clientId } }),
         this.prisma.clientGoal.findMany({
-          where: { clientId, ...tenantWhere(tenant.organizationId) },
+          where: { clientId, ...tenantWhere(tenant.dietitianAccountId) },
           orderBy: { createdAt: "desc" },
           take: 5,
         }),
         this.prisma.clientMeasurement.findMany({
-          where: { clientId, ...tenantWhere(tenant.organizationId) },
+          where: { clientId, ...tenantWhere(tenant.dietitianAccountId) },
           orderBy: { measuredAt: "desc" },
           take: 5,
         }),
         this.prisma.assessment.findMany({
-          where: { clientId, ...tenantWhere(tenant.organizationId) },
+          where: { clientId, ...tenantWhere(tenant.dietitianAccountId) },
           orderBy: { createdAt: "desc" },
           take: 3,
           include: { template: true },
         }),
         this.prisma.appointment.findMany({
-          where: { clientId, ...tenantWhere(tenant.organizationId) },
+          where: { clientId, ...tenantWhere(tenant.dietitianAccountId) },
           orderBy: { startAt: "desc" },
           take: 5,
         }),
         this.prisma.mealPlan.findFirst({
-          where: { clientId, ...tenantWhere(tenant.organizationId), status: "ACTIVE" },
+          where: { clientId, ...tenantWhere(tenant.dietitianAccountId), status: "ACTIVE" },
           include: {
             versions: {
               where: { status: "PUBLISHED" },
@@ -71,7 +71,7 @@ export class AiContextService {
           },
         }),
         this.prisma.timelineEvent.findMany({
-          where: { clientId, ...tenantWhere(tenant.organizationId) },
+          where: { clientId, ...tenantWhere(tenant.dietitianAccountId) },
           orderBy: { occurredAt: "desc" },
           take: 8,
           select: { type: true, occurredAt: true },
@@ -133,7 +133,7 @@ export class AiContextService {
     });
   }
 
-  async buildNutritionContext(tenant: TenantContext, clientId: string, foodQuery?: string) {
+  async buildNutritionContext(tenant: DietitianTenantContext, clientId: string, foodQuery?: string) {
     const base = await this.buildClientContext(tenant, clientId);
     const foods = foodQuery
       ? await this.prisma.food.findMany({
@@ -165,10 +165,10 @@ export class AiContextService {
     };
   }
 
-  async buildMessageContext(tenant: TenantContext, clientId: string) {
+  async buildMessageContext(tenant: DietitianTenantContext, clientId: string) {
     const base = await this.buildClientContext(tenant, clientId);
     const messages = await this.prisma.message.findMany({
-      where: { clientId, ...tenantWhere(tenant.organizationId), deletedAt: null },
+      where: { clientId, ...tenantWhere(tenant.dietitianAccountId), deletedAt: null },
       orderBy: { createdAt: "desc" },
       take: 10,
       select: { body: true, createdAt: true },

@@ -2,8 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import { FEATURE_KEYS } from "@nutrition-saas/config";
 import { CLIENT_ACCESS_DENIED, CLIENT_LIMIT_REACHED } from "../src/clients/client.messages";
-import { ORGANIZATION_ACCESS_DENIED } from "../src/organizations/tenant.types";
-import { PLATFORM_ASSESSMENT_TEMPLATE_ID } from "../src/assessments/platform-template.seed";
+import { DIETITIAN_ACCESS_DENIED } from "../src/dietitian/dietitian.types";
 import {
   activateStandardSubscription,
   connectClientPortal,
@@ -14,7 +13,7 @@ import {
   resetAuthDatabase,
   type AuthTestContext,
 } from "./app";
-import { MULTI_MEMBER_UNSUPPORTED } from "../src/organizations/organization.service";
+import { MULTI_MEMBER_UNSUPPORTED } from "../src/dietitian/dietitian.service";
 
 const PASSWORD = "ValidPass12";
 const SETTINGS = {
@@ -64,7 +63,7 @@ describe("Phase 5 practice clients", () => {
 
   async function createOrg(cookie: string, name: string) {
     const created = await request(ctx.app.getHttpServer())
-      .post("/api/v1/organizations")
+      .post("/api/v1/dietitian")
       .set("Cookie", cookie)
       .send({ name, settings: SETTINGS })
       .expect(201);
@@ -78,7 +77,7 @@ describe("Phase 5 practice clients", () => {
     body: Record<string, unknown> = {},
   ) {
     return request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${organizationId}/clients`)
+      .post(`/api/v1/dietitian/${organizationId}/clients`)
       .set("Cookie", cookie)
       .send({
         firstName: "Ada",
@@ -100,40 +99,40 @@ describe("Phase 5 practice clients", () => {
     expect(clientB.status).toBe(201);
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${orgA.id}/clients/${clientB.body.id}`)
+      .get(`/api/v1/dietitian/${orgA.id}/clients/${clientB.body.id}`)
       .set("Cookie", alice.cookie)
       .expect(403)
       .expect((res) => expect(res.body.message).toBe(CLIENT_ACCESS_DENIED));
 
     await request(ctx.app.getHttpServer())
-      .patch(`/api/v1/organizations/${orgA.id}/clients/${clientB.body.id}`)
+      .patch(`/api/v1/dietitian/${orgA.id}/clients/${clientB.body.id}`)
       .set("Cookie", alice.cookie)
       .send({ firstName: "Hacked" })
       .expect(403);
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${orgB.id}/clients/${clientB.body.id}`)
+      .get(`/api/v1/dietitian/${orgB.id}/clients/${clientB.body.id}`)
       .set("Cookie", alice.cookie)
       .expect(403)
-      .expect((res) => expect(res.body.message).toBe(ORGANIZATION_ACCESS_DENIED));
+      .expect((res) => expect(res.body.message).toBe(DIETITIAN_ACCESS_DENIED));
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${orgA.id}/clients/${clientB.body.id}/timeline`)
+      .get(`/api/v1/dietitian/${orgA.id}/clients/${clientB.body.id}/timeline`)
       .set("Cookie", alice.cookie)
       .expect(403);
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${orgA.id}/clients/${clientB.body.id}/assessments`)
+      .get(`/api/v1/dietitian/${orgA.id}/clients/${clientB.body.id}/assessments`)
       .set("Cookie", alice.cookie)
       .expect(403);
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${orgA.id}/clients/${clientB.body.id}/appointments`)
+      .get(`/api/v1/dietitian/${orgA.id}/clients/${clientB.body.id}/appointments`)
       .set("Cookie", alice.cookie)
       .expect(403);
 
     const listed = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${orgA.id}/clients`)
+      .get(`/api/v1/dietitian/${orgA.id}/clients`)
       .set("Cookie", alice.cookie)
       .expect(200);
     expect(listed.body.items).toHaveLength(1);
@@ -147,34 +146,27 @@ describe("Phase 5 practice clients", () => {
     const org = await createOrg(owner.cookie, "Practice");
     const otherOrg = await createOrg(otherDietitian.cookie, "Other Practice");
 
-    const addMember = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/members`)
-      .set("Cookie", owner.cookie)
-      .send({ email: otherDietitian.address, role: "DIETITIAN" });
-    expect(addMember.status).toBe(400);
-    expect(addMember.body.message).toBe(MULTI_MEMBER_UNSUPPORTED);
-
     const first = await createClient(owner.cookie, org.id, { firstName: "First", lastName: "Client" });
     const second = await createClient(owner.cookie, org.id, { firstName: "Second", lastName: "Client" });
     expect(first.status).toBe(201);
     expect(second.status).toBe(201);
 
     const ownerList = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/clients`)
+      .get(`/api/v1/dietitian/${org.id}/clients`)
       .set("Cookie", owner.cookie)
       .expect(200);
     expect(ownerList.body.total).toBe(2);
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/clients`)
+      .get(`/api/v1/dietitian/${org.id}/clients`)
       .set("Cookie", otherDietitian.cookie)
       .expect(403);
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/clients/${first.body.id}`)
+      .get(`/api/v1/dietitian/${org.id}/clients/${first.body.id}`)
       .set("Cookie", otherDietitian.cookie)
       .expect(403);
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/clients/${first.body.id}`)
+      .get(`/api/v1/dietitian/${org.id}/clients/${first.body.id}`)
       .set("Cookie", outsider.cookie)
       .expect(403);
 
@@ -184,19 +176,19 @@ describe("Phase 5 practice clients", () => {
     });
     expect(theirClient.status).toBe(201);
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${otherOrg.id}/clients/${theirClient.body.id}`)
+      .get(`/api/v1/dietitian/${otherOrg.id}/clients/${theirClient.body.id}`)
       .set("Cookie", owner.cookie)
       .expect(403);
 
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${first.body.id}/assignments`)
+      .post(`/api/v1/dietitian/${org.id}/clients/${first.body.id}/assignments`)
       .set("Cookie", owner.cookie)
       .send({ organizationMemberId: org.id })
       .expect(400)
       .expect((res) => expect(res.body.message).toBe(MULTI_MEMBER_UNSUPPORTED));
   });
 
-  it("creates a client portal account without making the client an organization member", async () => {
+  it("creates a client portal account without making the client a practice member", async () => {
     const owner = await registerVerifyLogin();
     const org = await createOrg(owner.cookie, "Portal Practice");
     const clientEmail = email("portal");
@@ -206,13 +198,6 @@ describe("Phase 5 practice clients", () => {
     expect(created.status).toBe(201);
     expect(created.body.portalStatus).toBeNull();
     expect(created.body.connectionStatus).toBe("not_connected");
-
-    const members = await ctx.prisma.organizationMember.findMany({
-      where: { organizationId: org.id },
-      include: { user: true },
-    });
-    expect(members.every((row) => row.user.email !== clientEmail)).toBe(true);
-    expect(members.every((row) => String(row.role) !== "CLIENT")).toBe(true);
 
     const portalCookie = await connectClientPortal(ctx, owner.cookie, org.id, {
       id: created.body.id,
@@ -224,24 +209,20 @@ describe("Phase 5 practice clients", () => {
 
     const other = await createClient(owner.cookie, org.id, { firstName: "Other", lastName: "Person" });
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/clients/${other.body.id}`)
+      .get(`/api/v1/dietitian/${org.id}/clients/${other.body.id}`)
       .set("Cookie", portalCookie)
       .expect(403);
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/clients/${created.body.id}/timeline`)
+      .get(`/api/v1/dietitian/${org.id}/clients/${created.body.id}/timeline`)
       .set("Cookie", portalCookie)
       .expect(403);
-
-    await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/members`)
-      .set("Cookie", owner.cookie)
-      .send({ email: clientEmail, role: "DIETITIAN" })
-      .expect(400)
-      .expect((res) => expect(res.body.message).toBe(MULTI_MEMBER_UNSUPPORTED));
 
     const accounts = await ctx.prisma.clientAccount.findMany({ where: { clientId: created.body.id } });
     expect(accounts).toHaveLength(1);
-    const clientCount = await ctx.prisma.client.count({ where: { organizationId: org.id, email: clientEmail } });
+    expect(accounts[0]?.dietitianAccountId).toBe(org.id);
+    const clientCount = await ctx.prisma.client.count({
+      where: { dietitianAccountId: org.id, email: clientEmail },
+    });
     expect(clientCount).toBe(1);
   });
 
@@ -253,7 +234,7 @@ describe("Phase 5 practice clients", () => {
     await connectClientPortal(ctx, owner.cookie, org.id, { id: created.body.id, email: clientEmail });
 
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${created.body.id}/goals`)
+      .post(`/api/v1/dietitian/${org.id}/clients/${created.body.id}/goals`)
       .set("Cookie", owner.cookie)
       .send({ title: "Walk daily" })
       .expect(201);
@@ -263,7 +244,7 @@ describe("Phase 5 practice clients", () => {
     });
 
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${created.body.id}/archive`)
+      .post(`/api/v1/dietitian/${org.id}/clients/${created.body.id}/archive`)
       .set("Cookie", owner.cookie)
       .expect(201);
 
@@ -280,12 +261,12 @@ describe("Phase 5 practice clients", () => {
       .expect(401);
 
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${created.body.id}/restore`)
+      .post(`/api/v1/dietitian/${org.id}/clients/${created.body.id}/restore`)
       .set("Cookie", owner.cookie)
       .send({ status: "ACTIVE" })
       .expect(201);
 
-    const restored = await ctx.prisma.client.findMany({ where: { organizationId: org.id } });
+    const restored = await ctx.prisma.client.findMany({ where: { dietitianAccountId: org.id } });
     expect(restored).toHaveLength(1);
     expect(restored[0]?.id).toBe(created.body.id);
 
@@ -321,29 +302,29 @@ describe("Phase 5 practice clients", () => {
     const client = await createClient(owner.cookie, org.id, { email: email("records") });
 
     await request(ctx.app.getHttpServer())
-      .patch(`/api/v1/organizations/${org.id}/clients/${client.body.id}/profile`)
+      .patch(`/api/v1/dietitian/${org.id}/clients/${client.body.id}/profile`)
       .set("Cookie", outsider.cookie)
       .send({ allergies: "peanuts" })
       .expect(403);
     await request(ctx.app.getHttpServer())
-      .patch(`/api/v1/organizations/${org.id}/clients/${client.body.id}/profile`)
+      .patch(`/api/v1/dietitian/${org.id}/clients/${client.body.id}/profile`)
       .set("Cookie", owner.cookie)
       .send({ allergies: "peanuts", notes: "practice notes" })
       .expect(200);
 
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${client.body.id}/goals`)
+      .post(`/api/v1/dietitian/${org.id}/clients/${client.body.id}/goals`)
       .set("Cookie", outsider.cookie)
       .send({ title: "Hidden" })
       .expect(403);
     const goal = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${client.body.id}/goals`)
+      .post(`/api/v1/dietitian/${org.id}/clients/${client.body.id}/goals`)
       .set("Cookie", owner.cookie)
       .send({ title: "Sleep 8 hours", targetValue: 8, targetUnit: "h" })
       .expect(201);
 
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${client.body.id}/measurements`)
+      .post(`/api/v1/dietitian/${org.id}/clients/${client.body.id}/measurements`)
       .set("Cookie", owner.cookie)
       .send({ type: "WEIGHT", value: 154, unit: "lb", measuredAt: new Date().toISOString() })
       .expect(201)
@@ -353,12 +334,12 @@ describe("Phase 5 practice clients", () => {
       });
 
     const tag = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/tags`)
+      .post(`/api/v1/dietitian/${org.id}/tags`)
       .set("Cookie", owner.cookie)
       .send({ name: "VIP", color: "#123456" })
       .expect(201);
     await request(ctx.app.getHttpServer())
-      .put(`/api/v1/organizations/${org.id}/clients/${client.body.id}/tags`)
+      .put(`/api/v1/dietitian/${org.id}/clients/${client.body.id}/tags`)
       .set("Cookie", owner.cookie)
       .send({ tagIds: [tag.body.id] })
       .expect(200);
@@ -366,25 +347,25 @@ describe("Phase 5 practice clients", () => {
     const otherOwner = await registerVerifyLogin();
     const otherOrg = await createOrg(otherOwner.cookie, "Other");
     await request(ctx.app.getHttpServer())
-      .put(`/api/v1/organizations/${otherOrg.id}/clients/${client.body.id}/tags`)
+      .put(`/api/v1/dietitian/${otherOrg.id}/clients/${client.body.id}/tags`)
       .set("Cookie", otherOwner.cookie)
       .send({ tagIds: [tag.body.id] })
       .expect(403);
     const otherClient = await createClient(otherOwner.cookie, otherOrg.id);
     await request(ctx.app.getHttpServer())
-      .put(`/api/v1/organizations/${otherOrg.id}/clients/${otherClient.body.id}/tags`)
+      .put(`/api/v1/dietitian/${otherOrg.id}/clients/${otherClient.body.id}/tags`)
       .set("Cookie", otherOwner.cookie)
       .send({ tagIds: [tag.body.id] })
       .expect(404);
 
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${client.body.id}/goals/${goal.body.id}/complete`)
+      .post(`/api/v1/dietitian/${org.id}/clients/${client.body.id}/goals/${goal.body.id}/complete`)
       .set("Cookie", owner.cookie)
       .expect(201);
 
     await connectClientPortal(ctx, owner.cookie, org.id, { id: client.body.id, email: client.body.email });
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${client.body.id}/account/deactivate`)
+      .post(`/api/v1/dietitian/${org.id}/clients/${client.body.id}/account/deactivate`)
       .set("Cookie", owner.cookie)
       .expect(201);
     const deactivatedLogin = await request(ctx.app.getHttpServer())
@@ -401,39 +382,35 @@ describe("Phase 5 practice clients", () => {
     const org = await createOrg(owner.cookie, "Clinical");
     const client = await createClient(owner.cookie, org.id);
 
-    const started = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${client.body.id}/assessments`)
+    const template = await request(ctx.app.getHttpServer())
+      .post(`/api/v1/dietitian/${org.id}/assessment-templates`)
       .set("Cookie", owner.cookie)
-      .send({ templateId: PLATFORM_ASSESSMENT_TEMPLATE_ID })
+      .send({ name: "Intake", schema: { sections: [] } })
+      .expect(201);
+
+    const started = await request(ctx.app.getHttpServer())
+      .post(`/api/v1/dietitian/${org.id}/clients/${client.body.id}/assessments`)
+      .set("Cookie", owner.cookie)
+      .send({ templateId: template.body.id })
       .expect(201);
     expect(started.body.templateVersion).toBe(1);
 
     const completed = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${client.body.id}/assessments/${started.body.id}/complete`)
+      .post(`/api/v1/dietitian/${org.id}/clients/${client.body.id}/assessments/${started.body.id}/complete`)
       .set("Cookie", owner.cookie)
       .send({ responses: { reason: "energy" } })
       .expect(201);
     expect(completed.body.templateVersion).toBe(1);
 
-    const orgTemplate = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/assessment-templates`)
-      .set("Cookie", owner.cookie)
-      .send({ name: "Practice template", schema: { sections: [] } })
-      .expect(201);
     await request(ctx.app.getHttpServer())
-      .patch(`/api/v1/organizations/${org.id}/assessment-templates/${orgTemplate.body.id}`)
+      .patch(`/api/v1/dietitian/${org.id}/assessment-templates/${template.body.id}`)
       .set("Cookie", owner.cookie)
       .send({ schema: { sections: [{ id: "v2" }] } })
       .expect(200)
       .expect((res) => expect(res.body.version).toBe(2));
 
-    await ctx.prisma.assessmentTemplate.update({
-      where: { id: PLATFORM_ASSESSMENT_TEMPLATE_ID },
-      data: { schema: { sections: [{ id: "changed" }] }, version: 2 },
-    });
-
     const listed = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/clients/${client.body.id}/assessments`)
+      .get(`/api/v1/dietitian/${org.id}/clients/${client.body.id}/assessments`)
       .set("Cookie", owner.cookie)
       .expect(200);
     expect(listed.body[0].templateVersion).toBe(1);
@@ -442,22 +419,22 @@ describe("Phase 5 practice clients", () => {
     const start = new Date(Date.now() + 60 * 60 * 1000).toISOString();
     const end = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${client.body.id}/appointments`)
+      .post(`/api/v1/dietitian/${org.id}/clients/${client.body.id}/appointments`)
       .set("Cookie", owner.cookie)
       .send({ title: "Follow-up", startAt: start, endAt: end })
       .expect(201);
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/clients/${client.body.id}/appointments`)
+      .get(`/api/v1/dietitian/${org.id}/clients/${client.body.id}/appointments`)
       .set("Cookie", outsider.cookie)
       .expect(403);
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/clients/${client.body.id}/timeline`)
+      .get(`/api/v1/dietitian/${org.id}/clients/${client.body.id}/timeline`)
       .set("Cookie", outsider.cookie)
       .expect(403);
 
     const timeline = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/clients/${client.body.id}/timeline`)
+      .get(`/api/v1/dietitian/${org.id}/clients/${client.body.id}/timeline`)
       .set("Cookie", owner.cookie)
       .expect(200);
     expect(timeline.body.some((row: { type: string }) => row.type === "ASSESSMENT_COMPLETED")).toBe(true);
@@ -473,7 +450,6 @@ describe("Phase 5 practice clients", () => {
     await ctx.prisma.featureOverride.create({
       data: {
         dietitianAccountId: org.id,
-        organizationId: org.id,
         featureId: feature.id,
         enabled: true,
         limitValue: 1,
@@ -488,7 +464,7 @@ describe("Phase 5 practice clients", () => {
     expect(second.body.message).toBe(CLIENT_LIMIT_REACHED);
 
     const audits = await ctx.prisma.auditLog.findMany({
-      where: { organizationId: org.id, action: { in: ["client_created", "client_account_invited"] } },
+      where: { dietitianAccountId: org.id, action: { in: ["client_created", "client_account_invited"] } },
     });
     expect(audits.some((row) => row.action === "client_created")).toBe(true);
     for (const row of audits) {
@@ -503,14 +479,14 @@ describe("Phase 5 practice clients", () => {
     const owner = await registerVerifyLogin();
     const org = await createOrg(owner.cookie, "Settings Clinic");
     const settings = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/settings`)
+      .get(`/api/v1/dietitian/${org.id}/settings`)
       .set("Cookie", owner.cookie)
       .expect(200);
     expect(settings.body.timezone).toBe("UTC");
     expect(settings.body.defaultAppointmentMinutes).toBe(60);
 
     const updated = await request(ctx.app.getHttpServer())
-      .patch(`/api/v1/organizations/${org.id}/settings`)
+      .patch(`/api/v1/dietitian/${org.id}/settings`)
       .set("Cookie", owner.cookie)
       .send({
         ...SETTINGS,

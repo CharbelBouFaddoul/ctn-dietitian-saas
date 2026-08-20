@@ -2,9 +2,9 @@ import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, UseGuards } f
 import { ApiCookieAuth, ApiProperty, ApiPropertyOptional, ApiTags } from "@nestjs/swagger";
 import { IsEnum, IsObject, IsOptional, IsString, IsUUID, MaxLength, MinLength } from "class-validator";
 import { SessionGuard } from "../auth/guards/session.guard";
-import { CurrentTenant } from "../organizations/decorators/current-tenant.decorator";
-import { TenantGuard } from "../organizations/guards/tenant.guard";
-import type { TenantContext } from "../organizations/tenant.types";
+import { CurrentTenant } from "../dietitian/decorators/current-tenant.decorator";
+import { DietitianGuard } from "../dietitian/guards/dietitian.guard";
+import type { DietitianTenantContext } from "../dietitian/dietitian.types";
 import { ClientActionRequired } from "../clients/decorators/client-action.decorator";
 import { ClientAccessGuard } from "../clients/guards/client-access.guard";
 import { AssessmentService } from "./assessment.service";
@@ -74,18 +74,18 @@ class CompleteAssessmentDto {
 
 @ApiTags("assessments")
 @ApiCookieAuth()
-@UseGuards(SessionGuard, TenantGuard)
-@Controller("api/v1/organizations/:organizationId")
+@UseGuards(SessionGuard, DietitianGuard)
+@Controller("api/v1/dietitian/:dietitianAccountId")
 export class AssessmentController {
   constructor(private readonly assessments: AssessmentService) {}
 
   @Get("assessment-templates")
-  listTemplates(@CurrentTenant() tenant: TenantContext) {
+  listTemplates(@CurrentTenant() tenant: DietitianTenantContext) {
     return this.assessments.listTemplates(tenant);
   }
 
   @Post("assessment-templates")
-  createTemplate(@CurrentTenant() tenant: TenantContext, @Body() body: CreateTemplateDto) {
+  createTemplate(@CurrentTenant() tenant: DietitianTenantContext, @Body() body: CreateTemplateDto) {
     return this.assessments.createTemplate(tenant, {
       ...body,
       schema: body.schema as Prisma.InputJsonValue,
@@ -94,7 +94,7 @@ export class AssessmentController {
 
   @Patch("assessment-templates/:templateId")
   updateTemplate(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("templateId", ParseUUIDPipe) templateId: string,
     @Body() body: UpdateTemplateDto,
   ) {
@@ -106,14 +106,14 @@ export class AssessmentController {
 
   @Get("clients/:clientId/assessments")
   @UseGuards(ClientAccessGuard)
-  list(@CurrentTenant() tenant: TenantContext, @Param("clientId", ParseUUIDPipe) clientId: string) {
+  list(@CurrentTenant() tenant: DietitianTenantContext, @Param("clientId", ParseUUIDPipe) clientId: string) {
     return this.assessments.list(tenant, clientId);
   }
 
   @Get("clients/:clientId/assessments/:assessmentId")
   @UseGuards(ClientAccessGuard)
   getOne(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("clientId", ParseUUIDPipe) clientId: string,
     @Param("assessmentId", ParseUUIDPipe) assessmentId: string,
   ) {
@@ -124,7 +124,7 @@ export class AssessmentController {
   @UseGuards(ClientAccessGuard)
   @ClientActionRequired("manageRecords")
   start(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("clientId", ParseUUIDPipe) clientId: string,
     @Body() body: StartAssessmentDto,
   ) {
@@ -135,7 +135,7 @@ export class AssessmentController {
   @UseGuards(ClientAccessGuard)
   @ClientActionRequired("manageRecords")
   save(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("clientId", ParseUUIDPipe) clientId: string,
     @Param("assessmentId", ParseUUIDPipe) assessmentId: string,
     @Body() body: SaveAssessmentDto,
@@ -152,7 +152,7 @@ export class AssessmentController {
   @UseGuards(ClientAccessGuard)
   @ClientActionRequired("manageRecords")
   complete(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("clientId", ParseUUIDPipe) clientId: string,
     @Param("assessmentId", ParseUUIDPipe) assessmentId: string,
     @Body() body: CompleteAssessmentDto,

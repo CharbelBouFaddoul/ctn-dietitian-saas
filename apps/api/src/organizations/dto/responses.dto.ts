@@ -120,7 +120,7 @@ export class OrganizationMemberResponseDto {
   deactivatedAt!: string | null;
 }
 
-export class TenantContextResponseDto {
+export class DietitianTenantContextResponseDto {
   @ApiProperty()
   organizationId!: string;
 

@@ -4,7 +4,7 @@ import { CurrentSession, CurrentUser } from "../auth/decorators/current-user.dec
 import { SessionGuard } from "../auth/guards/session.guard";
 import type { AuthenticatedRequestUser, AuthenticatedSession } from "../auth/auth.types";
 import { ClientAccessService } from "../clients/client-access.service";
-import { requireDietitianAccountId } from "../organizations/tenant-scope";
+import { requireDietitianAccountId } from "../dietitian/tenant-scope";
 import { ListFoodsQueryDto } from "./dto/food.dto";
 import { FoodService } from "./food.service";
 

@@ -1,9 +1,9 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { ApiCookieAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { SessionGuard } from "../auth/guards/session.guard";
-import { CurrentTenant } from "../organizations/decorators/current-tenant.decorator";
-import { TenantGuard } from "../organizations/guards/tenant.guard";
-import type { TenantContext } from "../organizations/tenant.types";
+import { CurrentTenant } from "../dietitian/decorators/current-tenant.decorator";
+import { DietitianGuard } from "../dietitian/guards/dietitian.guard";
+import type { DietitianTenantContext } from "../dietitian/dietitian.types";
 import { ClientService } from "./client.service";
 import { ClientPortfolioService } from "./client-portfolio.service";
 import { ClientActionRequired } from "./decorators/client-action.decorator";
@@ -12,8 +12,8 @@ import { ClientAccessGuard } from "./guards/client-access.guard";
 
 @ApiTags("clients")
 @ApiCookieAuth()
-@UseGuards(SessionGuard, TenantGuard)
-@Controller("api/v1/organizations/:organizationId/clients")
+@UseGuards(SessionGuard, DietitianGuard)
+@Controller("api/v1/dietitian/:dietitianAccountId/clients")
 export class ClientController {
   constructor(
     private readonly clients: ClientService,
@@ -22,13 +22,13 @@ export class ClientController {
 
   @Get()
   @ApiOperation({ summary: "List visible clients (server-side filter/pagination)" })
-  list(@CurrentTenant() tenant: TenantContext, @Query() query: ListClientsQueryDto) {
+  list(@CurrentTenant() tenant: DietitianTenantContext, @Query() query: ListClientsQueryDto) {
     return this.clients.list(tenant, query);
   }
 
   @Post()
   @ApiOperation({ summary: "Create a client. Does not create an organization membership." })
-  create(@CurrentTenant() tenant: TenantContext, @Body() body: CreateClientDto) {
+  create(@CurrentTenant() tenant: DietitianTenantContext, @Body() body: CreateClientDto) {
     return this.clients.create(tenant, body);
   }
 
@@ -36,7 +36,7 @@ export class ClientController {
   @UseGuards(ClientAccessGuard)
   @ApiOperation({ summary: "Read-only client portfolio overview aggregate" })
   getPortfolio(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("clientId", ParseUUIDPipe) clientId: string,
   ) {
     return this.portfolio.get(tenant, clientId);
@@ -44,7 +44,7 @@ export class ClientController {
 
   @Get(":clientId")
   @UseGuards(ClientAccessGuard)
-  get(@CurrentTenant() tenant: TenantContext, @Param("clientId", ParseUUIDPipe) clientId: string) {
+  get(@CurrentTenant() tenant: DietitianTenantContext, @Param("clientId", ParseUUIDPipe) clientId: string) {
     return this.clients.get(tenant, clientId);
   }
 
@@ -52,7 +52,7 @@ export class ClientController {
   @UseGuards(ClientAccessGuard)
   @ClientActionRequired("update")
   update(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("clientId", ParseUUIDPipe) clientId: string,
     @Body() body: UpdateClientDto,
   ) {
@@ -62,7 +62,7 @@ export class ClientController {
   @Post(":clientId/archive")
   @UseGuards(ClientAccessGuard)
   @ClientActionRequired("archive")
-  archive(@CurrentTenant() tenant: TenantContext, @Param("clientId", ParseUUIDPipe) clientId: string) {
+  archive(@CurrentTenant() tenant: DietitianTenantContext, @Param("clientId", ParseUUIDPipe) clientId: string) {
     return this.clients.archive(tenant, clientId);
   }
 
@@ -70,7 +70,7 @@ export class ClientController {
   @UseGuards(ClientAccessGuard)
   @ClientActionRequired("archive")
   restore(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("clientId", ParseUUIDPipe) clientId: string,
     @Body() body: RestoreClientDto,
   ) {

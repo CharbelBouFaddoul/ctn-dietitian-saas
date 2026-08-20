@@ -14,10 +14,10 @@ import { Throttle, ThrottlerGuard } from "@nestjs/throttler";
 import { THROTTLE_NAMES } from "@nutrition-saas/config";
 import { SessionGuard } from "../auth/guards/session.guard";
 import { ClientAccessService } from "../clients/client-access.service";
-import { CurrentTenant } from "../organizations/decorators/current-tenant.decorator";
-import { TenantGuard } from "../organizations/guards/tenant.guard";
-import type { TenantContext } from "../organizations/tenant.types";
-import { requireDietitianAccountId } from "../organizations/tenant-scope";
+import { CurrentTenant } from "../dietitian/decorators/current-tenant.decorator";
+import { DietitianGuard } from "../dietitian/guards/dietitian.guard";
+import type { DietitianTenantContext } from "../dietitian/dietitian.types";
+import { requireDietitianAccountId } from "../dietitian/tenant-scope";
 import { ConversationService } from "./conversation.service";
 import { MessagingRecipientService } from "./messaging-recipient.service";
 import { MarkConversationReadDto, MessagePaginationQueryDto, SendMessageDto } from "./dto/messaging.dto";
@@ -26,8 +26,8 @@ import { PrismaService } from "../prisma/prisma.service";
 
 @ApiTags("organizations")
 @ApiCookieAuth()
-@UseGuards(SessionGuard, TenantGuard)
-@Controller("api/v1/organizations/:organizationId")
+@UseGuards(SessionGuard, DietitianGuard)
+@Controller("api/v1/dietitian/:dietitianAccountId")
 export class OrgMessagingController {
   constructor(
     private readonly access: ClientAccessService,
@@ -39,13 +39,13 @@ export class OrgMessagingController {
 
   @Get("conversations")
   @ApiOperation({ summary: "List conversations for visible clients" })
-  async inbox(@CurrentTenant() tenant: TenantContext) {
+  async inbox(@CurrentTenant() tenant: DietitianTenantContext) {
     const clients = await this.prisma.client.findMany({
       where: this.access.visibleWhere(tenant),
       select: { id: true },
     });
     const rows = await this.conversations.listInbox(
-      tenant.organizationId,
+      tenant.dietitianAccountId,
       clients.map((row) => row.id),
     );
     const unread = await this.conversations.unreadCountsForReader(
@@ -57,7 +57,7 @@ export class OrgMessagingController {
 
   @Get("clients/:clientId/conversation")
   async getConversation(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("clientId", ParseUUIDPipe) clientId: string,
   ) {
     const client = await this.access.assertCanAccess(tenant, clientId, "read");
@@ -75,7 +75,7 @@ export class OrgMessagingController {
 
   @Get("clients/:clientId/conversation/messages")
   async listMessages(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("clientId", ParseUUIDPipe) clientId: string,
     @Query() query: MessagePaginationQueryDto,
   ) {
@@ -93,7 +93,7 @@ export class OrgMessagingController {
   @UseGuards(ThrottlerGuard)
   @Throttle({ [THROTTLE_NAMES.MESSAGING]: {} })
   async sendMessage(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("clientId", ParseUUIDPipe) clientId: string,
     @Body() body: SendMessageDto,
   ) {
@@ -113,7 +113,7 @@ export class OrgMessagingController {
 
   @Post("clients/:clientId/conversation/read")
   async markRead(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("clientId", ParseUUIDPipe) clientId: string,
     @Body() _body: MarkConversationReadDto,
   ) {
@@ -123,24 +123,24 @@ export class OrgMessagingController {
   }
 
   @Get("notifications")
-  async listNotifications(@CurrentTenant() tenant: TenantContext) {
-    return this.notifications.listForUser(tenant.userId, tenant.organizationId);
+  async listNotifications(@CurrentTenant() tenant: DietitianTenantContext) {
+    return this.notifications.listForUser(tenant.userId, tenant.dietitianAccountId);
   }
 
   @Get("notifications/unread-count")
-  async unreadNotifications(@CurrentTenant() tenant: TenantContext) {
-    const count = await this.notifications.unreadCount(tenant.userId, tenant.organizationId);
+  async unreadNotifications(@CurrentTenant() tenant: DietitianTenantContext) {
+    const count = await this.notifications.unreadCount(tenant.userId, tenant.dietitianAccountId);
     return { count };
   }
 
   @Post("notifications/read-all")
-  async markAllNotificationsRead(@CurrentTenant() tenant: TenantContext) {
-    return this.notifications.markAllRead(tenant.userId, tenant.organizationId);
+  async markAllNotificationsRead(@CurrentTenant() tenant: DietitianTenantContext) {
+    return this.notifications.markAllRead(tenant.userId, tenant.dietitianAccountId);
   }
 
   @Patch("notifications/:notificationId/read")
   async markNotificationRead(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("notificationId", ParseUUIDPipe) notificationId: string,
   ) {
     return this.notifications.markRead(tenant.userId, notificationId);

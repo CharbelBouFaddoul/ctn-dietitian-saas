@@ -9,8 +9,8 @@ import type { Client, Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { SecurityEventLogger } from "../auth/security-event.logger";
 import { EntitlementService } from "../entitlements/entitlement.service";
-import type { TenantContext } from "../organizations/tenant.types";
-import { legacyOrganizationId, tenantWhere } from "../organizations/tenant-scope";
+import type { DietitianTenantContext } from "../dietitian/dietitian.types";
+import { tenantWhere } from "../dietitian/tenant-scope";
 import { TimelineService } from "../timeline/timeline.service";
 import { ClientAccessService } from "./client-access.service";
 import {
@@ -30,7 +30,7 @@ export class ClientService {
     private readonly security: SecurityEventLogger,
   ) {}
 
-  async list(tenant: TenantContext, query: ListClientsQueryDto) {
+  async list(tenant: DietitianTenantContext, query: ListClientsQueryDto) {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 20;
     const where: Prisma.ClientWhereInput = {
@@ -77,10 +77,10 @@ export class ClientService {
     };
   }
 
-  async get(tenant: TenantContext, clientId: string) {
+  async get(tenant: DietitianTenantContext, clientId: string) {
     await this.access.assertCanAccess(tenant, clientId, "read");
     const client = await this.prisma.client.findFirst({
-      where: { id: clientId, ...tenantWhere(tenant.organizationId) },
+      where: { id: clientId, ...tenantWhere(tenant.dietitianAccountId) },
       include: {
         profile: true,
         account: true,
@@ -99,16 +99,15 @@ export class ClientService {
     return this.toDetail(client);
   }
 
-  async create(tenant: TenantContext, input: CreateClientDto) {
+  async create(tenant: DietitianTenantContext, input: CreateClientDto) {
     this.access.assertCanCreate(tenant);
-    await this.assertClientLimit(tenant.organizationId);
+    await this.assertClientLimit(tenant.dietitianAccountId);
 
     // Phase 1: assignedMemberId is ignored (no multi-member assignments).
     const client = await this.prisma.$transaction(async (tx) => {
       const created = await tx.client.create({
         data: {
-          dietitianAccountId: tenant.organizationId,
-          organizationId: legacyOrganizationId(tenant),
+          dietitianAccountId: tenant.dietitianAccountId,
           firstName: input.firstName.trim(),
           lastName: input.lastName.trim(),
           displayName: input.displayName?.trim() || `${input.firstName.trim()} ${input.lastName.trim()}`,
@@ -123,23 +122,21 @@ export class ClientService {
 
       await tx.clientProfile.create({
         data: {
-          dietitianAccountId: tenant.organizationId,
-          organizationId: legacyOrganizationId(tenant),
+          dietitianAccountId: tenant.dietitianAccountId,
           clientId: created.id,
         },
       });
 
       if (input.tagIds?.length) {
         const tags = await tx.tag.findMany({
-          where: { id: { in: input.tagIds }, ...tenantWhere(tenant.organizationId) },
+          where: { id: { in: input.tagIds }, ...tenantWhere(tenant.dietitianAccountId) },
         });
         if (tags.length !== input.tagIds.length) {
           throw new BadRequestException("One or more tags are invalid");
         }
         await tx.clientTag.createMany({
           data: tags.map((tag) => ({
-            dietitianAccountId: tenant.organizationId,
-            organizationId: legacyOrganizationId(tenant),
+            dietitianAccountId: tenant.dietitianAccountId,
             clientId: created.id,
             tagId: tag.id,
           })),
@@ -150,8 +147,7 @@ export class ClientService {
     });
 
     await this.timeline.record({
-      organizationId: tenant.organizationId,
-      legacyOrganizationId: legacyOrganizationId(tenant),
+      dietitianAccountId: tenant.dietitianAccountId,
       clientId: client.id,
       type: "CLIENT_CREATED",
       actorUserId: tenant.userId,
@@ -163,8 +159,7 @@ export class ClientService {
       type: "client_created",
       outcome: "success",
       userId: tenant.userId,
-      organizationId: tenant.organizationId,
-      dietitianAccountId: tenant.organizationId,
+      dietitianAccountId: tenant.dietitianAccountId,
       targetType: "client",
       targetId: client.id,
       metadata: { status: client.status },
@@ -173,7 +168,7 @@ export class ClientService {
     return this.get(tenant, client.id);
   }
 
-  async update(tenant: TenantContext, clientId: string, input: UpdateClientDto) {
+  async update(tenant: DietitianTenantContext, clientId: string, input: UpdateClientDto) {
     await this.access.assertCanAccess(tenant, clientId, "update");
     const updated = await this.prisma.client.update({
       where: { id: clientId },
@@ -188,8 +183,7 @@ export class ClientService {
       },
     });
     await this.timeline.record({
-      organizationId: tenant.organizationId,
-      legacyOrganizationId: legacyOrganizationId(tenant),
+      dietitianAccountId: tenant.dietitianAccountId,
       clientId,
       type: "CLIENT_UPDATED",
       actorUserId: tenant.userId,
@@ -200,15 +194,14 @@ export class ClientService {
       type: "client_updated",
       outcome: "success",
       userId: tenant.userId,
-      organizationId: tenant.organizationId,
-      dietitianAccountId: tenant.organizationId,
+      dietitianAccountId: tenant.dietitianAccountId,
       targetType: "client",
       targetId: clientId,
     });
     return this.get(tenant, updated.id);
   }
 
-  async archive(tenant: TenantContext, clientId: string) {
+  async archive(tenant: DietitianTenantContext, clientId: string) {
     const client = await this.access.assertCanAccess(tenant, clientId, "archive");
     await this.prisma.$transaction(async (tx) => {
       await tx.client.update({
@@ -232,8 +225,7 @@ export class ClientService {
       }
     });
     await this.timeline.record({
-      organizationId: tenant.organizationId,
-      legacyOrganizationId: legacyOrganizationId(tenant),
+      dietitianAccountId: tenant.dietitianAccountId,
       clientId,
       type: "CLIENT_ARCHIVED",
       actorUserId: tenant.userId,
@@ -245,18 +237,17 @@ export class ClientService {
       type: "client_archived",
       outcome: "success",
       userId: tenant.userId,
-      organizationId: tenant.organizationId,
-      dietitianAccountId: tenant.organizationId,
+      dietitianAccountId: tenant.dietitianAccountId,
       targetType: "client",
       targetId: clientId,
     });
     return this.get(tenant, clientId);
   }
 
-  async restore(tenant: TenantContext, clientId: string, status: "ACTIVE" | "INACTIVE" = "ACTIVE") {
+  async restore(tenant: DietitianTenantContext, clientId: string, status: "ACTIVE" | "INACTIVE" = "ACTIVE") {
     await this.access.assertCanAccess(tenant, clientId, "archive");
     const existing = await this.prisma.client.findFirst({
-      where: { id: clientId, ...tenantWhere(tenant.organizationId) },
+      where: { id: clientId, ...tenantWhere(tenant.dietitianAccountId) },
     });
     if (!existing) {
       throw new NotFoundException(CLIENT_ACCESS_DENIED);
@@ -266,15 +257,14 @@ export class ClientService {
       existing.status !== "ACTIVE" &&
       existing.status !== "PENDING"
     ) {
-      await this.assertClientLimit(tenant.organizationId);
+      await this.assertClientLimit(tenant.dietitianAccountId);
     }
     await this.prisma.client.update({
       where: { id: clientId },
       data: { status, archivedAt: null },
     });
     await this.timeline.record({
-      organizationId: tenant.organizationId,
-      legacyOrganizationId: legacyOrganizationId(tenant),
+      dietitianAccountId: tenant.dietitianAccountId,
       clientId,
       type: "CLIENT_RESTORED",
       actorUserId: tenant.userId,
@@ -286,8 +276,7 @@ export class ClientService {
       type: "client_restored",
       outcome: "success",
       userId: tenant.userId,
-      organizationId: tenant.organizationId,
-      dietitianAccountId: tenant.organizationId,
+      dietitianAccountId: tenant.dietitianAccountId,
       targetType: "client",
       targetId: clientId,
     });
@@ -352,7 +341,6 @@ export class ClientService {
     const owner = client.dietitianAccount;
     return {
       id: client.id,
-      organizationId: client.dietitianAccountId ?? client.organizationId,
       firstName: client.firstName,
       lastName: client.lastName,
       displayName: client.displayName,

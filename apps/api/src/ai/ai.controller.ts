@@ -5,9 +5,9 @@ import { THROTTLE_NAMES } from "@nutrition-saas/config";
 import { IsOptional, IsString, MaxLength } from "class-validator";
 import { SessionGuard } from "../auth/guards/session.guard";
 import { ClientAccessGuard } from "../clients/guards/client-access.guard";
-import { CurrentTenant } from "../organizations/decorators/current-tenant.decorator";
-import { TenantGuard } from "../organizations/guards/tenant.guard";
-import type { TenantContext } from "../organizations/tenant.types";
+import { CurrentTenant } from "../dietitian/decorators/current-tenant.decorator";
+import { DietitianGuard } from "../dietitian/guards/dietitian.guard";
+import type { DietitianTenantContext } from "../dietitian/dietitian.types";
 import { AiService } from "./ai.service";
 
 class AiPromptDto {
@@ -26,28 +26,28 @@ class AiPromptDto {
 
 @ApiTags("ai")
 @ApiCookieAuth()
-@UseGuards(SessionGuard, TenantGuard)
-@Controller("api/v1/organizations/:organizationId")
+@UseGuards(SessionGuard, DietitianGuard)
+@Controller("api/v1/dietitian/:dietitianAccountId")
 export class OrganizationAiController {
   constructor(private readonly ai: AiService) {}
 
   @Get("ai/usage")
-  usage(@CurrentTenant() tenant: TenantContext) {
-    return this.ai.getUsageSummary(tenant.organizationId);
+  usage(@CurrentTenant() tenant: DietitianTenantContext) {
+    return this.ai.getUsageSummary(tenant.dietitianAccountId);
   }
 }
 
 @ApiTags("ai")
 @ApiCookieAuth()
-@UseGuards(SessionGuard, TenantGuard, ClientAccessGuard, ThrottlerGuard)
+@UseGuards(SessionGuard, DietitianGuard, ClientAccessGuard, ThrottlerGuard)
 @Throttle({ [THROTTLE_NAMES.AI]: {} })
-@Controller("api/v1/organizations/:organizationId/clients/:clientId/ai")
+@Controller("api/v1/dietitian/:dietitianAccountId/clients/:clientId/ai")
 export class ClientAiController {
   constructor(private readonly ai: AiService) {}
 
   @Post("client-summary")
   clientSummary(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("clientId", ParseUUIDPipe) clientId: string,
     @Body() body: AiPromptDto,
   ) {
@@ -56,7 +56,7 @@ export class ClientAiController {
 
   @Post("meal-plan-assistance")
   mealPlanAssistance(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("clientId", ParseUUIDPipe) clientId: string,
     @Body() body: AiPromptDto,
   ) {
@@ -65,7 +65,7 @@ export class ClientAiController {
 
   @Post("nutrition-assistance")
   nutritionAssistance(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("clientId", ParseUUIDPipe) clientId: string,
     @Body() body: AiPromptDto,
   ) {
@@ -74,7 +74,7 @@ export class ClientAiController {
 
   @Post("consultation-summary")
   consultationSummary(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("clientId", ParseUUIDPipe) clientId: string,
     @Body() body: AiPromptDto,
   ) {
@@ -83,7 +83,7 @@ export class ClientAiController {
 
   @Post("message-draft")
   messageDraft(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("clientId", ParseUUIDPipe) clientId: string,
     @Body() body: AiPromptDto,
   ) {

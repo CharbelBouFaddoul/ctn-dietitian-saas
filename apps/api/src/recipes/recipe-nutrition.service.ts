@@ -52,7 +52,7 @@ export class RecipeNutritionService {
   }
 
   async calculate(
-    organizationId: string,
+    dietitianAccountId: string,
     recipe: Recipe,
     ingredients: RecipeIngredient[],
     foodMap?: Map<string, EffectiveFood>,
@@ -62,7 +62,7 @@ export class RecipeNutritionService {
       throw new BadRequestException("Recipe servings must be greater than zero");
     }
     const ids = ingredients.map((row) => row.foodId);
-    const resolved = foodMap ?? (await this.foods.getEffectiveMany(organizationId, ids));
+    const resolved = foodMap ?? (await this.foods.getEffectiveMany(dietitianAccountId, ids));
     const calculated = ingredients
       .slice()
       .sort((a, b) => a.sortOrder - b.sortOrder || a.createdAt.getTime() - b.createdAt.getTime())

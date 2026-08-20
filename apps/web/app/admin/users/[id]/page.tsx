@@ -129,7 +129,7 @@ export default function AdminUserDetailPage() {
             <tbody>
               <tr>
                 <Td label="Account">
-                  <Link href={`/admin/organizations/${user.dietitianAccount.id}`} className="ui-link">
+                  <Link href={`/admin/dietitians/${user.dietitianAccount.id}`} className="ui-link">
                     {user.dietitianAccount.displayName}
                   </Link>
                 </Td>

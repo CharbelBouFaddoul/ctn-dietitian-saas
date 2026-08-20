@@ -15,8 +15,8 @@ import { z } from "@nutrition-saas/validation";
 import { SecurityEventLogger } from "../auth/security-event.logger";
 import { EntitlementService } from "../entitlements/entitlement.service";
 import { PrismaService } from "../prisma/prisma.service";
-import type { TenantContext } from "../organizations/tenant.types";
-import { legacyOrganizationId, tenantWhere } from "../organizations/tenant-scope";
+import type { DietitianTenantContext } from "../dietitian/dietitian.types";
+import { tenantWhere } from "../dietitian/tenant-scope";
 import { validateRulePayload } from "./automation.schemas";
 import { ACTION_LABELS, TRIGGER_LABELS } from "./automation-catalog";
 import { AutomationUsageService } from "./automation-usage.service";
@@ -30,26 +30,26 @@ export class AutomationService {
     private readonly security: SecurityEventLogger,
   ) {}
 
-  assertCanManage(_tenant: TenantContext): void {
+  assertCanManage(_tenant: DietitianTenantContext): void {
   }
 
-  async list(tenant: TenantContext) {
+  async list(tenant: DietitianTenantContext) {
     this.assertCanManage(tenant);
     const rows = await this.prisma.automationRule.findMany({
-      where: { ...tenantWhere(tenant.organizationId), archivedAt: null },
+      where: { ...tenantWhere(tenant.dietitianAccountId), archivedAt: null },
       orderBy: { createdAt: "desc" },
     });
     return rows.map((row) => this.toResponse(row));
   }
 
-  async get(tenant: TenantContext, automationId: string) {
+  async get(tenant: DietitianTenantContext, automationId: string) {
     this.assertCanManage(tenant);
-    const row = await this.findRule(tenant.organizationId, automationId);
+    const row = await this.findRule(tenant.dietitianAccountId, automationId);
     return this.toResponse(row);
   }
 
   async create(
-    tenant: TenantContext,
+    tenant: DietitianTenantContext,
     input: {
       name: string;
       description?: string;
@@ -61,15 +61,14 @@ export class AutomationService {
   ) {
     this.assertCanManage(tenant);
     const { configuration, conditions } = this.validatePayload(input);
-    const enabled = await this.entitlements.can(tenant.organizationId, FEATURE_KEYS.AUTOMATION);
+    const enabled = await this.entitlements.can(tenant.dietitianAccountId, FEATURE_KEYS.AUTOMATION);
     if (!enabled) {
       throw new ForbiddenException("Automation is not enabled for this organization");
     }
 
     const rule = await this.prisma.automationRule.create({
       data: {
-        dietitianAccountId: tenant.organizationId,
-        organizationId: legacyOrganizationId(tenant),
+        dietitianAccountId: tenant.dietitianAccountId,
         name: input.name.trim(),
         description: input.description?.trim() ?? null,
         status: "PAUSED",
@@ -85,8 +84,7 @@ export class AutomationService {
       type: "automation_rule_created",
       outcome: "success",
       userId: tenant.userId,
-      organizationId: tenant.organizationId,
-      dietitianAccountId: tenant.organizationId,
+      dietitianAccountId: tenant.dietitianAccountId,
       targetType: "automation_rule",
       targetId: rule.id,
     });
@@ -111,7 +109,7 @@ export class AutomationService {
   }
 
   async update(
-    tenant: TenantContext,
+    tenant: DietitianTenantContext,
     automationId: string,
     input: {
       name?: string;
@@ -123,7 +121,7 @@ export class AutomationService {
     },
   ) {
     this.assertCanManage(tenant);
-    const existing = await this.findRule(tenant.organizationId, automationId);
+    const existing = await this.findRule(tenant.dietitianAccountId, automationId);
     if (existing.status === "ARCHIVED") {
       throw new BadRequestException("Archived automation rules cannot be edited");
     }
@@ -151,8 +149,7 @@ export class AutomationService {
       type: "automation_rule_updated",
       outcome: "success",
       userId: tenant.userId,
-      organizationId: tenant.organizationId,
-      dietitianAccountId: tenant.organizationId,
+      dietitianAccountId: tenant.dietitianAccountId,
       targetType: "automation_rule",
       targetId: rule.id,
     });
@@ -160,17 +157,17 @@ export class AutomationService {
     return this.toResponse(rule);
   }
 
-  async activate(tenant: TenantContext, automationId: string) {
+  async activate(tenant: DietitianTenantContext, automationId: string) {
     this.assertCanManage(tenant);
-    const existing = await this.findRule(tenant.organizationId, automationId);
-    const enabled = await this.entitlements.can(tenant.organizationId, FEATURE_KEYS.AUTOMATION);
+    const existing = await this.findRule(tenant.dietitianAccountId, automationId);
+    const enabled = await this.entitlements.can(tenant.dietitianAccountId, FEATURE_KEYS.AUTOMATION);
     if (!enabled) {
       throw new ForbiddenException("Automation is not enabled for this organization");
     }
-    const ruleLimit = await this.entitlements.limit(tenant.organizationId, FEATURE_KEYS.AUTOMATION_RULE_LIMIT);
+    const ruleLimit = await this.entitlements.limit(tenant.dietitianAccountId, FEATURE_KEYS.AUTOMATION_RULE_LIMIT);
     if (ruleLimit != null) {
       const activeCount = await this.prisma.automationRule.count({
-        where: { ...tenantWhere(tenant.organizationId), status: "ACTIVE", archivedAt: null },
+        where: { ...tenantWhere(tenant.dietitianAccountId), status: "ACTIVE", archivedAt: null },
       });
       if (existing.status !== "ACTIVE" && activeCount >= ruleLimit) {
         throw new ForbiddenException("Active automation rule limit reached");
@@ -186,8 +183,7 @@ export class AutomationService {
       type: "automation_rule_activated",
       outcome: "success",
       userId: tenant.userId,
-      organizationId: tenant.organizationId,
-      dietitianAccountId: tenant.organizationId,
+      dietitianAccountId: tenant.dietitianAccountId,
       targetType: "automation_rule",
       targetId: rule.id,
     });
@@ -195,9 +191,9 @@ export class AutomationService {
     return this.toResponse(rule);
   }
 
-  async pause(tenant: TenantContext, automationId: string) {
+  async pause(tenant: DietitianTenantContext, automationId: string) {
     this.assertCanManage(tenant);
-    await this.findRule(tenant.organizationId, automationId);
+    await this.findRule(tenant.dietitianAccountId, automationId);
     const rule = await this.prisma.automationRule.update({
       where: { id: automationId },
       data: { status: "PAUSED", updatedById: tenant.userId },
@@ -206,17 +202,16 @@ export class AutomationService {
       type: "automation_rule_paused",
       outcome: "success",
       userId: tenant.userId,
-      organizationId: tenant.organizationId,
-      dietitianAccountId: tenant.organizationId,
+      dietitianAccountId: tenant.dietitianAccountId,
       targetType: "automation_rule",
       targetId: rule.id,
     });
     return this.toResponse(rule);
   }
 
-  async archive(tenant: TenantContext, automationId: string) {
+  async archive(tenant: DietitianTenantContext, automationId: string) {
     this.assertCanManage(tenant);
-    await this.findRule(tenant.organizationId, automationId);
+    await this.findRule(tenant.dietitianAccountId, automationId);
     const rule = await this.prisma.automationRule.update({
       where: { id: automationId },
       data: {
@@ -229,29 +224,28 @@ export class AutomationService {
       type: "automation_rule_archived",
       outcome: "success",
       userId: tenant.userId,
-      organizationId: tenant.organizationId,
-      dietitianAccountId: tenant.organizationId,
+      dietitianAccountId: tenant.dietitianAccountId,
       targetType: "automation_rule",
       targetId: rule.id,
     });
     return this.toResponse(rule);
   }
 
-  async listRunsForRule(tenant: TenantContext, automationId: string, limit = 50) {
+  async listRunsForRule(tenant: DietitianTenantContext, automationId: string, limit = 50) {
     this.assertCanManage(tenant);
-    await this.findRule(tenant.organizationId, automationId);
+    await this.findRule(tenant.dietitianAccountId, automationId);
     const rows = await this.prisma.automationRun.findMany({
-      where: { ...tenantWhere(tenant.organizationId), automationRuleId: automationId },
+      where: { ...tenantWhere(tenant.dietitianAccountId), automationRuleId: automationId },
       orderBy: { createdAt: "desc" },
       take: Math.min(100, limit),
     });
     return rows.map((row) => this.runToResponse(row));
   }
 
-  async listRuns(tenant: TenantContext, limit = 50) {
+  async listRuns(tenant: DietitianTenantContext, limit = 50) {
     this.assertCanManage(tenant);
     const rows = await this.prisma.automationRun.findMany({
-      where: tenantWhere(tenant.organizationId),
+      where: tenantWhere(tenant.dietitianAccountId),
       orderBy: { createdAt: "desc" },
       take: Math.min(100, limit),
       include: { rule: true },
@@ -264,9 +258,9 @@ export class AutomationService {
     }));
   }
 
-  async getUsage(tenant: TenantContext) {
+  async getUsage(tenant: DietitianTenantContext) {
     this.assertCanManage(tenant);
-    return this.usage.getUsageSummary(tenant.organizationId);
+    return this.usage.getUsageSummary(tenant.dietitianAccountId);
   }
 
   async getAdminSummary(organizationId: string) {
@@ -322,7 +316,7 @@ export class AutomationService {
 
   private toResponse(row: {
     id: string;
-    organizationId: string;
+    dietitianAccountId: string;
     name: string;
     description: string | null;
     status: AutomationRuleStatus;
@@ -339,7 +333,6 @@ export class AutomationService {
   }) {
     return {
       id: row.id,
-      organizationId: row.organizationId,
       name: row.name,
       description: row.description,
       status: row.status,
@@ -359,7 +352,7 @@ export class AutomationService {
 
   private runToResponse(row: {
     id: string;
-    organizationId: string;
+    dietitianAccountId: string;
     automationRuleId: string;
     status: string;
     triggerKey: string;
@@ -374,7 +367,6 @@ export class AutomationService {
   }) {
     return {
       id: row.id,
-      organizationId: row.organizationId,
       automationRuleId: row.automationRuleId,
       status: row.status,
       triggerKey: row.triggerKey,

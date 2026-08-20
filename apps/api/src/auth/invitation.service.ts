@@ -65,7 +65,7 @@ export class InvitationService {
   async deleteUnusedPracticeInvites(dietitianAccountId: string): Promise<void> {
     await this.prisma.invitationToken.deleteMany({
       where: {
-        OR: [{ dietitianAccountId }, { organizationId: dietitianAccountId }],
+        dietitianAccountId,
         purpose: "CLIENT_INVITE",
         clientId: null,
         usedAt: null,
@@ -77,7 +77,7 @@ export class InvitationService {
   async findOpenPracticeInvite(dietitianAccountId: string): Promise<InvitationToken | null> {
     return this.prisma.invitationToken.findFirst({
       where: {
-        OR: [{ dietitianAccountId }, { organizationId: dietitianAccountId }],
+        dietitianAccountId,
         purpose: "CLIENT_INVITE",
         clientId: null,
         usedAt: null,
@@ -120,7 +120,6 @@ export class InvitationService {
         createdById: input.createdById,
         clientId: input.clientId,
         dietitianAccountId,
-        organizationId: input.organizationId ?? dietitianAccountId,
         expiresAt: new Date(Date.now() + ttl * 1000),
       },
     });

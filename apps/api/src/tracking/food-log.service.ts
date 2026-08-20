@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from "@nestjs/comm
 import { localDateKey, parseLocalDate } from "@nutrition-saas/utilities";
 import type { Client, MealLogCategory, Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
-import { requireDietitianAccountId } from "../organizations/tenant-scope";
+import { requireDietitianAccountId } from "../dietitian/tenant-scope";
 import { TimelineService } from "../timeline/timeline.service";
 import {
   FoodLogNutritionService,
@@ -85,7 +85,6 @@ export class FoodLogService {
     const row = await this.prisma.foodLog.create({
       data: {
         dietitianAccountId,
-        organizationId: client.organizationId,
         clientId: client.id,
         foodId: input.foodId,
         quantity: input.quantity,
@@ -98,8 +97,7 @@ export class FoodLogService {
       },
     });
     await this.timeline.record({
-      organizationId: dietitianAccountId,
-      legacyOrganizationId: client.organizationId,
+      dietitianAccountId: dietitianAccountId,
       clientId: client.id,
       type: "FOOD_LOGGED",
       actorUserId,

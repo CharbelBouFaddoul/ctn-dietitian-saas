@@ -406,9 +406,9 @@ No user
 
 **Phase 5 (done):** dashboards + notifications + product email gate.
 
-**Phase 6 (done):** client portfolio aggregate (`GET …/clients/:id/portfolio`), chart tab IA (overview snapshot + missing/alerts), timeline pagination, assessment GET-by-id, portal `me` profile enrichment. Profile photo upload still deferred. Remount `/api/v1/dietitian` deferred to Phase 7+.
+**Phase 6 (done):** client portfolio aggregate, chart tab IA, timeline pagination, assessment GET-by-id, portal `me` profile enrichment. Profile photo upload still deferred.
 
-**Phase 7+ (deferred):** `/api/v1/dietitian` remount, DietitianGuard, stop dual-write, drop Organization/Member/Assignment tables — not started.
+**Phase 7 (done):** practice APIs remounted to `/api/v1/dietitian/:dietitianAccountId`; `DietitianGuard` + `DietitianTenantContext`; Organization dual-write stopped; `organizationId` / Organization / OrganizationMember / OrganizationSettings removed after backfill; admin at `/admin/dietitians`; web clients updated. Remount complete — no further Organization tenancy shell.
 
 What must change later (audit only):
 

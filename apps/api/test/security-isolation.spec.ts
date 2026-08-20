@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import { FEATURE_KEYS } from "@nutrition-saas/config";
 import { CLIENT_ACCESS_DENIED } from "../src/clients/client.messages";
-import { ORGANIZATION_ACCESS_DENIED, ORGANIZATION_UNAVAILABLE } from "../src/organizations/tenant.types";
+import { DIETITIAN_ACCESS_DENIED, DIETITIAN_UNAVAILABLE } from "../src/dietitian/dietitian.types";
 import {
   activateStandardSubscription,
   connectClientPortal,
@@ -12,7 +12,6 @@ import {
   resetAuthDatabase,
   type AuthTestContext,
 } from "./app";
-import { MULTI_MEMBER_UNSUPPORTED } from "../src/organizations/organization.service";
 
 const PASSWORD = "ValidPass12";
 const SETTINGS = {
@@ -62,7 +61,7 @@ describe("release-blocking security isolation", () => {
 
   async function createOrg(cookie: string, name: string) {
     const created = await request(ctx.app.getHttpServer())
-      .post("/api/v1/organizations")
+      .post("/api/v1/dietitian")
       .set("Cookie", cookie)
       .send({ name, settings: SETTINGS })
       .expect(201);
@@ -72,7 +71,7 @@ describe("release-blocking security isolation", () => {
 
   async function createClient(cookie: string, organizationId: string, body: Record<string, unknown> = {}) {
     return request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${organizationId}/clients`)
+      .post(`/api/v1/dietitian/${organizationId}/clients`)
       .set("Cookie", cookie)
       .send({ firstName: "Pat", lastName: "Client", email: nextEmail("client"), ...body });
   }
@@ -85,19 +84,19 @@ describe("release-blocking security isolation", () => {
     const clientB = await createClient(b.cookie, orgB.id);
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${orgB.id}`)
+      .get(`/api/v1/dietitian/${orgB.id}`)
       .set("Cookie", a.cookie)
       .expect(403)
-      .expect((res) => expect(res.body.message).toBe(ORGANIZATION_ACCESS_DENIED));
+      .expect((res) => expect(res.body.message).toBe(DIETITIAN_ACCESS_DENIED));
 
     await request(ctx.app.getHttpServer())
-      .patch(`/api/v1/organizations/${orgB.id}`)
+      .patch(`/api/v1/dietitian/${orgB.id}`)
       .set("Cookie", a.cookie)
       .send({ name: "Hijacked" })
       .expect(403);
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${orgA.id}/clients/${clientB.body.id}`)
+      .get(`/api/v1/dietitian/${orgA.id}/clients/${clientB.body.id}`)
       .set("Cookie", a.cookie)
       .expect(403)
       .expect((res) => expect(res.body.message).toBe(CLIENT_ACCESS_DENIED));
@@ -107,22 +106,17 @@ describe("release-blocking security isolation", () => {
     const owner = await registerVerifyLogin();
     const otherDietitian = await registerVerifyLogin();
     const org = await createOrg(owner.cookie, "Clinic");
-    const add = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/members`)
-      .set("Cookie", owner.cookie)
-      .send({ email: otherDietitian.address, role: "DIETITIAN" });
-    expect(add.status).toBe(400);
-    expect(add.body.message).toBe(MULTI_MEMBER_UNSUPPORTED);
+    await createOrg(otherDietitian.cookie, "Other Clinic");
 
     const client = await createClient(owner.cookie, org.id);
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/clients/${client.body.id}`)
+      .get(`/api/v1/dietitian/${org.id}/clients/${client.body.id}`)
       .set("Cookie", otherDietitian.cookie)
       .expect(403);
 
     await request(ctx.app.getHttpServer())
-      .patch(`/api/v1/organizations/${org.id}/clients/${client.body.id}`)
+      .patch(`/api/v1/dietitian/${org.id}/clients/${client.body.id}`)
       .set("Cookie", otherDietitian.cookie)
       .send({ firstName: "Blocked" })
       .expect(403);
@@ -136,7 +130,7 @@ describe("release-blocking security isolation", () => {
     const portalA = await connectClientPortal(ctx, owner.cookie, org.id, clientA.body);
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/clients/${clientB.body.id}/conversation/messages`)
+      .get(`/api/v1/dietitian/${org.id}/clients/${clientB.body.id}/conversation/messages`)
       .set("Cookie", portalA)
       .expect(403);
   });
@@ -148,7 +142,7 @@ describe("release-blocking security isolation", () => {
     const client = await createClient(owner.cookie, org.id);
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/clients/${client.body.id}/timeline`)
+      .get(`/api/v1/dietitian/${org.id}/clients/${client.body.id}/timeline`)
       .set("Cookie", outsider.cookie)
       .expect(403);
   });
@@ -164,7 +158,7 @@ describe("release-blocking security isolation", () => {
     expect(aiFeature.key).toBe(FEATURE_KEYS.AI);
 
     await request(ctx.app.getHttpServer())
-      .put(`/api/v1/admin/organizations/${orgA.id}/overrides/${FEATURE_KEYS.AI}`)
+      .put(`/api/v1/admin/dietitians/${orgA.id}/overrides/${FEATURE_KEYS.AI}`)
       .set("Cookie", superAdmin.cookie)
       .send({ enabled: true, limitValue: 99, reason: "Org A test override" })
       .expect(200);
@@ -208,7 +202,7 @@ describe("release-blocking security isolation", () => {
     });
 
     await request(ctx.app.getHttpServer())
-      .put(`/api/v1/organizations/${org.id}/foods/${food.id}/override`)
+      .put(`/api/v1/dietitian/${org.id}/foods/${food.id}/override`)
       .set("Cookie", owner.cookie)
       .send({ energyKcal: 99 })
       .expect(200);
@@ -229,7 +223,7 @@ describe("release-blocking security isolation", () => {
     const client = await createClient(owner.cookie, org.id);
     await connectClientPortal(ctx, owner.cookie, org.id, client.body);
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${client.body.id}/archive`)
+      .post(`/api/v1/dietitian/${org.id}/clients/${client.body.id}/archive`)
       .set("Cookie", owner.cookie)
       .expect(201);
     await request(ctx.app.getHttpServer())
@@ -242,7 +236,7 @@ describe("release-blocking security isolation", () => {
     const owner = await registerVerifyLogin();
     const org = await createOrg(owner.cookie, "Standard Org");
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/automations`)
+      .post(`/api/v1/dietitian/${org.id}/automations`)
       .set("Cookie", owner.cookie)
       .send({
         name: "Inactive follow-up",
@@ -285,66 +279,40 @@ describe("release-blocking security isolation", () => {
     const outsiderUser = await ctx.prisma.user.findFirstOrThrow({
       where: { emailNormalized: outsider.address },
     });
-    const fakeMember = await ctx.prisma.organizationMember.create({
-      data: {
-        organizationId: org.id,
-        userId: outsiderUser.id,
-        role: "DIETITIAN",
-        status: "ACTIVE",
-      },
-    });
     await ctx.prisma.clientAssignment.create({
       data: {
-        organizationId: org.id,
         dietitianAccountId: org.id,
         clientId: client.body.id,
-        organizationMemberId: fakeMember.id,
+        userId: outsiderUser.id,
         assignedById: outsiderUser.id,
       },
     });
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/clients/${client.body.id}`)
+      .get(`/api/v1/dietitian/${org.id}/clients/${client.body.id}`)
       .set("Cookie", outsider.cookie)
       .expect(403);
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}`)
+      .get(`/api/v1/dietitian/${org.id}`)
       .set("Cookie", outsider.cookie)
       .expect(403)
-      .expect((res) => expect(res.body.message).toBe(ORGANIZATION_ACCESS_DENIED));
+      .expect((res) => expect(res.body.message).toBe(DIETITIAN_ACCESS_DENIED));
   });
 
-  it("rejects legacy organization id when it differs from DietitianAccount id", async () => {
+  it("rejects guessed dietitian account ids", async () => {
     const owner = await registerVerifyLogin();
-    const org = await createOrg(owner.cookie, "Legacy Bypass");
-    const ownerUser = await ctx.prisma.user.findFirstOrThrow({
-      where: { emailNormalized: owner.address },
-    });
-
-    // Simulate a split DIETITIAN-style account: account id != legacy organization id.
-    const legacyOrg = await ctx.prisma.organization.create({
-      data: {
-        name: "Legacy Only Org",
-        slug: `legacy-only-${seq}`,
-        status: "ACTIVE",
-        createdById: ownerUser.id,
-      },
-    });
-    await ctx.prisma.dietitianAccount.update({
-      where: { id: org.id },
-      data: { legacyOrganizationId: legacyOrg.id },
-    });
+    const org = await createOrg(owner.cookie, "Guess Bypass");
+    const guessedId = "00000000-0000-4000-8000-000000000099";
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${legacyOrg.id}`)
+      .get(`/api/v1/dietitian/${guessedId}`)
       .set("Cookie", owner.cookie)
       .expect(403)
-      .expect((res) => expect(res.body.message).toBe(ORGANIZATION_ACCESS_DENIED));
+      .expect((res) => expect(res.body.message).toBe(DIETITIAN_ACCESS_DENIED));
 
-    // Account id still works.
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}`)
+      .get(`/api/v1/dietitian/${org.id}`)
       .set("Cookie", owner.cookie)
       .expect(200);
   });
@@ -355,9 +323,9 @@ describe("release-blocking security isolation", () => {
     await ctx.lifecycle.setStatus(org.id, "SUSPENDED");
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/clients`)
+      .get(`/api/v1/dietitian/${org.id}/clients`)
       .set("Cookie", owner.cookie)
       .expect(403)
-      .expect((res) => expect(res.body.message).toBe(ORGANIZATION_UNAVAILABLE));
+      .expect((res) => expect(res.body.message).toBe(DIETITIAN_UNAVAILABLE));
   });
 });

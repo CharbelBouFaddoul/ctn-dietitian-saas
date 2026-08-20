@@ -9,12 +9,12 @@ import { EmailService } from "../email/email.service";
 import { SecurityEventLogger } from "../auth/security-event.logger";
 import { ClientAccessService } from "../clients/client-access.service";
 import { PrismaService } from "../prisma/prisma.service";
-import type { TenantContext } from "../organizations/tenant.types";
+import type { DietitianTenantContext } from "../dietitian/dietitian.types";
 import { TimelineService } from "../timeline/timeline.service";
 import { NotificationService } from "../notifications/notification.service";
 import { computeLineTotal, decimalToNumber, money, sumMoney } from "./invoice-money";
 import { InvoiceNumberService } from "./invoice-number.service";
-import { legacyOrganizationId, requireDietitianAccountId, tenantWhere } from "../organizations/tenant-scope";
+import { requireDietitianAccountId, tenantWhere } from "../dietitian/tenant-scope";
 
 export interface InvoiceItemInput {
   description: string;
@@ -39,7 +39,7 @@ export class InvoiceService {
   ) {}
 
   async listForOrg(
-    tenant: TenantContext,
+    tenant: DietitianTenantContext,
     query: {
       clientId?: string;
       status?: InvoiceStatus;
@@ -49,13 +49,12 @@ export class InvoiceService {
       limit?: number;
     },
   ) {
-    await this.refreshOverdue(tenant.organizationId);
+    await this.refreshOverdue(tenant.dietitianAccountId);
     const visible = this.access.visibleWhere(tenant);
     const page = Math.max(1, query.page ?? 1);
     const limit = Math.min(100, Math.max(1, query.limit ?? 25));
     const where: Prisma.InvoiceWhereInput = {
-      dietitianAccountId: tenant.organizationId,
-      organizationId: legacyOrganizationId(tenant),
+      dietitianAccountId: tenant.dietitianAccountId,
       archivedAt: null,
       client: visible,
       ...(query.clientId ? { clientId: query.clientId } : {}),
@@ -89,30 +88,30 @@ export class InvoiceService {
     };
   }
 
-  async listForClient(tenant: TenantContext, clientId: string) {
+  async listForClient(tenant: DietitianTenantContext, clientId: string) {
     await this.access.assertCanAccess(tenant, clientId, "read");
-    await this.refreshOverdue(tenant.organizationId);
+    await this.refreshOverdue(tenant.dietitianAccountId);
     const rows = await this.prisma.invoice.findMany({
-      where: { ...tenantWhere(tenant.organizationId), clientId, archivedAt: null },
+      where: { ...tenantWhere(tenant.dietitianAccountId), clientId, archivedAt: null },
       include: { items: { orderBy: { sortOrder: "asc" } } },
       orderBy: [{ issueDate: "desc" }, { createdAt: "desc" }],
     });
     return rows.map((row) => this.toResponse(row));
   }
 
-  async getForOrg(tenant: TenantContext, invoiceId: string) {
-    await this.refreshOverdue(tenant.organizationId);
+  async getForOrg(tenant: DietitianTenantContext, invoiceId: string) {
+    await this.refreshOverdue(tenant.dietitianAccountId);
     const invoice = await this.findOrgInvoice(tenant, invoiceId);
     return this.toResponse(invoice);
   }
 
-  async getPrintPayload(tenant: TenantContext, invoiceId: string) {
+  async getPrintPayload(tenant: DietitianTenantContext, invoiceId: string) {
     const invoice = await this.findOrgInvoice(tenant, invoiceId);
     const settings = await this.prisma.dietitianSettings.findUnique({
-      where: { dietitianAccountId: tenant.organizationId },
+      where: { dietitianAccountId: tenant.dietitianAccountId },
     });
     const org = await this.prisma.dietitianAccount.findUniqueOrThrow({
-      where: { id: tenant.organizationId },
+      where: { id: tenant.dietitianAccountId },
     });
     return {
       invoice: this.toResponse(invoice),
@@ -134,7 +133,7 @@ export class InvoiceService {
   }
 
   async createDraft(
-    tenant: TenantContext,
+    tenant: DietitianTenantContext,
     clientId: string,
     input: {
       issueDate?: string;
@@ -149,7 +148,7 @@ export class InvoiceService {
       throw new BadRequestException("At least one line item is required");
     }
     const settings = await this.prisma.dietitianSettings.findUnique({
-      where: { dietitianAccountId: tenant.organizationId },
+      where: { dietitianAccountId: tenant.dietitianAccountId },
     });
     const currency = input.currency ?? settings?.currency ?? "USD";
     const issueDate = input.issueDate ? this.parseDate(input.issueDate) : null;
@@ -165,8 +164,7 @@ export class InvoiceService {
     const invoice = await this.prisma.$transaction(async (tx) => {
       const created = await tx.invoice.create({
         data: {
-          dietitianAccountId: tenant.organizationId,
-          organizationId: legacyOrganizationId(tenant),
+          dietitianAccountId: tenant.dietitianAccountId,
           clientId,
           status: "DRAFT",
           issueDate,
@@ -178,8 +176,7 @@ export class InvoiceService {
           createdById: tenant.userId,
           items: {
             create: computed.items.map((item, index) => ({
-              dietitianAccountId: tenant.organizationId,
-              organizationId: legacyOrganizationId(tenant),
+              dietitianAccountId: tenant.dietitianAccountId,
               description: item.description,
               quantity: item.quantity,
               unitPrice: item.unitPrice,
@@ -193,8 +190,7 @@ export class InvoiceService {
       return created;
     });
     await this.timeline.record({
-      organizationId: tenant.organizationId,
-      legacyOrganizationId: legacyOrganizationId(tenant),
+      dietitianAccountId: tenant.dietitianAccountId,
       clientId,
       type: "INVOICE_CREATED",
       actorUserId: tenant.userId,
@@ -206,8 +202,7 @@ export class InvoiceService {
       type: "invoice_created",
       outcome: "success",
       userId: tenant.userId,
-      organizationId: tenant.organizationId,
-      dietitianAccountId: tenant.organizationId,
+      dietitianAccountId: tenant.dietitianAccountId,
       targetType: "invoice",
       targetId: invoice.id,
     });
@@ -215,7 +210,7 @@ export class InvoiceService {
   }
 
   async updateDraft(
-    tenant: TenantContext,
+    tenant: DietitianTenantContext,
     invoiceId: string,
     input: {
       issueDate?: string | null;
@@ -248,8 +243,7 @@ export class InvoiceService {
                 total: computed.total,
                 items: {
                   create: computed.items.map((item, index) => ({
-                    dietitianAccountId: tenant.organizationId,
-                    organizationId: legacyOrganizationId(tenant),
+                    dietitianAccountId: tenant.dietitianAccountId,
                     description: item.description,
                     quantity: item.quantity,
                     unitPrice: item.unitPrice,
@@ -267,29 +261,28 @@ export class InvoiceService {
       type: "invoice_updated",
       outcome: "success",
       userId: tenant.userId,
-      organizationId: tenant.organizationId,
-      dietitianAccountId: tenant.organizationId,
+      dietitianAccountId: tenant.dietitianAccountId,
       targetType: "invoice",
       targetId: invoice.id,
     });
     return this.toResponse(invoice);
   }
 
-  async issue(tenant: TenantContext, invoiceId: string) {
+  async issue(tenant: DietitianTenantContext, invoiceId: string) {
     const existing = await this.findOrgInvoice(tenant, invoiceId);
     if (existing.status !== "DRAFT") {
       throw new BadRequestException("Only draft invoices can be issued");
     }
     await this.access.assertCanAccess(tenant, existing.clientId, "manageRecords");
     const settings = await this.prisma.dietitianSettings.findUnique({
-      where: { dietitianAccountId: tenant.organizationId },
+      where: { dietitianAccountId: tenant.dietitianAccountId },
     });
     const issueDate = existing.issueDate ?? this.todayDate(settings?.timezone ?? "UTC");
     const dueDate =
       existing.dueDate ??
       (settings?.invoiceDefaultDueDays ? this.addDays(issueDate, settings.invoiceDefaultDueDays) : issueDate);
     const invoice = await this.prisma.$transaction(async (tx) => {
-      const invoiceNumber = await this.numbers.allocate(tenant.organizationId, tx);
+      const invoiceNumber = await this.numbers.allocate(tenant.dietitianAccountId, tx);
       return tx.invoice.update({
         where: { id: invoiceId },
         data: {
@@ -303,8 +296,7 @@ export class InvoiceService {
       });
     });
     await this.timeline.record({
-      organizationId: tenant.organizationId,
-      legacyOrganizationId: legacyOrganizationId(tenant),
+      dietitianAccountId: tenant.dietitianAccountId,
       clientId: invoice.clientId,
       type: "INVOICE_ISSUED",
       actorUserId: tenant.userId,
@@ -316,15 +308,14 @@ export class InvoiceService {
       type: "invoice_issued",
       outcome: "success",
       userId: tenant.userId,
-      organizationId: tenant.organizationId,
-      dietitianAccountId: tenant.organizationId,
+      dietitianAccountId: tenant.dietitianAccountId,
       targetType: "invoice",
       targetId: invoice.id,
     });
     return this.toResponse(invoice);
   }
 
-  async send(tenant: TenantContext, invoiceId: string) {
+  async send(tenant: DietitianTenantContext, invoiceId: string) {
     const existing = await this.findOrgInvoice(tenant, invoiceId);
     if (!["ISSUED", "SENT", "OVERDUE"].includes(existing.status)) {
       throw new BadRequestException("Invoice must be issued before sending");
@@ -337,8 +328,7 @@ export class InvoiceService {
     });
     if (invoice.status === "SENT") {
       await this.timeline.record({
-        organizationId: tenant.organizationId,
-        legacyOrganizationId: legacyOrganizationId(tenant),
+        dietitianAccountId: tenant.dietitianAccountId,
         clientId: invoice.clientId,
         type: "INVOICE_SENT",
         actorUserId: tenant.userId,
@@ -353,8 +343,7 @@ export class InvoiceService {
     });
     if (clientAccount?.userId) {
       await this.notifications.create({
-        dietitianAccountId: tenant.organizationId,
-        organizationId: legacyOrganizationId(tenant),
+        dietitianAccountId: tenant.dietitianAccountId,
         userId: clientAccount.userId,
         clientId: invoice.clientId,
         type: "INVOICE_SENT",
@@ -376,15 +365,14 @@ export class InvoiceService {
       type: "invoice_sent",
       outcome: "success",
       userId: tenant.userId,
-      organizationId: tenant.organizationId,
-      dietitianAccountId: tenant.organizationId,
+      dietitianAccountId: tenant.dietitianAccountId,
       targetType: "invoice",
       targetId: invoice.id,
     });
     return this.toResponse(invoice);
   }
 
-  async markPaid(tenant: TenantContext, invoiceId: string) {
+  async markPaid(tenant: DietitianTenantContext, invoiceId: string) {
     const existing = await this.findOrgInvoice(tenant, invoiceId);
     if (!OPEN_UNPAID.includes(existing.status) && existing.status !== "PAID") {
       throw new BadRequestException("Invoice cannot be marked paid from its current status");
@@ -399,8 +387,7 @@ export class InvoiceService {
       include: { client: true, items: { orderBy: { sortOrder: "asc" } } },
     });
     await this.timeline.record({
-      organizationId: tenant.organizationId,
-      legacyOrganizationId: legacyOrganizationId(tenant),
+      dietitianAccountId: tenant.dietitianAccountId,
       clientId: invoice.clientId,
       type: "INVOICE_PAID",
       actorUserId: tenant.userId,
@@ -412,15 +399,14 @@ export class InvoiceService {
       type: "invoice_paid",
       outcome: "success",
       userId: tenant.userId,
-      organizationId: tenant.organizationId,
-      dietitianAccountId: tenant.organizationId,
+      dietitianAccountId: tenant.dietitianAccountId,
       targetType: "invoice",
       targetId: invoice.id,
     });
     return this.toResponse(invoice);
   }
 
-  async cancel(tenant: TenantContext, invoiceId: string) {
+  async cancel(tenant: DietitianTenantContext, invoiceId: string) {
     const existing = await this.findOrgInvoice(tenant, invoiceId);
     if (existing.status === "CANCELLED") {
       return this.toResponse(existing);
@@ -435,8 +421,7 @@ export class InvoiceService {
       include: { client: true, items: { orderBy: { sortOrder: "asc" } } },
     });
     await this.timeline.record({
-      organizationId: tenant.organizationId,
-      legacyOrganizationId: legacyOrganizationId(tenant),
+      dietitianAccountId: tenant.dietitianAccountId,
       clientId: invoice.clientId,
       type: "INVOICE_CANCELLED",
       actorUserId: tenant.userId,
@@ -448,15 +433,14 @@ export class InvoiceService {
       type: "invoice_cancelled",
       outcome: "success",
       userId: tenant.userId,
-      organizationId: tenant.organizationId,
-      dietitianAccountId: tenant.organizationId,
+      dietitianAccountId: tenant.dietitianAccountId,
       targetType: "invoice",
       targetId: invoice.id,
     });
     return this.toResponse(invoice);
   }
 
-  async archive(tenant: TenantContext, invoiceId: string) {
+  async archive(tenant: DietitianTenantContext, invoiceId: string) {
     const existing = await this.findOrgInvoice(tenant, invoiceId);
     await this.access.assertCanAccess(tenant, existing.clientId, "manageRecords");
     const invoice = await this.prisma.invoice.update({
@@ -468,8 +452,7 @@ export class InvoiceService {
       type: "invoice_archived",
       outcome: "success",
       userId: tenant.userId,
-      organizationId: tenant.organizationId,
-      dietitianAccountId: tenant.organizationId,
+      dietitianAccountId: tenant.dietitianAccountId,
       targetType: "invoice",
       targetId: invoice.id,
     });
@@ -533,10 +516,10 @@ export class InvoiceService {
     };
   }
 
-  private async findOrgInvoice(tenant: TenantContext, invoiceId: string) {
+  private async findOrgInvoice(tenant: DietitianTenantContext, invoiceId: string) {
     const visible = this.access.visibleWhere(tenant);
     const invoice = await this.prisma.invoice.findFirst({
-      where: { id: invoiceId, ...tenantWhere(tenant.organizationId),
+      where: { id: invoiceId, ...tenantWhere(tenant.dietitianAccountId),
         archivedAt: null,
         client: visible,
       },
@@ -605,7 +588,6 @@ export class InvoiceService {
   private toResponse(row: Invoice & { client?: Client; items: InvoiceItem[] }) {
     return {
       id: row.id,
-      organizationId: row.organizationId,
       clientId: row.clientId,
       clientName: row.client
         ? row.client.displayName ?? `${row.client.firstName} ${row.client.lastName}`

@@ -60,7 +60,7 @@ export default function AdminSubscriptionsPage() {
               {rows.map((row) => (
                 <tr key={row.id}>
                   <Td label="Organization">
-                    <Link href={`/admin/organizations/${row.organization.id}`} className="ui-link">
+                    <Link href={`/admin/dietitians/${row.organization.id}`} className="ui-link">
                       {row.organization.name}
                     </Link>
                   </Td>

@@ -2,10 +2,10 @@ import { BadRequestException, Injectable, NotFoundException } from "@nestjs/comm
 import type { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { SecurityEventLogger } from "../auth/security-event.logger";
-import type { TenantContext } from "../organizations/tenant.types";
+import type { DietitianTenantContext } from "../dietitian/dietitian.types";
 import { TimelineService } from "../timeline/timeline.service";
 import { ClientAccessService } from "../clients/client-access.service";
-import { legacyOrganizationId, tenantWhere } from "../organizations/tenant-scope";
+import { tenantWhere } from "../dietitian/tenant-scope";
 
 @Injectable()
 export class AssessmentService {
@@ -16,24 +16,23 @@ export class AssessmentService {
     private readonly security: SecurityEventLogger,
   ) {}
 
-  async listTemplates(tenant: TenantContext) {
+  async listTemplates(tenant: DietitianTenantContext) {
     return this.prisma.assessmentTemplate.findMany({
       where: {
         status: "ACTIVE",
-        OR: [{ organizationId: null, dietitianAccountId: null }, { ...tenantWhere(tenant.organizationId) }],
+        ...tenantWhere(tenant.dietitianAccountId),
       },
       orderBy: { name: "asc" },
     });
   }
 
   async createTemplate(
-    tenant: TenantContext,
+    tenant: DietitianTenantContext,
     input: { name: string; description?: string; schema: Prisma.InputJsonValue },
   ) {
     return this.prisma.assessmentTemplate.create({
       data: {
-        dietitianAccountId: tenant.organizationId,
-        organizationId: legacyOrganizationId(tenant),
+        dietitianAccountId: tenant.dietitianAccountId,
         name: input.name.trim(),
         description: input.description?.trim() ?? null,
         schema: input.schema,
@@ -44,12 +43,12 @@ export class AssessmentService {
   }
 
   async updateTemplate(
-    tenant: TenantContext,
+    tenant: DietitianTenantContext,
     templateId: string,
     input: { name?: string; description?: string; schema?: Prisma.InputJsonValue; status?: "ACTIVE" | "INACTIVE" | "ARCHIVED" },
   ) {
     const template = await this.prisma.assessmentTemplate.findFirst({
-      where: { id: templateId, ...tenantWhere(tenant.organizationId) },
+      where: { id: templateId, ...tenantWhere(tenant.dietitianAccountId) },
     });
     if (!template) {
       throw new NotFoundException("Template not found");
@@ -67,20 +66,20 @@ export class AssessmentService {
     });
   }
 
-  async list(tenant: TenantContext, clientId: string) {
+  async list(tenant: DietitianTenantContext, clientId: string) {
     await this.access.assertCanAccess(tenant, clientId, "read");
     const rows = await this.prisma.assessment.findMany({
-      where: { clientId, ...tenantWhere(tenant.organizationId) },
+      where: { clientId, ...tenantWhere(tenant.dietitianAccountId) },
       include: { template: true },
       orderBy: { createdAt: "desc" },
     });
     return rows.map((row) => this.toResponse(row));
   }
 
-  async get(tenant: TenantContext, clientId: string, assessmentId: string) {
+  async get(tenant: DietitianTenantContext, clientId: string, assessmentId: string) {
     await this.access.assertCanAccess(tenant, clientId, "read");
     const row = await this.prisma.assessment.findFirst({
-      where: { id: assessmentId, clientId, ...tenantWhere(tenant.organizationId) },
+      where: { id: assessmentId, clientId, ...tenantWhere(tenant.dietitianAccountId) },
       include: { template: true },
     });
     if (!row) {
@@ -89,13 +88,13 @@ export class AssessmentService {
     return this.toResponse(row);
   }
 
-  async start(tenant: TenantContext, clientId: string, templateId: string) {
+  async start(tenant: DietitianTenantContext, clientId: string, templateId: string) {
     await this.access.assertCanAccess(tenant, clientId, "manageRecords");
     const template = await this.prisma.assessmentTemplate.findFirst({
       where: {
         id: templateId,
         status: "ACTIVE",
-        OR: [{ organizationId: null, dietitianAccountId: null }, { ...tenantWhere(tenant.organizationId) }],
+        ...tenantWhere(tenant.dietitianAccountId),
       },
     });
     if (!template) {
@@ -103,8 +102,7 @@ export class AssessmentService {
     }
     const assessment = await this.prisma.assessment.create({
       data: {
-        dietitianAccountId: tenant.organizationId,
-        organizationId: legacyOrganizationId(tenant),
+        dietitianAccountId: tenant.dietitianAccountId,
         clientId,
         templateId: template.id,
         templateVersion: template.version,
@@ -115,8 +113,7 @@ export class AssessmentService {
       include: { template: true },
     });
     await this.timeline.record({
-      organizationId: tenant.organizationId,
-      legacyOrganizationId: legacyOrganizationId(tenant),
+      dietitianAccountId: tenant.dietitianAccountId,
       clientId,
       type: "ASSESSMENT_STARTED",
       actorUserId: tenant.userId,
@@ -127,9 +124,9 @@ export class AssessmentService {
     return this.toResponse(assessment);
   }
 
-  async saveResponses(tenant: TenantContext, clientId: string, assessmentId: string, responses: Prisma.InputJsonValue) {
+  async saveResponses(tenant: DietitianTenantContext, clientId: string, assessmentId: string, responses: Prisma.InputJsonValue) {
     await this.access.assertCanAccess(tenant, clientId, "manageRecords");
-    const existing = await this.requireAssessment(tenant.organizationId, clientId, assessmentId);
+    const existing = await this.requireAssessment(tenant.dietitianAccountId, clientId, assessmentId);
     if (existing.status === "COMPLETED" || existing.status === "ARCHIVED") {
       throw new BadRequestException("Completed assessments cannot be rewritten");
     }
@@ -141,9 +138,9 @@ export class AssessmentService {
     return this.toResponse(assessment);
   }
 
-  async complete(tenant: TenantContext, clientId: string, assessmentId: string, responses?: Prisma.InputJsonValue) {
+  async complete(tenant: DietitianTenantContext, clientId: string, assessmentId: string, responses?: Prisma.InputJsonValue) {
     await this.access.assertCanAccess(tenant, clientId, "manageRecords");
-    const existing = await this.requireAssessment(tenant.organizationId, clientId, assessmentId);
+    const existing = await this.requireAssessment(tenant.dietitianAccountId, clientId, assessmentId);
     if (existing.status === "COMPLETED" || existing.status === "ARCHIVED") {
       throw new BadRequestException("Completed assessments cannot be rewritten");
     }
@@ -158,8 +155,7 @@ export class AssessmentService {
       include: { template: true },
     });
     await this.timeline.record({
-      organizationId: tenant.organizationId,
-      legacyOrganizationId: legacyOrganizationId(tenant),
+      dietitianAccountId: tenant.dietitianAccountId,
       clientId,
       type: "ASSESSMENT_COMPLETED",
       actorUserId: tenant.userId,
@@ -171,8 +167,7 @@ export class AssessmentService {
       type: "assessment_completed",
       outcome: "success",
       userId: tenant.userId,
-      organizationId: tenant.organizationId,
-      dietitianAccountId: tenant.organizationId,
+      dietitianAccountId: tenant.dietitianAccountId,
       targetType: "assessment",
       targetId: assessment.id,
       metadata: { templateVersion: assessment.templateVersion },

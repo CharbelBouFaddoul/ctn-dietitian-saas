@@ -1,8 +1,8 @@
 import { ForbiddenException, Injectable } from "@nestjs/common";
 import type { Client, Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
-import type { TenantContext } from "../organizations/tenant.types";
-import { tenantWhere } from "../organizations/tenant-scope";
+import type { DietitianTenantContext } from "../dietitian/dietitian.types";
+import { tenantWhere } from "../dietitian/tenant-scope";
 import {
   CLIENT_ACCESS_DENIED,
   CLIENT_NOT_AVAILABLE,
@@ -34,16 +34,16 @@ export type PortalAccessOptions = {
 export class ClientAccessService {
   constructor(private readonly prisma: PrismaService) {}
 
-  assertCanCreate(_tenant: TenantContext): void {
-    // Phase 1: account owner only reaches TenantGuard; all actions allowed.
+  assertCanCreate(_tenant: DietitianTenantContext): void {
+    // Phase 1: account owner only reaches DietitianGuard; all actions allowed.
   }
 
-  visibleWhere(tenant: TenantContext): Prisma.ClientWhereInput {
-    return tenantWhere(tenant.organizationId);
+  visibleWhere(tenant: DietitianTenantContext): Prisma.ClientWhereInput {
+    return tenantWhere(tenant.dietitianAccountId);
   }
 
   async assertCanAccess(
-    tenant: TenantContext,
+    tenant: DietitianTenantContext,
     clientId: string,
     action: ClientAction = "read",
   ): Promise<Client> {
@@ -52,7 +52,7 @@ export class ClientAccessService {
     }
 
     const client = await this.prisma.client.findFirst({
-      where: { id: clientId, ...tenantWhere(tenant.organizationId) },
+      where: { id: clientId, ...tenantWhere(tenant.dietitianAccountId) },
     });
     if (!client) {
       throw new ForbiddenException(CLIENT_ACCESS_DENIED);

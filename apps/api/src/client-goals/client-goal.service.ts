@@ -1,8 +1,8 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { SecurityEventLogger } from "../auth/security-event.logger";
-import type { TenantContext } from "../organizations/tenant.types";
-import { legacyOrganizationId, tenantWhere } from "../organizations/tenant-scope";
+import type { DietitianTenantContext } from "../dietitian/dietitian.types";
+import { tenantWhere } from "../dietitian/tenant-scope";
 import { TimelineService } from "../timeline/timeline.service";
 import { ClientAccessService } from "../clients/client-access.service";
 
@@ -15,25 +15,24 @@ export class ClientGoalService {
     private readonly security: SecurityEventLogger,
   ) {}
 
-  async list(tenant: TenantContext, clientId: string) {
+  async list(tenant: DietitianTenantContext, clientId: string) {
     await this.access.assertCanAccess(tenant, clientId, "read");
     const goals = await this.prisma.clientGoal.findMany({
-      where: { clientId, ...tenantWhere(tenant.organizationId) },
+      where: { clientId, ...tenantWhere(tenant.dietitianAccountId) },
       orderBy: { createdAt: "desc" },
     });
     return goals.map((goal) => this.toResponse(goal));
   }
 
   async create(
-    tenant: TenantContext,
+    tenant: DietitianTenantContext,
     clientId: string,
     input: { title: string; description?: string; targetValue?: number; targetUnit?: string; startDate?: string; targetDate?: string },
   ) {
     await this.access.assertCanAccess(tenant, clientId, "manageRecords");
     const goal = await this.prisma.clientGoal.create({
       data: {
-        dietitianAccountId: tenant.organizationId,
-        organizationId: legacyOrganizationId(tenant),
+        dietitianAccountId: tenant.dietitianAccountId,
         clientId,
         title: input.title.trim(),
         description: input.description?.trim() ?? null,
@@ -45,8 +44,7 @@ export class ClientGoalService {
       },
     });
     await this.timeline.record({
-      organizationId: tenant.organizationId,
-      legacyOrganizationId: legacyOrganizationId(tenant),
+      dietitianAccountId: tenant.dietitianAccountId,
       clientId,
       type: "GOAL_CREATED",
       actorUserId: tenant.userId,
@@ -58,18 +56,17 @@ export class ClientGoalService {
       type: "goal_created",
       outcome: "success",
       userId: tenant.userId,
-      organizationId: tenant.organizationId,
-      dietitianAccountId: tenant.organizationId,
+      dietitianAccountId: tenant.dietitianAccountId,
       targetType: "goal",
       targetId: goal.id,
     });
     return this.toResponse(goal);
   }
 
-  async complete(tenant: TenantContext, clientId: string, goalId: string) {
+  async complete(tenant: DietitianTenantContext, clientId: string, goalId: string) {
     await this.access.assertCanAccess(tenant, clientId, "manageRecords");
     const existing = await this.prisma.clientGoal.findFirst({
-      where: { id: goalId, clientId, ...tenantWhere(tenant.organizationId) },
+      where: { id: goalId, clientId, ...tenantWhere(tenant.dietitianAccountId) },
     });
     if (!existing) {
       throw new NotFoundException("Goal not found");
@@ -79,8 +76,7 @@ export class ClientGoalService {
       data: { status: "COMPLETED", completedAt: new Date() },
     });
     await this.timeline.record({
-      organizationId: tenant.organizationId,
-      legacyOrganizationId: legacyOrganizationId(tenant),
+      dietitianAccountId: tenant.dietitianAccountId,
       clientId,
       type: "GOAL_COMPLETED",
       actorUserId: tenant.userId,
@@ -91,18 +87,17 @@ export class ClientGoalService {
       type: "goal_completed",
       outcome: "success",
       userId: tenant.userId,
-      organizationId: tenant.organizationId,
-      dietitianAccountId: tenant.organizationId,
+      dietitianAccountId: tenant.dietitianAccountId,
       targetType: "goal",
       targetId: goal.id,
     });
     return this.toResponse(goal);
   }
 
-  async cancel(tenant: TenantContext, clientId: string, goalId: string) {
+  async cancel(tenant: DietitianTenantContext, clientId: string, goalId: string) {
     await this.access.assertCanAccess(tenant, clientId, "manageRecords");
     const existing = await this.prisma.clientGoal.findFirst({
-      where: { id: goalId, clientId, ...tenantWhere(tenant.organizationId) },
+      where: { id: goalId, clientId, ...tenantWhere(tenant.dietitianAccountId) },
     });
     if (!existing) {
       throw new NotFoundException("Goal not found");
@@ -112,8 +107,7 @@ export class ClientGoalService {
       data: { status: "CANCELLED" },
     });
     await this.timeline.record({
-      organizationId: tenant.organizationId,
-      legacyOrganizationId: legacyOrganizationId(tenant),
+      dietitianAccountId: tenant.dietitianAccountId,
       clientId,
       type: "GOAL_CANCELLED",
       actorUserId: tenant.userId,

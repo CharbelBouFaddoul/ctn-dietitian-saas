@@ -15,8 +15,7 @@ import { seedPlatformAssessmentTemplate } from "../src/assessments/platform-temp
 import { seedPlatformSettings } from "../src/platform-settings/platform-settings.seed";
 import { PlatformSettingsModule } from "../src/platform-settings/platform-settings.module";
 import { OrganizationModule } from "../src/organizations/organization.module";
-import { OrganizationLifecycleService } from "../src/organizations/organization-lifecycle.service";
-import { MembershipService } from "../src/organizations/membership.service";
+import { DietitianLifecycleService } from "../src/dietitian/dietitian-lifecycle.service";
 import { TimelineModule } from "../src/timeline/timeline.module";
 import { ClientsModule } from "../src/clients/clients.module";
 import { ClientAccountsModule } from "../src/client-accounts/client-accounts.module";
@@ -60,8 +59,7 @@ export interface AuthTestContext {
   passwords: PasswordService;
   invitations: InvitationService;
   verification: EmailVerificationService;
-  lifecycle: OrganizationLifecycleService;
-  memberships: MembershipService;
+  lifecycle: DietitianLifecycleService;
   entitlements: EntitlementService;
   security: SecurityEventLogger;
 }
@@ -126,8 +124,7 @@ export async function createAuthTestApp(): Promise<AuthTestContext> {
     passwords: app.get(PasswordService),
     invitations: app.get(InvitationService),
     verification: app.get(EmailVerificationService),
-    lifecycle: app.get(OrganizationLifecycleService),
-    memberships: app.get(MembershipService),
+    lifecycle: app.get(DietitianLifecycleService),
     entitlements: app.get(EntitlementService),
     security: app.get(SecurityEventLogger),
   };
@@ -179,9 +176,6 @@ export async function resetAuthDatabase(prisma: PrismaService): Promise<void> {
   await prisma.subscription.deleteMany();
   await prisma.dietitianSettings.deleteMany();
   await prisma.dietitianAccount.deleteMany();
-  await prisma.organizationMember.deleteMany();
-  await prisma.organizationSettings.deleteMany();
-  await prisma.organization.deleteMany();
   await prisma.consent.deleteMany();
   await prisma.invitationToken.deleteMany();
   await prisma.passwordResetToken.deleteMany();
@@ -254,7 +248,7 @@ export const DEFAULT_ORG_SETTINGS = {
   dateFormat: "YYYY_MM_DD",
 } as const;
 
-/** Phase 1: entitlements resolve by dietitianAccountId (OWNER account id == legacy org id). */
+/** Phase 7: entitlements resolve by dietitianAccountId only. */
 export async function activateSubscription(
   prisma: PrismaService,
   dietitianAccountId: string,
@@ -264,7 +258,6 @@ export async function activateSubscription(
   return prisma.subscription.create({
     data: {
       dietitianAccountId,
-      organizationId: dietitianAccountId,
       planId: plan.id,
       status: "ACTIVE",
       startedAt: new Date(),
@@ -283,7 +276,7 @@ export async function createOrgWithSubscription(
   options?: { planSlug?: string; settings?: Record<string, unknown> },
 ): Promise<{ id: string; name: string }> {
   const created = await request(ctx.app.getHttpServer())
-    .post("/api/v1/organizations")
+    .post("/api/v1/dietitian")
     .set("Cookie", cookie)
     .send({ name, settings: options?.settings ?? DEFAULT_ORG_SETTINGS })
     .expect(201);
@@ -294,11 +287,11 @@ export async function createOrgWithSubscription(
 export async function generateJoinCode(
   ctx: AuthTestContext,
   ownerCookie: string,
-  organizationId: string,
+  dietitianAccountId: string,
   clientId: string,
 ): Promise<{ code: string; expiresAt: string; hint: string; status: string }> {
   const generated = await request(ctx.app.getHttpServer())
-    .post(`/api/v1/organizations/${organizationId}/clients/${clientId}/account/join-code`)
+    .post(`/api/v1/dietitian/${dietitianAccountId}/clients/${clientId}/account/join-code`)
     .set("Cookie", ownerCookie)
     .expect(201);
   return generated.body as { code: string; expiresAt: string; hint: string; status: string };
@@ -307,10 +300,10 @@ export async function generateJoinCode(
 export async function generatePracticeJoinCode(
   ctx: AuthTestContext,
   ownerCookie: string,
-  organizationId: string,
+  dietitianAccountId: string,
 ): Promise<{ code: string; expiresAt: string; hint: string; status: string }> {
   const generated = await request(ctx.app.getHttpServer())
-    .post(`/api/v1/organizations/${organizationId}/join-code`)
+    .post(`/api/v1/dietitian/${dietitianAccountId}/join-code`)
     .set("Cookie", ownerCookie)
     .expect(201);
   return generated.body as { code: string; expiresAt: string; hint: string; status: string };
@@ -338,11 +331,11 @@ export async function registerVerifyLoginUser(
 export async function connectClientPortal(
   ctx: AuthTestContext,
   ownerCookie: string,
-  organizationId: string,
+  dietitianAccountId: string,
   client: { id: string; email: string },
   password = TEST_PASSWORD,
 ): Promise<string> {
-  const { code } = await generateJoinCode(ctx, ownerCookie, organizationId, client.id);
+  const { code } = await generateJoinCode(ctx, ownerCookie, dietitianAccountId, client.id);
   const session = await registerVerifyLoginUser(ctx, client.email, password);
   await request(ctx.app.getHttpServer())
     .post("/api/v1/portal/join")

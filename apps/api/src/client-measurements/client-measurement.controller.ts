@@ -2,9 +2,9 @@ import { Body, Controller, Get, Param, ParseUUIDPipe, Post, UseGuards } from "@n
 import { ApiCookieAuth, ApiProperty, ApiPropertyOptional, ApiTags } from "@nestjs/swagger";
 import { IsDateString, IsEnum, IsNumber, IsOptional, IsString, MaxLength } from "class-validator";
 import { SessionGuard } from "../auth/guards/session.guard";
-import { CurrentTenant } from "../organizations/decorators/current-tenant.decorator";
-import { TenantGuard } from "../organizations/guards/tenant.guard";
-import type { TenantContext } from "../organizations/tenant.types";
+import { CurrentTenant } from "../dietitian/decorators/current-tenant.decorator";
+import { DietitianGuard } from "../dietitian/guards/dietitian.guard";
+import type { DietitianTenantContext } from "../dietitian/dietitian.types";
 import { ClientActionRequired } from "../clients/decorators/client-action.decorator";
 import { ClientAccessGuard } from "../clients/guards/client-access.guard";
 import { ClientMeasurementService } from "./client-measurement.service";
@@ -35,20 +35,20 @@ class CreateMeasurementDto {
 
 @ApiTags("client-measurements")
 @ApiCookieAuth()
-@UseGuards(SessionGuard, TenantGuard, ClientAccessGuard)
-@Controller("api/v1/organizations/:organizationId/clients/:clientId/measurements")
+@UseGuards(SessionGuard, DietitianGuard, ClientAccessGuard)
+@Controller("api/v1/dietitian/:dietitianAccountId/clients/:clientId/measurements")
 export class ClientMeasurementController {
   constructor(private readonly measurements: ClientMeasurementService) {}
 
   @Get()
-  list(@CurrentTenant() tenant: TenantContext, @Param("clientId", ParseUUIDPipe) clientId: string) {
+  list(@CurrentTenant() tenant: DietitianTenantContext, @Param("clientId", ParseUUIDPipe) clientId: string) {
     return this.measurements.list(tenant, clientId);
   }
 
   @Post()
   @ClientActionRequired("manageRecords")
   create(
-    @CurrentTenant() tenant: TenantContext,
+    @CurrentTenant() tenant: DietitianTenantContext,
     @Param("clientId", ParseUUIDPipe) clientId: string,
     @Body() body: CreateMeasurementDto,
   ) {

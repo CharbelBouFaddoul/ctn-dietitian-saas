@@ -93,13 +93,13 @@ describe("ai and messaging rate limiting", () => {
 
   async function createProOrg(cookie: string) {
     const org = await request(ctx.app.getHttpServer())
-      .post("/api/v1/organizations")
+      .post("/api/v1/dietitian")
       .set("Cookie", cookie)
       .send({ name: "Rate Limit Clinic", settings: SETTINGS })
       .expect(201);
     await activateSubscription(ctx.prisma, org.body.id, "pro");
     const client = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.body.id}/clients`)
+      .post(`/api/v1/dietitian/${org.body.id}/clients`)
       .set("Cookie", cookie)
       .send({ firstName: "Pat", lastName: "Client", email: email("client") })
       .expect(201);
@@ -109,7 +109,7 @@ describe("ai and messaging rate limiting", () => {
   it("rate limits AI generation endpoints", async () => {
     const owner = await registerVerifyLogin();
     const { orgId, clientId, cookie } = await createProOrg(owner.cookie);
-    const path = `/api/v1/organizations/${orgId}/clients/${clientId}/ai/client-summary`;
+    const path = `/api/v1/dietitian/${orgId}/clients/${clientId}/ai/client-summary`;
 
     expect((await request(ctx.app.getHttpServer()).post(path).set("Cookie", cookie).send({})).status).toBe(201);
     expect((await request(ctx.app.getHttpServer()).post(path).set("Cookie", cookie).send({})).status).toBe(201);
@@ -119,7 +119,7 @@ describe("ai and messaging rate limiting", () => {
   it("rate limits org messaging sends", async () => {
     const owner = await registerVerifyLogin();
     const { orgId, clientId, cookie } = await createProOrg(owner.cookie);
-    const path = `/api/v1/organizations/${orgId}/clients/${clientId}/conversation/messages`;
+    const path = `/api/v1/dietitian/${orgId}/clients/${clientId}/conversation/messages`;
     const body = { body: "Hello" };
 
     expect((await request(ctx.app.getHttpServer()).post(path).set("Cookie", cookie).send(body)).status).toBe(201);

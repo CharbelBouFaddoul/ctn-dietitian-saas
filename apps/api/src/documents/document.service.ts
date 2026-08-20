@@ -16,7 +16,7 @@ import { SecurityEventLogger } from "../auth/security-event.logger";
 import { TimelineService } from "../timeline/timeline.service";
 import { NotificationService } from "../notifications/notification.service";
 import { MessagingRecipientService } from "../messaging/messaging-recipient.service";
-import { requireDietitianAccountId } from "../organizations/tenant-scope";
+import { requireDietitianAccountId } from "../dietitian/tenant-scope";
 import {
   assertAllowedUpload,
   detectMime,
@@ -101,7 +101,7 @@ export class DocumentService {
     const safeName = sanitizeFilename(input.originalFilename);
     const ext = extensionFromFilename(safeName);
     const storageKey = this.storage.buildDocumentKey(
-      input.client.organizationId,
+      requireDietitianAccountId(input.client),
       input.client.id,
       documentId,
       ext,
@@ -114,7 +114,6 @@ export class DocumentService {
       data: {
         id: documentId,
         dietitianAccountId,
-        organizationId: input.client.organizationId,
         clientId: input.client.id,
         uploadedByUserId: input.uploadedByUserId,
         filename: safeName,
@@ -129,8 +128,7 @@ export class DocumentService {
     });
 
     await this.timeline.record({
-      organizationId: dietitianAccountId,
-      legacyOrganizationId: input.client.organizationId,
+      dietitianAccountId: dietitianAccountId,
       clientId: input.client.id,
       type: "DOCUMENT_UPLOADED",
       actorUserId: input.uploadedByUserId,
@@ -142,7 +140,6 @@ export class DocumentService {
       type: "document_uploaded",
       outcome: "success",
       userId: input.uploadedByUserId,
-      organizationId: dietitianAccountId,
       dietitianAccountId,
       targetType: "document",
       targetId: document.id,
@@ -174,7 +171,7 @@ export class DocumentService {
 
     if (visibility === "SHARED") {
       await this.timeline.record({
-        organizationId: client.organizationId,
+        dietitianAccountId: requireDietitianAccountId(client),
         clientId: client.id,
         type: "DOCUMENT_SHARED",
         actorUserId: userId,
@@ -185,7 +182,6 @@ export class DocumentService {
         type: "document_shared",
         outcome: "success",
         userId,
-        organizationId: client.organizationId,
         targetType: "document",
         targetId: document.id,
       });
@@ -195,7 +191,6 @@ export class DocumentService {
         type: "document_unshared",
         outcome: "success",
         userId,
-        organizationId: client.organizationId,
         targetType: "document",
         targetId: document.id,
       });
@@ -214,7 +209,7 @@ export class DocumentService {
       data: { status: "ARCHIVED", archivedAt: new Date(), visibility: "INTERNAL" },
     });
     await this.timeline.record({
-      organizationId: client.organizationId,
+      dietitianAccountId: requireDietitianAccountId(client),
       clientId: client.id,
       type: "DOCUMENT_ARCHIVED",
       actorUserId: userId,
@@ -225,7 +220,6 @@ export class DocumentService {
       type: "document_archived",
       outcome: "success",
       userId,
-      organizationId: client.organizationId,
       targetType: "document",
       targetId: document.id,
     });
@@ -260,12 +254,12 @@ export class DocumentService {
     }
   }
 
-  async recordDownloadDenied(userId: string | undefined, organizationId: string, documentId: string) {
+  async recordDownloadDenied(userId: string | undefined, dietitianAccountId: string, documentId: string) {
     await this.security.record({
       type: "document_download_denied",
       outcome: "failure",
       userId,
-      organizationId,
+      dietitianAccountId,
       targetType: "document",
       targetId: documentId,
     });
@@ -275,8 +269,7 @@ export class DocumentService {
     const clientUserId = await this.recipients.clientPortalUserId(document.clientId);
     if (clientUserId && clientUserId !== actorUserId) {
       await this.notifications.create({
-        organizationId: document.dietitianAccountId ?? document.organizationId,
-        legacyOrganizationId: document.organizationId,
+        dietitianAccountId: document.dietitianAccountId,
         userId: clientUserId,
         clientId: document.clientId,
         type: "DOCUMENT_SHARED",
@@ -297,8 +290,7 @@ export class DocumentService {
         .filter((id) => id !== actorUserId)
         .map((userId) =>
           this.notifications.create({
-            organizationId: dietitianAccountId,
-            legacyOrganizationId: document.organizationId,
+            dietitianAccountId,
             userId,
             clientId: document.clientId,
             type: "DOCUMENT_UPLOADED",

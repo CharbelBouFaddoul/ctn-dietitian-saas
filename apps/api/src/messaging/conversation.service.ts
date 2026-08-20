@@ -1,7 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type { Client, Conversation } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
-import { requireDietitianAccountId } from "../organizations/tenant-scope";
+import { requireDietitianAccountId } from "../dietitian/tenant-scope";
 import { TimelineService } from "../timeline/timeline.service";
 import { NotificationService } from "../notifications/notification.service";
 const PREVIEW_MAX = 120;
@@ -28,7 +28,6 @@ export class ConversationService {
     return this.prisma.conversation.create({
       data: {
         dietitianAccountId,
-        organizationId: client.organizationId,
         clientId: client.id,
       },
     });
@@ -91,7 +90,6 @@ export class ConversationService {
       const created = await tx.message.create({
         data: {
           dietitianAccountId,
-          organizationId: input.client.organizationId,
           clientId: input.client.id,
           conversationId: input.conversation.id,
           senderUserId: input.senderUserId,
@@ -115,7 +113,6 @@ export class ConversationService {
         },
         create: {
           dietitianAccountId,
-          organizationId: input.client.organizationId,
           conversationId: input.conversation.id,
           readerUserId: input.senderUserId,
           lastReadAt: created.createdAt,
@@ -126,8 +123,7 @@ export class ConversationService {
     });
 
     await this.timeline.record({
-      organizationId: dietitianAccountId,
-      legacyOrganizationId: input.client.organizationId,
+      dietitianAccountId: dietitianAccountId,
       clientId: input.client.id,
       type: "MESSAGE_SENT",
       actorUserId: input.senderUserId,
@@ -139,8 +135,7 @@ export class ConversationService {
     await Promise.all(
       input.notifyUserIds.map((userId) =>
         this.notifications.create({
-          organizationId: dietitianAccountId,
-          legacyOrganizationId: input.client.organizationId,
+          dietitianAccountId,
           userId,
           clientId: input.client.id,
           type: "NEW_MESSAGE",
@@ -171,7 +166,7 @@ export class ConversationService {
 
   async markRead(
     conversationId: string,
-    client: { dietitianAccountId: string | null; organizationId: string },
+    client: { dietitianAccountId: string },
     readerUserId: string,
   ) {
     const now = new Date();
@@ -182,7 +177,6 @@ export class ConversationService {
       },
       create: {
         dietitianAccountId,
-        organizationId: client.organizationId,
         conversationId,
         readerUserId,
         lastReadAt: now,

@@ -1,17 +1,14 @@
 import { Injectable } from "@nestjs/common";
 import type { Prisma, TimelineEventType } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
-import { tenantWhere } from "../organizations/tenant-scope";
+import { tenantWhere } from "../dietitian/tenant-scope";
 
 @Injectable()
 export class TimelineService {
   constructor(private readonly prisma: PrismaService) {}
 
   async record(input: {
-    /** DietitianAccount.id (Phase 1 path/tenant id). */
-    organizationId: string;
-    dietitianAccountId?: string;
-    legacyOrganizationId?: string | null;
+    dietitianAccountId: string;
     clientId: string;
     type: TimelineEventType;
     actorUserId?: string;
@@ -19,11 +16,9 @@ export class TimelineService {
     targetId?: string;
     metadata?: Prisma.InputJsonObject;
   }): Promise<void> {
-    const dietitianAccountId = input.dietitianAccountId ?? input.organizationId;
     await this.prisma.timelineEvent.create({
       data: {
-        dietitianAccountId,
-        organizationId: input.legacyOrganizationId ?? dietitianAccountId,
+        dietitianAccountId: input.dietitianAccountId,
         clientId: input.clientId,
         type: input.type,
         actorUserId: input.actorUserId ?? null,
@@ -36,14 +31,14 @@ export class TimelineService {
   }
 
   async list(
-    organizationId: string,
+    dietitianAccountId: string,
     clientId: string,
     options?: { before?: string; limit?: number },
   ) {
     const take = Math.min(Math.max(options?.limit ?? 50, 1), 100);
     const events = await this.prisma.timelineEvent.findMany({
       where: {
-        ...tenantWhere(organizationId),
+        ...tenantWhere(dietitianAccountId),
         clientId,
         ...(options?.before ? { occurredAt: { lt: new Date(options.before) } } : {}),
       },

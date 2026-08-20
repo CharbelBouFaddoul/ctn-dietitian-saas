@@ -3,9 +3,9 @@ import type { Prisma } from "@prisma/client";
 import { localDateKey } from "@nutrition-saas/utilities";
 import { ClientAccessService } from "../clients/client-access.service";
 import { PrismaService } from "../prisma/prisma.service";
-import type { TenantContext } from "../organizations/tenant.types";
+import type { DietitianTenantContext } from "../dietitian/dietitian.types";
 import { AnalyticsPeriod, resolveAnalyticsRange } from "./analytics-range";
-import { tenantWhere } from "../organizations/tenant-scope";
+import { tenantWhere } from "../dietitian/tenant-scope";
 
 const INACTIVE_DAYS = 14;
 
@@ -17,10 +17,10 @@ export class AnalyticsService {
   ) {}
 
   async overview(
-    tenant: TenantContext,
+    tenant: DietitianTenantContext,
     input: { period?: AnalyticsPeriod; startDate?: string; endDate?: string },
   ) {
-    const settings = await this.requireSettings(tenant.organizationId);
+    const settings = await this.requireSettings(tenant.dietitianAccountId);
     const range = resolveAnalyticsRange({
       period: input.period,
       timezone: settings.timezone,
@@ -51,33 +51,33 @@ export class AnalyticsService {
         where: { ...visible, status: { in: ["INACTIVE", "ARCHIVED"] } },
       }),
       this.prisma.mealPlan.count({
-        where: { ...tenantWhere(tenant.organizationId),
+        where: { ...tenantWhere(tenant.dietitianAccountId),
           status: "ACTIVE",
           client: visible,
         },
       }),
       this.prisma.appointment.count({
-        where: { ...tenantWhere(tenant.organizationId),
+        where: { ...tenantWhere(tenant.dietitianAccountId),
           startAt: { gte: range.start, lte: range.end },
           client: visible,
         },
       }),
       this.prisma.invoice.count({
-        where: { ...tenantWhere(tenant.organizationId),
+        where: { ...tenantWhere(tenant.dietitianAccountId),
           archivedAt: null,
           status: { in: ["ISSUED", "SENT", "OVERDUE"] },
           client: visible,
         },
       }),
       this.prisma.invoice.count({
-        where: { ...tenantWhere(tenant.organizationId),
+        where: { ...tenantWhere(tenant.dietitianAccountId),
           archivedAt: null,
           status: "OVERDUE",
           client: visible,
         },
       }),
       this.prisma.invoice.aggregate({
-        where: { ...tenantWhere(tenant.organizationId),
+        where: { ...tenantWhere(tenant.dietitianAccountId),
           archivedAt: null,
           issueDate: { gte: this.toDateOnly(range.start), lte: this.toDateOnly(range.end) },
           status: { not: "CANCELLED" },
@@ -86,7 +86,7 @@ export class AnalyticsService {
         _sum: { total: true },
       }),
       this.prisma.invoice.aggregate({
-        where: { ...tenantWhere(tenant.organizationId),
+        where: { ...tenantWhere(tenant.dietitianAccountId),
           archivedAt: null,
           paidAt: { gte: range.start, lte: range.end },
           status: "PAID",
@@ -128,10 +128,10 @@ export class AnalyticsService {
   }
 
   async clients(
-    tenant: TenantContext,
+    tenant: DietitianTenantContext,
     input: { period?: AnalyticsPeriod; startDate?: string; endDate?: string },
   ) {
-    const settings = await this.requireSettings(tenant.organizationId);
+    const settings = await this.requireSettings(tenant.dietitianAccountId);
     const range = resolveAnalyticsRange({
       period: input.period,
       timezone: settings.timezone,
@@ -150,15 +150,15 @@ export class AnalyticsService {
 
     const [food, water, exercise, sleep, habits, messages, mealPlans, overdueInvoices, overdueTasks] =
       await Promise.all([
-        this.latestByClient("foodLog", tenant.organizationId, clientIds, range),
-        this.latestByClient("waterLog", tenant.organizationId, clientIds, range),
-        this.latestByClient("exerciseLog", tenant.organizationId, clientIds, range),
-        this.latestByClient("sleepLog", tenant.organizationId, clientIds, range),
-        this.latestByClient("habitLog", tenant.organizationId, clientIds, range),
-        this.latestByClient("message", tenant.organizationId, clientIds, range),
-        this.activeMealPlanByClient(tenant.organizationId, clientIds),
-        this.overdueInvoicesByClient(tenant.organizationId, clientIds),
-        this.overdueTasksByClient(tenant.organizationId, clientIds),
+        this.latestByClient("foodLog", tenant.dietitianAccountId, clientIds, range),
+        this.latestByClient("waterLog", tenant.dietitianAccountId, clientIds, range),
+        this.latestByClient("exerciseLog", tenant.dietitianAccountId, clientIds, range),
+        this.latestByClient("sleepLog", tenant.dietitianAccountId, clientIds, range),
+        this.latestByClient("habitLog", tenant.dietitianAccountId, clientIds, range),
+        this.latestByClient("message", tenant.dietitianAccountId, clientIds, range),
+        this.activeMealPlanByClient(tenant.dietitianAccountId, clientIds),
+        this.overdueInvoicesByClient(tenant.dietitianAccountId, clientIds),
+        this.overdueTasksByClient(tenant.dietitianAccountId, clientIds),
       ]);
 
     const todayKey = localDateKey(new Date(), settings.timezone);
@@ -267,10 +267,10 @@ export class AnalyticsService {
   }
 
   async activity(
-    tenant: TenantContext,
+    tenant: DietitianTenantContext,
     input: { period?: AnalyticsPeriod; startDate?: string; endDate?: string },
   ) {
-    const settings = await this.requireSettings(tenant.organizationId);
+    const settings = await this.requireSettings(tenant.dietitianAccountId);
     const range = resolveAnalyticsRange({
       period: input.period,
       timezone: settings.timezone,
@@ -279,7 +279,7 @@ export class AnalyticsService {
     });
     const visible = this.access.visibleWhere(tenant);
     const base = {
-      ...tenantWhere(tenant.organizationId),
+      ...tenantWhere(tenant.dietitianAccountId),
       client: visible,
     };
 
@@ -307,10 +307,10 @@ export class AnalyticsService {
   }
 
   async financial(
-    tenant: TenantContext,
+    tenant: DietitianTenantContext,
     input: { period?: AnalyticsPeriod; startDate?: string; endDate?: string },
   ) {
-    const settings = await this.requireSettings(tenant.organizationId);
+    const settings = await this.requireSettings(tenant.dietitianAccountId);
     const range = resolveAnalyticsRange({
       period: input.period,
       timezone: settings.timezone,
@@ -319,7 +319,7 @@ export class AnalyticsService {
     });
     const visible = this.access.visibleWhere(tenant);
     const base: Prisma.InvoiceWhereInput = {
-      ...tenantWhere(tenant.organizationId),
+      ...tenantWhere(tenant.dietitianAccountId),
       archivedAt: null,
       client: visible,
     };
@@ -395,12 +395,12 @@ export class AnalyticsService {
   }
 
   private taskVisibleWhere(
-    tenant: TenantContext,
+    tenant: DietitianTenantContext,
     visible: Prisma.ClientWhereInput,
     extra: Prisma.TaskWhereInput,
   ): Prisma.TaskWhereInput {
     return {
-      ...tenantWhere(tenant.organizationId),
+      ...tenantWhere(tenant.dietitianAccountId),
       archivedAt: null,
       AND: [{ OR: [{ clientId: null }, { client: visible }] }, extra],
     };
@@ -418,12 +418,12 @@ export class AnalyticsService {
 
   private async latestByClient(
     kind: "foodLog" | "waterLog" | "exerciseLog" | "sleepLog" | "habitLog" | "message",
-    organizationId: string,
+    dietitianAccountId: string,
     clientIds: string[],
     range: { start: Date; end: Date },
   ): Promise<Map<string, Date>> {
     const map = new Map<string, Date>();
-    const scope = tenantWhere(organizationId);
+    const scope = tenantWhere(dietitianAccountId);
     if (kind === "foodLog") {
       const rows = await this.prisma.foodLog.groupBy({
         by: ["clientId"],

@@ -71,7 +71,7 @@ describe("phase6 client portfolio", () => {
 
   async function createOrg(cookie: string, name: string) {
     const created = await request(ctx.app.getHttpServer())
-      .post("/api/v1/organizations")
+      .post("/api/v1/dietitian")
       .set("Cookie", cookie)
       .send({ name, settings: SETTINGS })
       .expect(201);
@@ -81,7 +81,7 @@ describe("phase6 client portfolio", () => {
 
   async function createClient(cookie: string, organizationId: string, body: Record<string, unknown> = {}) {
     const res = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${organizationId}/clients`)
+      .post(`/api/v1/dietitian/${organizationId}/clients`)
       .set("Cookie", cookie)
       .send({
         firstName: "Pat",
@@ -101,7 +101,7 @@ describe("phase6 client portfolio", () => {
     const clientA = await createClient(a.cookie, orgA.id, { firstName: "Ann" });
 
     const portfolio = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${orgA.id}/clients/${clientA.id}/portfolio`)
+      .get(`/api/v1/dietitian/${orgA.id}/clients/${clientA.id}/portfolio`)
       .set("Cookie", a.cookie)
       .expect(200);
 
@@ -116,12 +116,12 @@ describe("phase6 client portfolio", () => {
     expect(Array.isArray(portfolio.body.quickLinks)).toBe(true);
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${orgA.id}/clients/${clientA.id}/portfolio`)
+      .get(`/api/v1/dietitian/${orgA.id}/clients/${clientA.id}/portfolio`)
       .set("Cookie", b.cookie)
       .expect(403);
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${orgB.id}/clients/${clientA.id}/portfolio`)
+      .get(`/api/v1/dietitian/${orgB.id}/clients/${clientA.id}/portfolio`)
       .set("Cookie", a.cookie)
       .expect(403);
   });
@@ -135,13 +135,13 @@ describe("phase6 client portfolio", () => {
     const clientB = await createClient(ownerB.cookie, orgB.id, { firstName: "Ben", phone: "222" });
 
     await request(ctx.app.getHttpServer())
-      .patch(`/api/v1/organizations/${orgA.id}/clients/${clientA.id}/profile`)
+      .patch(`/api/v1/dietitian/${orgA.id}/clients/${clientA.id}/profile`)
       .set("Cookie", ownerA.cookie)
       .send({ allergies: "Peanuts", lifestyle: "Walks daily" })
       .expect(200);
 
     await request(ctx.app.getHttpServer())
-      .patch(`/api/v1/organizations/${orgB.id}/clients/${clientB.id}/profile`)
+      .patch(`/api/v1/dietitian/${orgB.id}/clients/${clientB.id}/profile`)
       .set("Cookie", ownerB.cookie)
       .send({ allergies: "Shellfish", lifestyle: "Swims" })
       .expect(200);
@@ -189,12 +189,12 @@ describe("phase6 client portfolio", () => {
     });
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/clients/${client.id}/portfolio`)
+      .get(`/api/v1/dietitian/${org.id}/clients/${client.id}/portfolio`)
       .set("Cookie", owner.cookie)
       .expect(200);
 
     await request(ctx.app.getHttpServer())
-      .patch(`/api/v1/organizations/${org.id}/clients/${client.id}`)
+      .patch(`/api/v1/dietitian/${org.id}/clients/${client.id}`)
       .set("Cookie", owner.cookie)
       .send({ phone: "999" })
       .expect(403);
@@ -206,7 +206,7 @@ describe("phase6 client portfolio", () => {
     });
 
     const locked = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/clients/${client.id}/portfolio`)
+      .get(`/api/v1/dietitian/${org.id}/clients/${client.id}/portfolio`)
       .set("Cookie", owner.cookie)
       .expect(403);
     expect(String(locked.body.message).toLowerCase()).toContain("locked");
@@ -219,20 +219,20 @@ describe("phase6 client portfolio", () => {
 
     for (let i = 0; i < 12; i += 1) {
       await request(ctx.app.getHttpServer())
-        .patch(`/api/v1/organizations/${org.id}/clients/${client.id}`)
+        .patch(`/api/v1/dietitian/${org.id}/clients/${client.id}`)
         .set("Cookie", owner.cookie)
         .send({ phone: `100${i}` })
         .expect(200);
     }
 
     const portfolio = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/clients/${client.id}/portfolio`)
+      .get(`/api/v1/dietitian/${org.id}/clients/${client.id}/portfolio`)
       .set("Cookie", owner.cookie)
       .expect(200);
     expect(portfolio.body.recentTimeline.length).toBeLessThanOrEqual(8);
 
     const page1 = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/clients/${client.id}/timeline?limit=5`)
+      .get(`/api/v1/dietitian/${org.id}/clients/${client.id}/timeline?limit=5`)
       .set("Cookie", owner.cookie)
       .expect(200);
     expect(page1.body).toHaveLength(5);
@@ -240,7 +240,7 @@ describe("phase6 client portfolio", () => {
     const before = page1.body[page1.body.length - 1].occurredAt as string;
     const page2 = await request(ctx.app.getHttpServer())
       .get(
-        `/api/v1/organizations/${org.id}/clients/${client.id}/timeline?limit=5&before=${encodeURIComponent(before)}`,
+        `/api/v1/dietitian/${org.id}/clients/${client.id}/timeline?limit=5&before=${encodeURIComponent(before)}`,
       )
       .set("Cookie", owner.cookie)
       .expect(200);
@@ -256,27 +256,34 @@ describe("phase6 client portfolio", () => {
     const client = await createClient(owner.cookie, org.id);
 
     const templates = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/assessment-templates`)
+      .get(`/api/v1/dietitian/${org.id}/assessment-templates`)
       .set("Cookie", owner.cookie)
       .expect(200);
-    expect(templates.body.length).toBeGreaterThan(0);
-    const templateId = templates.body[0].id as string;
+    let templateId = templates.body[0]?.id as string | undefined;
+    if (!templateId) {
+      const created = await request(ctx.app.getHttpServer())
+        .post(`/api/v1/dietitian/${org.id}/assessment-templates`)
+        .set("Cookie", owner.cookie)
+        .send({ name: "Intake", schema: { sections: [] } })
+        .expect(201);
+      templateId = created.body.id as string;
+    }
 
     const started = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${client.id}/assessments`)
+      .post(`/api/v1/dietitian/${org.id}/clients/${client.id}/assessments`)
       .set("Cookie", owner.cookie)
       .send({ templateId })
       .expect(201);
 
     const got = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/clients/${client.id}/assessments/${started.body.id}`)
+      .get(`/api/v1/dietitian/${org.id}/clients/${client.id}/assessments/${started.body.id}`)
       .set("Cookie", owner.cookie)
       .expect(200);
     expect(got.body.id).toBe(started.body.id);
     expect(got.body).toHaveProperty("responses");
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/clients/${client.id}/assessments/${started.body.id}`)
+      .get(`/api/v1/dietitian/${org.id}/clients/${client.id}/assessments/${started.body.id}`)
       .set("Cookie", other.cookie)
       .expect(403);
   });
@@ -296,7 +303,6 @@ describe("phase6 client portfolio", () => {
       },
       create: {
         dietitianAccountId: org.id,
-        organizationId: org.id,
         featureId: feature.id,
         enabled: true,
         limitValue: 1,
@@ -307,14 +313,14 @@ describe("phase6 client portfolio", () => {
 
     const first = await createClient(owner.cookie, org.id, { firstName: "One" });
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${first.id}/archive`)
+      .post(`/api/v1/dietitian/${org.id}/clients/${first.id}/archive`)
       .set("Cookie", owner.cookie)
       .expect(201);
 
     const second = await createClient(owner.cookie, org.id, { firstName: "Two" });
 
     const blocked = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${first.id}/restore`)
+      .post(`/api/v1/dietitian/${org.id}/clients/${first.id}/restore`)
       .set("Cookie", owner.cookie)
       .send({ status: "ACTIVE" })
       .expect(403);

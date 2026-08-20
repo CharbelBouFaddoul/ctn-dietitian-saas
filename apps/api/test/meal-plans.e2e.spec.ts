@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import { FEATURE_KEYS } from "@nutrition-saas/config";
-import { ORGANIZATION_ACCESS_DENIED } from "../src/organizations/tenant.types";
+import { DIETITIAN_ACCESS_DENIED } from "../src/dietitian/dietitian.types";
 import {
   activateStandardSubscription,
   connectClientPortal,
@@ -11,7 +11,6 @@ import {
   resetAuthDatabase,
   type AuthTestContext,
 } from "./app";
-import { MULTI_MEMBER_UNSUPPORTED } from "../src/organizations/organization.service";
 
 const PASSWORD = "ValidPass12";
 const SETTINGS = {
@@ -61,7 +60,7 @@ describe("Phase 7 recipes and meal plans", () => {
 
   async function createOrg(cookie: string, name: string) {
     const created = await request(ctx.app.getHttpServer())
-      .post("/api/v1/organizations")
+      .post("/api/v1/dietitian")
       .set("Cookie", cookie)
       .send({ name, settings: SETTINGS })
       .expect(201);
@@ -71,7 +70,7 @@ describe("Phase 7 recipes and meal plans", () => {
 
   async function createClient(cookie: string, organizationId: string, body: Record<string, unknown> = {}) {
     return request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${organizationId}/clients`)
+      .post(`/api/v1/dietitian/${organizationId}/clients`)
       .set("Cookie", cookie)
       .send({ firstName: "Pat", lastName: "Client", email: email("client"), ...body });
   }
@@ -123,12 +122,12 @@ describe("Phase 7 recipes and meal plans", () => {
     const food = await seedFood();
 
     const recipe = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${orgA.id}/recipes`)
+      .post(`/api/v1/dietitian/${orgA.id}/recipes`)
       .set("Cookie", alice.cookie)
       .send({ name: "Chicken Bowl", servings: 2 })
       .expect(201);
     await request(ctx.app.getHttpServer())
-      .put(`/api/v1/organizations/${orgA.id}/recipes/${recipe.body.id}/ingredients`)
+      .put(`/api/v1/dietitian/${orgA.id}/recipes/${recipe.body.id}/ingredients`)
       .set("Cookie", alice.cookie)
       .send({ ingredients: [{ foodId: food.id, quantity: 200, unit: "g" }] })
       .expect(200)
@@ -138,31 +137,31 @@ describe("Phase 7 recipes and meal plans", () => {
       });
 
     await request(ctx.app.getHttpServer())
-      .put(`/api/v1/organizations/${orgA.id}/foods/${food.id}/override`)
+      .put(`/api/v1/dietitian/${orgA.id}/foods/${food.id}/override`)
       .set("Cookie", alice.cookie)
       .send({ energyKcal: 180 })
       .expect(200);
 
     const recalculated = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${orgA.id}/recipes/${recipe.body.id}`)
+      .get(`/api/v1/dietitian/${orgA.id}/recipes/${recipe.body.id}`)
       .set("Cookie", alice.cookie)
       .expect(200);
     expect(recalculated.body.nutrition.total.energyKcal).toBe(360);
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${orgA.id}/recipes/${recipe.body.id}`)
+      .get(`/api/v1/dietitian/${orgA.id}/recipes/${recipe.body.id}`)
       .set("Cookie", bob.cookie)
       .expect(403)
-      .expect((res) => expect(res.body.message).toBe(ORGANIZATION_ACCESS_DENIED));
+      .expect((res) => expect(res.body.message).toBe(DIETITIAN_ACCESS_DENIED));
 
     await request(ctx.app.getHttpServer())
-      .patch(`/api/v1/organizations/${orgA.id}/recipes/${recipe.body.id}`)
+      .patch(`/api/v1/dietitian/${orgA.id}/recipes/${recipe.body.id}`)
       .set("Cookie", bob.cookie)
       .send({ name: "Hacked" })
       .expect(403);
 
     const bobRecipe = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${orgB.id}/recipes`)
+      .get(`/api/v1/dietitian/${orgB.id}/recipes`)
       .set("Cookie", bob.cookie)
       .expect(200);
     expect(bobRecipe.body.items).toHaveLength(0);
@@ -172,68 +171,62 @@ describe("Phase 7 recipes and meal plans", () => {
     const owner = await registerVerifyLogin();
     const outsider = await registerVerifyLogin();
     const org = await createOrg(owner.cookie, "Practice");
-    const add = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/members`)
-      .set("Cookie", owner.cookie)
-      .send({ email: outsider.address, role: "DIETITIAN" });
-    expect(add.status).toBe(400);
-    expect(add.body.message).toBe(MULTI_MEMBER_UNSUPPORTED);
 
     const client = await createClient(owner.cookie, org.id, { firstName: "Assigned" });
     const otherClient = await createClient(owner.cookie, org.id, { firstName: "Other" });
 
     const food = await seedFood();
     const recipe = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/recipes`)
+      .post(`/api/v1/dietitian/${org.id}/recipes`)
       .set("Cookie", owner.cookie)
       .send({ name: "Pancakes", servings: 2 })
       .expect(201);
     await request(ctx.app.getHttpServer())
-      .put(`/api/v1/organizations/${org.id}/recipes/${recipe.body.id}/ingredients`)
+      .put(`/api/v1/dietitian/${org.id}/recipes/${recipe.body.id}/ingredients`)
       .set("Cookie", owner.cookie)
       .send({ ingredients: [{ foodId: food.id, quantity: 100, unit: "g" }] })
       .expect(200);
 
     const otherPlan = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/meal-plans`)
+      .post(`/api/v1/dietitian/${org.id}/meal-plans`)
       .set("Cookie", owner.cookie)
       .send({ clientId: otherClient.body.id, name: "Other plan" })
       .expect(201);
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/meal-plans`)
+      .post(`/api/v1/dietitian/${org.id}/meal-plans`)
       .set("Cookie", outsider.cookie)
       .send({ clientId: otherClient.body.id, name: "Denied" })
       .expect(403);
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/meal-plans/${otherPlan.body.id}`)
+      .get(`/api/v1/dietitian/${org.id}/meal-plans/${otherPlan.body.id}`)
       .set("Cookie", outsider.cookie)
       .expect(403)
-      .expect((res) => expect(res.body.message).toBe(ORGANIZATION_ACCESS_DENIED));
+      .expect((res) => expect(res.body.message).toBe(DIETITIAN_ACCESS_DENIED));
 
     const plan = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/meal-plans`)
+      .post(`/api/v1/dietitian/${org.id}/meal-plans`)
       .set("Cookie", owner.cookie)
       .send({ clientId: client.body.id, name: "Week 1" })
       .expect(201);
     const draftId = plan.body.versions[0].id as string;
     const draft = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/meal-plans/${plan.body.id}/versions/${draftId}`)
+      .get(`/api/v1/dietitian/${org.id}/meal-plans/${plan.body.id}/versions/${draftId}`)
       .set("Cookie", owner.cookie)
       .expect(200);
     const breakfast = breakfastMeal(draft.body);
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/meal-plans/${plan.body.id}/versions/${draftId}/meals/${breakfast.id}/items`)
+      .post(`/api/v1/dietitian/${org.id}/meal-plans/${plan.body.id}/versions/${draftId}/meals/${breakfast.id}/items`)
       .set("Cookie", owner.cookie)
       .send({ itemType: "FOOD", foodId: food.id, quantity: 150, unit: "g" })
       .expect(201);
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/meal-plans/${plan.body.id}/versions/${draftId}/meals/${breakfast.id}/items`)
+      .post(`/api/v1/dietitian/${org.id}/meal-plans/${plan.body.id}/versions/${draftId}/meals/${breakfast.id}/items`)
       .set("Cookie", owner.cookie)
       .send({ itemType: "RECIPE", recipeId: recipe.body.id, quantity: 2, unit: "serving" })
       .expect(201);
 
     const beforePublish = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/meal-plans/${plan.body.id}/versions/${draftId}`)
+      .get(`/api/v1/dietitian/${org.id}/meal-plans/${plan.body.id}/versions/${draftId}`)
       .set("Cookie", owner.cookie)
       .expect(200);
     const foodItem = beforePublish.body.snapshot.days[0].meals[0].items.find((row: { itemType: string }) => row.itemType === "FOOD");
@@ -244,23 +237,23 @@ describe("Phase 7 recipes and meal plans", () => {
     expect(beforePublish.body.snapshot.days[0].nutrition.energyKcal).toBeCloseTo(412.5, 5);
 
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/meal-plans/${plan.body.id}/versions/${draftId}/publish`)
+      .post(`/api/v1/dietitian/${org.id}/meal-plans/${plan.body.id}/versions/${draftId}/publish`)
       .set("Cookie", owner.cookie)
       .expect(201);
 
     await request(ctx.app.getHttpServer())
-      .put(`/api/v1/organizations/${org.id}/foods/${food.id}/override`)
+      .put(`/api/v1/dietitian/${org.id}/foods/${food.id}/override`)
       .set("Cookie", owner.cookie)
       .send({ energyKcal: 180 })
       .expect(200);
     await request(ctx.app.getHttpServer())
-      .put(`/api/v1/organizations/${org.id}/recipes/${recipe.body.id}/ingredients`)
+      .put(`/api/v1/dietitian/${org.id}/recipes/${recipe.body.id}/ingredients`)
       .set("Cookie", owner.cookie)
       .send({ ingredients: [{ foodId: food.id, quantity: 300, unit: "g" }] })
       .expect(200);
 
     const published = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/meal-plans/${plan.body.id}/versions/${draftId}`)
+      .get(`/api/v1/dietitian/${org.id}/meal-plans/${plan.body.id}/versions/${draftId}`)
       .set("Cookie", owner.cookie)
       .expect(200);
     expect(published.body.status).toBe("PUBLISHED");
@@ -271,13 +264,13 @@ describe("Phase 7 recipes and meal plans", () => {
     expect(publishedRecipe.nutrition.energyKcal).toBe(165);
 
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/meal-plans/${plan.body.id}/versions/${draftId}/meals/${breakfast.id}/items`)
+      .post(`/api/v1/dietitian/${org.id}/meal-plans/${plan.body.id}/versions/${draftId}/meals/${breakfast.id}/items`)
       .set("Cookie", owner.cookie)
       .send({ itemType: "FOOD", foodId: food.id, quantity: 10, unit: "g" })
       .expect(400);
 
     const v2 = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/meal-plans/${plan.body.id}/versions`)
+      .post(`/api/v1/dietitian/${org.id}/meal-plans/${plan.body.id}/versions`)
       .set("Cookie", owner.cookie)
       .expect(201);
     expect(v2.body.status).toBe("DRAFT");
@@ -287,24 +280,24 @@ describe("Phase 7 recipes and meal plans", () => {
     expect(v2Recipe.nutrition.energyKcal).toBe(540);
 
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/meal-plans/${plan.body.id}/versions/${v2.body.id}/publish`)
+      .post(`/api/v1/dietitian/${org.id}/meal-plans/${plan.body.id}/versions/${v2.body.id}/publish`)
       .set("Cookie", owner.cookie)
       .expect(201);
     const v1 = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/meal-plans/${plan.body.id}/versions/${draftId}`)
+      .get(`/api/v1/dietitian/${org.id}/meal-plans/${plan.body.id}/versions/${draftId}`)
       .set("Cookie", owner.cookie)
       .expect(200);
     expect(v1.body.status).toBe("SUPERSEDED");
     expect(v1.body.snapshot.days[0].meals[0].items.find((row: { itemType: string }) => row.itemType === "FOOD").nutrition.energyKcal).toBeCloseTo(247.5, 5);
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/meal-plans/${plan.body.id}`)
+      .get(`/api/v1/dietitian/${org.id}/meal-plans/${plan.body.id}`)
       .set("Cookie", outsider.cookie)
       .expect(403)
-      .expect((res) => expect(res.body.message).toBe(ORGANIZATION_ACCESS_DENIED));
+      .expect((res) => expect(res.body.message).toBe(DIETITIAN_ACCESS_DENIED));
 
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/recipes`)
+      .post(`/api/v1/dietitian/${org.id}/recipes`)
       .set("Cookie", outsider.cookie)
       .send({ name: "Staff recipe", servings: 1 })
       .expect(403);
@@ -327,18 +320,18 @@ describe("Phase 7 recipes and meal plans", () => {
     const food = await seedFood();
 
     const plan = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/meal-plans`)
+      .post(`/api/v1/dietitian/${org.id}/meal-plans`)
       .set("Cookie", owner.cookie)
       .send({ clientId: client.body.id, name: "Client plan" })
       .expect(201);
     const draftId = plan.body.versions[0].id as string;
     const draft = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/meal-plans/${plan.body.id}/versions/${draftId}`)
+      .get(`/api/v1/dietitian/${org.id}/meal-plans/${plan.body.id}/versions/${draftId}`)
       .set("Cookie", owner.cookie)
       .expect(200);
     const breakfast = breakfastMeal(draft.body);
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/meal-plans/${plan.body.id}/versions/${draftId}/meals/${breakfast.id}/items`)
+      .post(`/api/v1/dietitian/${org.id}/meal-plans/${plan.body.id}/versions/${draftId}/meals/${breakfast.id}/items`)
       .set("Cookie", owner.cookie)
       .send({ itemType: "FOOD", foodId: food.id, quantity: 100, unit: "g" })
       .expect(201);
@@ -354,7 +347,7 @@ describe("Phase 7 recipes and meal plans", () => {
     expect(draftView.body.plan).toBeNull();
 
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/meal-plans/${plan.body.id}/versions/${draftId}/publish`)
+      .post(`/api/v1/dietitian/${org.id}/meal-plans/${plan.body.id}/versions/${draftId}/publish`)
       .set("Cookie", owner.cookie)
       .expect(201);
 
@@ -363,21 +356,21 @@ describe("Phase 7 recipes and meal plans", () => {
     expect(published.body.plan.snapshot.days[0].meals[0].items[0].nutrition.energyKcal).toBe(165);
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/meal-plans/${plan.body.id}`)
+      .get(`/api/v1/dietitian/${org.id}/meal-plans/${plan.body.id}`)
       .set("Cookie", portalCookie)
       .expect(403);
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/meal-plans/${plan.body.id}`)
+      .get(`/api/v1/dietitian/${org.id}/meal-plans/${plan.body.id}`)
       .set("Cookie", otherOwner.cookie)
       .expect(403);
     await request(ctx.app.getHttpServer())
-      .patch(`/api/v1/organizations/${org.id}/meal-plans/${plan.body.id}`)
+      .patch(`/api/v1/dietitian/${org.id}/meal-plans/${plan.body.id}`)
       .set("Cookie", otherOwner.cookie)
       .send({ name: "Hacked" })
       .expect(403);
     const otherPlans = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${otherOrg.id}/meal-plans`)
+      .get(`/api/v1/dietitian/${otherOrg.id}/meal-plans`)
       .set("Cookie", otherOwner.cookie)
       .expect(200);
     expect(otherPlans.body.items).toHaveLength(0);
@@ -393,38 +386,38 @@ describe("Phase 7 recipes and meal plans", () => {
     const client = await createClient(owner.cookie, org.id);
     const food = await seedFood();
     const recipe = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/recipes`)
+      .post(`/api/v1/dietitian/${org.id}/recipes`)
       .set("Cookie", owner.cookie)
       .send({ name: "Old", servings: 1 })
       .expect(201);
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/recipes/${recipe.body.id}/archive`)
+      .post(`/api/v1/dietitian/${org.id}/recipes/${recipe.body.id}/archive`)
       .set("Cookie", owner.cookie)
       .expect(201);
 
     const plan = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/meal-plans`)
+      .post(`/api/v1/dietitian/${org.id}/meal-plans`)
       .set("Cookie", owner.cookie)
       .send({ clientId: client.body.id, name: "Empty" })
       .expect(201);
     const draftId = plan.body.versions[0].id as string;
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/meal-plans/${plan.body.id}/versions/${draftId}/publish`)
+      .post(`/api/v1/dietitian/${org.id}/meal-plans/${plan.body.id}/versions/${draftId}/publish`)
       .set("Cookie", owner.cookie)
       .expect(400);
 
     const draft = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/meal-plans/${plan.body.id}/versions/${draftId}`)
+      .get(`/api/v1/dietitian/${org.id}/meal-plans/${plan.body.id}/versions/${draftId}`)
       .set("Cookie", owner.cookie)
       .expect(200);
     const breakfast = breakfastMeal(draft.body);
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/meal-plans/${plan.body.id}/versions/${draftId}/meals/${breakfast.id}/items`)
+      .post(`/api/v1/dietitian/${org.id}/meal-plans/${plan.body.id}/versions/${draftId}/meals/${breakfast.id}/items`)
       .set("Cookie", owner.cookie)
       .send({ itemType: "RECIPE", recipeId: recipe.body.id, quantity: 1, unit: "serving" })
       .expect(400);
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/meal-plans/${plan.body.id}/versions/${draftId}/meals/${breakfast.id}/items`)
+      .post(`/api/v1/dietitian/${org.id}/meal-plans/${plan.body.id}/versions/${draftId}/meals/${breakfast.id}/items`)
       .set("Cookie", owner.cookie)
       .send({ itemType: "FOOD", foodId: food.id, quantity: 100, unit: "g" })
       .expect(201);
@@ -449,7 +442,7 @@ describe("Phase 7 recipes and meal plans", () => {
       },
     });
     const calculated = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/meal-plans/${plan.body.id}/versions/${draftId}/meals/${breakfast.id}/items`)
+      .post(`/api/v1/dietitian/${org.id}/meal-plans/${plan.body.id}/versions/${draftId}/meals/${breakfast.id}/items`)
       .set("Cookie", owner.cookie)
       .send({ itemType: "FOOD", foodId: food.id, quantity: 33.3, unit: "g" })
       .expect(201);
@@ -458,14 +451,14 @@ describe("Phase 7 recipes and meal plans", () => {
     );
     expect(decimalItem.nutrition.energyKcal).toBeCloseTo(54.945, 5);
     const ounce = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/meal-plans/${plan.body.id}/versions/${draftId}/meals/${breakfast.id}/items`)
+      .post(`/api/v1/dietitian/${org.id}/meal-plans/${plan.body.id}/versions/${draftId}/meals/${breakfast.id}/items`)
       .set("Cookie", owner.cookie)
       .send({ itemType: "FOOD", foodId: food.id, quantity: 1, unit: "oz" })
       .expect(201);
     const ounceItem = ounce.body.snapshot.days[0].meals[0].items.find((row: { unit: string }) => row.unit === "oz");
     expect(ounceItem.nutrition.energyKcal).toBeCloseTo(46.77671315625, 8);
     const withNull = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/meal-plans/${plan.body.id}/versions/${draftId}/meals/${breakfast.id}/items`)
+      .post(`/api/v1/dietitian/${org.id}/meal-plans/${plan.body.id}/versions/${draftId}/meals/${breakfast.id}/items`)
       .set("Cookie", owner.cookie)
       .send({ itemType: "FOOD", foodId: unknownFiber.id, quantity: 50, unit: "g" })
       .expect(201);

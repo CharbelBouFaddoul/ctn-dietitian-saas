@@ -7,10 +7,10 @@ import type { Prisma, TaskPriority, TaskStatus } from "@prisma/client";
 import { SecurityEventLogger } from "../auth/security-event.logger";
 import { ClientAccessService } from "../clients/client-access.service";
 import { PrismaService } from "../prisma/prisma.service";
-import type { TenantContext } from "../organizations/tenant.types";
+import type { DietitianTenantContext } from "../dietitian/dietitian.types";
 import { TimelineService } from "../timeline/timeline.service";
 import { NotificationService } from "../notifications/notification.service";
-import { legacyOrganizationId, tenantWhere } from "../organizations/tenant-scope";
+import { tenantWhere } from "../dietitian/tenant-scope";
 
 export type TaskView = "all" | "mine" | "due_today" | "upcoming" | "overdue" | "completed";
 
@@ -25,13 +25,13 @@ export class TaskService {
   ) {}
 
   async list(
-    tenant: TenantContext,
+    tenant: DietitianTenantContext,
     query: {
       view?: TaskView;
       status?: TaskStatus;
       priority?: TaskPriority;
       clientId?: string;
-      assignedMemberId?: string;
+      assignedUserId?: string;
       search?: string;
       page?: number;
       limit?: number;
@@ -59,10 +59,8 @@ export class TaskService {
       dueFilter = { assignedUserId: tenant.userId };
     }
 
-    void query.assignedMemberId;
-
     const where: Prisma.TaskWhereInput = {
-      ...tenantWhere(tenant.organizationId),
+      ...tenantWhere(tenant.dietitianAccountId),
       archivedAt: null,
       AND: [
         {
@@ -73,7 +71,7 @@ export class TaskService {
       ...(query.status ? { status: query.status } : {}),
       ...(query.priority ? { priority: query.priority } : {}),
       ...(query.clientId ? { clientId: query.clientId } : {}),
-      // assignedMemberId query filter is intentionally ignored (Phase 2: ACL via assignedUserId only).
+      ...(query.assignedUserId ? { assignedUserId: query.assignedUserId } : {}),
       ...(query.search
         ? {
             OR: [
@@ -89,7 +87,7 @@ export class TaskService {
         where,
         include: {
           client: true,
-          assignedMember: { include: { user: true } },
+          assignedUser: true,
           createdBy: true,
         },
         orderBy: [{ dueAt: "asc" }, { createdAt: "desc" }],
@@ -107,12 +105,12 @@ export class TaskService {
     };
   }
 
-  async listForClient(tenant: TenantContext, clientId: string) {
+  async listForClient(tenant: DietitianTenantContext, clientId: string) {
     await this.access.assertCanAccess(tenant, clientId, "read");
     const rows = await this.prisma.task.findMany({
-      where: { ...tenantWhere(tenant.organizationId), clientId, archivedAt: null },
+      where: { ...tenantWhere(tenant.dietitianAccountId), clientId, archivedAt: null },
       include: {
-        assignedMember: { include: { user: true } },
+        assignedUser: true,
         createdBy: true,
       },
       orderBy: [{ dueAt: "asc" }, { createdAt: "desc" }],
@@ -120,18 +118,18 @@ export class TaskService {
     return rows.map((row) => this.toResponse(row));
   }
 
-  async get(tenant: TenantContext, taskId: string) {
+  async get(tenant: DietitianTenantContext, taskId: string) {
     const task = await this.findTask(tenant, taskId);
     return this.toResponse(task);
   }
 
   async create(
-    tenant: TenantContext,
+    tenant: DietitianTenantContext,
     input: {
       title: string;
       description?: string;
       clientId?: string;
-      assignedMemberId?: string;
+      assignedUserId?: string;
       priority?: TaskPriority;
       dueAt?: string;
     },
@@ -141,11 +139,9 @@ export class TaskService {
     }
     const task = await this.prisma.task.create({
       data: {
-        dietitianAccountId: tenant.organizationId,
-        organizationId: legacyOrganizationId(tenant),
+        dietitianAccountId: tenant.dietitianAccountId,
         clientId: input.clientId ?? null,
-        assignedMemberId: null,
-        assignedUserId: tenant.userId,
+        assignedUserId: input.assignedUserId ?? tenant.userId,
         createdById: tenant.userId,
         title: input.title.trim(),
         description: input.description?.trim() ?? null,
@@ -154,14 +150,13 @@ export class TaskService {
       },
       include: {
         client: true,
-        assignedMember: { include: { user: true } },
+        assignedUser: true,
         createdBy: true,
       },
     });
     if (task.clientId) {
       await this.timeline.record({
-        organizationId: tenant.organizationId,
-        legacyOrganizationId: legacyOrganizationId(tenant),
+        dietitianAccountId: tenant.dietitianAccountId,
         clientId: task.clientId,
         type: "TASK_CREATED",
         actorUserId: tenant.userId,
@@ -175,8 +170,7 @@ export class TaskService {
       type: "task_created",
       outcome: "success",
       userId: tenant.userId,
-      organizationId: tenant.organizationId,
-      dietitianAccountId: tenant.organizationId,
+      dietitianAccountId: tenant.dietitianAccountId,
       targetType: "task",
       targetId: task.id,
     });
@@ -184,13 +178,13 @@ export class TaskService {
   }
 
   async update(
-    tenant: TenantContext,
+    tenant: DietitianTenantContext,
     taskId: string,
     input: {
       title?: string;
       description?: string | null;
       clientId?: string | null;
-      assignedMemberId?: string | null;
+      assignedUserId?: string | null;
       status?: TaskStatus;
       priority?: TaskPriority;
       dueAt?: string | null;
@@ -206,8 +200,6 @@ export class TaskService {
     if (input.clientId) {
       await this.access.assertCanAccess(tenant, input.clientId, "manageRecords");
     }
-    const assignedMemberId =
-      input.assignedMemberId !== undefined ? null : undefined;
     const previousAssignee = existing.assignedUserId;
     const task = await this.prisma.task.update({
       where: { id: taskId },
@@ -215,34 +207,32 @@ export class TaskService {
         title: input.title?.trim(),
         description: input.description === undefined ? undefined : input.description,
         clientId: input.clientId === undefined ? undefined : input.clientId,
-        assignedMemberId,
-        assignedUserId: input.assignedMemberId !== undefined ? tenant.userId : undefined,
+        assignedUserId: input.assignedUserId === undefined ? undefined : input.assignedUserId,
         status: input.status,
         priority: input.priority,
         dueAt: input.dueAt === undefined ? undefined : input.dueAt ? new Date(input.dueAt) : null,
       },
       include: {
         client: true,
-        assignedMember: { include: { user: true } },
+        assignedUser: true,
         createdBy: true,
       },
     });
-    if (input.assignedMemberId !== undefined && task.assignedUserId !== previousAssignee) {
+    if (input.assignedUserId !== undefined && task.assignedUserId !== previousAssignee) {
       await this.notifyAssignment(task);
     }
     await this.security.record({
       type: "task_updated",
       outcome: "success",
       userId: tenant.userId,
-      organizationId: tenant.organizationId,
-      dietitianAccountId: tenant.organizationId,
+      dietitianAccountId: tenant.dietitianAccountId,
       targetType: "task",
       targetId: task.id,
     });
     return this.toResponse(task);
   }
 
-  async complete(tenant: TenantContext, taskId: string) {
+  async complete(tenant: DietitianTenantContext, taskId: string) {
     const existing = await this.findTask(tenant, taskId);
     if (existing.clientId) {
       await this.access.assertCanAccess(tenant, existing.clientId, "manageRecords");
@@ -252,14 +242,13 @@ export class TaskService {
       data: { status: "COMPLETED", completedAt: new Date() },
       include: {
         client: true,
-        assignedMember: { include: { user: true } },
+        assignedUser: true,
         createdBy: true,
       },
     });
     if (task.clientId) {
       await this.timeline.record({
-        organizationId: tenant.organizationId,
-        legacyOrganizationId: legacyOrganizationId(tenant),
+        dietitianAccountId: tenant.dietitianAccountId,
         clientId: task.clientId,
         type: "TASK_COMPLETED",
         actorUserId: tenant.userId,
@@ -272,15 +261,14 @@ export class TaskService {
       type: "task_completed",
       outcome: "success",
       userId: tenant.userId,
-      organizationId: tenant.organizationId,
-      dietitianAccountId: tenant.organizationId,
+      dietitianAccountId: tenant.dietitianAccountId,
       targetType: "task",
       targetId: task.id,
     });
     return this.toResponse(task);
   }
 
-  async cancel(tenant: TenantContext, taskId: string) {
+  async cancel(tenant: DietitianTenantContext, taskId: string) {
     const existing = await this.findTask(tenant, taskId);
     if (existing.clientId) {
       await this.access.assertCanAccess(tenant, existing.clientId, "manageRecords");
@@ -290,14 +278,13 @@ export class TaskService {
       data: { status: "CANCELLED" },
       include: {
         client: true,
-        assignedMember: { include: { user: true } },
+        assignedUser: true,
         createdBy: true,
       },
     });
     if (task.clientId) {
       await this.timeline.record({
-        organizationId: tenant.organizationId,
-        legacyOrganizationId: legacyOrganizationId(tenant),
+        dietitianAccountId: tenant.dietitianAccountId,
         clientId: task.clientId,
         type: "TASK_CANCELLED",
         actorUserId: tenant.userId,
@@ -310,15 +297,14 @@ export class TaskService {
       type: "task_cancelled",
       outcome: "success",
       userId: tenant.userId,
-      organizationId: tenant.organizationId,
-      dietitianAccountId: tenant.organizationId,
+      dietitianAccountId: tenant.dietitianAccountId,
       targetType: "task",
       targetId: task.id,
     });
     return this.toResponse(task);
   }
 
-  async archive(tenant: TenantContext, taskId: string) {
+  async archive(tenant: DietitianTenantContext, taskId: string) {
     const existing = await this.findTask(tenant, taskId);
     if (existing.clientId) {
       await this.access.assertCanAccess(tenant, existing.clientId, "manageRecords");
@@ -328,7 +314,7 @@ export class TaskService {
       data: { archivedAt: new Date() },
       include: {
         client: true,
-        assignedMember: { include: { user: true } },
+        assignedUser: true,
         createdBy: true,
       },
     });
@@ -336,8 +322,7 @@ export class TaskService {
       type: "task_archived",
       outcome: "success",
       userId: tenant.userId,
-      organizationId: tenant.organizationId,
-      dietitianAccountId: tenant.organizationId,
+      dietitianAccountId: tenant.dietitianAccountId,
       targetType: "task",
       targetId: task.id,
     });
@@ -345,11 +330,10 @@ export class TaskService {
   }
 
   async createFromAutomation(input: {
-    organizationId: string;
+    dietitianAccountId: string;
     createdById: string;
     clientId?: string;
     assignedUserId?: string;
-    assignedMemberId?: string;
     title: string;
     description?: string;
     priority?: TaskPriority;
@@ -357,15 +341,14 @@ export class TaskService {
     automationRuleId: string;
     automationRunId: string;
   }) {
-    const dietitianAccountId = input.organizationId;
     const account = await this.prisma.dietitianAccount.findUniqueOrThrow({
-      where: { id: dietitianAccountId },
+      where: { id: input.dietitianAccountId },
     });
     if (input.clientId) {
       const client = await this.prisma.client.findFirst({
         where: {
           id: input.clientId,
-          dietitianAccountId,
+          dietitianAccountId: input.dietitianAccountId,
           status: "ACTIVE",
           archivedAt: null,
         },
@@ -379,10 +362,8 @@ export class TaskService {
 
     const task = await this.prisma.task.create({
       data: {
-        dietitianAccountId,
-        organizationId: account.legacyOrganizationId ?? dietitianAccountId,
+        dietitianAccountId: input.dietitianAccountId,
         clientId: input.clientId ?? null,
-        assignedMemberId: null,
         assignedUserId,
         createdById: input.createdById,
         title: input.title.trim(),
@@ -392,7 +373,6 @@ export class TaskService {
       },
       include: {
         client: true,
-        assignedMember: { include: { user: true } },
         assignedUser: true,
         createdBy: true,
       },
@@ -400,8 +380,7 @@ export class TaskService {
 
     if (task.clientId) {
       await this.timeline.record({
-        organizationId: dietitianAccountId,
-        legacyOrganizationId: account.legacyOrganizationId ?? dietitianAccountId,
+        dietitianAccountId: input.dietitianAccountId,
         clientId: task.clientId,
         type: "TASK_CREATED",
         actorUserId: input.createdById,
@@ -420,18 +399,18 @@ export class TaskService {
     return this.toResponse(task);
   }
 
-  private async findTask(tenant: TenantContext, taskId: string) {
+  private async findTask(tenant: DietitianTenantContext, taskId: string) {
     const visible = this.access.visibleWhere(tenant);
     const task = await this.prisma.task.findFirst({
       where: {
         id: taskId,
-        ...tenantWhere(tenant.organizationId),
+        ...tenantWhere(tenant.dietitianAccountId),
         archivedAt: null,
         OR: [{ clientId: null }, { client: visible }],
       },
       include: {
         client: true,
-        assignedMember: { include: { user: true } },
+        assignedUser: true,
         createdBy: true,
       },
     });
@@ -443,19 +422,15 @@ export class TaskService {
 
   private async notifyAssignment(task: {
     id: string;
-    organizationId: string;
-    dietitianAccountId?: string | null;
+    dietitianAccountId: string;
     clientId: string | null;
     title: string;
-    assignedMember: { userId: string } | null;
-    assignedUserId?: string | null;
+    assignedUserId: string | null;
   }) {
-    const userId = task.assignedUserId ?? task.assignedMember?.userId;
-    if (!userId) return;
+    if (!task.assignedUserId) return;
     await this.notifications.create({
-      organizationId: task.dietitianAccountId ?? task.organizationId,
-      legacyOrganizationId: task.organizationId,
-      userId,
+      dietitianAccountId: task.dietitianAccountId,
+      userId: task.assignedUserId,
       clientId: task.clientId ?? undefined,
       type: "TASK_ASSIGNED",
       title: "Task assigned",
@@ -467,11 +442,9 @@ export class TaskService {
 
   private toResponse(row: {
     id: string;
-    organizationId: string;
-    dietitianAccountId?: string | null;
+    dietitianAccountId: string;
     clientId: string | null;
-    assignedMemberId: string | null;
-    assignedUserId?: string | null;
+    assignedUserId: string | null;
     createdById: string;
     title: string;
     description: string | null;
@@ -482,19 +455,17 @@ export class TaskService {
     createdAt: Date;
     updatedAt: Date;
     client?: { id: string; firstName: string; lastName: string; displayName: string | null } | null;
-    assignedMember?: { id: string; user: { email: string } } | null;
+    assignedUser?: { email: string } | null;
     createdBy?: { email: string };
   }) {
     return {
       id: row.id,
-      organizationId: row.dietitianAccountId ?? row.organizationId,
       clientId: row.clientId,
       clientName: row.client
         ? row.client.displayName ?? `${row.client.firstName} ${row.client.lastName}`
         : null,
-      assignedMemberId: row.assignedMemberId,
-      assignedUserId: row.assignedUserId ?? null,
-      assigneeEmail: row.assignedMember?.user.email ?? null,
+      assignedUserId: row.assignedUserId,
+      assigneeEmail: row.assignedUser?.email ?? null,
       createdById: row.createdById,
       createdByEmail: row.createdBy?.email ?? null,
       title: row.title,

@@ -5,7 +5,7 @@ import { InvitationService } from "../auth/invitation.service";
 import { PasswordService } from "../auth/password.service";
 import { SecurityEventLogger } from "../auth/security-event.logger";
 import { EmailService } from "../email/email.service";
-import { OrganizationService } from "../organizations/organization.service";
+import { DietitianService } from "../dietitian/dietitian.service";
 import { PrismaService } from "../prisma/prisma.service";
 import type { AdminActor } from "./admin-actor";
 import { ADMIN_MESSAGES } from "./admin.messages";
@@ -17,7 +17,7 @@ export class AdminDietitianService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly passwords: PasswordService,
-    private readonly organizations: OrganizationService,
+    private readonly organizations: DietitianService,
     private readonly subscriptions: AdminSubscriptionService,
     private readonly invitations: InvitationService,
     private readonly email: EmailService,
@@ -79,7 +79,6 @@ export class AdminDietitianService {
       emailNormalized,
       createdById: actor.userId,
       dietitianAccountId: account.id,
-      organizationId: account.id,
     });
     await this.email.sendDietitianActivation(user.email, rawToken);
 
@@ -87,7 +86,6 @@ export class AdminDietitianService {
       type: "dietitian_provisioned",
       outcome: "success",
       userId: actor.userId,
-      organizationId: account.id,
       dietitianAccountId: account.id,
       ipAddress: actor.ipAddress,
       userAgent: actor.userAgent,

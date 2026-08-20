@@ -82,7 +82,7 @@ describe("phase4 subscription lifecycle", () => {
 
   async function createOrg(cookie: string, name: string) {
     const created = await request(ctx.app.getHttpServer())
-      .post("/api/v1/organizations")
+      .post("/api/v1/dietitian")
       .set("Cookie", cookie)
       .send({ name, settings: SETTINGS })
       .expect(201);
@@ -102,11 +102,10 @@ describe("phase4 subscription lifecycle", () => {
 
     for (const slug of ["standard", "pro", "premium"] as const) {
       const assigned = await request(ctx.app.getHttpServer())
-        .put(`/api/v1/admin/organizations/${org.id}/subscription`)
+        .put(`/api/v1/admin/dietitians/${org.id}/subscription`)
         .set("Cookie", admin.cookie)
         .send({ planId: bySlug[slug]!.id, status: "ACTIVE" })
         .expect(200);
-      expect(assigned.body.organizationId).toBe(org.id);
       expect(assigned.body.plan.slug).toBe(slug);
       expect(assigned.body.accessState).toBe("ACTIVE");
     }
@@ -115,6 +114,7 @@ describe("phase4 subscription lifecycle", () => {
       where: { dietitianAccountId: org.id },
     });
     expect(row.dietitianAccountId).toBe(org.id);
+    expect(row.planId).toBe(bySlug.premium!.id);
   });
 
   it("enforces CLIENT_LIMIT and does not delete clients on downgrade", async () => {
@@ -123,7 +123,7 @@ describe("phase4 subscription lifecycle", () => {
     const org = await createOrg(owner.cookie, "Limit Clinic");
     const standard = await ctx.prisma.plan.findUniqueOrThrow({ where: { slug: "standard" } });
     await request(ctx.app.getHttpServer())
-      .put(`/api/v1/admin/organizations/${org.id}/subscription`)
+      .put(`/api/v1/admin/dietitians/${org.id}/subscription`)
       .set("Cookie", admin.cookie)
       .send({ planId: standard.id, status: "ACTIVE" })
       .expect(200);
@@ -137,7 +137,6 @@ describe("phase4 subscription lifecycle", () => {
       },
       create: {
         dietitianAccountId: org.id,
-        organizationId: org.id,
         featureId: feature.id,
         enabled: true,
         limitValue: 2,
@@ -147,17 +146,17 @@ describe("phase4 subscription lifecycle", () => {
     });
 
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients`)
+      .post(`/api/v1/dietitian/${org.id}/clients`)
       .set("Cookie", owner.cookie)
       .send({ firstName: "A", lastName: "One", email: email("c") })
       .expect(201);
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients`)
+      .post(`/api/v1/dietitian/${org.id}/clients`)
       .set("Cookie", owner.cookie)
       .send({ firstName: "B", lastName: "Two", email: email("c") })
       .expect(201);
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients`)
+      .post(`/api/v1/dietitian/${org.id}/clients`)
       .set("Cookie", owner.cookie)
       .send({ firstName: "C", lastName: "Three", email: email("c") })
       .expect(403)
@@ -176,7 +175,7 @@ describe("phase4 subscription lifecycle", () => {
     expect(count).toBe(2);
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/clients`)
+      .get(`/api/v1/dietitian/${org.id}/clients`)
       .set("Cookie", owner.cookie)
       .expect(200)
       .expect((res) => expect(res.body.items.length).toBeGreaterThanOrEqual(2));
@@ -189,7 +188,7 @@ describe("phase4 subscription lifecycle", () => {
     const plan = await ctx.prisma.plan.findUniqueOrThrow({ where: { slug: "pro" } });
     const periodEnd = new Date(clock);
     await request(ctx.app.getHttpServer())
-      .put(`/api/v1/admin/organizations/${org.id}/subscription`)
+      .put(`/api/v1/admin/dietitians/${org.id}/subscription`)
       .set("Cookie", admin.cookie)
       .send({
         planId: plan.id,
@@ -200,31 +199,31 @@ describe("phase4 subscription lifecycle", () => {
 
     advanceDays(1);
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/subscription-access`)
+      .get(`/api/v1/dietitian/${org.id}/subscription-access`)
       .set("Cookie", owner.cookie)
       .expect(200)
       .expect((res) => expect(res.body.accessState).toBe("GRACE"));
 
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients`)
+      .post(`/api/v1/dietitian/${org.id}/clients`)
       .set("Cookie", owner.cookie)
       .send({ firstName: "Grace", lastName: "Ok", email: email("g") })
       .expect(201);
 
     advanceDays(3);
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/subscription-access`)
+      .get(`/api/v1/dietitian/${org.id}/subscription-access`)
       .set("Cookie", owner.cookie)
       .expect(200)
       .expect((res) => expect(res.body.accessState).toBe("READ_ONLY"));
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/clients`)
+      .get(`/api/v1/dietitian/${org.id}/clients`)
       .set("Cookie", owner.cookie)
       .expect(200);
 
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients`)
+      .post(`/api/v1/dietitian/${org.id}/clients`)
       .set("Cookie", owner.cookie)
       .send({ firstName: "Ro", lastName: "Blocked", email: email("ro") })
       .expect(403)
@@ -232,13 +231,13 @@ describe("phase4 subscription lifecycle", () => {
 
     advanceDays(7);
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/clients`)
+      .get(`/api/v1/dietitian/${org.id}/clients`)
       .set("Cookie", owner.cookie)
       .expect(403)
       .expect((res) => expect(res.body.message).toBe(SUBSCRIPTION_LOCKED));
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/subscription-access`)
+      .get(`/api/v1/dietitian/${org.id}/subscription-access`)
       .set("Cookie", owner.cookie)
       .expect(200)
       .expect((res) => expect(res.body.accessState).toBe("LOCKED"));
@@ -248,19 +247,19 @@ describe("phase4 subscription lifecycle", () => {
 
     const renewEnd = new Date(clock.getTime() + 30 * 24 * 60 * 60 * 1000);
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/admin/organizations/${org.id}/subscription/renew`)
+      .post(`/api/v1/admin/dietitians/${org.id}/subscription/renew`)
       .set("Cookie", admin.cookie)
       .send({ currentPeriodEnd: renewEnd.toISOString() })
       .expect(200);
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/subscription-access`)
+      .get(`/api/v1/dietitian/${org.id}/subscription-access`)
       .set("Cookie", owner.cookie)
       .expect(200)
       .expect((res) => expect(res.body.accessState).toBe("ACTIVE"));
 
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients`)
+      .post(`/api/v1/dietitian/${org.id}/clients`)
       .set("Cookie", owner.cookie)
       .send({ firstName: "Back", lastName: "Active", email: email("ba") })
       .expect(201);
@@ -279,7 +278,7 @@ describe("phase4 subscription lifecycle", () => {
     const plan = await ctx.prisma.plan.findUniqueOrThrow({ where: { slug: "standard" } });
 
     await request(ctx.app.getHttpServer())
-      .put(`/api/v1/admin/organizations/${orgA.id}/subscription`)
+      .put(`/api/v1/admin/dietitians/${orgA.id}/subscription`)
       .set("Cookie", admin.cookie)
       .send({
         planId: plan.id,
@@ -290,18 +289,18 @@ describe("phase4 subscription lifecycle", () => {
     await activateSubscription(ctx.prisma, orgB.id, "standard");
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${orgA.id}/clients`)
+      .get(`/api/v1/dietitian/${orgA.id}/clients`)
       .set("Cookie", ownerA.cookie)
       .expect(403)
       .expect((res) => expect(res.body.message).toBe(SUBSCRIPTION_LOCKED));
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${orgB.id}/clients`)
+      .get(`/api/v1/dietitian/${orgB.id}/clients`)
       .set("Cookie", ownerB.cookie)
       .expect(200);
 
     await request(ctx.app.getHttpServer())
-      .put(`/api/v1/admin/organizations/${orgA.id}/subscription`)
+      .put(`/api/v1/admin/dietitians/${orgA.id}/subscription`)
       .set("Cookie", ownerA.cookie)
       .send({ planId: plan.id })
       .expect(403);

@@ -81,7 +81,7 @@ describe("phase3 registration + portal connections", () => {
 
   async function createOrg(cookie: string, name: string) {
     const created = await request(ctx.app.getHttpServer())
-      .post("/api/v1/organizations")
+      .post("/api/v1/dietitian")
       .set("Cookie", cookie)
       .send({ name, settings: SETTINGS })
       .expect(201);
@@ -91,7 +91,7 @@ describe("phase3 registration + portal connections", () => {
 
   async function createClient(cookie: string, organizationId: string, body: Record<string, unknown> = {}) {
     return request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${organizationId}/clients`)
+      .post(`/api/v1/dietitian/${organizationId}/clients`)
       .set("Cookie", cookie)
       .send({ firstName: "Pat", lastName: "Client", email: email("client"), ...body });
   }
@@ -110,7 +110,7 @@ describe("phase3 registration + portal connections", () => {
     await setRegistrationEnabled(false);
 
     await request(ctx.app.getHttpServer())
-      .post("/api/v1/organizations")
+      .post("/api/v1/dietitian")
       .set("Cookie", owner.cookie)
       .send({ name: "Blocked Practice", settings: SETTINGS })
       .expect(403)
@@ -164,7 +164,7 @@ describe("phase3 registration + portal connections", () => {
     const cookie = `ns_session=${cookieValue(login.headers["set-cookie"])}`;
 
     const orgs = await request(ctx.app.getHttpServer())
-      .get("/api/v1/organizations")
+      .get("/api/v1/dietitian")
       .set("Cookie", cookie)
       .expect(200);
     expect(orgs.body).toHaveLength(1);
@@ -248,7 +248,7 @@ describe("phase3 registration + portal connections", () => {
     });
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/clients`)
+      .get(`/api/v1/dietitian/${org.id}/clients`)
       .set("Cookie", portalCookie)
       .expect(403);
   });

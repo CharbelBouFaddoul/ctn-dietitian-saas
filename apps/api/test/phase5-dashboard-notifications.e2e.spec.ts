@@ -80,7 +80,7 @@ describe("phase5 dashboard + notifications", () => {
 
   async function createOrg(cookie: string, name: string) {
     const created = await request(ctx.app.getHttpServer())
-      .post("/api/v1/organizations")
+      .post("/api/v1/dietitian")
       .set("Cookie", cookie)
       .send({ name, settings: SETTINGS })
       .expect(201);
@@ -90,7 +90,7 @@ describe("phase5 dashboard + notifications", () => {
 
   async function createClient(cookie: string, organizationId: string, clientEmail?: string) {
     const res = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${organizationId}/clients`)
+      .post(`/api/v1/dietitian/${organizationId}/clients`)
       .set("Cookie", cookie)
       .send({
         firstName: "Pat",
@@ -109,7 +109,7 @@ describe("phase5 dashboard + notifications", () => {
     await createClient(a.cookie, orgA.id);
 
     const dashA = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${orgA.id}/practice/dashboard`)
+      .get(`/api/v1/dietitian/${orgA.id}/practice/dashboard`)
       .set("Cookie", a.cookie)
       .expect(200);
     expect(dashA.body.clientCount).toBe(1);
@@ -119,12 +119,12 @@ describe("phase5 dashboard + notifications", () => {
     expect(dashA.body).toHaveProperty("unreadNotificationCount");
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${orgB.id}/practice/dashboard`)
+      .get(`/api/v1/dietitian/${orgB.id}/practice/dashboard`)
       .set("Cookie", a.cookie)
       .expect(403);
 
     const dashB = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${orgB.id}/practice/dashboard`)
+      .get(`/api/v1/dietitian/${orgB.id}/practice/dashboard`)
       .set("Cookie", b.cookie)
       .expect(200);
     expect(dashB.body.clientCount).toBe(0);
@@ -187,7 +187,7 @@ describe("phase5 dashboard + notifications", () => {
     });
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/practice/dashboard`)
+      .get(`/api/v1/dietitian/${org.id}/practice/dashboard`)
       .set("Cookie", owner.cookie)
       .expect(200);
 
@@ -198,7 +198,7 @@ describe("phase5 dashboard + notifications", () => {
     });
 
     const locked = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/practice/dashboard`)
+      .get(`/api/v1/dietitian/${org.id}/practice/dashboard`)
       .set("Cookie", owner.cookie)
       .expect(403);
     expect(String(locked.body.message)).toContain("locked");
@@ -212,7 +212,7 @@ describe("phase5 dashboard + notifications", () => {
     const portalCookie = await connectClientPortal(ctx, owner.cookie, org.id, client);
 
     const joined = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/notifications`)
+      .get(`/api/v1/dietitian/${org.id}/notifications`)
       .set("Cookie", owner.cookie)
       .expect(200);
     expect(joined.body.some((row: { type: string }) => row.type === "CLIENT_JOINED")).toBe(true);
@@ -220,7 +220,7 @@ describe("phase5 dashboard + notifications", () => {
     const start = new Date(clock.getTime() + 60 * 60 * 1000).toISOString();
     const end = new Date(clock.getTime() + 2 * 60 * 60 * 1000).toISOString();
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${client.id}/appointments`)
+      .post(`/api/v1/dietitian/${org.id}/clients/${client.id}/appointments`)
       .set("Cookie", owner.cookie)
       .send({ title: "Check-in", startAt: start, endAt: end })
       .expect(201);
@@ -251,13 +251,13 @@ describe("phase5 dashboard + notifications", () => {
     expect([200, 201]).toContain(markAll.status);
 
     const orgMarkAll = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/notifications/read-all`)
+      .post(`/api/v1/dietitian/${org.id}/notifications/read-all`)
       .set("Cookie", owner.cookie);
     expect([200, 201]).toContain(orgMarkAll.status);
 
     const other = await registerVerifyLogin(email("other"));
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/notifications`)
+      .get(`/api/v1/dietitian/${org.id}/notifications`)
       .set("Cookie", other.cookie)
       .expect(403);
   });
@@ -285,7 +285,7 @@ describe("phase5 dashboard + notifications", () => {
       .expect(403);
 
     const draft = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${client.id}/invoices`)
+      .post(`/api/v1/dietitian/${org.id}/clients/${client.id}/invoices`)
       .set("Cookie", owner.cookie)
       .send({
         items: [{ description: "Consult", quantity: 1, unitPrice: 50 }],
@@ -293,13 +293,13 @@ describe("phase5 dashboard + notifications", () => {
       .expect(201);
 
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/invoices/${draft.body.id}/issue`)
+      .post(`/api/v1/dietitian/${org.id}/invoices/${draft.body.id}/issue`)
       .set("Cookie", owner.cookie)
       .expect(201);
 
     ctx.emails.messages.length = 0;
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/invoices/${draft.body.id}/send`)
+      .post(`/api/v1/dietitian/${org.id}/invoices/${draft.body.id}/send`)
       .set("Cookie", owner.cookie)
       .expect(201);
 
@@ -319,20 +319,20 @@ describe("phase5 dashboard + notifications", () => {
       .expect(200);
 
     const draft2 = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${client.id}/invoices`)
+      .post(`/api/v1/dietitian/${org.id}/clients/${client.id}/invoices`)
       .set("Cookie", owner.cookie)
       .send({
         items: [{ description: "Follow-up", quantity: 1, unitPrice: 25 }],
       })
       .expect(201);
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/invoices/${draft2.body.id}/issue`)
+      .post(`/api/v1/dietitian/${org.id}/invoices/${draft2.body.id}/issue`)
       .set("Cookie", owner.cookie)
       .expect(201);
 
     ctx.emails.messages.length = 0;
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/invoices/${draft2.body.id}/send`)
+      .post(`/api/v1/dietitian/${org.id}/invoices/${draft2.body.id}/send`)
       .set("Cookie", owner.cookie)
       .expect(201);
     expect(ctx.emails.messages.some((m) => m.subject.startsWith("Invoice"))).toBe(true);

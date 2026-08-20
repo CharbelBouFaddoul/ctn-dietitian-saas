@@ -22,8 +22,7 @@ import {
   TEST_PASSWORD,
   type AuthTestContext,
 } from "./app";
-import { MULTI_MEMBER_UNSUPPORTED } from "../src/organizations/organization.service";
-import { ORGANIZATION_ACCESS_DENIED } from "../src/organizations/tenant.types";
+import { DIETITIAN_ACCESS_DENIED } from "../src/dietitian/dietitian.types";
 
 const SETTINGS = {
   timezone: "UTC",
@@ -62,7 +61,7 @@ describe("client join codes", () => {
 
   async function createOrg(cookie: string, name: string) {
     const created = await request(ctx.app.getHttpServer())
-      .post("/api/v1/organizations")
+      .post("/api/v1/dietitian")
       .set("Cookie", cookie)
       .send({ name, settings: SETTINGS })
       .expect(201);
@@ -72,7 +71,7 @@ describe("client join codes", () => {
 
   async function createClient(cookie: string, organizationId: string, body: Record<string, unknown> = {}) {
     return request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${organizationId}/clients`)
+      .post(`/api/v1/dietitian/${organizationId}/clients`)
       .set("Cookie", cookie)
       .send({ firstName: "Ada", lastName: "Lovelace", email: email("client"), ...body });
   }
@@ -84,13 +83,6 @@ describe("client join codes", () => {
     const org = await createOrg(owner.cookie, "Join Practice");
     const otherOrg = await createOrg(otherDietitian.cookie, "Other Practice");
 
-    const addMember = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/members`)
-      .set("Cookie", owner.cookie)
-      .send({ email: otherDietitian.address, role: "DIETITIAN" });
-    expect(addMember.status).toBe(400);
-    expect(addMember.body.message).toBe(MULTI_MEMBER_UNSUPPORTED);
-
     const client = await createClient(owner.cookie, org.id);
 
     const generated = await generateJoinCode(ctx, owner.cookie, org.id, client.body.id);
@@ -98,17 +90,17 @@ describe("client join codes", () => {
     expect(generated.status).toBe("waiting");
 
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${client.body.id}/account/join-code`)
+      .post(`/api/v1/dietitian/${org.id}/clients/${client.body.id}/account/join-code`)
       .set("Cookie", otherDietitian.cookie)
       .expect(403);
 
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${client.body.id}/account/join-code`)
+      .post(`/api/v1/dietitian/${org.id}/clients/${client.body.id}/account/join-code`)
       .set("Cookie", outsider.cookie)
       .expect(403);
 
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${otherOrg.id}/clients/${client.body.id}/account/join-code`)
+      .post(`/api/v1/dietitian/${otherOrg.id}/clients/${client.body.id}/account/join-code`)
       .set("Cookie", otherDietitian.cookie)
       .expect(403);
   });
@@ -134,7 +126,9 @@ describe("client join codes", () => {
     expect(me.body.client.id).toBe(client.body.id);
     expect(me.body.client.firstName).toBe("Pat");
 
-    const rows = await ctx.prisma.client.findMany({ where: { organizationId: org.id, email: clientEmail } });
+    const rows = await ctx.prisma.client.findMany({
+      where: { dietitianAccountId: org.id, email: clientEmail },
+    });
     expect(rows).toHaveLength(1);
   });
 
@@ -168,7 +162,7 @@ describe("client join codes", () => {
 
     const toRevoke = await generateJoinCode(ctx, owner.cookie, org.id, other.body.id);
     await request(ctx.app.getHttpServer())
-      .delete(`/api/v1/organizations/${org.id}/clients/${other.body.id}/account/join-code`)
+      .delete(`/api/v1/dietitian/${org.id}/clients/${other.body.id}/account/join-code`)
       .set("Cookie", owner.cookie)
       .expect(200);
     await request(ctx.app.getHttpServer())
@@ -243,7 +237,7 @@ describe("client join codes", () => {
       .expect((res) => expect(res.body.message).toBe(JOIN_NOT_ALLOWED));
 
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${clientA.body.id}/account/join-code`)
+      .post(`/api/v1/dietitian/${org.id}/clients/${clientA.body.id}/account/join-code`)
       .set("Cookie", owner.cookie)
       .expect(409)
       .expect((res) => expect(res.body.message).toBe(CLIENT_ACCOUNT_EXISTS));
@@ -278,19 +272,12 @@ describe("client join codes", () => {
     const outsider = await registerVerifyLogin();
     const org = await createOrg(owner.cookie, "Classroom Practice");
 
-    const addStaff = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/members`)
-      .set("Cookie", owner.cookie)
-      .send({ email: outsider.address, role: "STAFF" });
-    expect(addStaff.status).toBe(400);
-    expect(addStaff.body.message).toBe(MULTI_MEMBER_UNSUPPORTED);
-
     const generated = await generatePracticeJoinCode(ctx, owner.cookie, org.id);
     expect(generated.code).toMatch(/^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$/);
     expect(generated.status).toBe("active");
 
     const viewed = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/join-code`)
+      .get(`/api/v1/dietitian/${org.id}/join-code`)
       .set("Cookie", owner.cookie)
       .expect(200);
     expect(viewed.body.code).toBeNull();
@@ -298,12 +285,12 @@ describe("client join codes", () => {
     expect(viewed.body.status).toBe("active");
 
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/join-code`)
+      .post(`/api/v1/dietitian/${org.id}/join-code`)
       .set("Cookie", outsider.cookie)
       .expect(403)
-      .expect((res) => expect(res.body.message).toBe(ORGANIZATION_ACCESS_DENIED));
+      .expect((res) => expect(res.body.message).toBe(DIETITIAN_ACCESS_DENIED));
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/join-code`)
+      .get(`/api/v1/dietitian/${org.id}/join-code`)
       .set("Cookie", outsider.cookie)
       .expect(403);
   });
@@ -329,7 +316,7 @@ describe("client join codes", () => {
     expect(me.body.client.lastName).toBe("Taylor");
 
     const list = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/clients`)
+      .get(`/api/v1/dietitian/${org.id}/clients`)
       .set("Cookie", owner.cookie)
       .expect(200);
     expect(list.body.items).toHaveLength(1);
@@ -348,7 +335,7 @@ describe("client join codes", () => {
       .expect(201);
 
     const afterSecond = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/clients`)
+      .get(`/api/v1/dietitian/${org.id}/clients`)
       .set("Cookie", owner.cookie)
       .expect(200);
     expect(afterSecond.body.items).toHaveLength(2);
@@ -380,7 +367,6 @@ describe("client join codes", () => {
     await ctx.prisma.featureOverride.create({
       data: {
         dietitianAccountId: org.id,
-        organizationId: org.id,
         featureId: feature.id,
         enabled: true,
         limitValue: 1,
