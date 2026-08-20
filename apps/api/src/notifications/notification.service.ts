@@ -7,7 +7,10 @@ export class NotificationService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(input: {
+    /** DietitianAccount.id (Phase 1 path/tenant id). */
     organizationId: string;
+    dietitianAccountId?: string;
+    legacyOrganizationId?: string | null;
     userId: string;
     clientId?: string;
     type: NotificationType;
@@ -17,9 +20,11 @@ export class NotificationService {
     targetId?: string;
     metadata?: Prisma.InputJsonObject;
   }) {
+    const dietitianAccountId = input.dietitianAccountId ?? input.organizationId;
     return this.prisma.notification.create({
       data: {
-        organizationId: input.organizationId,
+        dietitianAccountId,
+        organizationId: input.legacyOrganizationId ?? dietitianAccountId,
         userId: input.userId,
         clientId: input.clientId ?? null,
         type: input.type,
@@ -36,7 +41,7 @@ export class NotificationService {
     const rows = await this.prisma.notification.findMany({
       where: {
         userId,
-        ...(organizationId ? { organizationId } : {}),
+        ...(organizationId ? { dietitianAccountId: organizationId } : {}),
       },
       orderBy: { createdAt: "desc" },
       take: limit,
@@ -49,7 +54,7 @@ export class NotificationService {
       where: {
         userId,
         readAt: null,
-        ...(organizationId ? { organizationId } : {}),
+        ...(organizationId ? { dietitianAccountId: organizationId } : {}),
       },
     });
   }
@@ -69,6 +74,7 @@ export class NotificationService {
   private toResponse(row: {
     id: string;
     organizationId: string;
+    dietitianAccountId?: string | null;
     userId: string;
     clientId: string | null;
     type: NotificationType;
@@ -82,13 +88,15 @@ export class NotificationService {
   }) {
     return {
       id: row.id,
-      organizationId: row.organizationId,
+      organizationId: row.dietitianAccountId ?? row.organizationId,
+      userId: row.userId,
+      clientId: row.clientId,
       type: row.type,
       title: row.title,
       body: row.body,
-      clientId: row.clientId,
       targetType: row.targetType,
       targetId: row.targetId,
+      metadata: row.metadata,
       readAt: row.readAt?.toISOString() ?? null,
       createdAt: row.createdAt.toISOString(),
     };

@@ -10,6 +10,7 @@ export interface SecurityEvent {
   outcome: SecurityEventOutcome;
   userId?: string;
   organizationId?: string;
+  dietitianAccountId?: string;
   emailNormalized?: string;
   ipAddress?: string;
   userAgent?: string;
@@ -33,6 +34,7 @@ export class SecurityEventLogger {
         outcome: event.outcome,
         userId: event.userId,
         organizationId: event.organizationId,
+        dietitianAccountId: event.dietitianAccountId,
         reason: event.reason,
         at: new Date().toISOString(),
       }),
@@ -54,13 +56,15 @@ export class SecurityEventLogger {
       ...(event.emailNormalized ? { emailNormalized: event.emailNormalized } : {}),
     });
 
+    const dietitianAccountId = event.dietitianAccountId ?? event.organizationId ?? null;
     await this.prisma.auditLog.create({
       data: {
         actorUserId: event.userId ?? null,
         organizationId: event.organizationId ?? null,
+        dietitianAccountId,
         action: event.type,
         targetType: event.targetType ?? this.inferTargetType(event),
-        targetId: event.targetId ?? event.organizationId ?? event.userId ?? null,
+        targetId: event.targetId ?? dietitianAccountId ?? event.userId ?? null,
         requestId: event.requestId ?? null,
         result: this.toResult(event.outcome),
         metadata: metadata as Prisma.InputJsonObject,
@@ -75,8 +79,8 @@ export class SecurityEventLogger {
   }
 
   private inferTargetType(event: SecurityEvent): string | null {
-    if (event.organizationId) {
-      return "organization";
+    if (event.dietitianAccountId || event.organizationId) {
+      return "dietitian_account";
     }
     if (event.userId) {
       return "user";

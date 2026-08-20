@@ -1,5 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
-import type { OrganizationStatus } from "@prisma/client";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { SecurityEventLogger } from "../auth/security-event.logger";
 import { OrganizationLifecycleService } from "../organizations/organization-lifecycle.service";
@@ -7,6 +6,9 @@ import { EntitlementService } from "../entitlements/entitlement.service";
 import type { AdminActor } from "./admin-actor";
 import { ADMIN_MESSAGES } from "./admin.messages";
 
+type AccountStatus = "ACTIVE" | "SUSPENDED" | "ARCHIVED";
+
+/** Phase 1 admin APIs: organizationId path param is DietitianAccount.id */
 @Injectable()
 export class AdminOrganizationService {
   constructor(
@@ -17,11 +19,11 @@ export class AdminOrganizationService {
   ) {}
 
   async list(search?: string) {
-    const organizations = await this.prisma.organization.findMany({
+    const accounts = await this.prisma.dietitianAccount.findMany({
       where: search
         ? {
             OR: [
-              { name: { contains: search, mode: "insensitive" } },
+              { displayName: { contains: search, mode: "insensitive" } },
               { slug: { contains: search, mode: "insensitive" } },
             ],
           }
@@ -31,63 +33,56 @@ export class AdminOrganizationService {
       take: 100,
     });
 
-    return organizations.map((organization) => this.toListItem(organization));
+    return accounts.map((account) => this.toListItem(account));
   }
 
   async get(organizationId: string) {
-    const organization = await this.prisma.organization.findUnique({
-      where: { id: organizationId },
-      include: {
-        settings: true,
-        members: { include: { user: true }, orderBy: { createdAt: "asc" } },
-        subscription: { include: { plan: true } },
-      },
-    });
-    if (!organization) {
-      throw new NotFoundException(ADMIN_MESSAGES.organizationNotFound);
-    }
-
+    const account = await this.requireAccount(organizationId);
     const entitlements = await this.entitlements.listEffective(organizationId);
     return {
-      id: organization.id,
-      name: organization.name,
-      slug: organization.slug,
-      status: organization.status,
-      createdAt: organization.createdAt.toISOString(),
-      archivedAt: organization.archivedAt?.toISOString() ?? null,
-      suspendedAt: organization.suspendedAt?.toISOString() ?? null,
-      settings: organization.settings
+      id: account.id,
+      name: account.displayName,
+      slug: account.slug,
+      status: account.status,
+      createdAt: account.createdAt.toISOString(),
+      archivedAt: account.archivedAt?.toISOString() ?? null,
+      suspendedAt: account.suspendedAt?.toISOString() ?? null,
+      settings: account.settings
         ? {
-            timezone: organization.settings.timezone,
-            locale: organization.settings.locale,
-            currency: organization.settings.currency,
-            weightUnit: organization.settings.weightUnit,
-            heightUnit: organization.settings.heightUnit,
-            dateFormat: organization.settings.dateFormat,
+            timezone: account.settings.timezone,
+            locale: account.settings.locale,
+            currency: account.settings.currency,
+            weightUnit: account.settings.weightUnit,
+            heightUnit: account.settings.heightUnit,
+            dateFormat: account.settings.dateFormat,
           }
         : null,
-      members: organization.members.map((member) => ({
-        id: member.id,
-        userId: member.userId,
-        email: member.user.email,
-        role: member.role,
-        status: member.status,
-      })),
-      subscription: organization.subscription
-        ? this.toSubscription(organization.subscription)
-        : null,
+      members: [
+        {
+          id: account.id,
+          userId: account.userId,
+          email: account.user.email,
+          role: "OWNER",
+          status: "ACTIVE",
+        },
+      ],
+      subscription: account.subscription ? this.toSubscription(account.subscription) : null,
       entitlements,
     };
   }
 
-  async setStatus(organizationId: string, status: OrganizationStatus, actor: AdminActor) {
-    await this.requireOrganization(organizationId);
+  async setStatus(organizationId: string, status: AccountStatus, actor: AdminActor) {
+    await this.requireAccount(organizationId);
+    if (status !== "ACTIVE" && status !== "SUSPENDED" && status !== "ARCHIVED") {
+      throw new BadRequestException("Invalid dietitian account status");
+    }
     const organization = await this.lifecycle.setStatus(organizationId, status, actor.userId);
     await this.security.record({
       type: "admin_organization_status_changed",
       outcome: "success",
       userId: actor.userId,
       organizationId,
+      dietitianAccountId: organizationId,
       ipAddress: actor.ipAddress,
       userAgent: actor.userAgent,
       requestId: actor.requestId,
@@ -99,21 +94,28 @@ export class AdminOrganizationService {
   }
 
   async entitlementsFor(organizationId: string) {
-    await this.requireOrganization(organizationId);
+    await this.requireAccount(organizationId);
     return this.entitlements.listEffective(organizationId);
   }
 
-  private async requireOrganization(organizationId: string) {
-    const organization = await this.prisma.organization.findUnique({ where: { id: organizationId } });
-    if (!organization) {
+  private async requireAccount(dietitianAccountId: string) {
+    const account = await this.prisma.dietitianAccount.findUnique({
+      where: { id: dietitianAccountId },
+      include: {
+        settings: true,
+        user: true,
+        subscription: { include: { plan: true } },
+      },
+    });
+    if (!account) {
       throw new NotFoundException(ADMIN_MESSAGES.organizationNotFound);
     }
-    return organization;
+    return account;
   }
 
-  private toListItem(organization: {
+  private toListItem(account: {
     id: string;
-    name: string;
+    displayName: string;
     slug: string;
     status: string;
     createdAt: Date;
@@ -123,15 +125,15 @@ export class AdminOrganizationService {
     } | null;
   }) {
     return {
-      id: organization.id,
-      name: organization.name,
-      slug: organization.slug,
-      status: organization.status,
-      createdAt: organization.createdAt.toISOString(),
-      subscription: organization.subscription
+      id: account.id,
+      name: account.displayName,
+      slug: account.slug,
+      status: account.status,
+      createdAt: account.createdAt.toISOString(),
+      subscription: account.subscription
         ? {
-            status: organization.subscription.status,
-            plan: organization.subscription.plan,
+            status: account.subscription.status,
+            plan: account.subscription.plan,
           }
         : null,
     };

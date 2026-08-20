@@ -107,23 +107,24 @@ export class SessionService {
   }
 
   async clientPortalMayAuthenticate(userId: string): Promise<boolean> {
-    const account = await this.prisma.clientAccount.findUnique({
+    const accounts = await this.prisma.clientAccount.findMany({
       where: { userId },
       include: { client: true },
     });
-    if (!account) {
+    if (accounts.length === 0) {
       return true;
     }
-    const membership = await this.prisma.organizationMember.findFirst({
-      where: { userId, status: "ACTIVE" },
+    const dietitianAccount = await this.prisma.dietitianAccount.findUnique({
+      where: { userId },
     });
-    if (membership) {
+    if (dietitianAccount) {
       return true;
     }
-    if (account.client.status !== "ACTIVE") {
-      return false;
-    }
-    return account.status === "ACTIVE" || account.status === "DEACTIVATED";
+    return accounts.some(
+      (account) =>
+        account.client.status === "ACTIVE" &&
+        (account.status === "ACTIVE" || account.status === "DEACTIVATED"),
+    );
   }
 
   toAuthenticatedSession(session: Session): AuthenticatedSession {

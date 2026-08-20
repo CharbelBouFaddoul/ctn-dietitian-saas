@@ -16,13 +16,17 @@ export class AutomationSweepService {
 
   async runSweep(): Promise<{ rulesProcessed: number; candidatesExecuted: number }> {
     const rules = await this.prisma.automationRule.findMany({
-      where: { status: "ACTIVE", archivedAt: null, organization: { status: "ACTIVE" } },
-      include: { organization: { include: { settings: true } } },
+      where: {
+        status: "ACTIVE",
+        archivedAt: null,
+        dietitianAccount: { status: "ACTIVE" },
+      },
+      include: { dietitianAccount: { include: { settings: true } } },
     });
 
     let candidatesExecuted = 0;
     for (const rule of rules) {
-      const timezone = rule.organization.settings?.timezone ?? "UTC";
+      const timezone = rule.dietitianAccount?.settings?.timezone ?? "UTC";
       const localDate = localDateKey(new Date(), timezone);
       const candidates = await this.evaluator.findCandidates(rule, timezone, localDate);
       for (const candidate of candidates) {

@@ -1,5 +1,5 @@
 import { ForbiddenException, Injectable } from "@nestjs/common";
-import type { Organization, OrganizationStatus } from "@prisma/client";
+import type { DietitianAccount, DietitianAccountStatus } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { SecurityEventLogger } from "../auth/security-event.logger";
 import { ORGANIZATION_UNAVAILABLE } from "./tenant.types";
@@ -11,44 +11,52 @@ export class OrganizationLifecycleService {
     private readonly security: SecurityEventLogger,
   ) {}
 
-  isOperable(status: OrganizationStatus): boolean {
+  isOperable(status: DietitianAccountStatus | string): boolean {
     return status === "ACTIVE";
   }
 
-  assertOperable(status: OrganizationStatus): void {
+  assertOperable(status: DietitianAccountStatus | string): void {
     if (!this.isOperable(status)) {
       throw new ForbiddenException(ORGANIZATION_UNAVAILABLE);
     }
   }
 
   async setStatus(
-    organizationId: string,
-    status: OrganizationStatus,
+    dietitianAccountId: string,
+    status: "ACTIVE" | "SUSPENDED" | "ARCHIVED",
     actorUserId?: string,
-  ): Promise<Organization> {
-    const data: {
-      status: OrganizationStatus;
-      archivedAt: Date | null;
-      suspendedAt: Date | null;
-    } = {
-      status,
+  ): Promise<DietitianAccount> {
+    const data = {
+      status: status as DietitianAccountStatus,
       archivedAt: status === "ARCHIVED" ? new Date() : null,
       suspendedAt: status === "SUSPENDED" ? new Date() : null,
     };
 
-    const organization = await this.prisma.organization.update({
-      where: { id: organizationId },
+    const account = await this.prisma.dietitianAccount.update({
+      where: { id: dietitianAccountId },
       data,
     });
+
+    if (account.legacyOrganizationId) {
+      await this.prisma.organization.updateMany({
+        where: { id: account.legacyOrganizationId },
+        data: {
+          status,
+          archivedAt: data.archivedAt,
+          suspendedAt: data.suspendedAt,
+        },
+      });
+    }
 
     await this.security.record({
       type: "organization_status_changed",
       outcome: "success",
-      organizationId,
+      organizationId: dietitianAccountId,
+      dietitianAccountId,
       userId: actorUserId,
       reason: status,
     });
 
-    return organization;
+    return account;
   }
 }

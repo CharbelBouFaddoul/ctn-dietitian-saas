@@ -11,6 +11,7 @@ import {
   JOIN_NOT_ALLOWED,
 } from "../src/clients/client.messages";
 import {
+  activateStandardSubscription,
   connectClientPortal,
   createAuthTestApp,
   extractEmailedToken,
@@ -21,6 +22,8 @@ import {
   TEST_PASSWORD,
   type AuthTestContext,
 } from "./app";
+import { MULTI_MEMBER_UNSUPPORTED } from "../src/organizations/organization.service";
+import { ORGANIZATION_ACCESS_DENIED } from "../src/organizations/tenant.types";
 
 const SETTINGS = {
   timezone: "UTC",
@@ -63,10 +66,7 @@ describe("client join codes", () => {
       .set("Cookie", cookie)
       .send({ name, settings: SETTINGS })
       .expect(201);
-    const plan = await ctx.prisma.plan.findUniqueOrThrow({ where: { slug: "standard" } });
-    await ctx.prisma.subscription.create({
-      data: { organizationId: created.body.id, planId: plan.id, status: "ACTIVE" },
-    });
+    await activateStandardSubscription(ctx.prisma, created.body.id);
     return created.body as { id: string; name: string };
   }
 
@@ -77,34 +77,21 @@ describe("client join codes", () => {
       .send({ firstName: "Ada", lastName: "Lovelace", email: email("client"), ...body });
   }
 
-  it("lets assigned dietitians generate codes and forbids staff and outsiders", async () => {
+  it("lets owners generate codes and forbids other dietitians and outsiders", async () => {
     const owner = await registerVerifyLogin();
-    const dietitian = await registerVerifyLogin();
-    const staff = await registerVerifyLogin();
+    const otherDietitian = await registerVerifyLogin();
     const outsider = await registerVerifyLogin();
     const org = await createOrg(owner.cookie, "Join Practice");
-    const otherOrg = await createOrg(outsider.cookie, "Other Practice");
-    await request(ctx.app.getHttpServer())
+    const otherOrg = await createOrg(otherDietitian.cookie, "Other Practice");
+
+    const addMember = await request(ctx.app.getHttpServer())
       .post(`/api/v1/organizations/${org.id}/members`)
       .set("Cookie", owner.cookie)
-      .send({ email: dietitian.address, role: "DIETITIAN" })
-      .expect(201);
-    await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/members`)
-      .set("Cookie", owner.cookie)
-      .send({ email: staff.address, role: "STAFF" })
-      .expect(201);
+      .send({ email: otherDietitian.address, role: "DIETITIAN" });
+    expect(addMember.status).toBe(400);
+    expect(addMember.body.message).toBe(MULTI_MEMBER_UNSUPPORTED);
+
     const client = await createClient(owner.cookie, org.id);
-    const unassigned = await createClient(owner.cookie, org.id, { firstName: "Unassigned" });
-    const dietitianCtx = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}`)
-      .set("Cookie", dietitian.cookie)
-      .expect(200);
-    await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${client.body.id}/assignments`)
-      .set("Cookie", owner.cookie)
-      .send({ organizationMemberId: dietitianCtx.body.context.membershipId })
-      .expect(201);
 
     const generated = await generateJoinCode(ctx, owner.cookie, org.id, client.body.id);
     expect(generated.code).toMatch(/^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$/);
@@ -112,17 +99,7 @@ describe("client join codes", () => {
 
     await request(ctx.app.getHttpServer())
       .post(`/api/v1/organizations/${org.id}/clients/${client.body.id}/account/join-code`)
-      .set("Cookie", dietitian.cookie)
-      .expect(201);
-
-    await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${unassigned.body.id}/account/join-code`)
-      .set("Cookie", dietitian.cookie)
-      .expect(403);
-
-    await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${client.body.id}/account/join-code`)
-      .set("Cookie", staff.cookie)
+      .set("Cookie", otherDietitian.cookie)
       .expect(403);
 
     await request(ctx.app.getHttpServer())
@@ -132,7 +109,7 @@ describe("client join codes", () => {
 
     await request(ctx.app.getHttpServer())
       .post(`/api/v1/organizations/${otherOrg.id}/clients/${client.body.id}/account/join-code`)
-      .set("Cookie", outsider.cookie)
+      .set("Cookie", otherDietitian.cookie)
       .expect(403);
   });
 
@@ -290,16 +267,17 @@ describe("client join codes", () => {
       .expect(200);
   });
 
-  it("lets owners generate a reusable practice code and forbids staff", async () => {
+  it("lets owners generate a reusable practice code and forbids outsiders", async () => {
     const owner = await registerVerifyLogin();
-    const staff = await registerVerifyLogin();
     const outsider = await registerVerifyLogin();
     const org = await createOrg(owner.cookie, "Classroom Practice");
-    await request(ctx.app.getHttpServer())
+
+    const addStaff = await request(ctx.app.getHttpServer())
       .post(`/api/v1/organizations/${org.id}/members`)
       .set("Cookie", owner.cookie)
-      .send({ email: staff.address, role: "STAFF" })
-      .expect(201);
+      .send({ email: outsider.address, role: "STAFF" });
+    expect(addStaff.status).toBe(400);
+    expect(addStaff.body.message).toBe(MULTI_MEMBER_UNSUPPORTED);
 
     const generated = await generatePracticeJoinCode(ctx, owner.cookie, org.id);
     expect(generated.code).toMatch(/^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$/);
@@ -315,14 +293,11 @@ describe("client join codes", () => {
 
     await request(ctx.app.getHttpServer())
       .post(`/api/v1/organizations/${org.id}/join-code`)
-      .set("Cookie", staff.cookie)
-      .expect(403);
+      .set("Cookie", outsider.cookie)
+      .expect(403)
+      .expect((res) => expect(res.body.message).toBe(ORGANIZATION_ACCESS_DENIED));
     await request(ctx.app.getHttpServer())
       .get(`/api/v1/organizations/${org.id}/join-code`)
-      .set("Cookie", staff.cookie)
-      .expect(403);
-    await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/join-code`)
       .set("Cookie", outsider.cookie)
       .expect(403);
   });
@@ -398,6 +373,7 @@ describe("client join codes", () => {
     const feature = await ctx.prisma.feature.findUniqueOrThrow({ where: { key: FEATURE_KEYS.CLIENT_LIMIT } });
     await ctx.prisma.featureOverride.create({
       data: {
+        dietitianAccountId: org.id,
         organizationId: org.id,
         featureId: feature.id,
         enabled: true,

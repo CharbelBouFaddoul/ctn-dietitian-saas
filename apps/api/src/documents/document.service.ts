@@ -38,7 +38,7 @@ export class DocumentService {
   async listForOrg(client: Client, includeInternal: boolean) {
     const rows = await this.prisma.document.findMany({
       where: {
-        organizationId: client.organizationId,
+        dietitianAccountId: client.dietitianAccountId ?? client.organizationId,
         clientId: client.id,
         status: "ACTIVE",
         ...(includeInternal ? {} : { visibility: "SHARED" }),
@@ -52,7 +52,7 @@ export class DocumentService {
   async listSharedForPortal(client: Client) {
     const rows = await this.prisma.document.findMany({
       where: {
-        organizationId: client.organizationId,
+        dietitianAccountId: client.dietitianAccountId ?? client.organizationId,
         clientId: client.id,
         status: "ACTIVE",
         visibility: "SHARED",
@@ -64,7 +64,7 @@ export class DocumentService {
   }
 
   async getMetadata(documentId: string, client: Client, portal: boolean): Promise<Document> {
-    const document = await this.findScoped(documentId, client.organizationId, client.id);
+    const document = await this.findScoped(documentId, client.dietitianAccountId ?? client.organizationId, client.id);
     this.assertReadable(document, portal);
     return document;
   }
@@ -106,9 +106,11 @@ export class DocumentService {
 
     await this.storage.writeStreamToKey(storageKey, Readable.from(input.buffer));
 
+    const dietitianAccountId = input.client.dietitianAccountId ?? input.client.organizationId;
     const document = await this.prisma.document.create({
       data: {
         id: documentId,
+        dietitianAccountId,
         organizationId: input.client.organizationId,
         clientId: input.client.id,
         uploadedByUserId: input.uploadedByUserId,
@@ -124,7 +126,8 @@ export class DocumentService {
     });
 
     await this.timeline.record({
-      organizationId: input.client.organizationId,
+      organizationId: dietitianAccountId,
+      legacyOrganizationId: input.client.organizationId,
       clientId: input.client.id,
       type: "DOCUMENT_UPLOADED",
       actorUserId: input.uploadedByUserId,
@@ -136,7 +139,8 @@ export class DocumentService {
       type: "document_uploaded",
       outcome: "success",
       userId: input.uploadedByUserId,
-      organizationId: input.client.organizationId,
+      organizationId: dietitianAccountId,
+      dietitianAccountId,
       targetType: "document",
       targetId: document.id,
       metadata: { mimeType: mime, sizeBytes },
@@ -152,7 +156,7 @@ export class DocumentService {
   }
 
   async setVisibility(documentId: string, client: Client, userId: string, visibility: DocumentVisibility) {
-    const document = await this.findScoped(documentId, client.organizationId, client.id);
+    const document = await this.findScoped(documentId, client.dietitianAccountId ?? client.organizationId, client.id);
     if (document.status !== "ACTIVE") {
       throw new NotFoundException("Document not found");
     }
@@ -198,7 +202,7 @@ export class DocumentService {
   }
 
   async archive(documentId: string, client: Client, userId: string) {
-    const document = await this.findScoped(documentId, client.organizationId, client.id);
+    const document = await this.findScoped(documentId, client.dietitianAccountId ?? client.organizationId, client.id);
     if (document.status === "ARCHIVED") {
       return this.toResponse(document);
     }
@@ -236,7 +240,7 @@ export class DocumentService {
 
   async findScoped(documentId: string, organizationId: string, clientId: string) {
     const document = await this.prisma.document.findFirst({
-      where: { id: documentId, organizationId, clientId },
+      where: { id: documentId, dietitianAccountId: organizationId, clientId },
     });
     if (!document) {
       throw new NotFoundException("Document not found");

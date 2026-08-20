@@ -3,6 +3,7 @@ import type { AppointmentStatus } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { SecurityEventLogger } from "../auth/security-event.logger";
 import type { TenantContext } from "../organizations/tenant.types";
+import { legacyOrganizationId, tenantWhere } from "../organizations/tenant-scope";
 import { TimelineService } from "../timeline/timeline.service";
 import { ClientAccessService } from "../clients/client-access.service";
 
@@ -18,7 +19,7 @@ export class AppointmentService {
   async listForClient(tenant: TenantContext, clientId: string) {
     await this.access.assertCanAccess(tenant, clientId, "read");
     const rows = await this.prisma.appointment.findMany({
-      where: { clientId, organizationId: tenant.organizationId },
+      where: { clientId, ...tenantWhere(tenant.organizationId) },
       orderBy: { startAt: "asc" },
     });
     return rows.map((row) => this.toResponse(row));
@@ -30,7 +31,7 @@ export class AppointmentService {
     from.setDate(from.getDate() - 30);
     const rows = await this.prisma.appointment.findMany({
       where: {
-        organizationId: tenant.organizationId,
+        ...tenantWhere(tenant.organizationId),
         startAt: { gte: from },
         status: { not: "CANCELLED" },
         client: visible,
@@ -62,27 +63,23 @@ export class AppointmentService {
     if (!(startAt.getTime() < endAt.getTime())) {
       throw new BadRequestException("Appointment end must be after start");
     }
-    const memberId = input.assignedMemberId ?? tenant.membershipId;
-    const member = await this.prisma.organizationMember.findFirst({
-      where: { id: memberId, organizationId: tenant.organizationId, status: "ACTIVE" },
-    });
-    if (!member) {
-      throw new BadRequestException("Assigned member is not available");
-    }
     const appointment = await this.prisma.appointment.create({
       data: {
-        organizationId: tenant.organizationId,
+        dietitianAccountId: tenant.organizationId,
+        organizationId: legacyOrganizationId(tenant),
         clientId,
         title: input.title.trim(),
         startAt,
         endAt,
-        assignedMemberId: memberId,
+        assignedUserId: tenant.userId,
+        assignedMemberId: null,
         notes: input.notes?.trim() ?? null,
         createdById: tenant.userId,
       },
     });
     await this.timeline.record({
       organizationId: tenant.organizationId,
+      legacyOrganizationId: legacyOrganizationId(tenant),
       clientId,
       type: "APPOINTMENT_CREATED",
       actorUserId: tenant.userId,
@@ -95,6 +92,7 @@ export class AppointmentService {
       outcome: "success",
       userId: tenant.userId,
       organizationId: tenant.organizationId,
+      dietitianAccountId: tenant.organizationId,
       targetType: "appointment",
       targetId: appointment.id,
     });
@@ -110,7 +108,7 @@ export class AppointmentService {
   ) {
     await this.access.assertCanAccess(tenant, clientId, "manageRecords");
     const existing = await this.prisma.appointment.findFirst({
-      where: { id: appointmentId, clientId, organizationId: tenant.organizationId },
+      where: { id: appointmentId, clientId, ...tenantWhere(tenant.organizationId) },
     });
     if (!existing) {
       throw new NotFoundException("Appointment not found");
@@ -127,6 +125,7 @@ export class AppointmentService {
           : "APPOINTMENT_UPDATED";
     await this.timeline.record({
       organizationId: tenant.organizationId,
+      legacyOrganizationId: legacyOrganizationId(tenant),
       clientId,
       type: timelineType,
       actorUserId: tenant.userId,
@@ -139,6 +138,7 @@ export class AppointmentService {
       outcome: "success",
       userId: tenant.userId,
       organizationId: tenant.organizationId,
+      dietitianAccountId: tenant.organizationId,
       targetType: "appointment",
       targetId: appointment.id,
       metadata: { status },
@@ -154,6 +154,7 @@ export class AppointmentService {
     status: string;
     notes: string | null;
     assignedMemberId: string | null;
+    assignedUserId?: string | null;
   }) {
     return {
       id: row.id,
@@ -163,6 +164,7 @@ export class AppointmentService {
       status: row.status,
       notes: row.notes,
       assignedMemberId: row.assignedMemberId,
+      assignedUserId: row.assignedUserId ?? null,
     };
   }
 }

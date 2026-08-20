@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import { CLIENT_ACCESS_DENIED } from "../src/clients/client.messages";
 import {
+  activateStandardSubscription,
   connectClientPortal,
   cookieValue,
   createAuthTestApp,
@@ -9,6 +10,8 @@ import {
   resetAuthDatabase,
   type AuthTestContext,
 } from "./app";
+import { MULTI_MEMBER_UNSUPPORTED } from "../src/organizations/organization.service";
+import { ORGANIZATION_ACCESS_DENIED } from "../src/organizations/tenant.types";
 
 const PASSWORD = "ValidPass12";
 const SETTINGS = {
@@ -62,10 +65,7 @@ describe("Phase 10 invoices, tasks, and analytics", () => {
       .set("Cookie", cookie)
       .send({ name, settings: SETTINGS })
       .expect(201);
-    const plan = await ctx.prisma.plan.findUniqueOrThrow({ where: { slug: "standard" } });
-    await ctx.prisma.subscription.create({
-      data: { organizationId: created.body.id, planId: plan.id, status: "ACTIVE" },
-    });
+    await activateStandardSubscription(ctx.prisma, created.body.id);
     return created.body as { id: string };
   }
 
@@ -149,17 +149,19 @@ describe("Phase 10 invoices, tasks, and analytics", () => {
       .expect(400);
   });
 
-  it("isolates invoices and tasks between organizations and assignments", async () => {
+  it("isolates invoices and tasks between dietitian accounts", async () => {
     const ownerA = await registerVerifyLogin();
     const ownerB = await registerVerifyLogin();
-    const dietitian = await registerVerifyLogin();
+    const outsider = await registerVerifyLogin();
     const orgA = await createOrg(ownerA.cookie, "Org A");
     const orgB = await createOrg(ownerB.cookie, "Org B");
-    await request(ctx.app.getHttpServer())
+    const add = await request(ctx.app.getHttpServer())
       .post(`/api/v1/organizations/${orgA.id}/members`)
       .set("Cookie", ownerA.cookie)
-      .send({ email: dietitian.address, role: "DIETITIAN" })
-      .expect(201);
+      .send({ email: outsider.address, role: "DIETITIAN" });
+    expect(add.status).toBe(400);
+    expect(add.body.message).toBe(MULTI_MEMBER_UNSUPPORTED);
+
     const clientA = await createClient(ownerA.cookie, orgA.id);
     const clientB = await createClient(ownerB.cookie, orgB.id);
 
@@ -182,8 +184,9 @@ describe("Phase 10 invoices, tasks, and analytics", () => {
 
     await request(ctx.app.getHttpServer())
       .get(`/api/v1/organizations/${orgA.id}/clients/${clientA.body.id}/invoices`)
-      .set("Cookie", dietitian.cookie)
-      .expect(403);
+      .set("Cookie", outsider.cookie)
+      .expect(403)
+      .expect((res) => expect(res.body.message).toBe(ORGANIZATION_ACCESS_DENIED));
 
     const task = await request(ctx.app.getHttpServer())
       .post(`/api/v1/organizations/${orgA.id}/tasks`)

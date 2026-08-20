@@ -1,10 +1,11 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { SecurityEventLogger } from "../auth/security-event.logger";
 import type { TenantContext } from "../organizations/tenant.types";
 import { TimelineService } from "../timeline/timeline.service";
 import { ClientAccessService } from "../clients/client-access.service";
+import { legacyOrganizationId, tenantWhere } from "../organizations/tenant-scope";
 
 @Injectable()
 export class AssessmentService {
@@ -19,7 +20,7 @@ export class AssessmentService {
     return this.prisma.assessmentTemplate.findMany({
       where: {
         status: "ACTIVE",
-        OR: [{ organizationId: null }, { organizationId: tenant.organizationId }],
+        OR: [{ organizationId: null, dietitianAccountId: null }, { ...tenantWhere(tenant.organizationId) }],
       },
       orderBy: { name: "asc" },
     });
@@ -29,12 +30,10 @@ export class AssessmentService {
     tenant: TenantContext,
     input: { name: string; description?: string; schema: Prisma.InputJsonValue },
   ) {
-    if (tenant.role === "STAFF") {
-      throw new ForbiddenException("Staff cannot manage assessment templates");
-    }
     return this.prisma.assessmentTemplate.create({
       data: {
-        organizationId: tenant.organizationId,
+        dietitianAccountId: tenant.organizationId,
+        organizationId: legacyOrganizationId(tenant),
         name: input.name.trim(),
         description: input.description?.trim() ?? null,
         schema: input.schema,
@@ -49,11 +48,8 @@ export class AssessmentService {
     templateId: string,
     input: { name?: string; description?: string; schema?: Prisma.InputJsonValue; status?: "ACTIVE" | "INACTIVE" | "ARCHIVED" },
   ) {
-    if (tenant.role === "STAFF") {
-      throw new ForbiddenException("Staff cannot manage assessment templates");
-    }
     const template = await this.prisma.assessmentTemplate.findFirst({
-      where: { id: templateId, organizationId: tenant.organizationId },
+      where: { id: templateId, ...tenantWhere(tenant.organizationId) },
     });
     if (!template) {
       throw new NotFoundException("Template not found");
@@ -74,7 +70,7 @@ export class AssessmentService {
   async list(tenant: TenantContext, clientId: string) {
     await this.access.assertCanAccess(tenant, clientId, "read");
     const rows = await this.prisma.assessment.findMany({
-      where: { clientId, organizationId: tenant.organizationId },
+      where: { clientId, ...tenantWhere(tenant.organizationId) },
       include: { template: true },
       orderBy: { createdAt: "desc" },
     });
@@ -87,7 +83,7 @@ export class AssessmentService {
       where: {
         id: templateId,
         status: "ACTIVE",
-        OR: [{ organizationId: null }, { organizationId: tenant.organizationId }],
+        OR: [{ organizationId: null, dietitianAccountId: null }, { ...tenantWhere(tenant.organizationId) }],
       },
     });
     if (!template) {
@@ -95,7 +91,8 @@ export class AssessmentService {
     }
     const assessment = await this.prisma.assessment.create({
       data: {
-        organizationId: tenant.organizationId,
+        dietitianAccountId: tenant.organizationId,
+        organizationId: legacyOrganizationId(tenant),
         clientId,
         templateId: template.id,
         templateVersion: template.version,
@@ -107,6 +104,7 @@ export class AssessmentService {
     });
     await this.timeline.record({
       organizationId: tenant.organizationId,
+      legacyOrganizationId: legacyOrganizationId(tenant),
       clientId,
       type: "ASSESSMENT_STARTED",
       actorUserId: tenant.userId,
@@ -149,6 +147,7 @@ export class AssessmentService {
     });
     await this.timeline.record({
       organizationId: tenant.organizationId,
+      legacyOrganizationId: legacyOrganizationId(tenant),
       clientId,
       type: "ASSESSMENT_COMPLETED",
       actorUserId: tenant.userId,
@@ -161,6 +160,7 @@ export class AssessmentService {
       outcome: "success",
       userId: tenant.userId,
       organizationId: tenant.organizationId,
+      dietitianAccountId: tenant.organizationId,
       targetType: "assessment",
       targetId: assessment.id,
       metadata: { templateVersion: assessment.templateVersion },

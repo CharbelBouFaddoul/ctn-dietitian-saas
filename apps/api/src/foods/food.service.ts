@@ -61,7 +61,7 @@ export class FoodService {
 
     const overrideRows = await this.prisma.foodOverride.findMany({
       where: {
-        organizationId,
+        dietitianAccountId: organizationId,
         status: "ACTIVE",
         foodId: { in: rows.map((row) => row.id) },
       },
@@ -89,7 +89,7 @@ export class FoodService {
   async getEffective(organizationId: string, foodId: string) {
     const food = await this.loadFood(foodId);
     const override = await this.prisma.foodOverride.findUnique({
-      where: { organizationId_foodId: { organizationId, foodId } },
+      where: { dietitianAccountId_foodId: { dietitianAccountId: organizationId, foodId } },
     });
     return this.toEffective(food, override);
   }
@@ -107,7 +107,7 @@ export class FoodService {
       throw new NotFoundException("Food not found");
     }
     const overrides = await this.prisma.foodOverride.findMany({
-      where: { organizationId, foodId: { in: unique } },
+      where: { dietitianAccountId: organizationId, foodId: { in: unique } },
     });
     const overrideByFood = new Map(overrides.map((row) => [row.foodId, row]));
     const result = new Map<string, Awaited<ReturnType<FoodService["getEffective"]>>>();

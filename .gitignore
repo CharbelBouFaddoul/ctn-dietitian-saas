@@ -13,4 +13,5 @@ backups
 .DS_Store
 *.tsbuildinfo
 apps/api/generated
-.prisma
+# Only ignore a root-level .prisma folder — never node_modules/.prisma (Prisma Client types).
+/.prisma

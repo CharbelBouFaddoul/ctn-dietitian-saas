@@ -1,10 +1,9 @@
-import { ConflictException, Injectable } from "@nestjs/common";
+import { BadRequestException, ConflictException, Injectable } from "@nestjs/common";
 import type { DateFormat, HeightUnit, WeightUnit } from "@prisma/client";
 import { randomBytes } from "node:crypto";
 import { slugify } from "@nutrition-saas/utilities";
 import { PrismaService } from "../prisma/prisma.service";
 import { SecurityEventLogger } from "../auth/security-event.logger";
-import { tenantWhere } from "./tenant-scope";
 import type { CreateOrganizationDto, OrganizationSettingsInputDto, UpdateOrganizationSettingsDto } from "./dto/organization.dto";
 
 @Injectable()
@@ -15,10 +14,16 @@ export class OrganizationService {
   ) {}
 
   async create(userId: string, input: CreateOrganizationDto) {
-    const slug = await this.allocateSlug(input.slug?.trim() || slugify(input.name));
+    const existingAccount = await this.prisma.dietitianAccount.findUnique({ where: { userId } });
+    if (existingAccount) {
+      throw new ConflictException("User already has a dietitian account");
+    }
 
-    const organization = await this.prisma.$transaction(async (tx) => {
-      const created = await tx.organization.create({
+    const slug = await this.allocateSlug(input.slug?.trim() || slugify(input.name));
+    const settings = this.settingsData(input.settings);
+
+    const account = await this.prisma.$transaction(async (tx) => {
+      const organization = await tx.organization.create({
         data: {
           name: input.name.trim(),
           slug,
@@ -29,14 +34,14 @@ export class OrganizationService {
 
       await tx.organizationSettings.create({
         data: {
-          organizationId: created.id,
-          ...this.settingsData(input.settings),
+          organizationId: organization.id,
+          ...settings,
         },
       });
 
       await tx.organizationMember.create({
         data: {
-          organizationId: created.id,
+          organizationId: organization.id,
           userId,
           role: "OWNER",
           status: "ACTIVE",
@@ -44,73 +49,95 @@ export class OrganizationService {
         },
       });
 
-      return created;
+      const dietitianAccount = await tx.dietitianAccount.create({
+        data: {
+          id: organization.id,
+          userId,
+          displayName: organization.name,
+          slug: organization.slug,
+          status: "ACTIVE",
+          legacyOrganizationId: organization.id,
+          country: null,
+        },
+      });
+
+      await tx.dietitianSettings.create({
+        data: {
+          dietitianAccountId: dietitianAccount.id,
+          ...settings,
+        },
+      });
+
+      return dietitianAccount;
     });
 
     await this.security.record({
       type: "organization_created",
       outcome: "success",
       userId,
-      organizationId: organization.id,
-    });
-    await this.security.record({
-      type: "membership_created",
-      outcome: "success",
-      userId,
-      organizationId: organization.id,
-      reason: "OWNER",
+      organizationId: account.id,
+      dietitianAccountId: account.id,
     });
 
-    return this.getForUser(userId, organization.id);
+    return this.getForUser(userId, account.id);
   }
 
   async listForUser(userId: string) {
-    const memberships = await this.prisma.organizationMember.findMany({
-      where: { userId, status: "ACTIVE" },
-      include: { organization: true },
+    const accounts = await this.prisma.dietitianAccount.findMany({
+      where: { userId, status: { not: "ARCHIVED" } },
       orderBy: { createdAt: "asc" },
     });
-
-    return memberships.map((membership) => this.toResponse(membership));
+    return accounts.map((account) => this.toAccountResponse(account));
   }
 
-  async getForUser(userId: string, organizationId: string) {
-    const membership = await this.prisma.organizationMember.findFirst({
-      where: {
-        ...tenantWhere(organizationId),
-        userId,
-        status: "ACTIVE",
-      },
-      include: {
-        organization: { include: { settings: true } },
-      },
+  async getForUser(userId: string, dietitianAccountId: string) {
+    const account = await this.prisma.dietitianAccount.findFirst({
+      where: { id: dietitianAccountId, userId },
+      include: { settings: true },
     });
-
-    if (!membership) {
+    if (!account) {
       return null;
     }
-
-    return this.toResponse(membership, membership.organization.settings ?? undefined);
+    return this.toAccountResponse(account, account.settings);
   }
 
-  async updateName(organizationId: string, name: string) {
-    return this.prisma.organization.update({
-      where: { id: organizationId },
-      data: { name: name.trim() },
+  async updateName(dietitianAccountId: string, name: string) {
+    const trimmed = name.trim();
+    const account = await this.prisma.dietitianAccount.update({
+      where: { id: dietitianAccountId },
+      data: { displayName: trimmed },
+    });
+    if (account.legacyOrganizationId) {
+      await this.prisma.organization.updateMany({
+        where: { id: account.legacyOrganizationId },
+        data: { name: trimmed },
+      });
+    }
+    return account;
+  }
+
+  async getSettings(dietitianAccountId: string) {
+    return this.prisma.dietitianSettings.findUnique({
+      where: { dietitianAccountId },
     });
   }
 
-  async getSettings(organizationId: string) {
-    return this.prisma.organizationSettings.findUnique({
-      where: { organizationId },
+  async updateSettings(dietitianAccountId: string, settings: UpdateOrganizationSettingsDto) {
+    const data = this.settingsData(settings);
+    const updated = await this.prisma.dietitianSettings.update({
+      where: { dietitianAccountId },
+      data,
     });
-  }
-
-  async updateSettings(organizationId: string, settings: UpdateOrganizationSettingsDto) {
-    return this.prisma.organizationSettings.update({
-      where: { organizationId },
-      data: this.settingsData(settings),
+    const account = await this.prisma.dietitianAccount.findUnique({
+      where: { id: dietitianAccountId },
     });
+    if (account?.legacyOrganizationId) {
+      await this.prisma.organizationSettings.updateMany({
+        where: { organizationId: account.legacyOrganizationId },
+        data,
+      });
+    }
+    return updated;
   }
 
   toSettingsResponse(settings: {
@@ -196,11 +223,13 @@ export class OrganizationService {
     };
   }
 
-  private toResponse(
-    membership: {
-      role: string;
+  private toAccountResponse(
+    account: {
+      id: string;
+      displayName: string;
+      slug: string;
       status: string;
-      organization: { id: string; name: string; slug: string; status: string; createdAt: Date };
+      createdAt: Date;
     },
     settings?: {
       timezone: string;
@@ -229,13 +258,13 @@ export class OrganizationService {
     } | null,
   ) {
     return {
-      id: membership.organization.id,
-      name: membership.organization.name,
-      slug: membership.organization.slug,
-      status: membership.organization.status,
-      role: membership.role,
-      membershipStatus: membership.status,
-      createdAt: membership.organization.createdAt.toISOString(),
+      id: account.id,
+      name: account.displayName,
+      slug: account.slug,
+      status: account.status,
+      role: "OWNER" as const,
+      membershipStatus: "ACTIVE" as const,
+      createdAt: account.createdAt.toISOString(),
       ...(settings ? { settings: this.toSettingsResponse(settings) } : {}),
     };
   }
@@ -244,11 +273,18 @@ export class OrganizationService {
     const normalized = slugify(base);
     for (let attempt = 0; attempt < 8; attempt += 1) {
       const candidate = attempt === 0 ? normalized : `${normalized}-${randomBytes(2).toString("hex")}`;
-      const existing = await this.prisma.organization.findUnique({ where: { slug: candidate } });
-      if (!existing) {
+      const existingOrg = await this.prisma.organization.findUnique({ where: { slug: candidate } });
+      const existingAccount = await this.prisma.dietitianAccount.findUnique({ where: { slug: candidate } });
+      if (!existingOrg && !existingAccount) {
         return candidate;
       }
     }
     throw new ConflictException("Unable to allocate a unique organization slug");
   }
+}
+
+export const MULTI_MEMBER_UNSUPPORTED = "Multi-member practices are not supported";
+
+export function rejectMultiMember(): never {
+  throw new BadRequestException(MULTI_MEMBER_UNSUPPORTED);
 }

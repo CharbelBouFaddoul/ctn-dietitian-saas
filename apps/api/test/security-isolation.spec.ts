@@ -4,6 +4,7 @@ import { FEATURE_KEYS } from "@nutrition-saas/config";
 import { CLIENT_ACCESS_DENIED } from "../src/clients/client.messages";
 import { ORGANIZATION_ACCESS_DENIED } from "../src/organizations/tenant.types";
 import {
+  activateStandardSubscription,
   connectClientPortal,
   cookieValue,
   createAuthTestApp,
@@ -11,6 +12,7 @@ import {
   resetAuthDatabase,
   type AuthTestContext,
 } from "./app";
+import { MULTI_MEMBER_UNSUPPORTED } from "../src/organizations/organization.service";
 
 const PASSWORD = "ValidPass12";
 const SETTINGS = {
@@ -64,10 +66,7 @@ describe("release-blocking security isolation", () => {
       .set("Cookie", cookie)
       .send({ name, settings: SETTINGS })
       .expect(201);
-    const plan = await ctx.prisma.plan.findUniqueOrThrow({ where: { slug: "standard" } });
-    await ctx.prisma.subscription.create({
-      data: { organizationId: created.body.id, planId: plan.id, status: "ACTIVE" },
-    });
+    await activateStandardSubscription(ctx.prisma, created.body.id);
     return created.body as { id: string };
   }
 
@@ -104,25 +103,27 @@ describe("release-blocking security isolation", () => {
       .expect((res) => expect(res.body.message).toBe(CLIENT_ACCESS_DENIED));
   });
 
-  it("blocks dietitian access to unassigned clients", async () => {
+  it("blocks other dietitians from accessing another account's clients", async () => {
     const owner = await registerVerifyLogin();
-    const dietitian = await registerVerifyLogin();
+    const otherDietitian = await registerVerifyLogin();
     const org = await createOrg(owner.cookie, "Clinic");
-    await request(ctx.app.getHttpServer())
+    const add = await request(ctx.app.getHttpServer())
       .post(`/api/v1/organizations/${org.id}/members`)
       .set("Cookie", owner.cookie)
-      .send({ email: dietitian.address, role: "DIETITIAN" })
-      .expect(201);
-    const unassigned = await createClient(owner.cookie, org.id);
+      .send({ email: otherDietitian.address, role: "DIETITIAN" });
+    expect(add.status).toBe(400);
+    expect(add.body.message).toBe(MULTI_MEMBER_UNSUPPORTED);
+
+    const client = await createClient(owner.cookie, org.id);
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/clients/${unassigned.body.id}`)
-      .set("Cookie", dietitian.cookie)
+      .get(`/api/v1/organizations/${org.id}/clients/${client.body.id}`)
+      .set("Cookie", otherDietitian.cookie)
       .expect(403);
 
     await request(ctx.app.getHttpServer())
-      .patch(`/api/v1/organizations/${org.id}/clients/${unassigned.body.id}`)
-      .set("Cookie", dietitian.cookie)
+      .patch(`/api/v1/organizations/${org.id}/clients/${client.body.id}`)
+      .set("Cookie", otherDietitian.cookie)
       .send({ firstName: "Blocked" })
       .expect(403);
   });
@@ -142,18 +143,13 @@ describe("release-blocking security isolation", () => {
 
   it("does not let timeline bypass client authorization", async () => {
     const owner = await registerVerifyLogin();
-    const dietitian = await registerVerifyLogin();
+    const outsider = await registerVerifyLogin();
     const org = await createOrg(owner.cookie, "Timeline Clinic");
-    await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/members`)
-      .set("Cookie", owner.cookie)
-      .send({ email: dietitian.address, role: "DIETITIAN" })
-      .expect(201);
     const client = await createClient(owner.cookie, org.id);
 
     await request(ctx.app.getHttpServer())
       .get(`/api/v1/organizations/${org.id}/clients/${client.body.id}/timeline`)
-      .set("Cookie", dietitian.cookie)
+      .set("Cookie", outsider.cookie)
       .expect(403);
   });
 

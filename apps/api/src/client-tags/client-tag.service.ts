@@ -1,9 +1,9 @@
-import { ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import type { TenantContext } from "../organizations/tenant.types";
+import { legacyOrganizationId, tenantWhere } from "../organizations/tenant-scope";
 import { ClientAccessService } from "../clients/client-access.service";
-import { CLIENT_ACCESS_DENIED } from "../clients/client.messages";
 
 @Injectable()
 export class ClientTagService {
@@ -14,19 +14,17 @@ export class ClientTagService {
 
   async listTags(tenant: TenantContext) {
     return this.prisma.tag.findMany({
-      where: { organizationId: tenant.organizationId },
+      where: tenantWhere(tenant.organizationId),
       orderBy: { name: "asc" },
     });
   }
 
   async createTag(tenant: TenantContext, name: string, color?: string) {
-    if (tenant.role === "STAFF") {
-      throw new ForbiddenException(CLIENT_ACCESS_DENIED);
-    }
     try {
       return await this.prisma.tag.create({
         data: {
-          organizationId: tenant.organizationId,
+          dietitianAccountId: tenant.organizationId,
+          organizationId: legacyOrganizationId(tenant),
           name: name.trim(),
           color: color ?? null,
         },
@@ -42,17 +40,18 @@ export class ClientTagService {
   async setClientTags(tenant: TenantContext, clientId: string, tagIds: string[]) {
     await this.access.assertCanAccess(tenant, clientId, "update");
     const tags = await this.prisma.tag.findMany({
-      where: { id: { in: tagIds }, organizationId: tenant.organizationId },
+      where: { id: { in: tagIds }, ...tenantWhere(tenant.organizationId) },
     });
     if (tags.length !== tagIds.length) {
       throw new NotFoundException("One or more tags are invalid");
     }
     await this.prisma.$transaction(async (tx) => {
-      await tx.clientTag.deleteMany({ where: { clientId, organizationId: tenant.organizationId } });
+      await tx.clientTag.deleteMany({ where: { clientId, ...tenantWhere(tenant.organizationId) } });
       if (tags.length > 0) {
         await tx.clientTag.createMany({
           data: tags.map((tag) => ({
-            organizationId: tenant.organizationId,
+            dietitianAccountId: tenant.organizationId,
+            organizationId: legacyOrganizationId(tenant),
             clientId,
             tagId: tag.id,
           })),

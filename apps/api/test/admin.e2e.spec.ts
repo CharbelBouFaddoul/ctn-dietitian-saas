@@ -361,19 +361,29 @@ describe("platform admin, entitlements, and audit", () => {
     expect((await ctx.entitlements.resolve(org.id, FEATURE_KEYS.AI)).source).toBe("default");
   });
 
-  it("enforces one subscription row per organization", async () => {
+  it("enforces one subscription row per dietitian account", async () => {
     const owner = await registerVerifyLogin();
     const org = await createOrg(owner.cookie, "One Sub");
     const standard = await planBySlug("standard");
     const pro = await planBySlug("pro");
 
     await ctx.prisma.subscription.create({
-      data: { organizationId: org.id, planId: standard.id, status: "ACTIVE" },
+      data: {
+        dietitianAccountId: org.id,
+        organizationId: org.id,
+        planId: standard.id,
+        status: "ACTIVE",
+      },
     });
 
     await expect(
       ctx.prisma.subscription.create({
-        data: { organizationId: org.id, planId: pro.id, status: "ACTIVE" },
+        data: {
+          dietitianAccountId: org.id,
+          organizationId: org.id,
+          planId: pro.id,
+          status: "ACTIVE",
+        },
       }),
     ).rejects.toThrow(Prisma.PrismaClientKnownRequestError);
   });

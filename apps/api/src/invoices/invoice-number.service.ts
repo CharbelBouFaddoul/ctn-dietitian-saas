@@ -6,13 +6,13 @@ import { PrismaService } from "../prisma/prisma.service";
 export class InvoiceNumberService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** Concurrency-safe organization-scoped invoice number allocation. */
-  async allocate(organizationId: string, tx?: Prisma.TransactionClient): Promise<string> {
+  /** Phase 1: organizationId argument is DietitianAccount.id */
+  async allocate(dietitianAccountId: string, tx?: Prisma.TransactionClient): Promise<string> {
     const client = tx ?? this.prisma;
     const rows = await client.$queryRaw<{ allocated: number }[]>`
-      INSERT INTO invoice_sequences (organization_id, next_number, updated_at)
-      VALUES (${organizationId}::uuid, 2, NOW())
-      ON CONFLICT (organization_id) DO UPDATE
+      INSERT INTO invoice_sequences (dietitian_account_id, organization_id, next_number, updated_at)
+      VALUES (${dietitianAccountId}::uuid, ${dietitianAccountId}::uuid, 2, NOW())
+      ON CONFLICT (dietitian_account_id) DO UPDATE
       SET next_number = invoice_sequences.next_number + 1, updated_at = NOW()
       RETURNING invoice_sequences.next_number - 1 AS allocated
     `;

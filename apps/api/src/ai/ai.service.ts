@@ -29,6 +29,7 @@ import {
 } from "./ai-output.schemas";
 import { AI_PROMPT_VERSIONS, buildSystemPrompt, buildUserPrompt } from "./ai-prompts";
 import { AiUsageService } from "./ai-usage.service";
+import { legacyOrganizationId } from "../organizations/tenant-scope";
 
 export interface AiGenerationResult<T> {
   requestId: string;
@@ -157,6 +158,7 @@ export class AiService {
     if (!aiEnabled) {
       await this.recordRejected({
         organizationId,
+        legacyOrganizationId: legacyOrganizationId(input.tenant),
         userId: input.tenant.userId,
         clientId: input.clientId,
         action: input.action,
@@ -180,6 +182,7 @@ export class AiService {
     if (limit === null || limit <= 0) {
       await this.recordRejected({
         organizationId,
+        legacyOrganizationId: legacyOrganizationId(input.tenant),
         userId: input.tenant.userId,
         clientId: input.clientId,
         action: input.action,
@@ -194,6 +197,7 @@ export class AiService {
     if (!reservation.allowed) {
       await this.recordRejected({
         organizationId,
+        legacyOrganizationId: legacyOrganizationId(input.tenant),
         userId: input.tenant.userId,
         clientId: input.clientId,
         action: input.action,
@@ -215,7 +219,8 @@ export class AiService {
 
     const request = await this.prisma.aiRequest.create({
       data: {
-        organizationId,
+        dietitianAccountId: organizationId,
+        organizationId: legacyOrganizationId(input.tenant),
         userId: input.tenant.userId,
         clientId: input.clientId,
         action: input.action,
@@ -315,6 +320,7 @@ export class AiService {
 
   private async recordRejected(input: {
     organizationId: string;
+    legacyOrganizationId?: string | null;
     userId: string;
     clientId: string;
     action: AiAction;
@@ -324,7 +330,8 @@ export class AiService {
   }) {
     await this.prisma.aiRequest.create({
       data: {
-        organizationId: input.organizationId,
+        dietitianAccountId: input.organizationId,
+        organizationId: input.legacyOrganizationId ?? input.organizationId,
         userId: input.userId,
         clientId: input.clientId,
         action: input.action,

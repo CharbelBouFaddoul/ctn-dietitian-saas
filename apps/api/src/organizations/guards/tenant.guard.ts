@@ -6,17 +6,12 @@ import {
 } from "@nestjs/common";
 import type { Request } from "express";
 import { PrismaService } from "../../prisma/prisma.service";
-import { tenantWhere } from "../tenant-scope";
-import { OrganizationLifecycleService } from "../organization-lifecycle.service";
-import { ORGANIZATION_ACCESS_DENIED } from "../tenant.types";
+import { ORGANIZATION_ACCESS_DENIED, ORGANIZATION_UNAVAILABLE } from "../tenant.types";
 import type { TenantContext } from "../tenant.types";
 
 @Injectable()
 export class TenantGuard implements CanActivate {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly lifecycle: OrganizationLifecycleService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest<Request>();
@@ -31,29 +26,30 @@ export class TenantGuard implements CanActivate {
       throw new ForbiddenException(ORGANIZATION_ACCESS_DENIED);
     }
 
-    const membership = await this.prisma.organizationMember.findFirst({
+    const account = await this.prisma.dietitianAccount.findFirst({
       where: {
-        ...tenantWhere(organizationId),
+        id: organizationId,
         userId: user.id,
-        status: "ACTIVE",
       },
-      include: { organization: true },
     });
 
-    if (!membership) {
+    if (!account) {
       throw new ForbiddenException(ORGANIZATION_ACCESS_DENIED);
     }
 
-    this.lifecycle.assertOperable(membership.organization.status);
+    if (account.status !== "ACTIVE") {
+      throw new ForbiddenException(ORGANIZATION_UNAVAILABLE);
+    }
 
     const tenant: TenantContext = {
       userId: user.id,
-      organizationId: membership.organizationId,
-      organizationName: membership.organization.name,
-      organizationStatus: membership.organization.status,
-      membershipId: membership.id,
-      role: membership.role,
-      membershipStatus: membership.status,
+      organizationId: account.id,
+      organizationName: account.displayName,
+      organizationStatus: account.status,
+      membershipId: account.id,
+      role: "OWNER",
+      membershipStatus: "ACTIVE",
+      legacyOrganizationId: account.legacyOrganizationId ?? account.id,
     };
 
     req.tenant = tenant;

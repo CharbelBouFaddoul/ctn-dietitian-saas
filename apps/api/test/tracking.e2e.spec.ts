@@ -1,8 +1,9 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import { FEATURE_KEYS } from "@nutrition-saas/config";
-import { CLIENT_ACCESS_DENIED } from "../src/clients/client.messages";
+import { ORGANIZATION_ACCESS_DENIED } from "../src/organizations/tenant.types";
 import {
+  activateStandardSubscription,
   connectClientPortal,
   cookieValue,
   createAuthTestApp,
@@ -10,6 +11,7 @@ import {
   resetAuthDatabase,
   type AuthTestContext,
 } from "./app";
+import { MULTI_MEMBER_UNSUPPORTED } from "../src/organizations/organization.service";
 
 const PASSWORD = "ValidPass12";
 const SETTINGS = {
@@ -63,10 +65,7 @@ describe("Phase 8 client tracking", () => {
       .set("Cookie", cookie)
       .send({ name, settings: { ...SETTINGS, timezone } })
       .expect(201);
-    const plan = await ctx.prisma.plan.findUniqueOrThrow({ where: { slug: "standard" } });
-    await ctx.prisma.subscription.create({
-      data: { organizationId: created.body.id, planId: plan.id, status: "ACTIVE" },
-    });
+    await activateStandardSubscription(ctx.prisma, created.body.id);
     return created.body as { id: string };
   }
 
@@ -158,35 +157,22 @@ describe("Phase 8 client tracking", () => {
       .expect(403);
   });
 
-  it("enforces client access for dietitian review and blocks cross-client portal access", async () => {
+  it("enforces owner review access and blocks cross-client portal access", async () => {
     const owner = await registerVerifyLogin();
-    const dietitian = await registerVerifyLogin();
-    const staff = await registerVerifyLogin();
+    const outsider = await registerVerifyLogin();
     const org = await createOrg(owner.cookie, "Practice");
-    await request(ctx.app.getHttpServer())
+    const add = await request(ctx.app.getHttpServer())
       .post(`/api/v1/organizations/${org.id}/members`)
       .set("Cookie", owner.cookie)
-      .send({ email: dietitian.address, role: "DIETITIAN" })
-      .expect(201);
-    await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/members`)
-      .set("Cookie", owner.cookie)
-      .send({ email: staff.address, role: "STAFF" })
-      .expect(201);
-    const assigned = await createClient(owner.cookie, org.id);
-    const unassigned = await createClient(owner.cookie, org.id);
-    const dietitianCtx = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}`)
-      .set("Cookie", dietitian.cookie)
-      .expect(200);
-    await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${assigned.body.id}/assignments`)
-      .set("Cookie", owner.cookie)
-      .send({ organizationMemberId: dietitianCtx.body.context.membershipId })
-      .expect(201);
+      .send({ email: outsider.address, role: "DIETITIAN" });
+    expect(add.status).toBe(400);
+    expect(add.body.message).toBe(MULTI_MEMBER_UNSUPPORTED);
+
+    const client = await createClient(owner.cookie, org.id);
+    const other = await createClient(owner.cookie, org.id);
 
     const food = await seedFood();
-    const portal = await connectClientPortal(ctx, owner.cookie, org.id, assigned.body);
+    const portal = await connectClientPortal(ctx, owner.cookie, org.id, client.body);
     await request(ctx.app.getHttpServer())
       .post("/api/v1/portal/tracking/food-logs")
       .set("Cookie", portal)
@@ -194,23 +180,18 @@ describe("Phase 8 client tracking", () => {
       .expect(201);
 
     await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/clients/${unassigned.body.id}/tracking/summary`)
-      .set("Cookie", dietitian.cookie)
+      .get(`/api/v1/organizations/${org.id}/clients/${client.body.id}/tracking/summary`)
+      .set("Cookie", outsider.cookie)
       .expect(403)
-      .expect((res) => expect(res.body.message).toBe(CLIENT_ACCESS_DENIED));
+      .expect((res) => expect(res.body.message).toBe(ORGANIZATION_ACCESS_DENIED));
 
     const ownerSummary = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/clients/${assigned.body.id}/tracking/summary`)
+      .get(`/api/v1/organizations/${org.id}/clients/${client.body.id}/tracking/summary`)
       .set("Cookie", owner.cookie)
       .expect(200);
     expect(ownerSummary.body.food.presented.energyKcal).toBe(248);
 
-    await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/clients/${assigned.body.id}/tracking/summary`)
-      .set("Cookie", staff.cookie)
-      .expect(403);
-
-    const otherPortal = await connectClientPortal(ctx, owner.cookie, org.id, unassigned.body);
+    const otherPortal = await connectClientPortal(ctx, owner.cookie, org.id, other.body);
     const otherSummary = await request(ctx.app.getHttpServer())
       .get("/api/v1/portal/tracking/summary")
       .set("Cookie", otherPortal)

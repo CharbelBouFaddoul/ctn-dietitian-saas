@@ -13,8 +13,9 @@ export class TrackingTimezoneService {
   constructor(private readonly prisma: PrismaService) {}
 
   async timezoneForClient(client: Client): Promise<string> {
-    const settings = await this.prisma.organizationSettings.findUnique({
-      where: { organizationId: client.organizationId },
+    const dietitianAccountId = client.dietitianAccountId ?? client.organizationId;
+    const settings = await this.prisma.dietitianSettings.findUnique({
+      where: { dietitianAccountId },
       select: { timezone: true },
     });
     return settings?.timezone ?? "UTC";
@@ -46,7 +47,7 @@ export class FoodLogService {
     const trackingDate = this.timezone.parseTrackingDate(date);
     const rows = await this.prisma.foodLog.findMany({
       where: {
-        organizationId: client.organizationId,
+        dietitianAccountId: client.dietitianAccountId ?? client.organizationId,
         clientId: client.id,
         trackingDate,
         status: "ACTIVE",
@@ -73,14 +74,16 @@ export class FoodLogService {
       throw new BadRequestException("consumedAt must be a valid timestamp");
     }
     const timeZone = await this.timezone.timezoneForClient(client);
+    const dietitianAccountId = client.dietitianAccountId ?? client.organizationId;
     const snapshot = await this.nutrition.buildSnapshot(
-      client.organizationId,
+      dietitianAccountId,
       input.foodId,
       input.quantity,
       input.unit,
     );
     const row = await this.prisma.foodLog.create({
       data: {
+        dietitianAccountId,
         organizationId: client.organizationId,
         clientId: client.id,
         foodId: input.foodId,
@@ -94,7 +97,8 @@ export class FoodLogService {
       },
     });
     await this.timeline.record({
-      organizationId: client.organizationId,
+      organizationId: dietitianAccountId,
+      legacyOrganizationId: client.organizationId,
       clientId: client.id,
       type: "FOOD_LOGGED",
       actorUserId,
@@ -155,7 +159,7 @@ export class FoodLogService {
     const row = await this.prisma.foodLog.findFirst({
       where: {
         id: logId,
-        organizationId: client.organizationId,
+        dietitianAccountId: client.dietitianAccountId ?? client.organizationId,
         clientId: client.id,
         status: "ACTIVE",
       },

@@ -4,6 +4,7 @@ import { FEATURE_KEYS } from "@nutrition-saas/config";
 import { AutomationExecutorService } from "../src/automation/automation-executor.service";
 import { AutomationSweepService } from "../src/automation/automation-sweep.service";
 import {
+  activateSubscription,
   connectClientPortal,
   cookieValue,
   createAuthTestApp,
@@ -11,6 +12,8 @@ import {
   resetAuthDatabase,
   type AuthTestContext,
 } from "./app";
+import { MULTI_MEMBER_UNSUPPORTED } from "../src/organizations/organization.service";
+import { ORGANIZATION_ACCESS_DENIED } from "../src/organizations/tenant.types";
 
 const PASSWORD = "ValidPass12";
 const SETTINGS = {
@@ -76,10 +79,7 @@ describe("Phase 12 automation", () => {
       .set("Cookie", cookie)
       .send({ name, settings: SETTINGS })
       .expect(201);
-    const plan = await ctx.prisma.plan.findUniqueOrThrow({ where: { slug: planSlug } });
-    await ctx.prisma.subscription.create({
-      data: { organizationId: created.body.id, planId: plan.id, status: "ACTIVE" },
-    });
+    await activateSubscription(ctx.prisma, created.body.id, planSlug);
     return created.body as { id: string };
   }
 
@@ -106,26 +106,28 @@ describe("Phase 12 automation", () => {
       });
   }
 
-  it("rejects automation management for standard plan and staff", async () => {
-    const owner = await registerVerifyLogin();
-    const staffEmail = email("staff");
-    const standardOrg = await createOrg(owner.cookie, "Standard Org", "standard");
-    const proOrg = await createOrg(owner.cookie, "Pro Org", "pro");
+  it("rejects automation management for standard plan and outsiders", async () => {
+    const standardOwner = await registerVerifyLogin();
+    const proOwner = await registerVerifyLogin();
+    const outsider = await registerVerifyLogin();
+    const standardOrg = await createOrg(standardOwner.cookie, "Standard Org", "standard");
+    const proOrg = await createOrg(proOwner.cookie, "Pro Org", "pro");
 
-    await createRule(owner.cookie, standardOrg.id).expect(403);
-    await createRule(owner.cookie, proOrg.id).expect(201);
+    await createRule(standardOwner.cookie, standardOrg.id).expect(403);
+    await createRule(proOwner.cookie, proOrg.id).expect(201);
 
-    await registerVerifyLogin(staffEmail);
-    await ctx.memberships.add(proOrg.id, owner.userId, staffEmail, "STAFF");
-    const staffLogin = await request(ctx.app.getHttpServer())
-      .post("/api/v1/auth/login")
-      .send({ email: staffEmail, password: PASSWORD });
-    const staffCookie = `ns_session=${cookieValue(staffLogin.headers["set-cookie"])}`;
+    const add = await request(ctx.app.getHttpServer())
+      .post(`/api/v1/organizations/${proOrg.id}/members`)
+      .set("Cookie", proOwner.cookie)
+      .send({ email: outsider.address, role: "STAFF" });
+    expect(add.status).toBe(400);
+    expect(add.body.message).toBe(MULTI_MEMBER_UNSUPPORTED);
 
     await request(ctx.app.getHttpServer())
       .get(`/api/v1/organizations/${proOrg.id}/automations`)
-      .set("Cookie", staffCookie)
-      .expect(403);
+      .set("Cookie", outsider.cookie)
+      .expect(403)
+      .expect((res) => expect(res.body.message).toBe(ORGANIZATION_ACCESS_DENIED));
   });
 
   it("isolates automation rules between organizations", async () => {
@@ -197,7 +199,10 @@ describe("Phase 12 automation", () => {
     expect(run?.status).toBe("SKIPPED");
 
     await ctx.prisma.client.update({ where: { id: client.id }, data: { status: "ACTIVE", archivedAt: null } });
-    await ctx.prisma.organization.update({ where: { id: org.id }, data: { status: "SUSPENDED", suspendedAt: new Date() } });
+    await ctx.prisma.dietitianAccount.update({
+      where: { id: org.id },
+      data: { status: "SUSPENDED", suspendedAt: new Date() },
+    });
     await executor.executeCandidate(rule, {
       triggerKey: `client-inactive:${client.id}:2026-08-19`,
       clientId: client.id,
@@ -223,6 +228,7 @@ describe("Phase 12 automation", () => {
 
     const appointment = await ctx.prisma.appointment.create({
       data: {
+        dietitianAccountId: org.id,
         organizationId: org.id,
         clientId: client.id,
         title: "Consult",
@@ -263,6 +269,7 @@ describe("Phase 12 automation", () => {
     });
     await ctx.prisma.featureOverride.create({
       data: {
+        dietitianAccountId: org.id,
         organizationId: org.id,
         featureId: feature.id,
         enabled: true,

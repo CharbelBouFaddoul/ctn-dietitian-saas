@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
@@ -8,11 +7,9 @@ import type { Prisma, QuantityUnit } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { SecurityEventLogger } from "../auth/security-event.logger";
 import type { TenantContext } from "../organizations/tenant.types";
-import { tenantWhere } from "../organizations/tenant-scope";
+import { legacyOrganizationId, tenantWhere } from "../organizations/tenant-scope";
 import { RecipeNutritionService } from "./recipe-nutrition.service";
 import { isFoodQuantityUnit } from "./recipe-nutrition.service";
-
-const STAFF_CANNOT_MANAGE = "Staff cannot manage recipes";
 
 export interface RecipeWriteInput {
   name?: string;
@@ -77,7 +74,7 @@ export class RecipeService {
   async get(tenant: TenantContext, recipeId: string) {
     const recipe = await this.requireRecipe(tenant.organizationId, recipeId);
     const ingredients = await this.prisma.recipeIngredient.findMany({
-      where: { recipeId, organizationId: tenant.organizationId },
+      where: { recipeId, ...tenantWhere(tenant.organizationId) },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
     });
     const calculated = await this.nutrition.calculate(tenant.organizationId, recipe, ingredients);
@@ -100,7 +97,8 @@ export class RecipeService {
     this.assertServings(input.servings);
     const recipe = await this.prisma.recipe.create({
       data: {
-        organizationId: tenant.organizationId,
+        dietitianAccountId: tenant.organizationId,
+        organizationId: legacyOrganizationId(tenant),
         name: input.name.trim(),
         description: input.description ?? null,
         instructions: input.instructions ?? null,
@@ -113,6 +111,7 @@ export class RecipeService {
       outcome: "success",
       userId: tenant.userId,
       organizationId: tenant.organizationId,
+      dietitianAccountId: tenant.organizationId,
       targetType: "recipe",
       targetId: recipe.id,
       metadata: { name: recipe.name },
@@ -143,6 +142,7 @@ export class RecipeService {
       outcome: "success",
       userId: tenant.userId,
       organizationId: tenant.organizationId,
+      dietitianAccountId: tenant.organizationId,
       targetType: "recipe",
       targetId: recipe.id,
     });
@@ -161,6 +161,7 @@ export class RecipeService {
       outcome: "success",
       userId: tenant.userId,
       organizationId: tenant.organizationId,
+      dietitianAccountId: tenant.organizationId,
       targetType: "recipe",
       targetId: recipe.id,
     });
@@ -171,13 +172,14 @@ export class RecipeService {
     this.assertCanManage(tenant);
     const recipe = await this.requireRecipe(tenant.organizationId, recipeId);
     const ingredients = await this.prisma.recipeIngredient.findMany({
-      where: { recipeId: recipe.id, organizationId: tenant.organizationId },
+      where: { recipeId: recipe.id, ...tenantWhere(tenant.organizationId) },
       orderBy: { sortOrder: "asc" },
     });
     const copy = await this.prisma.$transaction(async (tx) => {
       const created = await tx.recipe.create({
         data: {
-          organizationId: tenant.organizationId,
+          dietitianAccountId: tenant.organizationId,
+          organizationId: legacyOrganizationId(tenant),
           name: `${recipe.name} (copy)`,
           description: recipe.description,
           instructions: recipe.instructions,
@@ -188,7 +190,8 @@ export class RecipeService {
       if (ingredients.length > 0) {
         await tx.recipeIngredient.createMany({
           data: ingredients.map((row) => ({
-            organizationId: tenant.organizationId,
+            dietitianAccountId: tenant.organizationId,
+            organizationId: legacyOrganizationId(tenant),
             recipeId: created.id,
             foodId: row.foodId,
             quantity: row.quantity,
@@ -205,6 +208,7 @@ export class RecipeService {
       outcome: "success",
       userId: tenant.userId,
       organizationId: tenant.organizationId,
+      dietitianAccountId: tenant.organizationId,
       targetType: "recipe",
       targetId: copy.id,
       metadata: { duplicatedFrom: recipe.id },
@@ -231,12 +235,13 @@ export class RecipeService {
 
     await this.prisma.$transaction(async (tx) => {
       await tx.recipeIngredient.deleteMany({
-        where: { recipeId: recipe.id, organizationId: tenant.organizationId },
+        where: { recipeId: recipe.id, ...tenantWhere(tenant.organizationId) },
       });
       if (items.length > 0) {
         await tx.recipeIngredient.createMany({
           data: items.map((item, index) => ({
-            organizationId: tenant.organizationId,
+            dietitianAccountId: tenant.organizationId,
+            organizationId: legacyOrganizationId(tenant),
             recipeId: recipe.id,
             foodId: item.foodId,
             quantity: item.quantity,
@@ -252,6 +257,7 @@ export class RecipeService {
       outcome: "success",
       userId: tenant.userId,
       organizationId: tenant.organizationId,
+      dietitianAccountId: tenant.organizationId,
       targetType: "recipe",
       targetId: recipe.id,
       metadata: { fields: ["ingredients"] },
@@ -277,10 +283,7 @@ export class RecipeService {
     return recipe;
   }
 
-  private assertCanManage(tenant: TenantContext) {
-    if (tenant.role === "STAFF") {
-      throw new ForbiddenException(STAFF_CANNOT_MANAGE);
-    }
+  private assertCanManage(_tenant: TenantContext) {
   }
 
   private assertServings(servings: number) {

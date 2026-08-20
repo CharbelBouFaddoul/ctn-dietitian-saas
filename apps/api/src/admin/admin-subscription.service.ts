@@ -5,6 +5,7 @@ import { SecurityEventLogger } from "../auth/security-event.logger";
 import type { AdminActor } from "./admin-actor";
 import { ADMIN_MESSAGES } from "./admin.messages";
 
+/** Phase 1: organizationId argument is DietitianAccount.id */
 @Injectable()
 export class AdminSubscriptionService {
   constructor(
@@ -16,7 +17,7 @@ export class AdminSubscriptionService {
     const subscriptions = await this.prisma.subscription.findMany({
       include: {
         plan: true,
-        organization: true,
+        dietitianAccount: true,
       },
       orderBy: { createdAt: "desc" },
       take: 100,
@@ -25,11 +26,13 @@ export class AdminSubscriptionService {
     return subscriptions.map((subscription) => ({
       id: subscription.id,
       status: subscription.status,
-      organization: {
-        id: subscription.organization.id,
-        name: subscription.organization.name,
-        slug: subscription.organization.slug,
-      },
+      organization: subscription.dietitianAccount
+        ? {
+            id: subscription.dietitianAccount.id,
+            name: subscription.dietitianAccount.displayName,
+            slug: subscription.dietitianAccount.slug,
+          }
+        : null,
       plan: {
         id: subscription.plan.id,
         name: subscription.plan.name,
@@ -42,16 +45,16 @@ export class AdminSubscriptionService {
   }
 
   async getForOrganization(organizationId: string) {
-    await this.requireOrganization(organizationId);
+    await this.requireAccount(organizationId);
     const subscription = await this.prisma.subscription.findUnique({
-      where: { organizationId },
+      where: { dietitianAccountId: organizationId },
       include: { plan: true },
     });
     return subscription ? this.toResponse(subscription) : null;
   }
 
   async assign(organizationId: string, planId: string, actor: AdminActor, status: SubscriptionStatus = "ACTIVE") {
-    await this.requireOrganization(organizationId);
+    const account = await this.requireAccount(organizationId);
     const plan = await this.prisma.plan.findUnique({ where: { id: planId } });
     if (!plan) {
       throw new NotFoundException(ADMIN_MESSAGES.planNotFound);
@@ -60,7 +63,9 @@ export class AdminSubscriptionService {
       throw new BadRequestException(ADMIN_MESSAGES.planNotAssignable);
     }
 
-    const existing = await this.prisma.subscription.findUnique({ where: { organizationId } });
+    const existing = await this.prisma.subscription.findUnique({
+      where: { dietitianAccountId: organizationId },
+    });
     const now = new Date();
     const subscription = existing
       ? await this.prisma.subscription.update({
@@ -76,7 +81,8 @@ export class AdminSubscriptionService {
         })
       : await this.prisma.subscription.create({
           data: {
-            organizationId,
+            dietitianAccountId: organizationId,
+            organizationId: account.legacyOrganizationId ?? organizationId,
             planId,
             status,
             startedAt: status === "ACTIVE" ? now : null,
@@ -90,6 +96,7 @@ export class AdminSubscriptionService {
       outcome: "success",
       userId: actor.userId,
       organizationId,
+      dietitianAccountId: organizationId,
       ipAddress: actor.ipAddress,
       userAgent: actor.userAgent,
       requestId: actor.requestId,
@@ -103,7 +110,7 @@ export class AdminSubscriptionService {
 
   async setStatus(organizationId: string, status: SubscriptionStatus, actor: AdminActor) {
     const existing = await this.prisma.subscription.findUnique({
-      where: { organizationId },
+      where: { dietitianAccountId: organizationId },
       include: { plan: true },
     });
     if (!existing) {
@@ -127,6 +134,7 @@ export class AdminSubscriptionService {
       outcome: "success",
       userId: actor.userId,
       organizationId,
+      dietitianAccountId: organizationId,
       ipAddress: actor.ipAddress,
       userAgent: actor.userAgent,
       requestId: actor.requestId,
@@ -151,16 +159,20 @@ export class AdminSubscriptionService {
     return "subscription_changed";
   }
 
-  private async requireOrganization(organizationId: string) {
-    const organization = await this.prisma.organization.findUnique({ where: { id: organizationId } });
-    if (!organization) {
+  private async requireAccount(dietitianAccountId: string) {
+    const account = await this.prisma.dietitianAccount.findUnique({
+      where: { id: dietitianAccountId },
+    });
+    if (!account) {
       throw new NotFoundException(ADMIN_MESSAGES.organizationNotFound);
     }
+    return account;
   }
 
   private toResponse(subscription: {
     id: string;
-    organizationId: string;
+    organizationId: string | null;
+    dietitianAccountId?: string | null;
     status: string;
     startedAt: Date | null;
     cancelledAt: Date | null;
@@ -174,7 +186,7 @@ export class AdminSubscriptionService {
   }) {
     return {
       id: subscription.id,
-      organizationId: subscription.organizationId,
+      organizationId: subscription.dietitianAccountId ?? subscription.organizationId,
       status: subscription.status,
       startedAt: subscription.startedAt?.toISOString() ?? null,
       cancelledAt: subscription.cancelledAt?.toISOString() ?? null,

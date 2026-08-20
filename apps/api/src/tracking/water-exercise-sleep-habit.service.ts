@@ -3,7 +3,6 @@ import type { Client, ExerciseIntensity } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { TimelineService } from "../timeline/timeline.service";
 import { TrackingTimezoneService } from "./food-log.service";
-
 function toMl(amount: number, unit: "ml" | "l"): number {
   return unit === "l" ? amount * 1000 : amount;
 }
@@ -19,7 +18,7 @@ export class WaterLogService {
   async listForClient(client: Client, date: string) {
     const trackingDate = this.timezone.parseTrackingDate(date);
     const rows = await this.prisma.waterLog.findMany({
-      where: { organizationId: client.organizationId, clientId: client.id, trackingDate, status: "ACTIVE" },
+      where: { dietitianAccountId: client.dietitianAccountId ?? client.organizationId, clientId: client.id, trackingDate, status: "ACTIVE" },
       orderBy: { loggedAt: "asc" },
     });
     return rows.map((row) => this.toResponse(row));
@@ -40,6 +39,7 @@ export class WaterLogService {
     const timeZone = await this.timezone.timezoneForClient(client);
     const row = await this.prisma.waterLog.create({
       data: {
+        dietitianAccountId: client.dietitianAccountId ?? client.organizationId,
         organizationId: client.organizationId,
         clientId: client.id,
         amountMl: toMl(input.amount, input.unit),
@@ -93,7 +93,7 @@ export class WaterLogService {
 
   private async requireActive(client: Client, logId: string) {
     const row = await this.prisma.waterLog.findFirst({
-      where: { id: logId, organizationId: client.organizationId, clientId: client.id, status: "ACTIVE" },
+      where: { id: logId, dietitianAccountId: client.dietitianAccountId ?? client.organizationId, clientId: client.id, status: "ACTIVE" },
     });
     if (!row) throw new NotFoundException("Water log not found");
     return row;
@@ -133,7 +133,7 @@ export class ExerciseLogService {
   async listForClient(client: Client, date: string) {
     const trackingDate = this.timezone.parseTrackingDate(date);
     const rows = await this.prisma.exerciseLog.findMany({
-      where: { organizationId: client.organizationId, clientId: client.id, trackingDate, status: "ACTIVE" },
+      where: { dietitianAccountId: client.dietitianAccountId ?? client.organizationId, clientId: client.id, trackingDate, status: "ACTIVE" },
       orderBy: { performedAt: "asc" },
     });
     return rows.map((row) => this.toResponse(row));
@@ -161,6 +161,7 @@ export class ExerciseLogService {
     const timeZone = await this.timezone.timezoneForClient(client);
     const row = await this.prisma.exerciseLog.create({
       data: {
+        dietitianAccountId: client.dietitianAccountId ?? client.organizationId,
         organizationId: client.organizationId,
         clientId: client.id,
         activityType: input.activityType.trim(),
@@ -230,7 +231,7 @@ export class ExerciseLogService {
 
   private async requireActive(client: Client, logId: string) {
     const row = await this.prisma.exerciseLog.findFirst({
-      where: { id: logId, organizationId: client.organizationId, clientId: client.id, status: "ACTIVE" },
+      where: { id: logId, dietitianAccountId: client.dietitianAccountId ?? client.organizationId, clientId: client.id, status: "ACTIVE" },
     });
     if (!row) throw new NotFoundException("Exercise log not found");
     return row;
@@ -284,7 +285,7 @@ export class SleepLogService {
   async getForClient(client: Client, date: string) {
     const sleepDate = this.timezone.parseTrackingDate(date);
     const row = await this.prisma.sleepLog.findFirst({
-      where: { organizationId: client.organizationId, clientId: client.id, date: sleepDate, status: "ACTIVE" },
+      where: { dietitianAccountId: client.dietitianAccountId ?? client.organizationId, clientId: client.id, date: sleepDate, status: "ACTIVE" },
     });
     return row ? this.toResponse(row) : null;
   }
@@ -322,7 +323,7 @@ export class SleepLogService {
     }
 
     const existing = await this.prisma.sleepLog.findFirst({
-      where: { organizationId: client.organizationId, clientId: client.id, date: sleepDate },
+      where: { dietitianAccountId: client.dietitianAccountId ?? client.organizationId, clientId: client.id, date: sleepDate },
     });
     const row = existing
       ? await this.prisma.sleepLog.update({
@@ -339,6 +340,7 @@ export class SleepLogService {
         })
       : await this.prisma.sleepLog.create({
           data: {
+            dietitianAccountId: client.dietitianAccountId ?? client.organizationId,
             organizationId: client.organizationId,
             clientId: client.id,
             date: sleepDate,
@@ -352,6 +354,7 @@ export class SleepLogService {
 
     if (!existing) {
       await this.timeline.record({
+        dietitianAccountId: client.dietitianAccountId ?? client.organizationId,
         organizationId: client.organizationId,
         clientId: client.id,
         type: "SLEEP_LOGGED",
@@ -365,7 +368,7 @@ export class SleepLogService {
 
   async archiveForClient(client: Client, logId: string) {
     const row = await this.prisma.sleepLog.findFirst({
-      where: { id: logId, organizationId: client.organizationId, clientId: client.id, status: "ACTIVE" },
+      where: { id: logId, dietitianAccountId: client.dietitianAccountId ?? client.organizationId, clientId: client.id, status: "ACTIVE" },
     });
     if (!row) throw new NotFoundException("Sleep log not found");
     const updated = await this.prisma.sleepLog.update({
@@ -413,7 +416,7 @@ export class HabitLogService {
   async listForClient(client: Client, date: string) {
     const logDate = this.timezone.parseTrackingDate(date);
     const rows = await this.prisma.habitLog.findMany({
-      where: { organizationId: client.organizationId, clientId: client.id, logDate, status: "ACTIVE" },
+      where: { dietitianAccountId: client.dietitianAccountId ?? client.organizationId, clientId: client.id, logDate, status: "ACTIVE" },
       orderBy: { habitLabel: "asc" },
     });
     return rows.map((row) => this.toResponse(row));
@@ -431,7 +434,7 @@ export class HabitLogService {
     }
     const existing = await this.prisma.habitLog.findFirst({
       where: {
-        organizationId: client.organizationId,
+        dietitianAccountId: client.dietitianAccountId ?? client.organizationId,
         clientId: client.id,
         habitKey,
         logDate,
@@ -451,6 +454,7 @@ export class HabitLogService {
         })
       : await this.prisma.habitLog.create({
           data: {
+            dietitianAccountId: client.dietitianAccountId ?? client.organizationId,
             organizationId: client.organizationId,
             clientId: client.id,
             habitKey,
@@ -464,6 +468,7 @@ export class HabitLogService {
 
     if (input.completed && (!existing || !existing.completed)) {
       await this.timeline.record({
+        dietitianAccountId: client.dietitianAccountId ?? client.organizationId,
         organizationId: client.organizationId,
         clientId: client.id,
         type: "HABIT_COMPLETED",

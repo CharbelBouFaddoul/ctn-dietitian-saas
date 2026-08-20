@@ -9,7 +9,14 @@ export class AdminAuditService {
   async list(filters: { q?: string; action?: string; organizationId?: string }) {
     const where: Prisma.AuditLogWhereInput = {
       ...(filters.action ? { action: filters.action } : {}),
-      ...(filters.organizationId ? { organizationId: filters.organizationId } : {}),
+      ...(filters.organizationId
+        ? {
+            OR: [
+              { dietitianAccountId: filters.organizationId },
+              { organizationId: filters.organizationId },
+            ],
+          }
+        : {}),
       ...(filters.q
         ? {
             OR: [
@@ -23,7 +30,7 @@ export class AdminAuditService {
 
     const logs = await this.prisma.auditLog.findMany({
       where,
-      include: { actor: true, organization: true },
+      include: { actor: true, dietitianAccount: true },
       orderBy: { createdAt: "desc" },
       take: 200,
     });
@@ -42,8 +49,12 @@ export class AdminAuditService {
       actor: log.actor
         ? { id: log.actor.id, email: log.actor.email, platformRole: log.actor.platformRole }
         : null,
-      organization: log.organization
-        ? { id: log.organization.id, name: log.organization.name, slug: log.organization.slug }
+      organization: log.dietitianAccount
+        ? {
+            id: log.dietitianAccount.id,
+            name: log.dietitianAccount.displayName,
+            slug: log.dietitianAccount.slug,
+          }
         : null,
     }));
   }

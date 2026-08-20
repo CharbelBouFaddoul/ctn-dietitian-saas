@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import {
+  activateSubscription,
   cookieValue,
   createAuthTestApp,
   extractEmailedToken,
@@ -94,10 +95,7 @@ describe("ai and messaging rate limiting", () => {
       .set("Cookie", cookie)
       .send({ name: "Rate Limit Clinic", settings: SETTINGS })
       .expect(201);
-    const plan = await ctx.prisma.plan.findUniqueOrThrow({ where: { slug: "pro" } });
-    await ctx.prisma.subscription.create({
-      data: { organizationId: org.body.id, planId: plan.id, status: "ACTIVE" },
-    });
+    await activateSubscription(ctx.prisma, org.body.id, "pro");
     const client = await request(ctx.app.getHttpServer())
       .post(`/api/v1/organizations/${org.body.id}/clients`)
       .set("Cookie", cookie)

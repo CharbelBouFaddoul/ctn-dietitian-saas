@@ -19,7 +19,9 @@ export interface CreateInvitationInput {
   createdById?: string;
   ttlSeconds?: number;
   clientId?: string;
+  /** DietitianAccount.id (Phase 1 path id). Also written to organizationId for legacy. */
   organizationId?: string;
+  dietitianAccountId?: string;
 }
 
 @Injectable()
@@ -59,15 +61,27 @@ export class InvitationService {
     });
   }
 
-  async deleteUnusedPracticeInvites(organizationId: string): Promise<void> {
+  /** Phase 1: organizationId argument is DietitianAccount.id */
+  async deleteUnusedPracticeInvites(dietitianAccountId: string): Promise<void> {
     await this.prisma.invitationToken.deleteMany({
-      where: { organizationId, purpose: "CLIENT_INVITE", clientId: null, usedAt: null },
+      where: {
+        OR: [{ dietitianAccountId }, { organizationId: dietitianAccountId }],
+        purpose: "CLIENT_INVITE",
+        clientId: null,
+        usedAt: null,
+      },
     });
   }
 
-  async findOpenPracticeInvite(organizationId: string): Promise<InvitationToken | null> {
+  /** Phase 1: organizationId argument is DietitianAccount.id */
+  async findOpenPracticeInvite(dietitianAccountId: string): Promise<InvitationToken | null> {
     return this.prisma.invitationToken.findFirst({
-      where: { organizationId, purpose: "CLIENT_INVITE", clientId: null, usedAt: null },
+      where: {
+        OR: [{ dietitianAccountId }, { organizationId: dietitianAccountId }],
+        purpose: "CLIENT_INVITE",
+        clientId: null,
+        usedAt: null,
+      },
       orderBy: { createdAt: "desc" },
     });
   }
@@ -97,6 +111,7 @@ export class InvitationService {
 
   private async insert(input: CreateInvitationInput, tokenHash: string): Promise<InvitationToken> {
     const ttl = input.ttlSeconds ?? this.config.get("INVITATION_TTL_SECONDS", { infer: true }) ?? 60 * 60 * 24 * 7;
+    const dietitianAccountId = input.dietitianAccountId ?? input.organizationId ?? null;
     return this.prisma.invitationToken.create({
       data: {
         tokenHash,
@@ -104,7 +119,8 @@ export class InvitationService {
         emailNormalized: input.emailNormalized,
         createdById: input.createdById,
         clientId: input.clientId,
-        organizationId: input.organizationId,
+        dietitianAccountId,
+        organizationId: input.organizationId ?? dietitianAccountId,
         expiresAt: new Date(Date.now() + ttl * 1000),
       },
     });

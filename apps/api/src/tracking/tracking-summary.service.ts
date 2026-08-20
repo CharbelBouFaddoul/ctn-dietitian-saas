@@ -5,7 +5,6 @@ import type { Client } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { parseFoodLogNutritionSnapshot } from "./food-log-nutrition.service";
 import { TrackingTimezoneService } from "./food-log.service";
-
 @Injectable()
 export class TrackingSummaryService {
   constructor(
@@ -20,23 +19,23 @@ export class TrackingSummaryService {
 
     const [foodLogs, waterLogs, exerciseLogs, sleepLog, habitLogs, goals] = await Promise.all([
       this.prisma.foodLog.findMany({
-        where: { organizationId: client.organizationId, clientId: client.id, trackingDate, status: "ACTIVE" },
+        where: { dietitianAccountId: client.dietitianAccountId ?? client.organizationId, clientId: client.id, trackingDate, status: "ACTIVE" },
         orderBy: { consumedAt: "asc" },
       }),
       this.prisma.waterLog.findMany({
-        where: { organizationId: client.organizationId, clientId: client.id, trackingDate, status: "ACTIVE" },
+        where: { dietitianAccountId: client.dietitianAccountId ?? client.organizationId, clientId: client.id, trackingDate, status: "ACTIVE" },
       }),
       this.prisma.exerciseLog.findMany({
-        where: { organizationId: client.organizationId, clientId: client.id, trackingDate, status: "ACTIVE" },
+        where: { dietitianAccountId: client.dietitianAccountId ?? client.organizationId, clientId: client.id, trackingDate, status: "ACTIVE" },
       }),
       this.prisma.sleepLog.findFirst({
-        where: { organizationId: client.organizationId, clientId: client.id, date: trackingDate, status: "ACTIVE" },
+        where: { dietitianAccountId: client.dietitianAccountId ?? client.organizationId, clientId: client.id, date: trackingDate, status: "ACTIVE" },
       }),
       this.prisma.habitLog.findMany({
-        where: { organizationId: client.organizationId, clientId: client.id, logDate: trackingDate, status: "ACTIVE" },
+        where: { dietitianAccountId: client.dietitianAccountId ?? client.organizationId, clientId: client.id, logDate: trackingDate, status: "ACTIVE" },
       }),
       this.prisma.clientGoal.findMany({
-        where: { organizationId: client.organizationId, clientId: client.id, status: "ACTIVE" },
+        where: { dietitianAccountId: client.dietitianAccountId ?? client.organizationId, clientId: client.id, status: "ACTIVE" },
         select: { title: true, targetValue: true, targetUnit: true },
       }),
     ]);

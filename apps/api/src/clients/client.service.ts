@@ -10,7 +10,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { SecurityEventLogger } from "../auth/security-event.logger";
 import { EntitlementService } from "../entitlements/entitlement.service";
 import type { TenantContext } from "../organizations/tenant.types";
-import { tenantWhere } from "../organizations/tenant-scope";
+import { legacyOrganizationId, tenantWhere } from "../organizations/tenant-scope";
 import { TimelineService } from "../timeline/timeline.service";
 import { ClientAccessService } from "./client-access.service";
 import {
@@ -37,13 +37,6 @@ export class ClientService {
       ...this.access.visibleWhere(tenant),
       ...(query.status ? { status: query.status } : {}),
       ...(query.tagId ? { tags: { some: { tagId: query.tagId } } } : {}),
-      ...(query.assignedMemberId
-        ? {
-            assignments: {
-              some: { organizationMemberId: query.assignedMemberId, unassignedAt: null },
-            },
-          }
-        : {}),
       ...(query.q
         ? {
             OR: [
@@ -116,15 +109,12 @@ export class ClientService {
     this.access.assertCanCreate(tenant);
     await this.assertClientLimit(tenant.organizationId);
 
-    const assignedMemberId = input.assignedMemberId ?? (tenant.role === "DIETITIAN" ? tenant.membershipId : undefined);
-    if (assignedMemberId) {
-      await this.requireMember(tenant.organizationId, assignedMemberId);
-    }
-
+    // Phase 1: assignedMemberId is ignored (no multi-member assignments).
     const client = await this.prisma.$transaction(async (tx) => {
       const created = await tx.client.create({
         data: {
-          organizationId: tenant.organizationId,
+          dietitianAccountId: tenant.organizationId,
+          organizationId: legacyOrganizationId(tenant),
           firstName: input.firstName.trim(),
           lastName: input.lastName.trim(),
           displayName: input.displayName?.trim() || `${input.firstName.trim()} ${input.lastName.trim()}`,
@@ -138,30 +128,24 @@ export class ClientService {
       });
 
       await tx.clientProfile.create({
-        data: { organizationId: tenant.organizationId, clientId: created.id },
+        data: {
+          dietitianAccountId: tenant.organizationId,
+          organizationId: legacyOrganizationId(tenant),
+          clientId: created.id,
+        },
       });
-
-      if (assignedMemberId) {
-        await tx.clientAssignment.create({
-          data: {
-            organizationId: tenant.organizationId,
-            clientId: created.id,
-            organizationMemberId: assignedMemberId,
-            assignedById: tenant.userId,
-          },
-        });
-      }
 
       if (input.tagIds?.length) {
         const tags = await tx.tag.findMany({
-          where: { id: { in: input.tagIds }, organizationId: tenant.organizationId },
+          where: { id: { in: input.tagIds }, ...tenantWhere(tenant.organizationId) },
         });
         if (tags.length !== input.tagIds.length) {
           throw new BadRequestException("One or more tags are invalid");
         }
         await tx.clientTag.createMany({
           data: tags.map((tag) => ({
-            organizationId: tenant.organizationId,
+            dietitianAccountId: tenant.organizationId,
+            organizationId: legacyOrganizationId(tenant),
             clientId: created.id,
             tagId: tag.id,
           })),
@@ -173,6 +157,7 @@ export class ClientService {
 
     await this.timeline.record({
       organizationId: tenant.organizationId,
+      legacyOrganizationId: legacyOrganizationId(tenant),
       clientId: client.id,
       type: "CLIENT_CREATED",
       actorUserId: tenant.userId,
@@ -180,21 +165,12 @@ export class ClientService {
       targetId: client.id,
       metadata: { status: client.status },
     });
-    if (assignedMemberId) {
-      await this.timeline.record({
-        organizationId: tenant.organizationId,
-        clientId: client.id,
-        type: "CLIENT_ASSIGNED",
-        actorUserId: tenant.userId,
-        targetType: "assignment",
-        metadata: { organizationMemberId: assignedMemberId },
-      });
-    }
     await this.security.record({
       type: "client_created",
       outcome: "success",
       userId: tenant.userId,
       organizationId: tenant.organizationId,
+      dietitianAccountId: tenant.organizationId,
       targetType: "client",
       targetId: client.id,
       metadata: { status: client.status },
@@ -219,6 +195,7 @@ export class ClientService {
     });
     await this.timeline.record({
       organizationId: tenant.organizationId,
+      legacyOrganizationId: legacyOrganizationId(tenant),
       clientId,
       type: "CLIENT_UPDATED",
       actorUserId: tenant.userId,
@@ -230,6 +207,7 @@ export class ClientService {
       outcome: "success",
       userId: tenant.userId,
       organizationId: tenant.organizationId,
+      dietitianAccountId: tenant.organizationId,
       targetType: "client",
       targetId: clientId,
     });
@@ -261,6 +239,7 @@ export class ClientService {
     });
     await this.timeline.record({
       organizationId: tenant.organizationId,
+      legacyOrganizationId: legacyOrganizationId(tenant),
       clientId,
       type: "CLIENT_ARCHIVED",
       actorUserId: tenant.userId,
@@ -273,6 +252,7 @@ export class ClientService {
       outcome: "success",
       userId: tenant.userId,
       organizationId: tenant.organizationId,
+      dietitianAccountId: tenant.organizationId,
       targetType: "client",
       targetId: clientId,
     });
@@ -293,6 +273,7 @@ export class ClientService {
     });
     await this.timeline.record({
       organizationId: tenant.organizationId,
+      legacyOrganizationId: legacyOrganizationId(tenant),
       clientId,
       type: "CLIENT_RESTORED",
       actorUserId: tenant.userId,
@@ -305,15 +286,15 @@ export class ClientService {
       outcome: "success",
       userId: tenant.userId,
       organizationId: tenant.organizationId,
+      dietitianAccountId: tenant.organizationId,
       targetType: "client",
       targetId: clientId,
-      metadata: { status },
     });
     return this.get(tenant, clientId);
   }
 
-  private async assertClientLimit(organizationId: string): Promise<void> {
-    const entitlement = await this.entitlements.resolve(organizationId, FEATURE_KEYS.CLIENT_LIMIT);
+  private async assertClientLimit(dietitianAccountId: string): Promise<void> {
+    const entitlement = await this.entitlements.resolve(dietitianAccountId, FEATURE_KEYS.CLIENT_LIMIT);
     if (!entitlement.enabled) {
       throw new ForbiddenException(CLIENT_LIMIT_REACHED);
     }
@@ -321,21 +302,11 @@ export class ClientService {
       return;
     }
     const count = await this.prisma.client.count({
-      where: { organizationId, status: { in: ["PENDING", "ACTIVE"] } },
+      where: { ...tenantWhere(dietitianAccountId), status: { in: ["PENDING", "ACTIVE"] } },
     });
     if (count >= entitlement.limit) {
       throw new ForbiddenException(CLIENT_LIMIT_REACHED);
     }
-  }
-
-  private async requireMember(organizationId: string, membershipId: string) {
-    const member = await this.prisma.organizationMember.findFirst({
-      where: { id: membershipId, organizationId, status: "ACTIVE" },
-    });
-    if (!member) {
-      throw new BadRequestException("Assigned member is not available");
-    }
-    return member;
   }
 
   private toListItem(client: {
@@ -387,7 +358,7 @@ export class ClientService {
     const connectionStatus = deriveConnectionStatus(client.account, client.invitations[0]);
     return {
       id: client.id,
-      organizationId: client.organizationId,
+      organizationId: client.dietitianAccountId ?? client.organizationId,
       firstName: client.firstName,
       lastName: client.lastName,
       displayName: client.displayName,

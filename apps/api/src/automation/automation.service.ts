@@ -16,7 +16,7 @@ import { SecurityEventLogger } from "../auth/security-event.logger";
 import { EntitlementService } from "../entitlements/entitlement.service";
 import { PrismaService } from "../prisma/prisma.service";
 import type { TenantContext } from "../organizations/tenant.types";
-import { tenantWhere } from "../organizations/tenant-scope";
+import { legacyOrganizationId, tenantWhere } from "../organizations/tenant-scope";
 import { validateRulePayload } from "./automation.schemas";
 import { ACTION_LABELS, TRIGGER_LABELS } from "./automation-catalog";
 import { AutomationUsageService } from "./automation-usage.service";
@@ -30,16 +30,13 @@ export class AutomationService {
     private readonly security: SecurityEventLogger,
   ) {}
 
-  assertCanManage(tenant: TenantContext): void {
-    if (tenant.role === "STAFF") {
-      throw new ForbiddenException("Staff cannot manage automation");
-    }
+  assertCanManage(_tenant: TenantContext): void {
   }
 
   async list(tenant: TenantContext) {
     this.assertCanManage(tenant);
     const rows = await this.prisma.automationRule.findMany({
-      where: { organizationId: tenant.organizationId, archivedAt: null },
+      where: { ...tenantWhere(tenant.organizationId), archivedAt: null },
       orderBy: { createdAt: "desc" },
     });
     return rows.map((row) => this.toResponse(row));
@@ -71,7 +68,8 @@ export class AutomationService {
 
     const rule = await this.prisma.automationRule.create({
       data: {
-        organizationId: tenant.organizationId,
+        dietitianAccountId: tenant.organizationId,
+        organizationId: legacyOrganizationId(tenant),
         name: input.name.trim(),
         description: input.description?.trim() ?? null,
         status: "PAUSED",
@@ -88,6 +86,7 @@ export class AutomationService {
       outcome: "success",
       userId: tenant.userId,
       organizationId: tenant.organizationId,
+      dietitianAccountId: tenant.organizationId,
       targetType: "automation_rule",
       targetId: rule.id,
     });
@@ -153,6 +152,7 @@ export class AutomationService {
       outcome: "success",
       userId: tenant.userId,
       organizationId: tenant.organizationId,
+      dietitianAccountId: tenant.organizationId,
       targetType: "automation_rule",
       targetId: rule.id,
     });
@@ -170,7 +170,7 @@ export class AutomationService {
     const ruleLimit = await this.entitlements.limit(tenant.organizationId, FEATURE_KEYS.AUTOMATION_RULE_LIMIT);
     if (ruleLimit != null) {
       const activeCount = await this.prisma.automationRule.count({
-        where: { organizationId: tenant.organizationId, status: "ACTIVE", archivedAt: null },
+        where: { ...tenantWhere(tenant.organizationId), status: "ACTIVE", archivedAt: null },
       });
       if (existing.status !== "ACTIVE" && activeCount >= ruleLimit) {
         throw new ForbiddenException("Active automation rule limit reached");
@@ -187,6 +187,7 @@ export class AutomationService {
       outcome: "success",
       userId: tenant.userId,
       organizationId: tenant.organizationId,
+      dietitianAccountId: tenant.organizationId,
       targetType: "automation_rule",
       targetId: rule.id,
     });
@@ -206,6 +207,7 @@ export class AutomationService {
       outcome: "success",
       userId: tenant.userId,
       organizationId: tenant.organizationId,
+      dietitianAccountId: tenant.organizationId,
       targetType: "automation_rule",
       targetId: rule.id,
     });
@@ -228,6 +230,7 @@ export class AutomationService {
       outcome: "success",
       userId: tenant.userId,
       organizationId: tenant.organizationId,
+      dietitianAccountId: tenant.organizationId,
       targetType: "automation_rule",
       targetId: rule.id,
     });
@@ -238,7 +241,7 @@ export class AutomationService {
     this.assertCanManage(tenant);
     await this.findRule(tenant.organizationId, automationId);
     const rows = await this.prisma.automationRun.findMany({
-      where: { organizationId: tenant.organizationId, automationRuleId: automationId },
+      where: { ...tenantWhere(tenant.organizationId), automationRuleId: automationId },
       orderBy: { createdAt: "desc" },
       take: Math.min(100, limit),
     });
@@ -248,7 +251,7 @@ export class AutomationService {
   async listRuns(tenant: TenantContext, limit = 50) {
     this.assertCanManage(tenant);
     const rows = await this.prisma.automationRun.findMany({
-      where: { organizationId: tenant.organizationId },
+      where: tenantWhere(tenant.organizationId),
       orderBy: { createdAt: "desc" },
       take: Math.min(100, limit),
       include: { rule: true },

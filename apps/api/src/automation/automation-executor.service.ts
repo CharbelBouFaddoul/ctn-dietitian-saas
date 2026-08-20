@@ -30,27 +30,28 @@ export class AutomationExecutorService {
   ) {}
 
   async executeCandidate(rule: AutomationRule, candidate: AutomationCandidate): Promise<void> {
-    const org = await this.prisma.organization.findUnique({
-      where: { id: rule.organizationId },
+    const dietitianAccountId = rule.dietitianAccountId ?? rule.organizationId;
+    const account = await this.prisma.dietitianAccount.findUnique({
+      where: { id: dietitianAccountId },
       include: { settings: true },
     });
-    if (!org || org.status !== "ACTIVE") {
+    if (!account || account.status !== "ACTIVE") {
       await this.skipRun(rule, candidate.triggerKey, "organization_inactive");
       return;
     }
 
-    const automationEnabled = await this.entitlements.can(rule.organizationId, FEATURE_KEYS.AUTOMATION);
+    const automationEnabled = await this.entitlements.can(dietitianAccountId, FEATURE_KEYS.AUTOMATION);
     if (!automationEnabled) {
       await this.skipRun(rule, candidate.triggerKey, "entitlement_denied");
       return;
     }
 
     const executionLimit = await this.entitlements.limit(
-      rule.organizationId,
+      dietitianAccountId,
       FEATURE_KEYS.AUTOMATION_EXECUTION_LIMIT,
     );
     if (executionLimit != null) {
-      const reservation = await this.usage.reserveExecution(rule.organizationId, executionLimit);
+      const reservation = await this.usage.reserveExecution(dietitianAccountId, executionLimit);
       if (!reservation.allowed) {
         await this.skipRun(rule, candidate.triggerKey, "execution_limit");
         return;
@@ -59,8 +60,8 @@ export class AutomationExecutorService {
 
     const existing = await this.prisma.automationRun.findUnique({
       where: {
-        organizationId_triggerKey: {
-          organizationId: rule.organizationId,
+        dietitianAccountId_triggerKey: {
+          dietitianAccountId,
           triggerKey: candidate.triggerKey,
         },
       },
@@ -89,7 +90,8 @@ export class AutomationExecutorService {
       } else {
         const created = await this.prisma.automationRun.create({
           data: {
-            organizationId: rule.organizationId,
+            dietitianAccountId,
+            organizationId: account.legacyOrganizationId ?? dietitianAccountId,
             automationRuleId: rule.id,
             triggerKey: candidate.triggerKey,
             status: "RUNNING",
@@ -108,7 +110,7 @@ export class AutomationExecutorService {
     try {
       if (candidate.clientId) {
         const client = await this.prisma.client.findFirst({
-          where: { id: candidate.clientId, organizationId: rule.organizationId },
+          where: { id: candidate.clientId, dietitianAccountId },
         });
         if (!client || client.status !== "ACTIVE" || client.archivedAt) {
           await this.completeRun(runId, rule.id, "SKIPPED", "client_inactive", "Client is not active");
@@ -117,8 +119,15 @@ export class AutomationExecutorService {
       }
 
       const configuration = rule.configuration as AutomationConfiguration;
-      const context = await this.buildContext(rule, candidate, org.name, org.settings?.timezone ?? "UTC");
-      await this.performAction(rule, configuration, context, candidate, runId);
+      const context = await this.buildContext(
+        rule,
+        candidate,
+        account.displayName,
+        account.settings?.timezone ?? "UTC",
+        dietitianAccountId,
+        account.userId,
+      );
+      await this.performAction(rule, configuration, context, candidate, runId, dietitianAccountId);
 
       await this.completeRun(runId, rule.id, "SUCCEEDED", null, null, {
         action: rule.actionType,
@@ -135,14 +144,15 @@ export class AutomationExecutorService {
   private async performAction(
     rule: AutomationRule,
     configuration: AutomationConfiguration,
-    context: TemplateContext & { recipientUserId: string; recipientEmail?: string | null; assignedMemberId?: string },
+    context: TemplateContext & { recipientUserId: string; recipientEmail?: string | null; assignedUserId?: string },
     candidate: AutomationCandidate,
     runId: string,
+    dietitianAccountId: string,
   ): Promise<void> {
     switch (rule.actionType) {
       case "SEND_IN_APP_NOTIFICATION":
         await this.notifications.create({
-          organizationId: rule.organizationId,
+          organizationId: dietitianAccountId,
           userId: context.recipientUserId,
           clientId: candidate.clientId,
           type: "AUTOMATION",
@@ -155,7 +165,7 @@ export class AutomationExecutorService {
         break;
       case "CREATE_CLIENT_NOTIFICATION":
         await this.notifications.create({
-          organizationId: rule.organizationId,
+          organizationId: dietitianAccountId,
           userId: context.recipientUserId,
           clientId: candidate.clientId,
           type: "AUTOMATION",
@@ -180,10 +190,10 @@ export class AutomationExecutorService {
       }
       case "CREATE_TASK":
         await this.tasks.createFromAutomation({
-          organizationId: rule.organizationId,
+          organizationId: dietitianAccountId,
           createdById: rule.createdById,
           clientId: candidate.clientId,
-          assignedMemberId: context.assignedMemberId,
+          assignedUserId: context.assignedUserId,
           title: this.templates.render(configuration.taskTitle!, context),
           description: configuration.taskDescription
             ? this.templates.render(configuration.taskDescription, context)
@@ -201,14 +211,21 @@ export class AutomationExecutorService {
     candidate: AutomationCandidate,
     organizationName: string,
     timezone: string,
-  ): Promise<TemplateContext & { recipientUserId: string; recipientEmail?: string | null; assignedMemberId?: string }> {
+    dietitianAccountId: string,
+    accountUserId: string,
+  ): Promise<TemplateContext & { recipientUserId: string; recipientEmail?: string | null; assignedUserId?: string }> {
     const configuration = rule.configuration as AutomationConfiguration;
     const context: TemplateContext = {
       organization: { name: organizationName },
       rule: { name: rule.name },
     };
 
-    let assignedMemberId: string | undefined;
+    const owner = await this.prisma.user.findUniqueOrThrow({ where: { id: accountUserId } });
+    context.dietitian = {
+      name: owner.firstName?.trim() || owner.email.split("@")[0] || "Dietitian",
+    };
+    const assignedUserId = accountUserId;
+
     if (candidate.clientId) {
       const client = await this.prisma.client.findUniqueOrThrow({ where: { id: candidate.clientId } });
       context.client = {
@@ -216,20 +233,6 @@ export class AutomationExecutorService {
         lastName: client.lastName,
         displayName: client.displayName ?? `${client.firstName} ${client.lastName}`,
       };
-      const assignment = await this.prisma.clientAssignment.findFirst({
-        where: {
-          clientId: candidate.clientId,
-          organizationId: rule.organizationId,
-          unassignedAt: null,
-        },
-        include: { organizationMember: { include: { user: true } } },
-      });
-      if (assignment) {
-        assignedMemberId = assignment.organizationMemberId;
-        context.dietitian = {
-          name: assignment.organizationMember.user.email.split("@")[0] ?? "Dietitian",
-        };
-      }
     }
 
     if (candidate.appointmentId) {
@@ -267,29 +270,26 @@ export class AutomationExecutorService {
             recipientUserId: rule.createdById,
             recipientEmail: (await this.prisma.user.findUniqueOrThrow({ where: { id: rule.createdById } })).email,
           }
-        : await this.resolveRecipient(rule, configuration, candidate, assignedMemberId);
-    return { ...context, ...recipient, assignedMemberId };
+        : await this.resolveRecipient(rule, configuration, candidate, assignedUserId, owner);
+    return { ...context, ...recipient, assignedUserId };
   }
 
   private async resolveRecipient(
     rule: AutomationRule,
     configuration: AutomationConfiguration,
     candidate: AutomationCandidate,
-    assignedMemberId?: string,
+    assignedUserId: string,
+    owner: { id: string; email: string },
   ): Promise<{ recipientUserId: string; recipientEmail?: string | null }> {
     switch (configuration.recipient) {
       case "RULE_CREATOR": {
         const user = await this.prisma.user.findUniqueOrThrow({ where: { id: rule.createdById } });
         return { recipientUserId: user.id, recipientEmail: user.email };
       }
-      case "ASSIGNED_DIETITIAN": {
-        if (!assignedMemberId) throw new Error("no_assigned_dietitian");
-        const member = await this.prisma.organizationMember.findUniqueOrThrow({
-          where: { id: assignedMemberId },
-          include: { user: true },
-        });
-        return { recipientUserId: member.userId, recipientEmail: member.user.email };
-      }
+      case "ASSIGNED_DIETITIAN":
+      case "SPECIFIC_MEMBER":
+        // Phase 1: only account owner exists; SPECIFIC_MEMBER resolves to owner.
+        return { recipientUserId: assignedUserId, recipientEmail: owner.email };
       case "CLIENT": {
         if (!candidate.clientId) throw new Error("client_required");
         const account = await this.prisma.clientAccount.findFirst({
@@ -299,22 +299,17 @@ export class AutomationExecutorService {
         if (!account) throw new Error("client_account_missing");
         return { recipientUserId: account.userId, recipientEmail: account.user.email };
       }
-      case "SPECIFIC_MEMBER": {
-        const member = await this.prisma.organizationMember.findFirstOrThrow({
-          where: { id: configuration.memberId!, organizationId: rule.organizationId },
-          include: { user: true },
-        });
-        return { recipientUserId: member.userId, recipientEmail: member.user.email };
-      }
       default:
         throw new Error("invalid_recipient");
     }
   }
 
   private async skipRun(rule: AutomationRule, triggerKey: string, reason: string): Promise<void> {
+    const dietitianAccountId = rule.dietitianAccountId ?? rule.organizationId;
     try {
       await this.prisma.automationRun.create({
         data: {
+          dietitianAccountId,
           organizationId: rule.organizationId,
           automationRuleId: rule.id,
           triggerKey,

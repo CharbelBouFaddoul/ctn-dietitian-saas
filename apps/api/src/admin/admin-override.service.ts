@@ -5,6 +5,7 @@ import type { AdminActor } from "./admin-actor";
 import { ADMIN_MESSAGES } from "./admin.messages";
 import type { UpsertFeatureOverrideDto } from "./dto/admin.dto";
 
+/** Phase 1: organizationId argument is DietitianAccount.id */
 @Injectable()
 export class AdminOverrideService {
   constructor(
@@ -13,8 +14,8 @@ export class AdminOverrideService {
   ) {}
 
   async upsert(organizationId: string, featureKey: string, input: UpsertFeatureOverrideDto, actor: AdminActor) {
-    const organization = await this.prisma.organization.findUnique({ where: { id: organizationId } });
-    if (!organization) {
+    const account = await this.prisma.dietitianAccount.findUnique({ where: { id: organizationId } });
+    if (!account) {
       throw new NotFoundException(ADMIN_MESSAGES.organizationNotFound);
     }
 
@@ -29,10 +30,11 @@ export class AdminOverrideService {
 
     const override = await this.prisma.featureOverride.upsert({
       where: {
-        organizationId_featureId: { organizationId, featureId: feature.id },
+        dietitianAccountId_featureId: { dietitianAccountId: organizationId, featureId: feature.id },
       },
       create: {
-        organizationId,
+        dietitianAccountId: organizationId,
+        organizationId: account.legacyOrganizationId ?? organizationId,
         featureId: feature.id,
         enabled: input.enabled ?? null,
         limitValue: input.limitValue ?? null,
@@ -51,6 +53,7 @@ export class AdminOverrideService {
       outcome: "success",
       userId: actor.userId,
       organizationId,
+      dietitianAccountId: organizationId,
       ipAddress: actor.ipAddress,
       userAgent: actor.userAgent,
       requestId: actor.requestId,
@@ -81,7 +84,7 @@ export class AdminOverrideService {
 
     const existing = await this.prisma.featureOverride.findUnique({
       where: {
-        organizationId_featureId: { organizationId, featureId: feature.id },
+        dietitianAccountId_featureId: { dietitianAccountId: organizationId, featureId: feature.id },
       },
     });
     if (!existing) {
@@ -94,6 +97,7 @@ export class AdminOverrideService {
       outcome: "success",
       userId: actor.userId,
       organizationId,
+      dietitianAccountId: organizationId,
       ipAddress: actor.ipAddress,
       userAgent: actor.userAgent,
       requestId: actor.requestId,

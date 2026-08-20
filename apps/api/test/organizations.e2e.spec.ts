@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
-import { ORGANIZATION_ACCESS_DENIED, ORGANIZATION_UNAVAILABLE } from "../src/organizations/tenant.types";
+import { ORGANIZATION_ACCESS_DENIED } from "../src/organizations/tenant.types";
+import { MULTI_MEMBER_UNSUPPORTED } from "../src/organizations/organization.service";
 import {
   createAuthTestApp,
   cookieValue,
@@ -55,7 +56,7 @@ describe("organizations and tenant isolation", () => {
     return { address, cookie: `ns_session=${cookieValue(login.headers["set-cookie"])}` };
   }
 
-  it("creates an organization with the creator as OWNER and unique membership", async () => {
+  it("creates a dietitian account with the creator as OWNER", async () => {
     const owner = await registerVerifyLogin();
     const created = await request(ctx.app.getHttpServer())
       .post("/api/v1/organizations")
@@ -81,39 +82,28 @@ describe("organizations and tenant isolation", () => {
     expect(current.body.context.organizationId).toBe(created.body.id);
   });
 
-  it("lets a user belong to multiple organizations without cross-access", async () => {
+  it("allows only one dietitian account per user", async () => {
     const user = await registerVerifyLogin();
-    const orgA = await request(ctx.app.getHttpServer())
+    await request(ctx.app.getHttpServer())
       .post("/api/v1/organizations")
       .set("Cookie", user.cookie)
       .send({ name: "Org A", settings: SETTINGS })
       .expect(201);
-    const orgB = await request(ctx.app.getHttpServer())
+
+    const second = await request(ctx.app.getHttpServer())
       .post("/api/v1/organizations")
       .set("Cookie", user.cookie)
-      .send({ name: "Org B", settings: SETTINGS })
-      .expect(201);
+      .send({ name: "Org B", settings: SETTINGS });
+    expect(second.status).toBe(409);
 
     const listed = await request(ctx.app.getHttpServer())
       .get("/api/v1/organizations")
       .set("Cookie", user.cookie)
       .expect(200);
-    expect(listed.body).toHaveLength(2);
-
-    await request(ctx.app.getHttpServer())
-      .patch(`/api/v1/organizations/${orgA.body.id}`)
-      .set("Cookie", user.cookie)
-      .send({ name: "Org A renamed" })
-      .expect(200);
-
-    const stillB = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${orgB.body.id}`)
-      .set("Cookie", user.cookie)
-      .expect(200);
-    expect(stillB.body.name).toBe("Org B");
+    expect(listed.body).toHaveLength(1);
   });
 
-  it("blocks Organization A from reading or updating Organization B", async () => {
+  it("blocks DietitianAccount A from reading or updating DietitianAccount B", async () => {
     const alice = await registerVerifyLogin();
     const bob = await registerVerifyLogin();
     const orgA = await request(ctx.app.getHttpServer())
@@ -157,7 +147,7 @@ describe("organizations and tenant isolation", () => {
       .expect(200);
   });
 
-  it("rejects users without membership and ignores guessed organization IDs", async () => {
+  it("rejects users without ownership and ignores guessed account IDs", async () => {
     const outsider = await registerVerifyLogin();
     const guessed = "11111111-1111-4111-8111-111111111111";
     const response = await request(ctx.app.getHttpServer())
@@ -169,13 +159,13 @@ describe("organizations and tenant isolation", () => {
 
   it("does not let the client supply an organization role or platform role", async () => {
     const owner = await registerVerifyLogin();
-    const created = await request(ctx.app.getHttpServer())
+    const forged = await request(ctx.app.getHttpServer())
       .post("/api/v1/organizations")
       .set("Cookie", owner.cookie)
       .send({ name: "Role Forge", settings: SETTINGS, role: "SUPER_ADMIN", platformRole: "ADMIN" })
       .expect(400);
 
-    expect(created.body.message).toEqual(expect.arrayContaining([expect.stringMatching(/should not exist/i)]));
+    expect(forged.body.message).toEqual(expect.arrayContaining([expect.stringMatching(/should not exist/i)]));
 
     const org = await request(ctx.app.getHttpServer())
       .post("/api/v1/organizations")
@@ -184,61 +174,48 @@ describe("organizations and tenant isolation", () => {
       .expect(201);
     expect(org.body.role).toBe("OWNER");
 
+    // DTO validation rejects invalid roles before the multi-member gate.
     const addAdmin = await request(ctx.app.getHttpServer())
       .post(`/api/v1/organizations/${org.body.id}/members`)
       .set("Cookie", owner.cookie)
       .send({ email: "x@example.com", role: "SUPER_ADMIN" });
     expect(addAdmin.status).toBe(400);
-
-    const addClient = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.body.id}/members`)
-      .set("Cookie", owner.cookie)
-      .send({ email: "x@example.com", role: "CLIENT" });
-    expect(addClient.status).toBe(400);
+    expect(addAdmin.body.message).toEqual(expect.arrayContaining([expect.stringMatching(/DIETITIAN|STAFF|must be/i)]));
   });
 
-  it("enforces membership uniqueness and deactivated memberships", async () => {
+  it("rejects multi-member practice operations", async () => {
     const owner = await registerVerifyLogin();
-    const staff = await registerVerifyLogin();
+    const other = await registerVerifyLogin();
     const org = await request(ctx.app.getHttpServer())
       .post("/api/v1/organizations")
       .set("Cookie", owner.cookie)
       .send({ name: "Members Org", settings: SETTINGS })
       .expect(201);
 
-    await request(ctx.app.getHttpServer())
+    const add = await request(ctx.app.getHttpServer())
       .post(`/api/v1/organizations/${org.body.id}/members`)
       .set("Cookie", owner.cookie)
-      .send({ email: staff.address, role: "STAFF" })
-      .expect(201);
-
-    const duplicate = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.body.id}/members`)
-      .set("Cookie", owner.cookie)
-      .send({ email: staff.address, role: "DIETITIAN" });
-    expect(duplicate.status).toBe(409);
+      .send({ email: other.address, role: "STAFF" });
+    expect(add.status).toBe(400);
+    expect(add.body.message).toBe(MULTI_MEMBER_UNSUPPORTED);
 
     const members = await request(ctx.app.getHttpServer())
       .get(`/api/v1/organizations/${org.body.id}/members`)
       .set("Cookie", owner.cookie)
       .expect(200);
-    const staffMember = members.body.find((row: { email: string }) => row.email === staff.address);
-
-    await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.body.id}/members/${staffMember.id}/deactivate`)
-      .set("Cookie", owner.cookie)
-      .expect(201);
+    expect(members.body).toHaveLength(1);
+    expect(members.body[0].role).toBe("OWNER");
+    expect(members.body[0].email).toBe(owner.address);
 
     const blocked = await request(ctx.app.getHttpServer())
       .get(`/api/v1/organizations/${org.body.id}`)
-      .set("Cookie", staff.cookie);
+      .set("Cookie", other.cookie);
     expect(blocked.status).toBe(403);
   });
 
-  it("allows DIETITIAN and STAFF to read but not manage the organization", async () => {
+  it("blocks non-owners from reading another dietitian account", async () => {
     const owner = await registerVerifyLogin();
-    const dietitian = await registerVerifyLogin();
-    const staff = await registerVerifyLogin();
+    const outsider = await registerVerifyLogin();
     const org = await request(ctx.app.getHttpServer())
       .post("/api/v1/organizations")
       .set("Cookie", owner.cookie)
@@ -246,81 +223,59 @@ describe("organizations and tenant isolation", () => {
       .expect(201);
 
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.body.id}/members`)
-      .set("Cookie", owner.cookie)
-      .send({ email: dietitian.address, role: "DIETITIAN" })
-      .expect(201);
-    await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.body.id}/members`)
-      .set("Cookie", owner.cookie)
-      .send({ email: staff.address, role: "STAFF" })
-      .expect(201);
-
-    await request(ctx.app.getHttpServer())
       .get(`/api/v1/organizations/${org.body.id}`)
-      .set("Cookie", dietitian.cookie)
-      .expect(200);
+      .set("Cookie", outsider.cookie)
+      .expect(403);
     await request(ctx.app.getHttpServer())
       .get(`/api/v1/organizations/${org.body.id}/settings`)
-      .set("Cookie", staff.cookie)
-      .expect(200);
+      .set("Cookie", outsider.cookie)
+      .expect(403);
 
-    const dietitianUpdate = await request(ctx.app.getHttpServer())
+    const outsiderUpdate = await request(ctx.app.getHttpServer())
       .patch(`/api/v1/organizations/${org.body.id}/settings`)
-      .set("Cookie", dietitian.cookie)
+      .set("Cookie", outsider.cookie)
       .send({ ...SETTINGS, locale: "fr-LB" });
-    expect(dietitianUpdate.status).toBe(403);
+    expect(outsiderUpdate.status).toBe(403);
 
-    const staffArchive = await request(ctx.app.getHttpServer())
+    const outsiderArchive = await request(ctx.app.getHttpServer())
       .post(`/api/v1/organizations/${org.body.id}/archive`)
-      .set("Cookie", staff.cookie);
-    expect(staffArchive.status).toBe(403);
+      .set("Cookie", outsider.cookie);
+    expect(outsiderArchive.status).toBe(403);
   });
 
-  it("blocks PENDING, SUSPENDED, and ARCHIVED organizations from normal access", async () => {
-    const owner = await registerVerifyLogin();
-    const pending = await request(ctx.app.getHttpServer())
-      .post("/api/v1/organizations")
-      .set("Cookie", owner.cookie)
-      .send({ name: "Pending Org", settings: SETTINGS })
-      .expect(201);
-    await ctx.lifecycle.setStatus(pending.body.id, "PENDING");
-    const pendingAccess = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${pending.body.id}`)
-      .set("Cookie", owner.cookie);
-    expect(pendingAccess.status).toBe(403);
-    expect(pendingAccess.body.message).toBe(ORGANIZATION_UNAVAILABLE);
-
+  it("blocks SUSPENDED and ARCHIVED dietitian accounts from normal access", async () => {
+    const suspendedOwner = await registerVerifyLogin();
     const suspended = await request(ctx.app.getHttpServer())
       .post("/api/v1/organizations")
-      .set("Cookie", owner.cookie)
+      .set("Cookie", suspendedOwner.cookie)
       .send({ name: "Suspended Org", settings: SETTINGS })
       .expect(201);
     await ctx.lifecycle.setStatus(suspended.body.id, "SUSPENDED");
     const suspendedAccess = await request(ctx.app.getHttpServer())
       .patch(`/api/v1/organizations/${suspended.body.id}/settings`)
-      .set("Cookie", owner.cookie)
+      .set("Cookie", suspendedOwner.cookie)
       .send(SETTINGS);
     expect(suspendedAccess.status).toBe(403);
 
+    const archivedOwner = await registerVerifyLogin();
     const archived = await request(ctx.app.getHttpServer())
       .post("/api/v1/organizations")
-      .set("Cookie", owner.cookie)
+      .set("Cookie", archivedOwner.cookie)
       .send({ name: "Archived Org", settings: SETTINGS })
       .expect(201);
     await request(ctx.app.getHttpServer())
       .post(`/api/v1/organizations/${archived.body.id}/archive`)
-      .set("Cookie", owner.cookie)
+      .set("Cookie", archivedOwner.cookie)
       .expect(201);
     const archivedAccess = await request(ctx.app.getHttpServer())
       .get(`/api/v1/organizations/${archived.body.id}`)
-      .set("Cookie", owner.cookie);
+      .set("Cookie", archivedOwner.cookie);
     expect(archivedAccess.status).toBe(403);
   });
 
-  it("protects the last OWNER and rejects unauthorized ownership transfer", async () => {
+  it("rejects membership role changes and ownership transfer", async () => {
     const owner = await registerVerifyLogin();
-    const dietitian = await registerVerifyLogin();
+    const other = await registerVerifyLogin();
     const org = await request(ctx.app.getHttpServer())
       .post("/api/v1/organizations")
       .set("Cookie", owner.cookie)
@@ -338,35 +293,22 @@ describe("organizations and tenant isolation", () => {
       .set("Cookie", owner.cookie)
       .send({ role: "DIETITIAN" });
     expect(demote.status).toBe(400);
+    expect(demote.body.message).toBe(MULTI_MEMBER_UNSUPPORTED);
 
-    await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.body.id}/members`)
-      .set("Cookie", owner.cookie)
-      .send({ email: dietitian.address, role: "DIETITIAN" })
-      .expect(201);
-    const afterAdd = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.body.id}/members`)
-      .set("Cookie", owner.cookie)
-      .expect(200);
-    const dietitianMember = afterAdd.body.find((row: { email: string }) => row.email === dietitian.address);
-
-    const unauthorized = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.body.id}/transfer-ownership`)
-      .set("Cookie", dietitian.cookie)
-      .send({ membershipId: dietitianMember.id });
-    expect(unauthorized.status).toBe(403);
-
-    await request(ctx.app.getHttpServer())
+    // membershipId must be a UUID so validation passes and the multi-member gate runs.
+    const transfer = await request(ctx.app.getHttpServer())
       .post(`/api/v1/organizations/${org.body.id}/transfer-ownership`)
       .set("Cookie", owner.cookie)
-      .send({ membershipId: dietitianMember.id })
-      .expect(201);
+      .send({ membershipId: "11111111-1111-4111-8111-111111111111" });
+    expect(transfer.status).toBe(400);
+    expect(transfer.body.message).toBe(MULTI_MEMBER_UNSUPPORTED);
 
-    const transferred = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.body.id}`)
-      .set("Cookie", dietitian.cookie)
-      .expect(200);
-    expect(transferred.body.role).toBe("OWNER");
+    // Outsider cannot reach transfer either (tenant denial), independent of multi-member.
+    await request(ctx.app.getHttpServer())
+      .post(`/api/v1/organizations/${org.body.id}/transfer-ownership`)
+      .set("Cookie", other.cookie)
+      .send({ membershipId: ownerMember.id })
+      .expect(403);
   });
 
   it("validates organization settings", async () => {

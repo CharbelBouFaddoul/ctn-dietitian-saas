@@ -5,14 +5,23 @@ import { PrismaService } from "../prisma/prisma.service";
 export class MessagingRecipientService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async assignedMemberUserIds(organizationId: string, clientId: string): Promise<string[]> {
-    const assignments = await this.prisma.clientAssignment.findMany({
-      where: { organizationId, clientId, unassignedAt: null },
-      include: { organizationMember: { select: { userId: true, status: true } } },
+  /** Phase 1: notify the dietitian account owner for this client. */
+  async assignedMemberUserIds(dietitianAccountId: string, clientId: string): Promise<string[]> {
+    const client = await this.prisma.client.findFirst({
+      where: { id: clientId, dietitianAccountId },
+      select: { dietitianAccountId: true },
     });
-    return assignments
-      .filter((row) => row.organizationMember.status === "ACTIVE")
-      .map((row) => row.organizationMember.userId);
+    if (!client?.dietitianAccountId) {
+      return [];
+    }
+    const account = await this.prisma.dietitianAccount.findUnique({
+      where: { id: client.dietitianAccountId },
+      select: { userId: true, status: true },
+    });
+    if (!account || account.status !== "ACTIVE") {
+      return [];
+    }
+    return [account.userId];
   }
 
   async clientPortalUserId(clientId: string): Promise<string | null> {

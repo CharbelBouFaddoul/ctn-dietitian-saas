@@ -3,6 +3,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import type { TenantContext } from "../organizations/tenant.types";
 import { ClientAccessService } from "../clients/client-access.service";
 import { AnalyticsService } from "../analytics/analytics.service";
+import { tenantWhere } from "../organizations/tenant-scope";
 
 @Injectable()
 export class PracticeDashboardService {
@@ -27,8 +28,7 @@ export class PracticeDashboardService {
         this.prisma.client.count({ where: visible }),
         this.prisma.client.count({ where: { ...visible, status: "ACTIVE" } }),
         this.prisma.appointment.findMany({
-          where: {
-            organizationId: tenant.organizationId,
+          where: { ...tenantWhere(tenant.organizationId),
             status: "SCHEDULED",
             startAt: { gte: now },
             client: visible,
@@ -38,22 +38,20 @@ export class PracticeDashboardService {
           take: 8,
         }),
         this.prisma.timelineEvent.findMany({
-          where: { organizationId: tenant.organizationId, client: visible },
+          where: { ...tenantWhere(tenant.organizationId), client: visible },
           include: { client: true },
           orderBy: { occurredAt: "desc" },
           take: 10,
         }),
         this.prisma.task.count({
-          where: {
-            organizationId: tenant.organizationId,
+          where: { ...tenantWhere(tenant.organizationId),
             archivedAt: null,
             assignedMemberId: tenant.membershipId,
             status: { in: ["TODO", "IN_PROGRESS"] },
           },
         }),
         this.prisma.task.count({
-          where: {
-            organizationId: tenant.organizationId,
+          where: { ...tenantWhere(tenant.organizationId),
             archivedAt: null,
             assignedMemberId: tenant.membershipId,
             status: { in: ["TODO", "IN_PROGRESS"] },

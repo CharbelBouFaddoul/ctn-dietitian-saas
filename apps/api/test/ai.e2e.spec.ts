@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import { FEATURE_KEYS } from "@nutrition-saas/config";
-import { CLIENT_ACCESS_DENIED } from "../src/clients/client.messages";
 import {
+  activateSubscription,
   connectClientPortal,
   cookieValue,
   createAuthTestApp,
@@ -10,6 +10,8 @@ import {
   resetAuthDatabase,
   type AuthTestContext,
 } from "./app";
+import { MULTI_MEMBER_UNSUPPORTED } from "../src/organizations/organization.service";
+import { ORGANIZATION_ACCESS_DENIED } from "../src/organizations/tenant.types";
 
 const PASSWORD = "ValidPass12";
 const SETTINGS = {
@@ -65,10 +67,7 @@ describe("Phase 11 AI assistance", () => {
       .set("Cookie", cookie)
       .send({ name, settings: SETTINGS })
       .expect(201);
-    const plan = await ctx.prisma.plan.findUniqueOrThrow({ where: { slug: planSlug } });
-    await ctx.prisma.subscription.create({
-      data: { organizationId: created.body.id, planId: plan.id, status: "ACTIVE" },
-    });
+    await activateSubscription(ctx.prisma, created.body.id, planSlug);
     return created.body as { id: string };
   }
 
@@ -80,21 +79,22 @@ describe("Phase 11 AI assistance", () => {
   }
 
   it("rejects AI when disabled by plan and allows when enabled", async () => {
-    const owner = await registerVerifyLogin();
-    const standardOrg = await createOrg(owner.cookie, "Standard Org", "standard");
-    const proOrg = await createOrg(owner.cookie, "Pro Org", "pro");
-    const standardClient = await createClient(owner.cookie, standardOrg.id);
-    const proClient = await createClient(owner.cookie, proOrg.id);
+    const standardOwner = await registerVerifyLogin();
+    const proOwner = await registerVerifyLogin();
+    const standardOrg = await createOrg(standardOwner.cookie, "Standard Org", "standard");
+    const proOrg = await createOrg(proOwner.cookie, "Pro Org", "pro");
+    const standardClient = await createClient(standardOwner.cookie, standardOrg.id);
+    const proClient = await createClient(proOwner.cookie, proOrg.id);
 
     await request(ctx.app.getHttpServer())
       .post(`/api/v1/organizations/${standardOrg.id}/clients/${standardClient.body.id}/ai/client-summary`)
-      .set("Cookie", owner.cookie)
+      .set("Cookie", standardOwner.cookie)
       .send({})
       .expect(403);
 
     const ok = await request(ctx.app.getHttpServer())
       .post(`/api/v1/organizations/${proOrg.id}/clients/${proClient.body.id}/ai/client-summary`)
-      .set("Cookie", owner.cookie)
+      .set("Cookie", proOwner.cookie)
       .send({})
       .expect(201);
 
@@ -109,6 +109,7 @@ describe("Phase 11 AI assistance", () => {
     const feature = await ctx.prisma.feature.findUniqueOrThrow({ where: { key: FEATURE_KEYS.AI_REQUEST_LIMIT } });
     await ctx.prisma.featureOverride.create({
       data: {
+        dietitianAccountId: org.id,
         organizationId: org.id,
         featureId: feature.id,
         enabled: true,
@@ -130,17 +131,19 @@ describe("Phase 11 AI assistance", () => {
       .expect(429);
   });
 
-  it("isolates AI access across organizations and client assignments", async () => {
+  it("isolates AI access across dietitian accounts", async () => {
     const ownerA = await registerVerifyLogin();
     const ownerB = await registerVerifyLogin();
-    const dietitian = await registerVerifyLogin();
+    const outsider = await registerVerifyLogin();
     const orgA = await createOrg(ownerA.cookie, "Org A", "pro");
     const orgB = await createOrg(ownerB.cookie, "Org B", "pro");
-    await request(ctx.app.getHttpServer())
+    const add = await request(ctx.app.getHttpServer())
       .post(`/api/v1/organizations/${orgA.id}/members`)
       .set("Cookie", ownerA.cookie)
-      .send({ email: dietitian.address, role: "DIETITIAN" })
-      .expect(201);
+      .send({ email: outsider.address, role: "DIETITIAN" });
+    expect(add.status).toBe(400);
+    expect(add.body.message).toBe(MULTI_MEMBER_UNSUPPORTED);
+
     const clientA = await createClient(ownerA.cookie, orgA.id);
     const clientB = await createClient(ownerB.cookie, orgB.id);
 
@@ -158,10 +161,10 @@ describe("Phase 11 AI assistance", () => {
 
     await request(ctx.app.getHttpServer())
       .post(`/api/v1/organizations/${orgA.id}/clients/${clientA.body.id}/ai/client-summary`)
-      .set("Cookie", dietitian.cookie)
+      .set("Cookie", outsider.cookie)
       .send({})
       .expect(403)
-      .expect((res) => expect(res.body.message).toBe(CLIENT_ACCESS_DENIED));
+      .expect((res) => expect(res.body.message).toBe(ORGANIZATION_ACCESS_DENIED));
   });
 
   it("blocks client portal users from dietitian AI endpoints", async () => {

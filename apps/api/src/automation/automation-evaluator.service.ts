@@ -3,7 +3,6 @@ import type { AutomationRule } from "@prisma/client";
 import { dayBoundsUtc, localDateKey, parseLocalDate } from "@nutrition-saas/utilities";
 import { PrismaService } from "../prisma/prisma.service";
 import type { AutomationConfiguration, AutomationConditions } from "./automation.schemas";
-
 export interface AutomationCandidate {
   triggerKey: string;
   clientId?: string;
@@ -18,6 +17,10 @@ export interface AutomationCandidate {
 export class AutomationEvaluatorService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private accountId(rule: AutomationRule): string {
+    return rule.dietitianAccountId ?? rule.organizationId;
+  }
+
   async findCandidates(
     rule: AutomationRule,
     timezone: string,
@@ -28,17 +31,17 @@ export class AutomationEvaluatorService {
 
     switch (rule.triggerType) {
       case "APPOINTMENT_UPCOMING":
-        return this.appointmentUpcoming(rule.organizationId, configuration, conditions, timezone, localDate);
+        return this.appointmentUpcoming(this.accountId(rule), configuration, conditions, timezone, localDate);
       case "APPOINTMENT_MISSED":
-        return this.appointmentMissed(rule.organizationId, configuration, timezone, localDate);
+        return this.appointmentMissed(this.accountId(rule), configuration, timezone, localDate);
       case "CLIENT_INACTIVE":
-        return this.clientInactive(rule.organizationId, configuration, timezone, localDate);
+        return this.clientInactive(this.accountId(rule), configuration, timezone, localDate);
       case "MEAL_PLAN_ENDING":
-        return this.mealPlanEnding(rule.organizationId, configuration, timezone, localDate);
+        return this.mealPlanEnding(this.accountId(rule), configuration, timezone, localDate);
       case "INVOICE_OVERDUE":
-        return this.invoiceOverdue(rule.organizationId, conditions, localDate);
+        return this.invoiceOverdue(this.accountId(rule), conditions, localDate);
       case "TASK_DUE":
-        return this.taskDue(rule.organizationId, conditions, timezone, localDate);
+        return this.taskDue(this.accountId(rule), conditions, timezone, localDate);
       case "CLIENT_CHECKIN_DUE":
         return this.clientCheckinDue(rule, configuration, timezone, localDate);
       case "SCHEDULED_DATE_TIME":
@@ -60,7 +63,7 @@ export class AutomationEvaluatorService {
     const { start, end } = dayBoundsUtc(targetDate, timezone);
     const appointments = await this.prisma.appointment.findMany({
       where: {
-        organizationId,
+        dietitianAccountId: organizationId,
         status: conditions.appointmentStatus ?? "SCHEDULED",
         startAt: { gte: start, lte: end },
         client: { status: "ACTIVE", archivedAt: null },
@@ -84,7 +87,7 @@ export class AutomationEvaluatorService {
     const { end } = dayBoundsUtc(targetDate, timezone);
     const appointments = await this.prisma.appointment.findMany({
       where: {
-        organizationId,
+        dietitianAccountId: organizationId,
         status: "SCHEDULED",
         endAt: { lte: end },
         client: { status: "ACTIVE", archivedAt: null },
@@ -108,7 +111,7 @@ export class AutomationEvaluatorService {
     cutoff.setUTCDate(cutoff.getUTCDate() - daysInactive);
 
     const clients = await this.prisma.client.findMany({
-      where: { organizationId, status: "ACTIVE", archivedAt: null },
+      where: { dietitianAccountId: organizationId, status: "ACTIVE", archivedAt: null },
     });
     const candidates: AutomationCandidate[] = [];
 
@@ -134,7 +137,7 @@ export class AutomationEvaluatorService {
 
     const plans = await this.prisma.mealPlan.findMany({
       where: {
-        organizationId,
+        dietitianAccountId: organizationId,
         status: "ACTIVE",
         archivedAt: null,
         client: { status: "ACTIVE", archivedAt: null },
@@ -175,7 +178,7 @@ export class AutomationEvaluatorService {
   ): Promise<AutomationCandidate[]> {
     const invoices = await this.prisma.invoice.findMany({
       where: {
-        organizationId,
+        dietitianAccountId: organizationId,
         status: conditions.invoiceStatus ?? "OVERDUE",
         archivedAt: null,
         client: { status: "ACTIVE", archivedAt: null },
@@ -200,7 +203,7 @@ export class AutomationEvaluatorService {
       : undefined;
     const tasks = await this.prisma.task.findMany({
       where: {
-        organizationId,
+        dietitianAccountId: organizationId,
         archivedAt: null,
         dueAt: { gte: start, lte: end },
         status: statusFilter ?? { in: ["TODO", "IN_PROGRESS"] },
@@ -222,7 +225,7 @@ export class AutomationEvaluatorService {
     const intervalDays = configuration.timing?.intervalDays ?? 7;
     const clients = await this.prisma.client.findMany({
       where: {
-        organizationId: rule.organizationId,
+        dietitianAccountId: this.accountId(rule),
         status: "ACTIVE",
         archivedAt: null,
       },
@@ -232,7 +235,7 @@ export class AutomationEvaluatorService {
     for (const client of clients) {
       const lastRun = await this.prisma.automationRun.findFirst({
         where: {
-          organizationId: rule.organizationId,
+          dietitianAccountId: this.accountId(rule),
           automationRuleId: rule.id,
           status: "SUCCEEDED",
           triggerKey: { startsWith: `client-checkin:${client.id}:` },
@@ -283,27 +286,27 @@ export class AutomationEvaluatorService {
   private async lastClientActivity(organizationId: string, clientId: string): Promise<Date | null> {
     const [food, water, exercise, sleep, habit] = await Promise.all([
       this.prisma.foodLog.findFirst({
-        where: { organizationId, clientId, status: "ACTIVE" },
+        where: { dietitianAccountId: organizationId, clientId, status: "ACTIVE" },
         orderBy: { consumedAt: "desc" },
         select: { consumedAt: true },
       }),
       this.prisma.waterLog.findFirst({
-        where: { organizationId, clientId, status: "ACTIVE" },
+        where: { dietitianAccountId: organizationId, clientId, status: "ACTIVE" },
         orderBy: { loggedAt: "desc" },
         select: { loggedAt: true },
       }),
       this.prisma.exerciseLog.findFirst({
-        where: { organizationId, clientId, status: "ACTIVE" },
+        where: { dietitianAccountId: organizationId, clientId, status: "ACTIVE" },
         orderBy: { performedAt: "desc" },
         select: { performedAt: true },
       }),
       this.prisma.sleepLog.findFirst({
-        where: { organizationId, clientId, status: "ACTIVE" },
+        where: { dietitianAccountId: organizationId, clientId, status: "ACTIVE" },
         orderBy: { createdAt: "desc" },
         select: { createdAt: true },
       }),
       this.prisma.habitLog.findFirst({
-        where: { organizationId, clientId, status: "ACTIVE", completed: true },
+        where: { dietitianAccountId: organizationId, clientId, status: "ACTIVE", completed: true },
         orderBy: { createdAt: "desc" },
         select: { createdAt: true },
       }),

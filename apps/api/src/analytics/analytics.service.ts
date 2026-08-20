@@ -5,6 +5,7 @@ import { ClientAccessService } from "../clients/client-access.service";
 import { PrismaService } from "../prisma/prisma.service";
 import type { TenantContext } from "../organizations/tenant.types";
 import { AnalyticsPeriod, resolveAnalyticsRange } from "./analytics-range";
+import { tenantWhere } from "../organizations/tenant-scope";
 
 const INACTIVE_DAYS = 14;
 
@@ -50,38 +51,33 @@ export class AnalyticsService {
         where: { ...visible, status: { in: ["INACTIVE", "ARCHIVED"] } },
       }),
       this.prisma.mealPlan.count({
-        where: {
-          organizationId: tenant.organizationId,
+        where: { ...tenantWhere(tenant.organizationId),
           status: "ACTIVE",
           client: visible,
         },
       }),
       this.prisma.appointment.count({
-        where: {
-          organizationId: tenant.organizationId,
+        where: { ...tenantWhere(tenant.organizationId),
           startAt: { gte: range.start, lte: range.end },
           client: visible,
         },
       }),
       this.prisma.invoice.count({
-        where: {
-          organizationId: tenant.organizationId,
+        where: { ...tenantWhere(tenant.organizationId),
           archivedAt: null,
           status: { in: ["ISSUED", "SENT", "OVERDUE"] },
           client: visible,
         },
       }),
       this.prisma.invoice.count({
-        where: {
-          organizationId: tenant.organizationId,
+        where: { ...tenantWhere(tenant.organizationId),
           archivedAt: null,
           status: "OVERDUE",
           client: visible,
         },
       }),
       this.prisma.invoice.aggregate({
-        where: {
-          organizationId: tenant.organizationId,
+        where: { ...tenantWhere(tenant.organizationId),
           archivedAt: null,
           issueDate: { gte: this.toDateOnly(range.start), lte: this.toDateOnly(range.end) },
           status: { not: "CANCELLED" },
@@ -90,8 +86,7 @@ export class AnalyticsService {
         _sum: { total: true },
       }),
       this.prisma.invoice.aggregate({
-        where: {
-          organizationId: tenant.organizationId,
+        where: { ...tenantWhere(tenant.organizationId),
           archivedAt: null,
           paidAt: { gte: range.start, lte: range.end },
           status: "PAID",
@@ -284,7 +279,7 @@ export class AnalyticsService {
     });
     const visible = this.access.visibleWhere(tenant);
     const base = {
-      organizationId: tenant.organizationId,
+      ...tenantWhere(tenant.organizationId),
       client: visible,
     };
 
@@ -324,7 +319,7 @@ export class AnalyticsService {
     });
     const visible = this.access.visibleWhere(tenant);
     const base: Prisma.InvoiceWhereInput = {
-      organizationId: tenant.organizationId,
+      ...tenantWhere(tenant.organizationId),
       archivedAt: null,
       client: visible,
     };
@@ -393,7 +388,9 @@ export class AnalyticsService {
   }
 
   private async requireSettings(organizationId: string) {
-    const settings = await this.prisma.organizationSettings.findUnique({ where: { organizationId } });
+    const settings = await this.prisma.dietitianSettings.findUnique({
+      where: { dietitianAccountId: organizationId },
+    });
     return settings ?? { timezone: "UTC", currency: "USD" };
   }
 
@@ -403,7 +400,7 @@ export class AnalyticsService {
     extra: Prisma.TaskWhereInput,
   ): Prisma.TaskWhereInput {
     return {
-      organizationId: tenant.organizationId,
+      ...tenantWhere(tenant.organizationId),
       archivedAt: null,
       AND: [{ OR: [{ clientId: null }, { client: visible }] }, extra],
     };

@@ -11,15 +11,16 @@ export class AutomationUsageService {
     private readonly entitlements: EntitlementService,
   ) {}
 
-  async getUsageSummary(organizationId: string) {
+  /** Phase 1: organizationId argument is DietitianAccount.id */
+  async getUsageSummary(dietitianAccountId: string) {
     const [enabled, ruleLimit, executionLimit, usage] = await Promise.all([
-      this.entitlements.can(organizationId, FEATURE_KEYS.AUTOMATION),
-      this.entitlements.limit(organizationId, FEATURE_KEYS.AUTOMATION_RULE_LIMIT),
-      this.entitlements.limit(organizationId, FEATURE_KEYS.AUTOMATION_EXECUTION_LIMIT),
-      this.getExecutionCount(organizationId),
+      this.entitlements.can(dietitianAccountId, FEATURE_KEYS.AUTOMATION),
+      this.entitlements.limit(dietitianAccountId, FEATURE_KEYS.AUTOMATION_RULE_LIMIT),
+      this.entitlements.limit(dietitianAccountId, FEATURE_KEYS.AUTOMATION_EXECUTION_LIMIT),
+      this.getExecutionCount(dietitianAccountId),
     ]);
     const activeRules = await this.prisma.automationRule.count({
-      where: { organizationId, status: "ACTIVE", archivedAt: null },
+      where: { dietitianAccountId, status: "ACTIVE", archivedAt: null },
     });
     return {
       enabled,
@@ -34,31 +35,36 @@ export class AutomationUsageService {
     };
   }
 
-  async getExecutionCount(organizationId: string, periodKey?: string) {
-    const key = periodKey ?? (await this.currentPeriodKey(organizationId));
+  async getExecutionCount(dietitianAccountId: string, periodKey?: string) {
+    const key = periodKey ?? (await this.currentPeriodKey(dietitianAccountId));
     const row = await this.prisma.automationUsage.findUnique({
-      where: { organizationId_periodKey: { organizationId, periodKey: key } },
+      where: { dietitianAccountId_periodKey: { dietitianAccountId, periodKey: key } },
     });
     return { periodKey: key, executionCount: row?.executionCount ?? 0 };
   }
 
   async reserveExecution(
-    organizationId: string,
+    dietitianAccountId: string,
     limit: number,
   ): Promise<{ allowed: boolean; used: number; periodKey: string }> {
-    const periodKey = await this.currentPeriodKey(organizationId);
+    const periodKey = await this.currentPeriodKey(dietitianAccountId);
     return this.prisma.$transaction(
       async (tx) => {
         const existing = await tx.automationUsage.findUnique({
-          where: { organizationId_periodKey: { organizationId, periodKey } },
+          where: { dietitianAccountId_periodKey: { dietitianAccountId, periodKey } },
         });
         const current = existing?.executionCount ?? 0;
         if (current >= limit) {
           return { allowed: false, used: current, periodKey };
         }
         const updated = await tx.automationUsage.upsert({
-          where: { organizationId_periodKey: { organizationId, periodKey } },
-          create: { organizationId, periodKey, executionCount: 1 },
+          where: { dietitianAccountId_periodKey: { dietitianAccountId, periodKey } },
+          create: {
+            dietitianAccountId,
+            organizationId: dietitianAccountId,
+            periodKey,
+            executionCount: 1,
+          },
           update: { executionCount: { increment: 1 } },
         });
         return { allowed: true, used: updated.executionCount, periodKey };
@@ -67,8 +73,10 @@ export class AutomationUsageService {
     );
   }
 
-  private async currentPeriodKey(organizationId: string): Promise<string> {
-    const settings = await this.prisma.organizationSettings.findUnique({ where: { organizationId } });
+  private async currentPeriodKey(dietitianAccountId: string): Promise<string> {
+    const settings = await this.prisma.dietitianSettings.findUnique({
+      where: { dietitianAccountId },
+    });
     const timezone = settings?.timezone ?? "UTC";
     const today = localDateKey(new Date(), timezone);
     return today.slice(0, 7);

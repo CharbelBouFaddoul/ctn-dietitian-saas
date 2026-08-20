@@ -20,24 +20,25 @@ export interface EffectiveFeatureEntitlement extends EntitlementResult {
 export class EntitlementService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async can(organizationId: string, featureKey: string): Promise<boolean> {
-    const result = await this.resolve(organizationId, featureKey);
+  /** Phase 1: organizationId argument is DietitianAccount.id */
+  async can(dietitianAccountId: string, featureKey: string): Promise<boolean> {
+    const result = await this.resolve(dietitianAccountId, featureKey);
     return result.enabled;
   }
 
-  async limit(organizationId: string, featureKey: string): Promise<number | null> {
-    const result = await this.resolve(organizationId, featureKey);
+  async limit(dietitianAccountId: string, featureKey: string): Promise<number | null> {
+    const result = await this.resolve(dietitianAccountId, featureKey);
     return result.limit;
   }
 
-  async resolve(organizationId: string, featureKey: string): Promise<EntitlementResult> {
+  async resolve(dietitianAccountId: string, featureKey: string): Promise<EntitlementResult> {
     const feature = await this.prisma.feature.findUnique({ where: { key: featureKey } });
     if (!feature || feature.status !== "ACTIVE") {
       return DENY;
     }
 
     const subscription = await this.prisma.subscription.findUnique({
-      where: { organizationId },
+      where: { dietitianAccountId },
     });
     if (!subscription || subscription.status !== "ACTIVE") {
       return DENY;
@@ -51,7 +52,7 @@ export class EntitlementService {
       }),
       this.prisma.featureOverride.findUnique({
         where: {
-          organizationId_featureId: { organizationId, featureId: feature.id },
+          dietitianAccountId_featureId: { dietitianAccountId, featureId: feature.id },
         },
       }),
     ]);
@@ -59,14 +60,14 @@ export class EntitlementService {
     return this.combine(planFeature, override);
   }
 
-  async listEffective(organizationId: string): Promise<EffectiveFeatureEntitlement[]> {
+  async listEffective(dietitianAccountId: string): Promise<EffectiveFeatureEntitlement[]> {
     const [features, subscription, overrides] = await Promise.all([
       this.prisma.feature.findMany({ orderBy: { key: "asc" } }),
       this.prisma.subscription.findUnique({
-        where: { organizationId },
+        where: { dietitianAccountId },
         include: { plan: { include: { planFeatures: true } } },
       }),
-      this.prisma.featureOverride.findMany({ where: { organizationId } }),
+      this.prisma.featureOverride.findMany({ where: { dietitianAccountId } }),
     ]);
 
     const overrideByFeature = new Map(overrides.map((row) => [row.featureId, row]));

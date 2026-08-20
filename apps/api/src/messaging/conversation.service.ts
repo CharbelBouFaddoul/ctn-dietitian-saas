@@ -3,7 +3,6 @@ import type { Client, Conversation } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { TimelineService } from "../timeline/timeline.service";
 import { NotificationService } from "../notifications/notification.service";
-
 const PREVIEW_MAX = 120;
 
 @Injectable()
@@ -15,10 +14,11 @@ export class ConversationService {
   ) {}
 
   async getOrCreate(client: Client): Promise<Conversation> {
+    const dietitianAccountId = client.dietitianAccountId ?? client.organizationId;
     const existing = await this.prisma.conversation.findUnique({
       where: {
-        organizationId_clientId: {
-          organizationId: client.organizationId,
+        dietitianAccountId_clientId: {
+          dietitianAccountId,
           clientId: client.id,
         },
       },
@@ -26,6 +26,7 @@ export class ConversationService {
     if (existing) return existing;
     return this.prisma.conversation.create({
       data: {
+        dietitianAccountId,
         organizationId: client.organizationId,
         clientId: client.id,
       },
@@ -36,7 +37,7 @@ export class ConversationService {
     const conversation = await this.prisma.conversation.findFirst({
       where: {
         id: conversationId,
-        organizationId: client.organizationId,
+        dietitianAccountId: client.dietitianAccountId ?? client.organizationId,
         clientId: client.id,
       },
     });
@@ -49,7 +50,7 @@ export class ConversationService {
   async listInbox(organizationId: string, clientIds: string[]) {
     if (clientIds.length === 0) return [];
     const rows = await this.prisma.conversation.findMany({
-      where: { organizationId, clientId: { in: clientIds }, status: "ACTIVE" },
+      where: { dietitianAccountId: organizationId, clientId: { in: clientIds }, status: "ACTIVE" },
       orderBy: [{ lastMessageAt: "desc" }, { updatedAt: "desc" }],
       include: {
         client: { select: { id: true, firstName: true, lastName: true, displayName: true } },
@@ -84,9 +85,11 @@ export class ConversationService {
       throw new ForbiddenException("Conversation is not active");
     }
 
+    const dietitianAccountId = input.client.dietitianAccountId ?? input.client.organizationId;
     const message = await this.prisma.$transaction(async (tx) => {
       const created = await tx.message.create({
         data: {
+          dietitianAccountId,
           organizationId: input.client.organizationId,
           clientId: input.client.id,
           conversationId: input.conversation.id,
@@ -110,6 +113,7 @@ export class ConversationService {
           },
         },
         create: {
+          dietitianAccountId,
           organizationId: input.client.organizationId,
           conversationId: input.conversation.id,
           readerUserId: input.senderUserId,
@@ -121,7 +125,8 @@ export class ConversationService {
     });
 
     await this.timeline.record({
-      organizationId: input.client.organizationId,
+      organizationId: dietitianAccountId,
+      legacyOrganizationId: input.client.organizationId,
       clientId: input.client.id,
       type: "MESSAGE_SENT",
       actorUserId: input.senderUserId,
@@ -133,7 +138,8 @@ export class ConversationService {
     await Promise.all(
       input.notifyUserIds.map((userId) =>
         this.notifications.create({
-          organizationId: input.client.organizationId,
+          organizationId: dietitianAccountId,
+          legacyOrganizationId: input.client.organizationId,
           userId,
           clientId: input.client.id,
           type: "NEW_MESSAGE",
@@ -152,7 +158,7 @@ export class ConversationService {
     const rows = await this.prisma.message.findMany({
       where: {
         conversationId,
-        organizationId,
+        dietitianAccountId: organizationId,
         deletedAt: null,
         ...(before ? { createdAt: { lt: new Date(before) } } : {}),
       },

@@ -55,6 +55,7 @@ export class ClientProfileService {
       outcome: "success",
       userId: tenant.userId,
       organizationId: tenant.organizationId,
+      dietitianAccountId: tenant.organizationId,
       targetType: "client",
       targetId: clientId,
     });

@@ -1,10 +1,11 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import { FEATURE_KEYS } from "@nutrition-saas/config";
-import { CLIENT_ACCESS_DENIED, CLIENT_EMAIL_IN_USE, CLIENT_LIMIT_REACHED } from "../src/clients/client.messages";
+import { CLIENT_ACCESS_DENIED, CLIENT_LIMIT_REACHED } from "../src/clients/client.messages";
 import { ORGANIZATION_ACCESS_DENIED } from "../src/organizations/tenant.types";
 import { PLATFORM_ASSESSMENT_TEMPLATE_ID } from "../src/assessments/platform-template.seed";
 import {
+  activateStandardSubscription,
   connectClientPortal,
   cookieValue,
   createAuthTestApp,
@@ -13,6 +14,7 @@ import {
   resetAuthDatabase,
   type AuthTestContext,
 } from "./app";
+import { MULTI_MEMBER_UNSUPPORTED } from "../src/organizations/organization.service";
 
 const PASSWORD = "ValidPass12";
 const SETTINGS = {
@@ -66,19 +68,8 @@ describe("Phase 5 practice clients", () => {
       .set("Cookie", cookie)
       .send({ name, settings: SETTINGS })
       .expect(201);
-    const plan = await ctx.prisma.plan.findUniqueOrThrow({ where: { slug: "standard" } });
-    await ctx.prisma.subscription.create({
-      data: { organizationId: created.body.id, planId: plan.id, status: "ACTIVE" },
-    });
+    await activateStandardSubscription(ctx.prisma, created.body.id);
     return created.body as { id: string; name: string };
-  }
-
-  async function orgContext(cookie: string, organizationId: string) {
-    const current = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${organizationId}`)
-      .set("Cookie", cookie)
-      .expect(200);
-    return current.body.context as { membershipId: string; role: string };
   }
 
   async function createClient(
@@ -149,44 +140,24 @@ describe("Phase 5 practice clients", () => {
     expect(listed.body.items[0].id).toBe(clientA.body.id);
   });
 
-  it("enforces OWNER vs assigned DIETITIAN vs STAFF client access and assignment history", async () => {
+  it("gives the owner access to all clients and blocks other dietitians", async () => {
     const owner = await registerVerifyLogin();
-    const dietitian = await registerVerifyLogin();
     const otherDietitian = await registerVerifyLogin();
-    const staff = await registerVerifyLogin();
+    const outsider = await registerVerifyLogin();
     const org = await createOrg(owner.cookie, "Practice");
+    const otherOrg = await createOrg(otherDietitian.cookie, "Other Practice");
 
-    await request(ctx.app.getHttpServer())
+    const addMember = await request(ctx.app.getHttpServer())
       .post(`/api/v1/organizations/${org.id}/members`)
       .set("Cookie", owner.cookie)
-      .send({ email: dietitian.address, role: "DIETITIAN" })
-      .expect(201);
-    await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/members`)
-      .set("Cookie", owner.cookie)
-      .send({ email: otherDietitian.address, role: "DIETITIAN" })
-      .expect(201);
-    await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/members`)
-      .set("Cookie", owner.cookie)
-      .send({ email: staff.address, role: "STAFF" })
-      .expect(201);
+      .send({ email: otherDietitian.address, role: "DIETITIAN" });
+    expect(addMember.status).toBe(400);
+    expect(addMember.body.message).toBe(MULTI_MEMBER_UNSUPPORTED);
 
-    const dietitianCtx = await orgContext(dietitian.cookie, org.id);
-    const otherCtx = await orgContext(otherDietitian.cookie, org.id);
-    const staffCtx = await orgContext(staff.cookie, org.id);
-
-    const assigned = await createClient(owner.cookie, org.id, {
-      firstName: "Assigned",
-      lastName: "Client",
-      assignedMemberId: dietitianCtx.membershipId,
-    });
-    expect(assigned.status).toBe(201);
-    const unassigned = await createClient(owner.cookie, org.id, {
-      firstName: "Unassigned",
-      lastName: "Client",
-    });
-    expect(unassigned.status).toBe(201);
+    const first = await createClient(owner.cookie, org.id, { firstName: "First", lastName: "Client" });
+    const second = await createClient(owner.cookie, org.id, { firstName: "Second", lastName: "Client" });
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(201);
 
     const ownerList = await request(ctx.app.getHttpServer())
       .get(`/api/v1/organizations/${org.id}/clients`)
@@ -194,80 +165,35 @@ describe("Phase 5 practice clients", () => {
       .expect(200);
     expect(ownerList.body.total).toBe(2);
 
-    const dietitianList = await request(ctx.app.getHttpServer())
+    await request(ctx.app.getHttpServer())
       .get(`/api/v1/organizations/${org.id}/clients`)
-      .set("Cookie", dietitian.cookie)
-      .expect(200);
-    expect(dietitianList.body.items.map((row: { id: string }) => row.id)).toEqual([assigned.body.id]);
-
-    await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/clients/${assigned.body.id}`)
-      .set("Cookie", dietitian.cookie)
-      .expect(200);
-
-    await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/clients/${unassigned.body.id}`)
-      .set("Cookie", dietitian.cookie)
-      .expect(403);
-    await request(ctx.app.getHttpServer())
-      .patch(`/api/v1/organizations/${org.id}/clients/${unassigned.body.id}`)
-      .set("Cookie", dietitian.cookie)
-      .send({ firstName: "Nope" })
-      .expect(403);
-
-    await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients`)
-      .set("Cookie", staff.cookie)
-      .send({ firstName: "Staff", lastName: "Create" })
-      .expect(403);
-
-    await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${assigned.body.id}/assignments`)
-      .set("Cookie", owner.cookie)
-      .send({ organizationMemberId: staffCtx.membershipId })
-      .expect(201);
-
-    await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/clients/${assigned.body.id}/profile`)
-      .set("Cookie", staff.cookie)
-      .expect(200);
-    await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${assigned.body.id}/archive`)
-      .set("Cookie", staff.cookie)
-      .expect(403);
-    await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${assigned.body.id}/account/invite`)
-      .set("Cookie", staff.cookie)
-      .expect(403);
-
-    const historyBefore = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/clients/${assigned.body.id}/assignments`)
-      .set("Cookie", owner.cookie)
-      .expect(200);
-    expect(historyBefore.body.filter((row: { active: boolean }) => row.active)).toHaveLength(1);
-
-    await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${assigned.body.id}/assignments`)
-      .set("Cookie", owner.cookie)
-      .send({ organizationMemberId: otherCtx.membershipId })
-      .expect(201);
-
-    await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/clients/${assigned.body.id}`)
-      .set("Cookie", dietitian.cookie)
-      .expect(403);
-    await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/clients/${assigned.body.id}`)
       .set("Cookie", otherDietitian.cookie)
-      .expect(200);
+      .expect(403);
+    await request(ctx.app.getHttpServer())
+      .get(`/api/v1/organizations/${org.id}/clients/${first.body.id}`)
+      .set("Cookie", otherDietitian.cookie)
+      .expect(403);
+    await request(ctx.app.getHttpServer())
+      .get(`/api/v1/organizations/${org.id}/clients/${first.body.id}`)
+      .set("Cookie", outsider.cookie)
+      .expect(403);
 
-    const history = await request(ctx.app.getHttpServer())
-      .get(`/api/v1/organizations/${org.id}/clients/${assigned.body.id}/assignments`)
+    const theirClient = await createClient(otherDietitian.cookie, otherOrg.id, {
+      firstName: "Their",
+      lastName: "Client",
+    });
+    expect(theirClient.status).toBe(201);
+    await request(ctx.app.getHttpServer())
+      .get(`/api/v1/organizations/${otherOrg.id}/clients/${theirClient.body.id}`)
       .set("Cookie", owner.cookie)
-      .expect(200);
-    expect(history.body).toHaveLength(3);
-    expect(history.body.filter((row: { active: boolean }) => row.active)).toHaveLength(1);
-    expect(history.body.some((row: { unassignedAt: string | null }) => row.unassignedAt !== null)).toBe(true);
+      .expect(403);
+
+    await request(ctx.app.getHttpServer())
+      .post(`/api/v1/organizations/${org.id}/clients/${first.body.id}/assignments`)
+      .set("Cookie", owner.cookie)
+      .send({ organizationMemberId: org.id })
+      .expect(400)
+      .expect((res) => expect(res.body.message).toBe(MULTI_MEMBER_UNSUPPORTED));
   });
 
   it("creates a client portal account without making the client an organization member", async () => {
@@ -310,8 +236,8 @@ describe("Phase 5 practice clients", () => {
       .post(`/api/v1/organizations/${org.id}/members`)
       .set("Cookie", owner.cookie)
       .send({ email: clientEmail, role: "DIETITIAN" })
-      .expect(409)
-      .expect((res) => expect(res.body.message).toBe(CLIENT_EMAIL_IN_USE));
+      .expect(400)
+      .expect((res) => expect(res.body.message).toBe(MULTI_MEMBER_UNSUPPORTED));
 
     const accounts = await ctx.prisma.clientAccount.findMany({ where: { clientId: created.body.id } });
     expect(accounts).toHaveLength(1);
@@ -390,18 +316,13 @@ describe("Phase 5 practice clients", () => {
 
   it("protects profile, goals, measurements, tags, and deactivates portal accounts", async () => {
     const owner = await registerVerifyLogin();
-    const dietitian = await registerVerifyLogin();
+    const outsider = await registerVerifyLogin();
     const org = await createOrg(owner.cookie, "Records");
-    await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/members`)
-      .set("Cookie", owner.cookie)
-      .send({ email: dietitian.address, role: "DIETITIAN" })
-      .expect(201);
     const client = await createClient(owner.cookie, org.id, { email: email("records") });
 
     await request(ctx.app.getHttpServer())
       .patch(`/api/v1/organizations/${org.id}/clients/${client.body.id}/profile`)
-      .set("Cookie", dietitian.cookie)
+      .set("Cookie", outsider.cookie)
       .send({ allergies: "peanuts" })
       .expect(403);
     await request(ctx.app.getHttpServer())
@@ -412,7 +333,7 @@ describe("Phase 5 practice clients", () => {
 
     await request(ctx.app.getHttpServer())
       .post(`/api/v1/organizations/${org.id}/clients/${client.body.id}/goals`)
-      .set("Cookie", dietitian.cookie)
+      .set("Cookie", outsider.cookie)
       .send({ title: "Hidden" })
       .expect(403);
     const goal = await request(ctx.app.getHttpServer())
@@ -476,13 +397,8 @@ describe("Phase 5 practice clients", () => {
 
   it("preserves assessment template version and authorizes appointments and timeline", async () => {
     const owner = await registerVerifyLogin();
-    const dietitian = await registerVerifyLogin();
+    const outsider = await registerVerifyLogin();
     const org = await createOrg(owner.cookie, "Clinical");
-    await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/members`)
-      .set("Cookie", owner.cookie)
-      .send({ email: dietitian.address, role: "DIETITIAN" })
-      .expect(201);
     const client = await createClient(owner.cookie, org.id);
 
     const started = await request(ctx.app.getHttpServer())
@@ -533,11 +449,11 @@ describe("Phase 5 practice clients", () => {
 
     await request(ctx.app.getHttpServer())
       .get(`/api/v1/organizations/${org.id}/clients/${client.body.id}/appointments`)
-      .set("Cookie", dietitian.cookie)
+      .set("Cookie", outsider.cookie)
       .expect(403);
     await request(ctx.app.getHttpServer())
       .get(`/api/v1/organizations/${org.id}/clients/${client.body.id}/timeline`)
-      .set("Cookie", dietitian.cookie)
+      .set("Cookie", outsider.cookie)
       .expect(403);
 
     const timeline = await request(ctx.app.getHttpServer())
@@ -556,6 +472,7 @@ describe("Phase 5 practice clients", () => {
     const feature = await ctx.prisma.feature.findUniqueOrThrow({ where: { key: FEATURE_KEYS.CLIENT_LIMIT } });
     await ctx.prisma.featureOverride.create({
       data: {
+        dietitianAccountId: org.id,
         organizationId: org.id,
         featureId: feature.id,
         enabled: true,

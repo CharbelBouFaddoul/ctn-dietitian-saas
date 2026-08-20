@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
-import { CLIENT_ACCESS_DENIED } from "../src/clients/client.messages";
 import {
+  activateStandardSubscription,
   connectClientPortal,
   cookieValue,
   createAuthTestApp,
@@ -9,6 +9,8 @@ import {
   resetAuthDatabase,
   type AuthTestContext,
 } from "./app";
+import { MULTI_MEMBER_UNSUPPORTED } from "../src/organizations/organization.service";
+import { ORGANIZATION_ACCESS_DENIED } from "../src/organizations/tenant.types";
 
 const PASSWORD = "ValidPass12";
 const SETTINGS = {
@@ -65,10 +67,7 @@ describe("Phase 9 messaging and documents", () => {
       .set("Cookie", cookie)
       .send({ name, settings: SETTINGS })
       .expect(201);
-    const plan = await ctx.prisma.plan.findUniqueOrThrow({ where: { slug: "standard" } });
-    await ctx.prisma.subscription.create({
-      data: { organizationId: created.body.id, planId: plan.id, status: "ACTIVE" },
-    });
+    await activateStandardSubscription(ctx.prisma, created.body.id);
     return created.body as { id: string };
   }
 
@@ -117,15 +116,17 @@ describe("Phase 9 messaging and documents", () => {
       .expect(404);
   });
 
-  it("enforces assignment rules and shared document access", async () => {
+  it("enforces owner access and shared document visibility", async () => {
     const owner = await registerVerifyLogin();
-    const dietitian = await registerVerifyLogin();
+    const outsider = await registerVerifyLogin();
     const org = await createOrg(owner.cookie, "Practice");
-    await request(ctx.app.getHttpServer())
+    const add = await request(ctx.app.getHttpServer())
       .post(`/api/v1/organizations/${org.id}/members`)
       .set("Cookie", owner.cookie)
-      .send({ email: dietitian.address, role: "DIETITIAN" })
-      .expect(201);
+      .send({ email: outsider.address, role: "DIETITIAN" });
+    expect(add.status).toBe(400);
+    expect(add.body.message).toBe(MULTI_MEMBER_UNSUPPORTED);
+
     const assigned = await createClient(owner.cookie, org.id);
     const unassigned = await createClient(owner.cookie, org.id);
     const portalAssigned = await connectClientPortal(ctx, owner.cookie, org.id, assigned.body);
@@ -150,9 +151,9 @@ describe("Phase 9 messaging and documents", () => {
 
     await request(ctx.app.getHttpServer())
       .get(`/api/v1/organizations/${org.id}/clients/${unassigned.body.id}/conversation/messages`)
-      .set("Cookie", dietitian.cookie)
+      .set("Cookie", outsider.cookie)
       .expect(403)
-      .expect((res) => expect(res.body.message).toBe(CLIENT_ACCESS_DENIED));
+      .expect((res) => expect(res.body.message).toBe(ORGANIZATION_ACCESS_DENIED));
 
     await request(ctx.app.getHttpServer())
       .post(`/api/v1/organizations/${org.id}/clients/${assigned.body.id}/conversation/messages`)

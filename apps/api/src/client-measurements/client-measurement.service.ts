@@ -4,6 +4,7 @@ import type { MeasurementType } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { SecurityEventLogger } from "../auth/security-event.logger";
 import type { TenantContext } from "../organizations/tenant.types";
+import { legacyOrganizationId, tenantWhere } from "../organizations/tenant-scope";
 import { TimelineService } from "../timeline/timeline.service";
 import { ClientAccessService } from "../clients/client-access.service";
 
@@ -28,7 +29,7 @@ export class ClientMeasurementService {
   async list(tenant: TenantContext, clientId: string) {
     await this.access.assertCanAccess(tenant, clientId, "read");
     const rows = await this.prisma.clientMeasurement.findMany({
-      where: { clientId, organizationId: tenant.organizationId },
+      where: { clientId, ...tenantWhere(tenant.organizationId) },
       orderBy: { measuredAt: "desc" },
     });
     return rows.map((row) => this.toResponse(row));
@@ -44,7 +45,8 @@ export class ClientMeasurementService {
     const value = this.toInternal(input.type, input.value, input.unit);
     const row = await this.prisma.clientMeasurement.create({
       data: {
-        organizationId: tenant.organizationId,
+        dietitianAccountId: tenant.organizationId,
+        organizationId: legacyOrganizationId(tenant),
         clientId,
         type: input.type,
         value,
@@ -56,6 +58,7 @@ export class ClientMeasurementService {
     });
     await this.timeline.record({
       organizationId: tenant.organizationId,
+      legacyOrganizationId: legacyOrganizationId(tenant),
       clientId,
       type: "MEASUREMENT_ADDED",
       actorUserId: tenant.userId,
@@ -68,6 +71,7 @@ export class ClientMeasurementService {
       outcome: "success",
       userId: tenant.userId,
       organizationId: tenant.organizationId,
+      dietitianAccountId: tenant.organizationId,
       targetType: "measurement",
       targetId: row.id,
       metadata: { measurementType: input.type },

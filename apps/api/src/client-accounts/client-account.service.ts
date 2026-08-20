@@ -14,6 +14,7 @@ import { TokenService } from "../auth/token.service";
 import { SessionService } from "../auth/session.service";
 import { EntitlementService } from "../entitlements/entitlement.service";
 import type { TenantContext } from "../organizations/tenant.types";
+import { legacyOrganizationId, tenantWhere } from "../organizations/tenant-scope";
 import { TimelineService } from "../timeline/timeline.service";
 import { ClientAccessService } from "../clients/client-access.service";
 import {
@@ -69,6 +70,7 @@ export class ClientAccountService {
       outcome: "success",
       userId: tenant.userId,
       organizationId: tenant.organizationId,
+      dietitianAccountId: tenant.organizationId,
       targetType: "organization",
       targetId: tenant.organizationId,
     });
@@ -87,6 +89,7 @@ export class ClientAccountService {
       outcome: "success",
       userId: tenant.userId,
       organizationId: tenant.organizationId,
+      dietitianAccountId: tenant.organizationId,
       targetType: "organization",
       targetId: tenant.organizationId,
     });
@@ -107,6 +110,7 @@ export class ClientAccountService {
       outcome: "success",
       userId: tenant.userId,
       organizationId: tenant.organizationId,
+      dietitianAccountId: tenant.organizationId,
       targetType: "client",
       targetId: clientId,
     });
@@ -125,6 +129,7 @@ export class ClientAccountService {
       outcome: "success",
       userId: tenant.userId,
       organizationId: tenant.organizationId,
+      dietitianAccountId: tenant.organizationId,
       targetType: "client",
       targetId: clientId,
     });
@@ -144,6 +149,7 @@ export class ClientAccountService {
     await this.sessions.revokeAllForUser(account.userId);
     await this.timeline.record({
       organizationId: tenant.organizationId,
+      legacyOrganizationId: legacyOrganizationId(tenant),
       clientId,
       type: "CLIENT_ACCOUNT_DEACTIVATED",
       actorUserId: tenant.userId,
@@ -155,6 +161,7 @@ export class ClientAccountService {
       outcome: "success",
       userId: tenant.userId,
       organizationId: tenant.organizationId,
+      dietitianAccountId: tenant.organizationId,
       targetType: "client_account",
       targetId: account.id,
     });
@@ -163,16 +170,21 @@ export class ClientAccountService {
 
   async onboarding(userId: string) {
     await this.assertCanUsePortalOnboarding(userId);
-    const account = await this.prisma.clientAccount.findUnique({
-      where: { userId },
+    const account = await this.prisma.clientAccount.findFirst({
+      where: { userId, status: "ACTIVE" },
       include: {
-        client: { include: { organization: { include: { settings: true } } } },
+        client: true,
+        dietitianAccount: { include: { settings: true } },
       },
+      orderBy: { activatedAt: "asc" },
     });
     if (account?.status === "ACTIVE") {
       return {
         status: "connected" as const,
-        practiceName: this.practiceName(account.client.organization),
+        practiceName: await this.practiceNameForAccount(
+          account.dietitianAccountId ?? account.organizationId,
+          account.dietitianAccount,
+        ),
       };
     }
     return { status: "needs_join" as const, practiceName: null };
@@ -187,7 +199,8 @@ export class ClientAccountService {
     }
 
     const invitation = await this.invitations.inspect(normalized);
-    if (!invitation || invitation.purpose !== "CLIENT_INVITE" || !invitation.organizationId) {
+    const dietitianAccountId = invitation?.dietitianAccountId ?? invitation?.organizationId ?? null;
+    if (!invitation || invitation.purpose !== "CLIENT_INVITE" || !dietitianAccountId) {
       throw new BadRequestException(JOIN_CODE_INVALID);
     }
     if (invitation.expiresAt.getTime() <= Date.now()) {
@@ -195,14 +208,14 @@ export class ClientAccountService {
     }
 
     if (!invitation.clientId) {
-      return this.joinPractice(userId, invitation.organizationId, invitation.createdById, input);
+      return this.joinPractice(userId, dietitianAccountId, invitation.createdById, input);
     }
 
     if (invitation.usedAt) {
       throw new BadRequestException(JOIN_CODE_USED);
     }
 
-    return this.joinExistingClient(userId, invitation.clientId, invitation.organizationId, normalized);
+    return this.joinExistingClient(userId, invitation.clientId, dietitianAccountId, normalized);
   }
 
   async portalMe(userId: string) {
@@ -210,7 +223,7 @@ export class ClientAccountService {
     return {
       client: {
         id: client.id,
-        organizationId: client.organizationId,
+        organizationId: client.dietitianAccountId ?? client.organizationId,
         firstName: client.firstName,
         lastName: client.lastName,
         displayName: client.displayName,
@@ -221,39 +234,42 @@ export class ClientAccountService {
 
   private async joinPractice(
     userId: string,
-    organizationId: string,
+    dietitianAccountId: string,
     createdById: string | null,
     input: { firstName?: string; lastName?: string },
   ) {
-    const userAccount = await this.prisma.clientAccount.findUnique({ where: { userId } });
-    if (userAccount?.status === "ACTIVE") {
-      throw new ConflictException(JOIN_ALREADY_CONNECTED);
+    const userAccounts = await this.prisma.clientAccount.findMany({ where: { userId } });
+    const active = userAccounts.find((row) => row.status === "ACTIVE");
+    if (active) {
+      const sameDietitian =
+        (active.dietitianAccountId ?? active.organizationId) === dietitianAccountId;
+      throw new ConflictException(sameDietitian ? JOIN_ALREADY_CONNECTED : JOIN_ALREADY_CONNECTED);
     }
-    if (userAccount && userAccount.organizationId !== organizationId) {
-      throw new ConflictException(JOIN_ALREADY_CONNECTED);
+    const existingForDietitian = userAccounts.find(
+      (row) => (row.dietitianAccountId ?? row.organizationId) === dietitianAccountId,
+    );
+
+    if (existingForDietitian) {
+      return this.activateExistingAccount(
+        userId,
+        existingForDietitian.clientId,
+        dietitianAccountId,
+        existingForDietitian.id,
+      );
     }
 
-    if (userAccount) {
-      return this.activateExistingAccount(userId, userAccount.clientId, organizationId, userAccount.id);
-    }
-
-    await this.assertClientLimit(organizationId);
+    await this.assertClientLimit(dietitianAccountId);
+    const account = await this.prisma.dietitianAccount.findUniqueOrThrow({
+      where: { id: dietitianAccountId },
+    });
+    const organizationId = account.legacyOrganizationId ?? account.id;
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
     const { firstName, lastName } = this.resolveJoinNames(user, input);
-    const assignedMember = createdById
-      ? await this.prisma.organizationMember.findFirst({
-          where: {
-            organizationId,
-            userId: createdById,
-            status: "ACTIVE",
-            role: { in: ["OWNER", "DIETITIAN"] },
-          },
-        })
-      : null;
 
-    const { account, clientId } = await this.prisma.$transaction(async (tx) => {
+    const { portalAccount, clientId } = await this.prisma.$transaction(async (tx) => {
       const created = await tx.client.create({
         data: {
+          dietitianAccountId,
           organizationId,
           firstName,
           lastName,
@@ -264,32 +280,24 @@ export class ClientAccountService {
         },
       });
       await tx.clientProfile.create({
-        data: { organizationId, clientId: created.id },
+        data: { dietitianAccountId, organizationId, clientId: created.id },
       });
-      if (assignedMember) {
-        await tx.clientAssignment.create({
-          data: {
-            organizationId,
-            clientId: created.id,
-            organizationMemberId: assignedMember.id,
-            assignedById: createdById,
-          },
-        });
-      }
       const saved = await tx.clientAccount.create({
         data: {
           userId,
           clientId: created.id,
+          dietitianAccountId,
           organizationId,
           status: "ACTIVE",
           activatedAt: new Date(),
         },
       });
-      return { account: saved, clientId: created.id };
+      return { portalAccount: saved, clientId: created.id };
     });
 
     await this.timeline.record({
-      organizationId,
+      organizationId: dietitianAccountId,
+      legacyOrganizationId: organizationId,
       clientId,
       type: "CLIENT_CREATED",
       actorUserId: userId,
@@ -297,57 +305,61 @@ export class ClientAccountService {
       targetId: clientId,
       metadata: { status: "ACTIVE", source: "practice_join" },
     });
-    if (assignedMember) {
-      await this.timeline.record({
-        organizationId,
-        clientId,
-        type: "CLIENT_ASSIGNED",
-        actorUserId: userId,
-        targetType: "assignment",
-        metadata: { organizationMemberId: assignedMember.id },
-      });
-    }
     await this.timeline.record({
-      organizationId,
+      organizationId: dietitianAccountId,
+      legacyOrganizationId: organizationId,
       clientId,
       type: "CLIENT_ACCOUNT_CREATED",
       actorUserId: userId,
       targetType: "client_account",
-      targetId: account.id,
+      targetId: portalAccount.id,
     });
     await this.timeline.record({
-      organizationId,
+      organizationId: dietitianAccountId,
+      legacyOrganizationId: organizationId,
       clientId,
       type: "CLIENT_ACCOUNT_ACTIVATED",
       actorUserId: userId,
       targetType: "client_account",
-      targetId: account.id,
+      targetId: portalAccount.id,
     });
     await this.security.record({
       type: "client_joined",
       outcome: "success",
       userId,
-      organizationId,
+      organizationId: dietitianAccountId,
+      dietitianAccountId,
       targetType: "client_account",
-      targetId: account.id,
+      targetId: portalAccount.id,
       metadata: { clientId, source: "practice_join" },
     });
 
-    return this.connectedResult(organizationId, clientId);
+    return this.connectedResult(dietitianAccountId, clientId);
   }
 
   private async joinExistingClient(
     userId: string,
     clientId: string,
-    organizationId: string,
+    dietitianAccountId: string,
     normalizedCode: string,
   ) {
-    const userAccount = await this.prisma.clientAccount.findUnique({ where: { userId } });
-    const clientAccount = await this.prisma.clientAccount.findUnique({ where: { clientId } });
-
+    const userAccounts = await this.prisma.clientAccount.findMany({ where: { userId } });
+    const userAccount = userAccounts.find(
+      (row) => (row.dietitianAccountId ?? row.organizationId) === dietitianAccountId,
+    );
+    const otherActive = userAccounts.find(
+      (row) =>
+        row.status === "ACTIVE" &&
+        (row.dietitianAccountId ?? row.organizationId) !== dietitianAccountId,
+    );
+    if (otherActive) {
+      throw new ConflictException(JOIN_ALREADY_CONNECTED);
+    }
     if (userAccount && userAccount.clientId !== clientId) {
       throw new ConflictException(JOIN_ALREADY_CONNECTED);
     }
+
+    const clientAccount = await this.prisma.clientAccount.findUnique({ where: { clientId } });
     if (clientAccount && clientAccount.userId !== userId) {
       throw new ConflictException(CLIENT_ACCOUNT_EXISTS);
     }
@@ -356,6 +368,11 @@ export class ClientAccountService {
     }
 
     const existing = userAccount ?? clientAccount;
+    const accountRow = await this.prisma.dietitianAccount.findUniqueOrThrow({
+      where: { id: dietitianAccountId },
+    });
+    const organizationId = accountRow.legacyOrganizationId ?? accountRow.id;
+
     const account = await this.prisma.$transaction(async (tx) => {
       const saved = existing
         ? await tx.clientAccount.update({
@@ -364,12 +381,14 @@ export class ClientAccountService {
               status: "ACTIVE",
               activatedAt: new Date(),
               deactivatedAt: null,
+              dietitianAccountId,
             },
           })
         : await tx.clientAccount.create({
             data: {
               userId,
               clientId,
+              dietitianAccountId,
               organizationId,
               status: "ACTIVE",
               activatedAt: new Date(),
@@ -389,7 +408,8 @@ export class ClientAccountService {
     await this.invitations.consume(normalizedCode, userId);
     if (!existing) {
       await this.timeline.record({
-        organizationId,
+        organizationId: dietitianAccountId,
+        legacyOrganizationId: organizationId,
         clientId,
         type: "CLIENT_ACCOUNT_CREATED",
         actorUserId: userId,
@@ -398,7 +418,8 @@ export class ClientAccountService {
       });
     }
     await this.timeline.record({
-      organizationId,
+      organizationId: dietitianAccountId,
+      legacyOrganizationId: organizationId,
       clientId,
       type: "CLIENT_ACCOUNT_ACTIVATED",
       actorUserId: userId,
@@ -409,31 +430,37 @@ export class ClientAccountService {
       type: "client_joined",
       outcome: "success",
       userId,
-      organizationId,
+      organizationId: dietitianAccountId,
+      dietitianAccountId,
       targetType: "client_account",
       targetId: account.id,
       metadata: { clientId },
     });
 
-    return this.connectedResult(organizationId, clientId);
+    return this.connectedResult(dietitianAccountId, clientId);
   }
 
   private async activateExistingAccount(
     userId: string,
     clientId: string,
-    organizationId: string,
+    dietitianAccountId: string,
     accountId: string,
   ) {
+    const accountRow = await this.prisma.dietitianAccount.findUniqueOrThrow({
+      where: { id: dietitianAccountId },
+    });
     await this.prisma.clientAccount.update({
       where: { id: accountId },
       data: {
         status: "ACTIVE",
         activatedAt: new Date(),
         deactivatedAt: null,
+        dietitianAccountId,
       },
     });
     await this.timeline.record({
-      organizationId,
+      organizationId: dietitianAccountId,
+      legacyOrganizationId: accountRow.legacyOrganizationId ?? accountRow.id,
       clientId,
       type: "CLIENT_ACCOUNT_ACTIVATED",
       actorUserId: userId,
@@ -444,22 +471,19 @@ export class ClientAccountService {
       type: "client_joined",
       outcome: "success",
       userId,
-      organizationId,
+      organizationId: dietitianAccountId,
+      dietitianAccountId,
       targetType: "client_account",
       targetId: accountId,
       metadata: { clientId },
     });
-    return this.connectedResult(organizationId, clientId);
+    return this.connectedResult(dietitianAccountId, clientId);
   }
 
-  private async connectedResult(organizationId: string, clientId: string) {
-    const organization = await this.prisma.organization.findUnique({
-      where: { id: organizationId },
-      include: { settings: true },
-    });
+  private async connectedResult(dietitianAccountId: string, clientId: string) {
     return {
       status: "connected" as const,
-      practiceName: organization ? this.practiceName(organization) : null,
+      practiceName: await this.practiceNameForAccount(dietitianAccountId),
       clientId,
     };
   }
@@ -469,16 +493,16 @@ export class ClientAccountService {
     if (user?.platformRole) {
       throw new ForbiddenException(JOIN_NOT_ALLOWED);
     }
-    const membership = await this.prisma.organizationMember.findFirst({
-      where: { userId, status: "ACTIVE" },
+    const dietitianAccount = await this.prisma.dietitianAccount.findUnique({
+      where: { userId },
     });
-    if (membership) {
+    if (dietitianAccount) {
       throw new ForbiddenException(JOIN_NOT_ALLOWED);
     }
   }
 
-  private async assertClientLimit(organizationId: string): Promise<void> {
-    const entitlement = await this.entitlements.resolve(organizationId, FEATURE_KEYS.CLIENT_LIMIT);
+  private async assertClientLimit(dietitianAccountId: string): Promise<void> {
+    const entitlement = await this.entitlements.resolve(dietitianAccountId, FEATURE_KEYS.CLIENT_LIMIT);
     if (!entitlement.enabled) {
       throw new ForbiddenException(CLIENT_LIMIT_REACHED);
     }
@@ -486,7 +510,7 @@ export class ClientAccountService {
       return;
     }
     const count = await this.prisma.client.count({
-      where: { organizationId, status: { in: ["PENDING", "ACTIVE"] } },
+      where: { ...tenantWhere(dietitianAccountId), status: { in: ["PENDING", "ACTIVE"] } },
     });
     if (count >= entitlement.limit) {
       throw new ForbiddenException(CLIENT_LIMIT_REACHED);
@@ -513,11 +537,23 @@ export class ClientAccountService {
     return `${token.charAt(0).toUpperCase()}${token.slice(1)}`.slice(0, 80);
   }
 
-  private practiceName(organization: {
-    name: string;
-    settings: { practiceName: string | null } | null;
-  }): string {
-    return organization.settings?.practiceName?.trim() || organization.name;
+  private async practiceNameForAccount(
+    dietitianAccountId: string,
+    preloaded?: {
+      displayName: string;
+      settings: { practiceName: string | null } | null;
+    } | null,
+  ): Promise<string | null> {
+    const account =
+      preloaded ??
+      (await this.prisma.dietitianAccount.findUnique({
+        where: { id: dietitianAccountId },
+        include: { settings: true },
+      }));
+    if (!account) {
+      return null;
+    }
+    return account.settings?.practiceName?.trim() || account.displayName;
   }
 
   private async connectionFor(clientId: string) {
@@ -555,7 +591,8 @@ export class ClientAccountService {
             emailNormalized: normalized.slice(-4),
             createdById: tenant.userId,
             clientId,
-            organizationId: tenant.organizationId,
+            organizationId: legacyOrganizationId(tenant),
+            dietitianAccountId: tenant.organizationId,
           },
           this.tokens.hashToken(normalized),
         );

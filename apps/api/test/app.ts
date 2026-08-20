@@ -40,6 +40,7 @@ import { TasksModule } from "../src/tasks/tasks.module";
 import { AnalyticsModule } from "../src/analytics/analytics.module";
 import { AiModule } from "../src/ai/ai.module";
 import { AutomationModule } from "../src/automation/automation.module";
+import { DietitianAccountsModule } from "../src/dietitian-accounts/dietitian-accounts.module";
 import { AppThrottlerModule } from "../src/common/app-throttler.module";
 import { CommonModule } from "../src/common/common.module";
 import { StorageModule } from "../src/storage/storage.module";
@@ -104,6 +105,7 @@ export async function createAuthTestApp(): Promise<AuthTestContext> {
       AnalyticsModule,
       AiModule,
       AutomationModule,
+      DietitianAccountsModule,
       PlatformSettingsModule,
       StorageModule,
     ],
@@ -175,6 +177,8 @@ export async function resetAuthDatabase(prisma: PrismaService): Promise<void> {
   await prisma.auditLog.deleteMany();
   await prisma.featureOverride.deleteMany();
   await prisma.subscription.deleteMany();
+  await prisma.dietitianSettings.deleteMany();
+  await prisma.dietitianAccount.deleteMany();
   await prisma.organizationMember.deleteMany();
   await prisma.organizationSettings.deleteMany();
   await prisma.organization.deleteMany();
@@ -236,6 +240,52 @@ export function cookieValue(
 }
 
 export const TEST_PASSWORD = "ValidPass12";
+
+export const DEFAULT_ORG_SETTINGS = {
+  timezone: "UTC",
+  locale: "en",
+  currency: "USD",
+  weightUnit: "kg",
+  heightUnit: "cm",
+  dateFormat: "YYYY_MM_DD",
+} as const;
+
+/** Phase 1: entitlements resolve by dietitianAccountId (OWNER account id == legacy org id). */
+export async function activateSubscription(
+  prisma: PrismaService,
+  dietitianAccountId: string,
+  planSlug = "standard",
+) {
+  const plan = await prisma.plan.findUniqueOrThrow({ where: { slug: planSlug } });
+  return prisma.subscription.create({
+    data: {
+      dietitianAccountId,
+      organizationId: dietitianAccountId,
+      planId: plan.id,
+      status: "ACTIVE",
+      startedAt: new Date(),
+    },
+  });
+}
+
+export async function activateStandardSubscription(prisma: PrismaService, dietitianAccountId: string) {
+  return activateSubscription(prisma, dietitianAccountId, "standard");
+}
+
+export async function createOrgWithSubscription(
+  ctx: AuthTestContext,
+  cookie: string,
+  name: string,
+  options?: { planSlug?: string; settings?: Record<string, unknown> },
+): Promise<{ id: string; name: string }> {
+  const created = await request(ctx.app.getHttpServer())
+    .post("/api/v1/organizations")
+    .set("Cookie", cookie)
+    .send({ name, settings: options?.settings ?? DEFAULT_ORG_SETTINGS })
+    .expect(201);
+  await activateSubscription(ctx.prisma, created.body.id, options?.planSlug ?? "standard");
+  return created.body as { id: string; name: string };
+}
 
 export async function generateJoinCode(
   ctx: AuthTestContext,

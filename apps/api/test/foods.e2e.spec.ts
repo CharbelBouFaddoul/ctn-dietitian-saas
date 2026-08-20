@@ -3,12 +3,14 @@ import request from "supertest";
 import { FEATURE_KEYS } from "@nutrition-saas/config";
 import { ORGANIZATION_ACCESS_DENIED } from "../src/organizations/tenant.types";
 import {
+  activateStandardSubscription,
   cookieValue,
   createAuthTestApp,
   extractEmailedToken,
   resetAuthDatabase,
   type AuthTestContext,
 } from "./app";
+import { MULTI_MEMBER_UNSUPPORTED } from "../src/organizations/organization.service";
 
 const PASSWORD = "ValidPass12";
 const SETTINGS = {
@@ -65,10 +67,7 @@ describe("Phase 6 foods and organization overrides", () => {
       .set("Cookie", cookie)
       .send({ name, settings: SETTINGS })
       .expect(201);
-    const plan = await ctx.prisma.plan.findUniqueOrThrow({ where: { slug: "standard" } });
-    await ctx.prisma.subscription.create({
-      data: { organizationId: created.body.id, planId: plan.id, status: "ACTIVE" },
-    });
+    await activateStandardSubscription(ctx.prisma, created.body.id);
     return created.body as { id: string; name: string };
   }
 
@@ -250,18 +249,20 @@ describe("Phase 6 foods and organization overrides", () => {
 
   it("audits override mutations without secrets and keeps search server-side", async () => {
     const owner = await registerVerifyLogin();
-    const staff = await registerVerifyLogin();
+    const outsider = await registerVerifyLogin();
     const org = await createOrg(owner.cookie, "Clinic");
-    await request(ctx.app.getHttpServer())
+    const add = await request(ctx.app.getHttpServer())
       .post(`/api/v1/organizations/${org.id}/members`)
       .set("Cookie", owner.cookie)
-      .send({ email: staff.address, role: "STAFF" })
-      .expect(201);
+      .send({ email: outsider.address, role: "STAFF" });
+    expect(add.status).toBe(400);
+    expect(add.body.message).toBe(MULTI_MEMBER_UNSUPPORTED);
+
     const food = await seedFood();
 
     await request(ctx.app.getHttpServer())
       .put(`/api/v1/organizations/${org.id}/foods/${food.id}/override`)
-      .set("Cookie", staff.cookie)
+      .set("Cookie", outsider.cookie)
       .send({ energyKcal: 180 })
       .expect(403);
 

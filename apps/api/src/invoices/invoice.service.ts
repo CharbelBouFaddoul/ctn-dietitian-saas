@@ -14,6 +14,7 @@ import { TimelineService } from "../timeline/timeline.service";
 import { NotificationService } from "../notifications/notification.service";
 import { computeLineTotal, decimalToNumber, money, sumMoney } from "./invoice-money";
 import { InvoiceNumberService } from "./invoice-number.service";
+import { legacyOrganizationId, tenantWhere } from "../organizations/tenant-scope";
 
 export interface InvoiceItemInput {
   description: string;
@@ -53,7 +54,8 @@ export class InvoiceService {
     const page = Math.max(1, query.page ?? 1);
     const limit = Math.min(100, Math.max(1, query.limit ?? 25));
     const where: Prisma.InvoiceWhereInput = {
-      organizationId: tenant.organizationId,
+      dietitianAccountId: tenant.organizationId,
+      organizationId: legacyOrganizationId(tenant),
       archivedAt: null,
       client: visible,
       ...(query.clientId ? { clientId: query.clientId } : {}),
@@ -91,7 +93,7 @@ export class InvoiceService {
     await this.access.assertCanAccess(tenant, clientId, "read");
     await this.refreshOverdue(tenant.organizationId);
     const rows = await this.prisma.invoice.findMany({
-      where: { organizationId: tenant.organizationId, clientId, archivedAt: null },
+      where: { ...tenantWhere(tenant.organizationId), clientId, archivedAt: null },
       include: { items: { orderBy: { sortOrder: "asc" } } },
       orderBy: [{ issueDate: "desc" }, { createdAt: "desc" }],
     });
@@ -106,17 +108,17 @@ export class InvoiceService {
 
   async getPrintPayload(tenant: TenantContext, invoiceId: string) {
     const invoice = await this.findOrgInvoice(tenant, invoiceId);
-    const settings = await this.prisma.organizationSettings.findUnique({
-      where: { organizationId: tenant.organizationId },
+    const settings = await this.prisma.dietitianSettings.findUnique({
+      where: { dietitianAccountId: tenant.organizationId },
     });
-    const org = await this.prisma.organization.findUniqueOrThrow({
+    const org = await this.prisma.dietitianAccount.findUniqueOrThrow({
       where: { id: tenant.organizationId },
     });
     return {
       invoice: this.toResponse(invoice),
       practice: {
-        organizationName: org.name,
-        practiceName: settings?.practiceName ?? org.name,
+        organizationName: org.displayName,
+        practiceName: settings?.practiceName ?? org.displayName,
         contactEmail: settings?.contactEmail ?? null,
         contactPhone: settings?.contactPhone ?? null,
         addressLine1: settings?.addressLine1 ?? null,
@@ -146,8 +148,8 @@ export class InvoiceService {
     if (!input.items.length) {
       throw new BadRequestException("At least one line item is required");
     }
-    const settings = await this.prisma.organizationSettings.findUnique({
-      where: { organizationId: tenant.organizationId },
+    const settings = await this.prisma.dietitianSettings.findUnique({
+      where: { dietitianAccountId: tenant.organizationId },
     });
     const currency = input.currency ?? settings?.currency ?? "USD";
     const issueDate = input.issueDate ? this.parseDate(input.issueDate) : null;
@@ -163,7 +165,8 @@ export class InvoiceService {
     const invoice = await this.prisma.$transaction(async (tx) => {
       const created = await tx.invoice.create({
         data: {
-          organizationId: tenant.organizationId,
+          dietitianAccountId: tenant.organizationId,
+          organizationId: legacyOrganizationId(tenant),
           clientId,
           status: "DRAFT",
           issueDate,
@@ -175,7 +178,8 @@ export class InvoiceService {
           createdById: tenant.userId,
           items: {
             create: computed.items.map((item, index) => ({
-              organizationId: tenant.organizationId,
+              dietitianAccountId: tenant.organizationId,
+              organizationId: legacyOrganizationId(tenant),
               description: item.description,
               quantity: item.quantity,
               unitPrice: item.unitPrice,
@@ -190,6 +194,7 @@ export class InvoiceService {
     });
     await this.timeline.record({
       organizationId: tenant.organizationId,
+      legacyOrganizationId: legacyOrganizationId(tenant),
       clientId,
       type: "INVOICE_CREATED",
       actorUserId: tenant.userId,
@@ -202,6 +207,7 @@ export class InvoiceService {
       outcome: "success",
       userId: tenant.userId,
       organizationId: tenant.organizationId,
+      dietitianAccountId: tenant.organizationId,
       targetType: "invoice",
       targetId: invoice.id,
     });
@@ -242,7 +248,8 @@ export class InvoiceService {
                 total: computed.total,
                 items: {
                   create: computed.items.map((item, index) => ({
-                    organizationId: tenant.organizationId,
+                    dietitianAccountId: tenant.organizationId,
+                    organizationId: legacyOrganizationId(tenant),
                     description: item.description,
                     quantity: item.quantity,
                     unitPrice: item.unitPrice,
@@ -261,6 +268,7 @@ export class InvoiceService {
       outcome: "success",
       userId: tenant.userId,
       organizationId: tenant.organizationId,
+      dietitianAccountId: tenant.organizationId,
       targetType: "invoice",
       targetId: invoice.id,
     });
@@ -273,8 +281,8 @@ export class InvoiceService {
       throw new BadRequestException("Only draft invoices can be issued");
     }
     await this.access.assertCanAccess(tenant, existing.clientId, "manageRecords");
-    const settings = await this.prisma.organizationSettings.findUnique({
-      where: { organizationId: tenant.organizationId },
+    const settings = await this.prisma.dietitianSettings.findUnique({
+      where: { dietitianAccountId: tenant.organizationId },
     });
     const issueDate = existing.issueDate ?? this.todayDate(settings?.timezone ?? "UTC");
     const dueDate =
@@ -296,6 +304,7 @@ export class InvoiceService {
     });
     await this.timeline.record({
       organizationId: tenant.organizationId,
+      legacyOrganizationId: legacyOrganizationId(tenant),
       clientId: invoice.clientId,
       type: "INVOICE_ISSUED",
       actorUserId: tenant.userId,
@@ -308,6 +317,7 @@ export class InvoiceService {
       outcome: "success",
       userId: tenant.userId,
       organizationId: tenant.organizationId,
+      dietitianAccountId: tenant.organizationId,
       targetType: "invoice",
       targetId: invoice.id,
     });
@@ -328,6 +338,7 @@ export class InvoiceService {
     if (invoice.status === "SENT") {
       await this.timeline.record({
         organizationId: tenant.organizationId,
+        legacyOrganizationId: legacyOrganizationId(tenant),
         clientId: invoice.clientId,
         type: "INVOICE_SENT",
         actorUserId: tenant.userId,
@@ -348,7 +359,8 @@ export class InvoiceService {
         invoice.currency,
       );
       await this.notifications.create({
-        organizationId: tenant.organizationId,
+        dietitianAccountId: tenant.organizationId,
+        organizationId: legacyOrganizationId(tenant),
         userId: clientAccount.userId,
         clientId: invoice.clientId,
         type: "INVOICE_SENT",
@@ -363,6 +375,7 @@ export class InvoiceService {
       outcome: "success",
       userId: tenant.userId,
       organizationId: tenant.organizationId,
+      dietitianAccountId: tenant.organizationId,
       targetType: "invoice",
       targetId: invoice.id,
     });
@@ -385,6 +398,7 @@ export class InvoiceService {
     });
     await this.timeline.record({
       organizationId: tenant.organizationId,
+      legacyOrganizationId: legacyOrganizationId(tenant),
       clientId: invoice.clientId,
       type: "INVOICE_PAID",
       actorUserId: tenant.userId,
@@ -397,6 +411,7 @@ export class InvoiceService {
       outcome: "success",
       userId: tenant.userId,
       organizationId: tenant.organizationId,
+      dietitianAccountId: tenant.organizationId,
       targetType: "invoice",
       targetId: invoice.id,
     });
@@ -419,6 +434,7 @@ export class InvoiceService {
     });
     await this.timeline.record({
       organizationId: tenant.organizationId,
+      legacyOrganizationId: legacyOrganizationId(tenant),
       clientId: invoice.clientId,
       type: "INVOICE_CANCELLED",
       actorUserId: tenant.userId,
@@ -431,6 +447,7 @@ export class InvoiceService {
       outcome: "success",
       userId: tenant.userId,
       organizationId: tenant.organizationId,
+      dietitianAccountId: tenant.organizationId,
       targetType: "invoice",
       targetId: invoice.id,
     });
@@ -450,6 +467,7 @@ export class InvoiceService {
       outcome: "success",
       userId: tenant.userId,
       organizationId: tenant.organizationId,
+      dietitianAccountId: tenant.organizationId,
       targetType: "invoice",
       targetId: invoice.id,
     });
@@ -460,7 +478,7 @@ export class InvoiceService {
     await this.refreshOverdue(client.organizationId);
     const rows = await this.prisma.invoice.findMany({
       where: {
-        organizationId: client.organizationId,
+        dietitianAccountId: client.dietitianAccountId ?? client.organizationId,
         clientId: client.id,
         archivedAt: null,
         status: { in: PORTAL_VISIBLE },
@@ -476,7 +494,7 @@ export class InvoiceService {
     const invoice = await this.prisma.invoice.findFirst({
       where: {
         id: invoiceId,
-        organizationId: client.organizationId,
+        dietitianAccountId: client.dietitianAccountId ?? client.organizationId,
         clientId: client.id,
         archivedAt: null,
         status: { in: PORTAL_VISIBLE },
@@ -486,17 +504,17 @@ export class InvoiceService {
     if (!invoice) {
       throw new NotFoundException("Invoice not found");
     }
-    const settings = await this.prisma.organizationSettings.findUnique({
-      where: { organizationId: client.organizationId },
+    const settings = await this.prisma.dietitianSettings.findUnique({
+      where: { dietitianAccountId: client.dietitianAccountId ?? client.organizationId },
     });
-    const org = await this.prisma.organization.findUniqueOrThrow({
-      where: { id: client.organizationId },
+    const org = await this.prisma.dietitianAccount.findUniqueOrThrow({
+      where: { id: client.dietitianAccountId ?? client.organizationId },
     });
     return {
       invoice: this.toResponse(invoice),
       practice: {
-        organizationName: org.name,
-        practiceName: settings?.practiceName ?? org.name,
+        organizationName: org.displayName,
+        practiceName: settings?.practiceName ?? org.displayName,
         contactEmail: settings?.contactEmail ?? null,
         contactPhone: settings?.contactPhone ?? null,
         addressLine1: settings?.addressLine1 ?? null,
@@ -514,9 +532,7 @@ export class InvoiceService {
   private async findOrgInvoice(tenant: TenantContext, invoiceId: string) {
     const visible = this.access.visibleWhere(tenant);
     const invoice = await this.prisma.invoice.findFirst({
-      where: {
-        id: invoiceId,
-        organizationId: tenant.organizationId,
+      where: { id: invoiceId, ...tenantWhere(tenant.organizationId),
         archivedAt: null,
         client: visible,
       },
@@ -550,7 +566,7 @@ export class InvoiceService {
   }
 
   private async refreshOverdue(organizationId: string) {
-    const settings = await this.prisma.organizationSettings.findUnique({ where: { organizationId } });
+    const settings = await this.prisma.dietitianSettings.findUnique({ where: { dietitianAccountId: organizationId } });
     const today = this.todayDate(settings?.timezone ?? "UTC");
     await this.prisma.invoice.updateMany({
       where: {

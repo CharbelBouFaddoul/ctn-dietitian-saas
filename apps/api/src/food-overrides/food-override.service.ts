@@ -1,11 +1,10 @@
-import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { NUTRIENT_KEYS, type NutritionValues } from "@nutrition-saas/nutrition";
 import { PrismaService } from "../prisma/prisma.service";
 import { SecurityEventLogger } from "../auth/security-event.logger";
 import type { TenantContext } from "../organizations/tenant.types";
+import { legacyOrganizationId } from "../organizations/tenant-scope";
 import { FoodService } from "../foods/food.service";
-
-const STAFF_CANNOT_OVERRIDE = "Staff cannot manage food overrides";
 
 export type OverrideInput = Partial<NutritionValues>;
 
@@ -18,12 +17,13 @@ export class FoodOverrideService {
   ) {}
 
   async upsert(tenant: TenantContext, foodId: string, input: OverrideInput) {
-    this.assertCanManage(tenant);
     await this.requireFood(foodId);
 
     const data = this.nutrientData(input);
     const existing = await this.prisma.foodOverride.findUnique({
-      where: { organizationId_foodId: { organizationId: tenant.organizationId, foodId } },
+      where: {
+        dietitianAccountId_foodId: { dietitianAccountId: tenant.organizationId, foodId },
+      },
     });
 
     const row = existing
@@ -33,7 +33,8 @@ export class FoodOverrideService {
         })
       : await this.prisma.foodOverride.create({
           data: {
-            organizationId: tenant.organizationId,
+            dietitianAccountId: tenant.organizationId,
+            organizationId: legacyOrganizationId(tenant),
             foodId,
             createdById: tenant.userId,
             ...data,
@@ -45,6 +46,7 @@ export class FoodOverrideService {
       outcome: "success",
       userId: tenant.userId,
       organizationId: tenant.organizationId,
+      dietitianAccountId: tenant.organizationId,
       targetType: "food_override",
       targetId: row.id,
       metadata: { foodId, fields: Object.keys(input) },
@@ -54,9 +56,10 @@ export class FoodOverrideService {
   }
 
   async remove(tenant: TenantContext, foodId: string) {
-    this.assertCanManage(tenant);
     const existing = await this.prisma.foodOverride.findUnique({
-      where: { organizationId_foodId: { organizationId: tenant.organizationId, foodId } },
+      where: {
+        dietitianAccountId_foodId: { dietitianAccountId: tenant.organizationId, foodId },
+      },
     });
     if (!existing) {
       throw new NotFoundException("Override not found");
@@ -70,17 +73,12 @@ export class FoodOverrideService {
       outcome: "success",
       userId: tenant.userId,
       organizationId: tenant.organizationId,
+      dietitianAccountId: tenant.organizationId,
       targetType: "food_override",
       targetId: existing.id,
       metadata: { foodId },
     });
     return this.foods.getEffective(tenant.organizationId, foodId);
-  }
-
-  private assertCanManage(tenant: TenantContext) {
-    if (tenant.role === "STAFF") {
-      throw new ForbiddenException(STAFF_CANNOT_OVERRIDE);
-    }
   }
 
   private async requireFood(foodId: string) {
