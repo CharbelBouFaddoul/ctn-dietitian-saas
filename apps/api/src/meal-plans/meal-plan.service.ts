@@ -19,6 +19,7 @@ import { ClientAccessService } from "../clients/client-access.service";
 import type { DietitianTenantContext } from "../dietitian/dietitian.types";
 import { requireDietitianAccountId, tenantWhere } from "../dietitian/tenant-scope";
 import { TimelineService } from "../timeline/timeline.service";
+import { NotificationService } from "../notifications/notification.service";
 import { RecipeNutritionService, isFoodQuantityUnit, type EffectiveFood } from "../recipes/recipe-nutrition.service";
 import { RecipeService } from "../recipes/recipe.service";
 
@@ -76,6 +77,7 @@ export class MealPlanService {
     private readonly recipeNutrition: RecipeNutritionService,
     private readonly timeline: TimelineService,
     private readonly security: SecurityEventLogger,
+    private readonly notifications: NotificationService,
   ) {}
 
   async list(
@@ -394,6 +396,28 @@ export class MealPlanService {
       targetType: "meal_plan_version",
       targetId: published.next.id,
     });
+
+    const portalAccount = await this.prisma.clientAccount.findFirst({
+      where: {
+        clientId: version.mealPlan.clientId,
+        dietitianAccountId: tenant.dietitianAccountId,
+        status: "ACTIVE",
+      },
+      select: { userId: true },
+    });
+    if (portalAccount) {
+      await this.notifications.create({
+        dietitianAccountId: tenant.dietitianAccountId,
+        userId: portalAccount.userId,
+        clientId: version.mealPlan.clientId,
+        type: "MEAL_PLAN_PUBLISHED",
+        title: "New meal plan published",
+        body: "Your dietitian published an updated meal plan for you.",
+        targetType: "meal_plan",
+        targetId: version.mealPlanId,
+      });
+    }
+
     return this.getVersion(tenant, planId, versionId);
   }
 

@@ -1,8 +1,10 @@
 import { Injectable } from "@nestjs/common";
+import { FEATURE_KEYS } from "@nutrition-saas/config";
 import { PrismaService } from "../prisma/prisma.service";
 import type { DietitianTenantContext } from "../dietitian/dietitian.types";
 import { ClientAccessService } from "../clients/client-access.service";
 import { AnalyticsService } from "../analytics/analytics.service";
+import { EntitlementService } from "../entitlements/entitlement.service";
 import { ConversationService } from "../messaging/conversation.service";
 import { NotificationService } from "../notifications/notification.service";
 import { tenantWhere } from "../dietitian/tenant-scope";
@@ -13,6 +15,7 @@ export class PracticeDashboardService {
     private readonly prisma: PrismaService,
     private readonly access: ClientAccessService,
     private readonly analytics: AnalyticsService,
+    private readonly entitlements: EntitlementService,
     private readonly conversations: ConversationService,
     private readonly notifications: NotificationService,
   ) {}
@@ -36,6 +39,7 @@ export class PracticeDashboardService {
       myTasks,
       overdueTasks,
       visibleClients,
+      clientLimitEntitlement,
     ] = await Promise.all([
       this.analytics.overview(tenant, { period: "this_month" }),
       this.analytics.clients(tenant, { period: "last_30_days" }),
@@ -90,17 +94,22 @@ export class PracticeDashboardService {
         where: visible,
         select: { id: true },
       }),
+      this.entitlements.resolve(tenant.dietitianAccountId, FEATURE_KEYS.CLIENT_LIMIT),
     ]);
 
     const inbox = await this.conversations.listInbox(
       tenant.dietitianAccountId,
       visibleClients.map((row) => row.id),
     );
-    const topConversations = inbox.slice(0, 5);
     const unreadMap = await this.conversations.unreadCountsForReader(
       tenant.userId,
-      topConversations.map((row) => row.id),
+      inbox.map((row) => row.id),
     );
+    let unreadMessageCount = 0;
+    for (const count of unreadMap.values()) {
+      unreadMessageCount += count;
+    }
+    const topConversations = inbox.slice(0, 5);
     const [recentNotifications, unreadNotificationCount] = await Promise.all([
       this.notifications.listRecentPreferUnread(tenant.userId, tenant.dietitianAccountId, 5),
       this.notifications.unreadCount(tenant.userId, tenant.dietitianAccountId),
@@ -110,6 +119,8 @@ export class PracticeDashboardService {
       id: row.id,
       title: row.title,
       startAt: row.startAt.toISOString(),
+      endAt: row.endAt.toISOString(),
+      status: row.status,
       clientId: row.client.id,
       clientName: row.client.displayName ?? `${row.client.firstName} ${row.client.lastName}`,
       clientEmail: row.client.email,
@@ -117,7 +128,9 @@ export class PracticeDashboardService {
 
     return {
       clientCount: total,
+      clientLimit: clientLimitEntitlement.enabled ? clientLimitEntitlement.limit : null,
       activeClients: active,
+      unreadMessageCount,
       newClientsThisMonth: overview.newClients,
       inactiveClients: overview.inactiveClients,
       tasksDueToday: overview.tasksDue,

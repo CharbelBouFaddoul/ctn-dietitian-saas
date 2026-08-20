@@ -22,7 +22,9 @@ import { usePractice } from "./practice-shell";
 
 interface Dashboard {
   clientCount: number;
+  clientLimit: number | null;
   activeClients: number;
+  unreadMessageCount: number;
   newClientsThisMonth: number;
   inactiveClients: number;
   tasksDueToday: number;
@@ -39,6 +41,8 @@ interface Dashboard {
     id: string;
     title: string;
     startAt: string;
+    endAt: string;
+    status: string;
     clientId: string;
     clientName: string;
     clientEmail?: string | null;
@@ -47,6 +51,8 @@ interface Dashboard {
     id: string;
     title: string;
     startAt: string;
+    endAt: string;
+    status: string;
     clientId: string;
     clientName: string;
     clientEmail?: string | null;
@@ -106,18 +112,23 @@ function AppointmentTable({
           <th>When</th>
           <th>Client</th>
           <th>Title</th>
+          <th>Status</th>
         </tr>
       </thead>
       <tbody>
         {rows.map((row) => (
           <tr key={row.id}>
-            <Td label="When">{formatDate(row.startAt)}</Td>
+            <Td label="When">
+              {formatDate(row.startAt)}
+              {row.endAt ? ` – ${new Date(row.endAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}` : ""}
+            </Td>
             <Td label="Client">
               <Link href={`/practice/${dietitianAccountId}/clients/${row.clientId}`} className="ui-link">
                 {clientIdentityLine({ id: row.clientId, displayName: row.clientName, email: row.clientEmail })}
               </Link>
             </Td>
             <Td label="Title">{row.title}</Td>
+            <Td label="Status">{humanizeLabel(row.status)}</Td>
           </tr>
         ))}
       </tbody>
@@ -147,17 +158,21 @@ export default function PracticeDashboardPage() {
   const metrics = [
     {
       tone: "clients" as const,
-      label: "Active clients",
-      value: loading ? "—" : String(data?.activeClients ?? 0),
+      label: "Clients",
+      value: loading
+        ? "—"
+        : data?.clientLimit != null
+          ? `${data.activeClients} / ${data.clientLimit}`
+          : String(data?.activeClients ?? 0),
       hint: `${data?.newClientsThisMonth ?? 0} new this month`,
       icon: PracticeAccents.clients,
     },
     {
       tone: "tasks" as const,
-      label: "My tasks",
-      value: loading ? "—" : String(data?.myTasks ?? 0),
-      hint: `${data?.myOverdueTasks ?? 0} overdue`,
-      icon: PracticeAccents.tasks,
+      label: "Unread messages",
+      value: loading ? "—" : String(data?.unreadMessageCount ?? 0),
+      hint: `${data?.myTasks ?? 0} open tasks`,
+      icon: PracticeAccents.messages,
     },
     {
       tone: "billing" as const,
@@ -298,7 +313,10 @@ export default function PracticeDashboardPage() {
               <ul className="ui-practice-list">
                 {data!.recentConversations.map((row) => (
                   <li key={row.id}>
-                    <Link href={`/practice/${dietitianAccountId}/messages`} className="ui-link">
+                    <Link
+                      href={`/practice/${dietitianAccountId}/messages?clientId=${row.clientId}`}
+                      className="ui-link"
+                    >
                       {row.clientName}
                     </Link>
                     <span className="ui-muted">
@@ -356,6 +374,32 @@ export default function PracticeDashboardPage() {
                       {clientIdentityLine({ id: row.clientId, displayName: row.clientName, email: row.clientEmail })}
                     </Link>
                     <span className="ui-muted">{row.reasons.map(humanizeLabel).join(" · ")}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Section>
+
+          <Section
+            title="Recently active clients"
+            description="Clients with recent practice activity."
+            actions={
+              <Link href={`/practice/${dietitianAccountId}/clients`} className="ui-link">
+                View clients
+              </Link>
+            }
+          >
+            {loading ? (
+              <Skeleton style={{ height: 48 }} />
+            ) : (data?.recentlyActive ?? []).length === 0 ? (
+              <EmptyState title="No recent clients">Client activity will appear here.</EmptyState>
+            ) : (
+              <ul className="ui-practice-list">
+                {(data?.recentlyActive ?? []).map((row) => (
+                  <li key={row.clientId}>
+                    <Link href={`/practice/${dietitianAccountId}/clients/${row.clientId}`} className="ui-link">
+                      {clientIdentityLine({ id: row.clientId, displayName: row.clientName, email: row.clientEmail })}
+                    </Link>
                   </li>
                 ))}
               </ul>

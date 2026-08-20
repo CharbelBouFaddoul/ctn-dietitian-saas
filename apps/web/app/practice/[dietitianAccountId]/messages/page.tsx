@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import {
   Alert,
   Avatar,
@@ -45,9 +45,11 @@ function relativeTime(value: string | null): string {
 
 export default function OrgMessagesPage() {
   const params = useParams<{ dietitianAccountId: string }>();
+  const searchParams = useSearchParams();
   const dietitianAccountId = params.dietitianAccountId;
+  const preferredClientId = searchParams.get("clientId");
   const [rows, setRows] = useState<InboxRow[] | null>(null);
-  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(preferredClientId);
   const [messages, setMessages] = useState<ChatMessage[] | null>(null);
   const [messageBody, setMessageBody] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -58,10 +60,16 @@ export default function OrgMessagesPage() {
     void api<InboxRow[]>(`/api/v1/dietitian/${dietitianAccountId}/conversations`)
       .then((data) => {
         setRows(data);
-        if (!selectedClientId && data[0]) setSelectedClientId(data[0].clientId);
+        setSelectedClientId((current) => {
+          if (preferredClientId && data.some((row) => row.clientId === preferredClientId)) {
+            return preferredClientId;
+          }
+          if (current && data.some((row) => row.clientId === current)) return current;
+          return data[0]?.clientId ?? null;
+        });
       })
       .catch((err) => setError(errorMessage(err, "Unable to load inbox")));
-  }, [dietitianAccountId]);
+  }, [dietitianAccountId, preferredClientId]);
 
   useEffect(() => {
     if (!selectedClientId) {

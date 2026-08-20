@@ -61,10 +61,11 @@ No Organization layer. No OrganizationMember. No STAFF tenancy. No `organization
 
 ## Phase 5 notes
 
-- Reuses `Notification` + `NotificationService`. Types include `APPOINTMENT_*`, `CLIENT_JOINED`, `SUBSCRIPTION_*`.
+- Reuses `Notification` + `NotificationService`. Types include `APPOINTMENT_*`, `CLIENT_JOINED`, `SUBSCRIPTION_*`, `MEAL_PLAN_PUBLISHED`.
 - `POST …/notifications/read-all` on practice + portal; shells poll unread-count.
 - `PlatformSettings.emailNotificationsEnabled` default **false**: gates invoice + automation product emails; auth emails always send.
 - Practice dashboard extended; portal `GET /api/v1/portal/dashboard`.
+- **Product Phase 4 polish:** practice dashboard adds `clientLimit`, `unreadMessageCount`, appointment `endAt`/`status`, recently-active clients UI; notification bell/list deep-link via `targetType`/`targetId`; meal-plan publish notifies linked patient.
 
 ## Phase 6 notes
 

@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Alert, Button, EmptyState, LoadingState, PageHeader } from "@nutrition-saas/ui";
 import { api } from "../../../../lib/api";
 import { formatDate } from "../../../../lib/format";
 import { errorMessage } from "../../../../lib/humanize-error";
+import { hrefForNotification } from "../../../../lib/notification-href";
 import {
   notificationTypeLabel,
   type NotificationItem,
@@ -14,7 +15,9 @@ import {
 
 export default function PracticeNotificationsPage() {
   const params = useParams<{ dietitianAccountId: string }>();
+  const router = useRouter();
   const dietitianAccountId = params.dietitianAccountId;
+  const mode = { kind: "practice" as const, dietitianAccountId };
   const base = `/api/v1/dietitian/${dietitianAccountId}/notifications`;
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -51,11 +54,15 @@ export default function PracticeNotificationsPage() {
     }
   }
 
-  async function markOne(id: string) {
-    await api(`${base}/${id}/read`, { method: "PATCH" });
-    setItems((prev) =>
-      prev.map((row) => (row.id === id ? { ...row, readAt: row.readAt ?? new Date().toISOString() } : row)),
-    );
+  async function openItem(item: NotificationItem) {
+    if (!item.readAt) {
+      await api(`${base}/${item.id}/read`, { method: "PATCH" });
+      setItems((prev) =>
+        prev.map((row) => (row.id === item.id ? { ...row, readAt: row.readAt ?? new Date().toISOString() } : row)),
+      );
+    }
+    const href = hrefForNotification(mode, item);
+    if (href) router.push(href);
   }
 
   if (loading) {
@@ -108,7 +115,7 @@ export default function PracticeNotificationsPage() {
         <ul className="ui-notif-feed">
           {items.map((item) => (
             <li key={item.id} className={item.readAt ? "is-read" : "is-unread"}>
-              <button type="button" className="ui-notif-feed__card" onClick={() => void markOne(item.id)}>
+              <button type="button" className="ui-notif-feed__card" onClick={() => void openItem(item)}>
                 <span className="ui-notif-feed__rail" aria-hidden />
                 <span className="ui-notif-feed__content">
                   <span className="ui-notif-feed__meta">
@@ -118,7 +125,9 @@ export default function PracticeNotificationsPage() {
                   </span>
                   <strong>{item.title}</strong>
                   <p>{item.body}</p>
-                  {!item.readAt ? <span className="ui-notif-feed__hint">Click to mark as read</span> : null}
+                  <span className="ui-notif-feed__hint">
+                    {hrefForNotification(mode, item) ? "Open related item" : "Mark as read"}
+                  </span>
                 </span>
               </button>
             </li>

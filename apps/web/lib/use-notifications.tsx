@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { api } from "./api";
 import { formatDate } from "./format";
+import { hrefForNotification } from "./notification-href";
 
 export interface NotificationItem {
   id: string;
@@ -13,6 +15,9 @@ export interface NotificationItem {
   readAt: string | null;
   createdAt: string;
   type: string;
+  targetType?: string | null;
+  targetId?: string | null;
+  clientId?: string | null;
 }
 
 type Mode =
@@ -36,6 +41,7 @@ export function notificationTypeLabel(type: string): string {
     SUBSCRIPTION_GRACE: "Subscription",
     SUBSCRIPTION_READ_ONLY: "Subscription",
     SUBSCRIPTION_LOCKED: "Subscription",
+    MEAL_PLAN_PUBLISHED: "Meal plan",
   };
   return map[type] ?? "Update";
 }
@@ -121,6 +127,7 @@ export function NotificationBell({
   enabled?: boolean;
   placement?: "auto" | "above" | "below";
 }) {
+  const router = useRouter();
   const {
     items,
     unreadCount,
@@ -216,6 +223,15 @@ export function NotificationBell({
     };
   }, [open, setOpen]);
 
+  async function openItem(item: NotificationItem) {
+    if (!item.readAt) {
+      await markRead(item.id);
+    }
+    setOpen(false);
+    const href = hrefForNotification(mode, item);
+    if (href) router.push(href);
+  }
+
   const panel =
     open && mounted && panelStyle
       ? createPortal(
@@ -265,7 +281,7 @@ export function NotificationBell({
                 <ul className="ui-notif__list">
                   {items.map((item) => (
                     <li key={item.id} className={item.readAt ? "is-read" : "is-unread"}>
-                      <button type="button" className="ui-notif__item" onClick={() => void markRead(item.id)}>
+                      <button type="button" className="ui-notif__item" onClick={() => void openItem(item)}>
                         <span className="ui-notif__dot" aria-hidden />
                         <span className="ui-notif__item-copy">
                           <span className="ui-notif__item-meta">

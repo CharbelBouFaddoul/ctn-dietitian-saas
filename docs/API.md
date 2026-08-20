@@ -166,7 +166,7 @@ Session + `TenantGuard`. Client-scoped routes also run `ClientAccessGuard` / `Cl
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| GET | `/practice/dashboard` | Member | Live client counts, upcoming appointments, recent timeline |
+| GET | `/practice/dashboard` | Owner (`DietitianGuard`) | Aggregated practice home: `clientCount`, `clientLimit`, `unreadMessageCount`, appointments (`endAt`/`status`), messages, notifications, needsAttention, recentlyActive |
 | GET/POST | `/clients` | Member; create OWNER/DIETITIAN | List (search/status/tag/assignee/page) / create. Optional `invitePortal` |
 | GET/PATCH | `/clients/:clientId` | Client access | Read / update identity |
 | POST | `/clients/:clientId/archive` | OWNER/DIETITIAN assigned | Archive; close assignments; deactivate portal; revoke sessions |
@@ -302,7 +302,9 @@ List, upload, download, share/unshare (`PATCH visibility`), archive.
 
 ### Notifications
 
-`/api/v1/portal/notifications` and `/organizations/:orgId/notifications`.
+Practice: `GET/PATCH/POST /api/v1/dietitian/:dietitianAccountId/notifications` (+ `/unread-count`, `/:id/read`, `/read-all`).
+Portal: `/api/v1/portal/notifications` (same operations; scoped by `activeClientId` → dietitianAccountId).
+Types include messages, documents, invoices, tasks, appointments, client join, subscription lifecycle, and `MEAL_PLAN_PUBLISHED`. In-app only (email is separate and gated).
 
 ### Invoices — portal (`/api/v1/portal/invoices`)
 
