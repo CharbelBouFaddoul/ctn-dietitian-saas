@@ -119,6 +119,7 @@ export class DietitianService {
     reminderEmailEnabled: boolean;
     reminderHoursBefore: number;
     invoiceDefaultDueDays: number;
+    invoiceDefaultTaxPercent?: number | { toString(): string } | null;
     invoiceFooter: string | null;
     emailFromName: string | null;
     emailReplyTo: string | null;
@@ -144,6 +145,9 @@ export class DietitianService {
       reminderEmailEnabled: settings.reminderEmailEnabled,
       reminderHoursBefore: settings.reminderHoursBefore,
       invoiceDefaultDueDays: settings.invoiceDefaultDueDays,
+      invoiceDefaultTaxPercent: Number(
+        (settings.invoiceDefaultTaxPercent ?? 0).toString(),
+      ),
       invoiceFooter: settings.invoiceFooter,
       emailFromName: settings.emailFromName,
       emailReplyTo: settings.emailReplyTo,
@@ -175,6 +179,9 @@ export class DietitianService {
       ...(update.reminderEmailEnabled !== undefined ? { reminderEmailEnabled: update.reminderEmailEnabled } : {}),
       ...(update.reminderHoursBefore !== undefined ? { reminderHoursBefore: update.reminderHoursBefore } : {}),
       ...(update.invoiceDefaultDueDays !== undefined ? { invoiceDefaultDueDays: update.invoiceDefaultDueDays } : {}),
+      ...(update.invoiceDefaultTaxPercent !== undefined
+        ? { invoiceDefaultTaxPercent: update.invoiceDefaultTaxPercent }
+        : {}),
       ...(update.invoiceFooter !== undefined ? { invoiceFooter: update.invoiceFooter } : {}),
       ...(update.emailFromName !== undefined ? { emailFromName: update.emailFromName } : {}),
       ...(update.emailReplyTo !== undefined ? { emailReplyTo: update.emailReplyTo } : {}),
@@ -210,6 +217,7 @@ export class DietitianService {
       reminderEmailEnabled: boolean;
       reminderHoursBefore: number;
       invoiceDefaultDueDays: number;
+      invoiceDefaultTaxPercent?: number | { toString(): string } | null;
       invoiceFooter: string | null;
       emailFromName: string | null;
       emailReplyTo: string | null;

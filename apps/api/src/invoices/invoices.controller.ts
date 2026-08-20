@@ -19,11 +19,14 @@ import {
 import {
   IsArray,
   IsDateString,
+  IsEnum,
   IsNumber,
   IsOptional,
   IsString,
   IsUUID,
+  Max,
   MaxLength,
+  Min,
   MinLength,
   ValidateNested,
 } from "class-validator";
@@ -49,10 +52,12 @@ class InvoiceItemDto {
 
   @ApiProperty()
   @IsNumber()
+  @Min(0.0001)
   quantity!: number;
 
   @ApiProperty()
   @IsNumber()
+  @Min(0)
   unitPrice!: number;
 }
 
@@ -89,6 +94,24 @@ class CreateInvoiceDto {
   @IsString()
   @MaxLength(5000)
   notes?: string;
+
+  @ApiPropertyOptional({ enum: ["PERCENT", "FIXED"] })
+  @IsOptional()
+  @IsEnum(["PERCENT", "FIXED"])
+  discountType?: "PERCENT" | "FIXED" | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  discountValue?: number | null;
+
+  @ApiPropertyOptional({ description: "Tax rate percent applied after discount" })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  taxRatePercent?: number | null;
 }
 
 class UpdateInvoiceDto {
@@ -120,6 +143,24 @@ class UpdateInvoiceDto {
   @IsString()
   @MaxLength(5000)
   notes?: string | null;
+
+  @ApiPropertyOptional({ enum: ["PERCENT", "FIXED"], nullable: true })
+  @IsOptional()
+  @IsEnum(["PERCENT", "FIXED"])
+  discountType?: "PERCENT" | "FIXED" | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  discountValue?: number | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  taxRatePercent?: number | null;
 }
 
 @ApiTags("portal")

@@ -94,6 +94,37 @@ describe("Phase 10 invoices, tasks, and analytics", () => {
 
     expect(draft.body.total).toBe(200);
     expect(draft.body.status).toBe("DRAFT");
+    expect(draft.body.subtotal).toBe(200);
+    expect(draft.body.discountAmount).toBe(0);
+    expect(draft.body.taxAmount).toBe(0);
+
+    const taxed = await request(ctx.app.getHttpServer())
+      .post(`/api/v1/dietitian/${org.id}/clients/${client.body.id}/invoices`)
+      .set("Cookie", owner.cookie)
+      .send({
+        items: [{ description: "Package", quantity: 1, unitPrice: 100 }],
+        discountType: "PERCENT",
+        discountValue: 10,
+        taxRatePercent: 11,
+        notes: "VAT included after discount",
+      })
+      .expect(201);
+
+    // subtotal 100 − 10% = 90 taxable; tax 11% of 90 = 9.9; total 99.9
+    expect(taxed.body.subtotal).toBe(100);
+    expect(taxed.body.discountAmount).toBe(10);
+    expect(taxed.body.taxAmount).toBe(9.9);
+    expect(taxed.body.total).toBe(99.9);
+    expect(taxed.body.taxRatePercent).toBe(11);
+
+    const patched = await request(ctx.app.getHttpServer())
+      .patch(`/api/v1/dietitian/${org.id}/invoices/${taxed.body.id}`)
+      .set("Cookie", owner.cookie)
+      .send({ discountType: "FIXED", discountValue: 5, taxRatePercent: 10 })
+      .expect(200);
+    expect(patched.body.discountAmount).toBe(5);
+    expect(patched.body.taxAmount).toBe(9.5);
+    expect(patched.body.total).toBe(104.5);
 
     await request(ctx.app.getHttpServer())
       .get("/api/v1/portal/invoices")

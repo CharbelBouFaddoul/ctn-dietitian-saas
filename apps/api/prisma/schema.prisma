@@ -287,6 +287,7 @@ model DietitianSettings {
   reminderEmailEnabled      Boolean    @default(true) @map("reminder_email_enabled")
   reminderHoursBefore       Int        @default(24) @map("reminder_hours_before")
   invoiceDefaultDueDays     Int        @default(14) @map("invoice_default_due_days")
+  invoiceDefaultTaxPercent  Decimal    @default(0) @map("invoice_default_tax_percent") @db.Decimal(8, 4)
   invoiceFooter             String?    @map("invoice_footer") @db.Text
   emailFromName             String?    @map("email_from_name")
   emailReplyTo              String?    @map("email_reply_to")
@@ -1559,26 +1560,36 @@ model InvoiceSequence {
   @@map("invoice_sequences")
 }
 
+enum InvoiceDiscountType {
+  PERCENT
+  FIXED
+}
+
 model Invoice {
-  id                 String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  dietitianAccountId String        @map("dietitian_account_id") @db.Uuid
-  clientId           String        @map("client_id") @db.Uuid
-  invoiceNumber      String?       @map("invoice_number")
-  status             InvoiceStatus @default(DRAFT)
-  issueDate          DateTime?     @map("issue_date") @db.Date
-  dueDate            DateTime?     @map("due_date") @db.Date
-  currency           String        @default("USD") @db.VarChar(3)
-  subtotal           Decimal       @default(0) @db.Decimal(12, 2)
-  total              Decimal       @default(0) @db.Decimal(12, 2)
-  notes              String?       @db.Text
-  createdById        String?       @map("created_by_id") @db.Uuid
-  issuedAt           DateTime?     @map("issued_at") @db.Timestamptz
-  sentAt             DateTime?     @map("sent_at") @db.Timestamptz
-  paidAt             DateTime?     @map("paid_at") @db.Timestamptz
-  cancelledAt        DateTime?     @map("cancelled_at") @db.Timestamptz
-  createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt          DateTime      @updatedAt @map("updated_at") @db.Timestamptz
-  archivedAt         DateTime?     @map("archived_at") @db.Timestamptz
+  id                 String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  dietitianAccountId String               @map("dietitian_account_id") @db.Uuid
+  clientId           String               @map("client_id") @db.Uuid
+  invoiceNumber      String?              @map("invoice_number")
+  status             InvoiceStatus        @default(DRAFT)
+  issueDate          DateTime?            @map("issue_date") @db.Date
+  dueDate            DateTime?            @map("due_date") @db.Date
+  currency           String               @default("USD") @db.VarChar(3)
+  subtotal           Decimal              @default(0) @db.Decimal(12, 2)
+  discountType       InvoiceDiscountType? @map("discount_type")
+  discountValue      Decimal?             @map("discount_value") @db.Decimal(12, 4)
+  discountAmount     Decimal              @default(0) @map("discount_amount") @db.Decimal(12, 2)
+  taxRatePercent     Decimal              @default(0) @map("tax_rate_percent") @db.Decimal(8, 4)
+  taxAmount          Decimal              @default(0) @map("tax_amount") @db.Decimal(12, 2)
+  total              Decimal              @default(0) @db.Decimal(12, 2)
+  notes              String?              @db.Text
+  createdById        String?              @map("created_by_id") @db.Uuid
+  issuedAt           DateTime?            @map("issued_at") @db.Timestamptz
+  sentAt             DateTime?            @map("sent_at") @db.Timestamptz
+  paidAt             DateTime?            @map("paid_at") @db.Timestamptz
+  cancelledAt        DateTime?            @map("cancelled_at") @db.Timestamptz
+  createdAt          DateTime             @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime             @updatedAt @map("updated_at") @db.Timestamptz
+  archivedAt         DateTime?            @map("archived_at") @db.Timestamptz
 
   dietitianAccount DietitianAccount @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
   client           Client           @relation(fields: [clientId], references: [id], onDelete: Restrict)

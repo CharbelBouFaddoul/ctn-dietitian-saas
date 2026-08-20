@@ -6466,3 +6466,365 @@
   }
 }
 
+/* ── Advanced invoice / facture ─────────────────────────────────────────── */
+
+.ui-invoice-list {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.ui-invoice-list__filters {
+  margin-bottom: 0;
+  width: 100%;
+}
+
+.ui-invoice-list__filters .ui-search-input {
+  flex: 1 1 16rem;
+  min-width: min(100%, 14rem);
+}
+
+.ui-invoice-list__filter-select {
+  flex: 0 1 12rem;
+  width: auto;
+  min-width: 10rem;
+  max-width: 16rem;
+}
+
+.ui-invoice-builder__toolbar {
+  margin-bottom: 1rem;
+}
+
+.ui-invoice-builder__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.ui-invoice-builder__form,
+.ui-invoice-builder__preview {
+  min-width: 0;
+}
+
+.ui-invoice-builder__panel {
+  background: var(--color-surface, #fff);
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 14px;
+  padding: 1rem 1.1rem 1.15rem;
+  margin-bottom: 1rem;
+}
+
+.ui-invoice-builder__panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.ui-invoice-builder__panel-title {
+  margin: 0 0 0.85rem;
+  font-size: 0.95rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.ui-invoice-builder__panel-head .ui-invoice-builder__panel-title {
+  margin-bottom: 0;
+}
+
+.ui-invoice-builder__fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.85rem 1rem;
+}
+
+.ui-invoice-builder__fields--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 0.85rem;
+}
+
+.ui-invoice-builder__lines {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.ui-invoice-builder__line {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) 5.5rem 7rem auto;
+  gap: 0.65rem;
+  align-items: end;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
+}
+
+.ui-invoice-builder__line:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.ui-invoice-builder__line-actions {
+  padding-bottom: 0.15rem;
+}
+
+.ui-invoice-builder__sticky-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.85rem 0 0.25rem;
+  position: sticky;
+  bottom: 0;
+  background: linear-gradient(to top, var(--color-bg, #f8fafc) 70%, transparent);
+}
+
+.ui-invoice-builder__preview-head {
+  margin-bottom: 0.85rem;
+}
+
+.ui-invoice-builder__preview-head h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1rem;
+}
+
+.ui-invoice-builder__preview-head p {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.ui-facture-stage {
+  background:
+    radial-gradient(circle at top, rgba(15, 23, 42, 0.04), transparent 55%),
+    #e8edf3;
+  border: 1px solid var(--color-border, #d7dee8);
+  border-radius: 16px;
+  padding: 1.25rem 1rem 1.5rem;
+  display: flex;
+  justify-content: center;
+}
+
+.ui-facture {
+  width: min(100%, 794px);
+  margin: 0 auto;
+  padding: 40px 44px;
+  background: #fff;
+  color: #0f172a;
+  border: 1px solid #dbe3ee;
+  border-radius: 4px;
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 18px 40px rgba(15, 23, 42, 0.1);
+}
+
+.ui-facture--paper {
+  min-height: 980px;
+}
+
+.ui-facture__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 28px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.ui-facture__brand {
+  margin: 0 0 8px;
+  font-size: 1.55rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.ui-facture__title-block {
+  text-align: right;
+}
+
+.ui-facture__eyebrow {
+  margin: 0;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #64748b;
+}
+
+.ui-facture__number {
+  margin: 4px 0 8px;
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.ui-facture__meta {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+.ui-facture__parties {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.ui-facture__label {
+  margin: 0 0 4px;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+}
+
+.ui-facture__party {
+  margin: 0;
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+
+.ui-facture__totals {
+  margin-top: 20px;
+  margin-left: auto;
+  width: min(320px, 100%);
+  display: grid;
+  gap: 8px;
+}
+
+.ui-facture__totals-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 0.95rem;
+}
+
+.ui-facture__totals-row--grand {
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 2px solid #0f172a;
+  font-size: 1.1rem;
+}
+
+.ui-facture__notes {
+  margin-top: 28px;
+  padding-top: 16px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.ui-facture__footer {
+  margin-top: 24px;
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+.ui-client-invoice-detail.ui-facture {
+  margin-top: 16px;
+}
+
+.ui-invoice-page__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.ui-invoice-page__hint {
+  margin: -0.35rem 0 1rem;
+  font-size: 0.875rem;
+}
+
+.ui-invoice-page__draft-form {
+  background: var(--color-surface, #fff);
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 14px;
+  padding: 1rem 1.1rem 1.15rem;
+  margin-bottom: 1.25rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+@media (max-width: 1100px) {
+  .ui-invoice-builder__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ui-facture--paper {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 720px) {
+  .ui-invoice-builder__fields,
+  .ui-invoice-builder__fields--3,
+  .ui-invoice-builder__line {
+    grid-template-columns: 1fr;
+  }
+
+  .ui-invoice-list__filter-select {
+    flex: 1 1 100%;
+    max-width: none;
+  }
+
+  .ui-facture {
+    padding: 24px 18px;
+  }
+
+  .ui-facture__header,
+  .ui-facture__parties {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+
+  .ui-facture__title-block {
+    text-align: left;
+  }
+}
+
+@media print {
+  @page {
+    margin: 14mm;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .ui-facture,
+  .ui-facture * {
+    visibility: visible;
+  }
+
+  .ui-facture-stage {
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+  }
+
+  .ui-facture {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    max-width: none;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .no-print,
+  .ui-invoice-page__controls,
+  .ui-invoice-builder__toolbar,
+  .ui-invoice-builder__form,
+  .ui-invoice-builder__preview-head,
+  nav,
+  header,
+  aside,
+  .ui-sidebar,
+  .ui-topbar {
+    display: none !important;
+  }
+}
+

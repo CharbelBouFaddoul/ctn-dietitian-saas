@@ -37,6 +37,7 @@ interface Settings {
   reminderEmailEnabled: boolean;
   reminderHoursBefore: number;
   invoiceDefaultDueDays: number;
+  invoiceDefaultTaxPercent: number;
   invoiceFooter: string | null;
   emailFromName: string | null;
   emailReplyTo: string | null;
@@ -222,6 +223,16 @@ export default function PracticeSettingsPage() {
                 min={0}
                 value={settings.invoiceDefaultDueDays}
                 onChange={(e) => set("invoiceDefaultDueDays", Number(e.target.value))}
+              />
+            </Field>
+            <Field label="Default tax rate (%)">
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                step="any"
+                value={settings.invoiceDefaultTaxPercent ?? 0}
+                onChange={(e) => set("invoiceDefaultTaxPercent", Number(e.target.value))}
               />
             </Field>
             <Field label="Invoice footer note">

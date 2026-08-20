@@ -12,7 +12,8 @@ import { PrismaService } from "../prisma/prisma.service";
 import type { DietitianTenantContext } from "../dietitian/dietitian.types";
 import { TimelineService } from "../timeline/timeline.service";
 import { NotificationService } from "../notifications/notification.service";
-import { computeLineTotal, decimalToNumber, money, sumMoney } from "./invoice-money";
+import { computeLineTotal, computeInvoiceTotals, decimalToNumber, money, sumMoney } from "./invoice-money";
+import type { DiscountType } from "./invoice-money";
 import { InvoiceNumberService } from "./invoice-number.service";
 import { requireDietitianAccountId, tenantWhere } from "../dietitian/tenant-scope";
 
@@ -20,6 +21,12 @@ export interface InvoiceItemInput {
   description: string;
   quantity: number | string;
   unitPrice: number | string;
+}
+
+export interface InvoiceTotalsInput {
+  discountType?: DiscountType | null;
+  discountValue?: number | null;
+  taxRatePercent?: number | null;
 }
 
 const PORTAL_VISIBLE: InvoiceStatus[] = ["ISSUED", "SENT", "PAID", "OVERDUE"];
@@ -141,6 +148,9 @@ export class InvoiceService {
       currency?: string;
       notes?: string;
       items: InvoiceItemInput[];
+      discountType?: DiscountType | null;
+      discountValue?: number | null;
+      taxRatePercent?: number | null;
     },
   ) {
     await this.access.assertCanAccess(tenant, clientId, "manageRecords");
@@ -160,7 +170,17 @@ export class InvoiceService {
         : issueDate && settings?.invoiceDefaultDueDays
           ? this.addDays(issueDate, settings.invoiceDefaultDueDays)
           : null;
-    const computed = this.computeItems(input.items);
+    const taxRatePercent =
+      input.taxRatePercent !== undefined && input.taxRatePercent !== null
+        ? input.taxRatePercent
+        : settings?.invoiceDefaultTaxPercent != null
+          ? Number(settings.invoiceDefaultTaxPercent)
+          : 0;
+    const computed = this.computeItems(input.items, {
+      discountType: input.discountType ?? null,
+      discountValue: input.discountValue ?? null,
+      taxRatePercent,
+    });
     const invoice = await this.prisma.$transaction(async (tx) => {
       const created = await tx.invoice.create({
         data: {
@@ -171,6 +191,11 @@ export class InvoiceService {
           dueDate,
           currency,
           subtotal: computed.subtotal,
+          discountType: computed.discountType,
+          discountValue: computed.discountValue,
+          discountAmount: computed.discountAmount,
+          taxRatePercent: computed.taxRatePercent,
+          taxAmount: computed.taxAmount,
           total: computed.total,
           notes: input.notes?.trim() ?? null,
           createdById: tenant.userId,
@@ -218,6 +243,9 @@ export class InvoiceService {
       currency?: string;
       notes?: string | null;
       items?: InvoiceItemInput[];
+      discountType?: DiscountType | null;
+      discountValue?: number | null;
+      taxRatePercent?: number | null;
     },
   ) {
     const existing = await this.findOrgInvoice(tenant, invoiceId);
@@ -225,9 +253,34 @@ export class InvoiceService {
       throw new BadRequestException("Only draft invoices can be edited");
     }
     await this.access.assertCanAccess(tenant, existing.clientId, "manageRecords");
-    const computed = input.items ? this.computeItems(input.items) : null;
+
+    const itemsInput =
+      input.items ??
+      existing.items.map((item) => ({
+        description: item.description,
+        quantity: Number(item.quantity.toString()),
+        unitPrice: Number(item.unitPrice.toString()),
+      }));
+    const totalsInput: InvoiceTotalsInput = {
+      discountType:
+        input.discountType !== undefined
+          ? input.discountType
+          : (existing.discountType as DiscountType | null),
+      discountValue:
+        input.discountValue !== undefined
+          ? input.discountValue
+          : existing.discountValue != null
+            ? Number(existing.discountValue)
+            : null,
+      taxRatePercent:
+        input.taxRatePercent !== undefined
+          ? input.taxRatePercent
+          : Number(existing.taxRatePercent),
+    };
+    const computed = this.computeItems(itemsInput, totalsInput);
+
     const invoice = await this.prisma.$transaction(async (tx) => {
-      if (computed) {
+      if (input.items) {
         await tx.invoiceItem.deleteMany({ where: { invoiceId } });
       }
       return tx.invoice.update({
@@ -237,10 +290,15 @@ export class InvoiceService {
           dueDate: input.dueDate === undefined ? undefined : input.dueDate ? this.parseDate(input.dueDate) : null,
           currency: input.currency,
           notes: input.notes === undefined ? undefined : input.notes,
-          ...(computed
+          subtotal: computed.subtotal,
+          discountType: computed.discountType,
+          discountValue: computed.discountValue,
+          discountAmount: computed.discountAmount,
+          taxRatePercent: computed.taxRatePercent,
+          taxAmount: computed.taxAmount,
+          total: computed.total,
+          ...(input.items
             ? {
-                subtotal: computed.subtotal,
-                total: computed.total,
                 items: {
                   create: computed.items.map((item, index) => ({
                     dietitianAccountId: tenant.dietitianAccountId,
@@ -531,7 +589,7 @@ export class InvoiceService {
     return invoice;
   }
 
-  private computeItems(items: InvoiceItemInput[]) {
+  private computeItems(items: InvoiceItemInput[], totals: InvoiceTotalsInput = {}) {
     const computed = items.map((item, index) => {
       const description = item.description.trim();
       if (!description) {
@@ -549,7 +607,34 @@ export class InvoiceService {
       return { description, quantity, unitPrice, lineTotal };
     });
     const subtotal = sumMoney(computed.map((item) => item.lineTotal));
-    return { items: computed, subtotal, total: subtotal };
+    const taxRatePercent = totals.taxRatePercent == null ? 0 : Number(totals.taxRatePercent);
+    if (taxRatePercent < 0 || taxRatePercent > 100) {
+      throw new BadRequestException("Tax rate must be between 0 and 100");
+    }
+    const discountType = totals.discountType ?? null;
+    const discountValue = totals.discountValue ?? null;
+    if (discountType && (discountValue == null || discountValue < 0)) {
+      throw new BadRequestException("Discount value must be zero or positive");
+    }
+    if (discountType === "PERCENT" && discountValue != null && discountValue > 100) {
+      throw new BadRequestException("Percent discount cannot exceed 100");
+    }
+    const moneyTotals = computeInvoiceTotals({
+      subtotal,
+      discountType,
+      discountValue,
+      taxRatePercent,
+    });
+    return {
+      items: computed,
+      subtotal,
+      discountType,
+      discountValue: discountType && discountValue != null ? money(discountValue) : null,
+      discountAmount: moneyTotals.discountAmount,
+      taxRatePercent: money(taxRatePercent),
+      taxAmount: moneyTotals.taxAmount,
+      total: moneyTotals.total,
+    };
   }
 
   private async refreshOverdue(dietitianAccountId: string) {
@@ -598,6 +683,11 @@ export class InvoiceService {
       dueDate: row.dueDate ? this.formatDate(row.dueDate) : null,
       currency: row.currency,
       subtotal: decimalToNumber(row.subtotal),
+      discountType: row.discountType,
+      discountValue: row.discountValue === null ? null : Number(row.discountValue.toString()),
+      discountAmount: decimalToNumber(row.discountAmount),
+      taxRatePercent: Number(row.taxRatePercent.toString()),
+      taxAmount: decimalToNumber(row.taxAmount),
       total: decimalToNumber(row.total),
       notes: row.notes,
       issuedAt: row.issuedAt?.toISOString() ?? null,

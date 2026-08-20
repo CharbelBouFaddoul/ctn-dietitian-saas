@@ -11,6 +11,7 @@ import {
   IsEmail,
   IsIn,
   IsInt,
+  IsNumber,
   IsOptional,
   IsString,
   Max,
@@ -166,6 +167,14 @@ export class UpdateDietitianSettingsDto extends DietitianSettingsInputDto {
   @Min(0)
   @Max(365)
   invoiceDefaultDueDays?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  invoiceDefaultTaxPercent?: number;
 
   @ApiPropertyOptional()
   @IsOptional()

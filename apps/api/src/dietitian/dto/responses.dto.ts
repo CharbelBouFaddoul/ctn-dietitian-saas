@@ -61,6 +61,9 @@ export class DietitianSettingsResponseDto {
   @ApiProperty()
   invoiceDefaultDueDays!: number;
 
+  @ApiProperty()
+  invoiceDefaultTaxPercent!: number;
+
   @ApiPropertyOptional({ nullable: true, type: String })
   invoiceFooter!: string | null;
 

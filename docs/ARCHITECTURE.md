@@ -566,7 +566,7 @@ Tooling: pnpm workspaces + Turborepo. Prisma lives in `apps/api`. Schema grows *
 
 `organization_settings` (1:1 with organization) holds practice name/logo, contact, **timezone**, **locale** (separate), currency, date format, measurement units, default appointment duration, reminder preferences, invoice settings, and email branding.
 
-Settings are consumed by invoices, emails, PDFs, appointments, client portal, and branding. Phase 10 invoice modules read `currency`, `invoiceDefaultDueDays`, and `invoiceFooter` from settings.
+Settings are consumed by invoices, emails, PDFs, appointments, client portal, and branding. Invoice modules read `currency`, `invoiceDefaultDueDays`, `invoiceDefaultTaxPercent`, and `invoiceFooter` from settings.
 
 ---
 
@@ -574,7 +574,7 @@ Settings are consumed by invoices, emails, PDFs, appointments, client portal, an
 
 **Modules:** `InvoicesModule`, `TasksModule`, `AnalyticsModule` (extends `PracticeModule` dashboard).
 
-**Invoices:** Server-side decimal totals; `InvoiceNumberService` uses PostgreSQL upsert on `invoice_sequences` for concurrency-safe numbering. Portal exposes read-only invoices (ISSUED/SENT/PAID/OVERDUE). No Stripe or payment webhooks.
+**Invoices:** Server-side decimal totals with optional percent/fixed discount and tax rate; `InvoiceNumberService` uses PostgreSQL upsert on `invoice_sequences` for concurrency-safe numbering. Portal exposes read-only invoices (ISSUED/SENT/PAID/OVERDUE) with facture print view. Browser print/Save as PDF; no Stripe or payment webhooks.
 
 **Tasks:** Organization-scoped; optional client link. `ClientAccessService` gates client-related tasks. Not exposed on client portal.
 

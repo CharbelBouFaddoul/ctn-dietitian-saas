@@ -398,7 +398,9 @@ Clients cannot mutate invoice status or amounts.
 | POST | `.../issue`, `.../send`, `.../pay`, `.../cancel`, `.../archive` | Lifecycle |
 | GET/POST | `/organizations/:orgId/clients/:clientId/invoices` | Client workspace list / create draft |
 
-Totals are computed server-side from line items (`quantity`, `unitPrice`).
+Totals are computed server-side from line items (`quantity`, `unitPrice`), then optional **discount** (`discountType` `PERCENT`|`FIXED` + `discountValue`) and **tax** (`taxRatePercent` applied to taxable amount after discount). Response includes `subtotal`, `discountAmount`, `taxAmount`, and `total`. New drafts inherit `invoiceDefaultTaxPercent` from dietitian settings when tax is omitted. Print/download uses browser print → Save as PDF (no server PDF binary).
+
+Create/update draft body may include: `discountType`, `discountValue`, `taxRatePercent`, `notes`, plus line `items`.
 
 ### Tasks — organization (`/organizations/:orgId/tasks`)
 

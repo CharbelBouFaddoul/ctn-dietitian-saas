@@ -1,21 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { FormEvent, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import {
   Alert,
   Breadcrumbs,
   Button,
+  Field,
+  Input,
   LoadingState,
   PageHeader,
+  Select,
   StatusBadge,
-  Table,
-  Td,
+  Textarea,
 } from "@nutrition-saas/ui";
+import { InvoiceDocument } from "../../../../../components/invoice-document";
 import { api } from "../../../../../lib/api";
 import { statusLabel } from "../../../../../lib/practice-labels";
 import { errorMessage } from "../../../../../lib/humanize-error";
-import { formatDateOnly, formatMoney } from "../../../../../lib/format";
 
 interface InvoiceDetail {
   id: string;
@@ -26,6 +29,11 @@ interface InvoiceDetail {
   dueDate: string | null;
   currency: string;
   subtotal: number;
+  discountType: "PERCENT" | "FIXED" | null;
+  discountValue: number | null;
+  discountAmount: number;
+  taxRatePercent: number;
+  taxAmount: number;
   total: number;
   notes: string | null;
   items: Array<{ description: string; quantity: number; unitPrice: number; lineTotal: number }>;
@@ -38,6 +46,7 @@ interface PrintPayload {
     contactEmail: string | null;
     contactPhone: string | null;
     addressLine1: string | null;
+    addressLine2: string | null;
     city: string | null;
     region: string | null;
     postalCode: string | null;
@@ -53,6 +62,10 @@ export default function InvoiceDetailPage() {
   const [print, setPrint] = useState<PrintPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
+  const [discountType, setDiscountType] = useState<"" | "PERCENT" | "FIXED">("");
+  const [discountValue, setDiscountValue] = useState("");
+  const [taxRatePercent, setTaxRatePercent] = useState("0");
+  const [notes, setNotes] = useState("");
 
   async function load() {
     const [detail, payload] = await Promise.all([
@@ -61,6 +74,10 @@ export default function InvoiceDetailPage() {
     ]);
     setInvoice(detail);
     setPrint(payload);
+    setDiscountType(detail.discountType ?? "");
+    setDiscountValue(detail.discountValue != null ? String(detail.discountValue) : "");
+    setTaxRatePercent(String(detail.taxRatePercent ?? 0));
+    setNotes(detail.notes ?? "");
   }
 
   useEffect(() => {
@@ -83,14 +100,35 @@ export default function InvoiceDetailPage() {
     }
   }
 
+  async function saveDraftTotals(event: FormEvent) {
+    event.preventDefault();
+    if (!invoice || invoice.status !== "DRAFT") return;
+    setActionBusy(true);
+    setError(null);
+    try {
+      await api(`/api/v1/dietitian/${dietitianAccountId}/invoices/${invoiceId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          notes: notes || null,
+          discountType: discountType || null,
+          discountValue: discountType ? Number(discountValue || 0) : null,
+          taxRatePercent: Number(taxRatePercent || 0),
+        }),
+      });
+      await load();
+    } catch (err) {
+      setError(errorMessage(err, "Unable to update invoice"));
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
   const invoicesHref = `/practice/${dietitianAccountId}/invoices`;
 
   if (!invoice && !error) {
     return (
       <section>
-        <Breadcrumbs
-          items={[{ label: "Invoices", href: invoicesHref }, { label: "Loading…" }]}
-        />
+        <Breadcrumbs items={[{ label: "Invoices", href: invoicesHref }, { label: "Loading…" }]} />
         <LoadingState />
       </section>
     );
@@ -99,196 +137,154 @@ export default function InvoiceDetailPage() {
   if (!invoice) {
     return (
       <section>
-        <Breadcrumbs
-          items={[{ label: "Invoices", href: invoicesHref }, { label: "Invoice" }]}
-        />
+        <Breadcrumbs items={[{ label: "Invoices", href: invoicesHref }, { label: "Invoice" }]} />
         <Alert tone="danger">{error ?? "Unable to load invoice"}</Alert>
       </section>
     );
   }
 
-  const title = invoice.invoiceNumber ?? "Draft invoice";
-  const canIssue = invoice.status === "DRAFT";
+  const isDraft = invoice.status === "DRAFT";
+  const title = invoice.invoiceNumber ?? (isDraft ? "Draft quotation" : "Invoice");
+  const canIssue = isDraft;
   const canTransition = ["ISSUED", "SENT", "OVERDUE"].includes(invoice.status);
+  const practice = print?.practice;
+  const documentLabel = isDraft ? "Quotation / Devis" : "Invoice / Facture";
 
   return (
-    <section>
-      <Breadcrumbs
-        items={[{ label: "Invoices", href: invoicesHref }, { label: title }]}
-      />
-      <PageHeader
-        title={title}
-        description={
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-            {invoice.clientName ?? "Client"}
-            <StatusBadge status={invoice.status} label={statusLabel(invoice.status)} />
-          </span>
-        }
-        actions={
-          <div className="ui-row">
-            {canIssue ? (
-              <Button disabled={actionBusy} onClick={() => void action("issue")}>
-                Issue
+    <section className="ui-invoice-page">
+      <div className="ui-invoice-page__controls no-print">
+        <Breadcrumbs items={[{ label: "Invoices", href: invoicesHref }, { label: title }]} />
+        <PageHeader
+          eyebrow="Document"
+          title={title}
+          description={
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              {invoice.clientName ?? "Client"}
+              <StatusBadge status={invoice.status} label={statusLabel(invoice.status)} />
+            </span>
+          }
+          actions={
+            <div className="ui-invoice-page__actions">
+              {canIssue ? (
+                <Button disabled={actionBusy} onClick={() => void action("issue")}>
+                  Issue invoice
+                </Button>
+              ) : null}
+              {canTransition ? (
+                <>
+                  <Button disabled={actionBusy} onClick={() => void action("send")}>
+                    Mark sent
+                  </Button>
+                  <Button disabled={actionBusy} onClick={() => void action("pay")}>
+                    Mark paid
+                  </Button>
+                  <Button variant="danger" disabled={actionBusy} onClick={() => void action("cancel")}>
+                    Cancel
+                  </Button>
+                </>
+              ) : null}
+              <Button variant="secondary" onClick={() => window.print()}>
+                Print
               </Button>
-            ) : null}
-            {canTransition ? (
-              <>
-                <Button disabled={actionBusy} onClick={() => void action("send")}>
-                  Mark sent
-                </Button>
-                <Button disabled={actionBusy} onClick={() => void action("pay")}>
-                  Mark paid
-                </Button>
-                <Button
-                  variant="danger"
-                  disabled={actionBusy}
-                  onClick={() => void action("cancel")}
-                >
-                  Cancel
-                </Button>
-              </>
-            ) : null}
-            <Button variant="secondary" onClick={() => window.print()}>
-              Print
-            </Button>
+              <Button variant="secondary" onClick={() => window.print()}>
+                Download PDF
+              </Button>
+              <Link href={invoicesHref} className="ui-btn ui-btn--ghost">
+                Back to list
+              </Link>
+            </div>
+          }
+        />
+
+        <p className="ui-muted ui-invoice-page__hint">
+          Download PDF opens your browser print dialog — choose “Save as PDF”. The paper below is the full document.
+        </p>
+
+        {error ? (
+          <div style={{ marginBottom: 16 }}>
+            <Alert tone="danger">{error}</Alert>
           </div>
-        }
-      />
+        ) : null}
 
-      {error ? (
-        <div style={{ marginBottom: 16 }}>
-          <Alert tone="danger">{error}</Alert>
-        </div>
-      ) : null}
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-          gap: 20,
-          marginBottom: 24,
-        }}
-      >
-        <div>
-          <p className="ui-eyebrow" style={{ marginBottom: 4 }}>
-            Issue date
-          </p>
-          <p style={{ margin: 0, fontWeight: 500 }}>{formatDateOnly(invoice.issueDate)}</p>
-        </div>
-        <div>
-          <p className="ui-eyebrow" style={{ marginBottom: 4 }}>
-            Due date
-          </p>
-          <p style={{ margin: 0, fontWeight: 500 }}>{formatDateOnly(invoice.dueDate)}</p>
-        </div>
+        {canIssue ? (
+          <form onSubmit={(event) => void saveDraftTotals(event)} className="ui-invoice-page__draft-form">
+            <h2 className="ui-invoice-builder__panel-title">Edit draft totals</h2>
+            <div className="ui-invoice-builder__fields ui-invoice-builder__fields--3">
+              <Field label="Discount type">
+                <Select
+                  value={discountType}
+                  onChange={(e) => setDiscountType(e.target.value as "" | "PERCENT" | "FIXED")}
+                >
+                  <option value="">None</option>
+                  <option value="PERCENT">Percent %</option>
+                  <option value="FIXED">Fixed amount</option>
+                </Select>
+              </Field>
+              <Field label="Discount value">
+                <Input
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={discountValue}
+                  onChange={(e) => setDiscountValue(e.target.value)}
+                  disabled={!discountType}
+                />
+              </Field>
+              <Field label="Tax %">
+                <Input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="any"
+                  value={taxRatePercent}
+                  onChange={(e) => setTaxRatePercent(e.target.value)}
+                />
+              </Field>
+            </div>
+            <Field label="Notes / payment details">
+              <Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
+            </Field>
+            <Button type="submit" disabled={actionBusy}>
+              Update document
+            </Button>
+          </form>
+        ) : null}
       </div>
 
-      <Table>
-        <thead>
-          <tr>
-            <th>Description</th>
-            <th>Qty</th>
-            <th>Unit price</th>
-            <th>Line total</th>
-          </tr>
-        </thead>
-        <tbody>
-          {invoice.items.map((item, idx) => (
-            <tr key={idx}>
-              <Td label="Description">{item.description}</Td>
-              <Td label="Qty">{item.quantity}</Td>
-              <Td label="Unit price">{formatMoney(item.unitPrice, invoice.currency)}</Td>
-              <Td label="Line total">
-                <strong>{formatMoney(item.lineTotal, invoice.currency)}</strong>
-              </Td>
-            </tr>
-          ))}
-        </tbody>
-        <tfoot>
-          <tr>
-            <td
-              colSpan={3}
-              style={{ textAlign: "right", fontWeight: 600, padding: "10px 16px 10px 0" }}
-            >
-              Total
-            </td>
-            <td style={{ fontWeight: 700, fontSize: "1.0625rem", padding: "10px 16px" }}>
-              {formatMoney(invoice.total, invoice.currency)}
-            </td>
-          </tr>
-        </tfoot>
-      </Table>
-
-      {invoice.notes ? (
-        <div
-          style={{
-            marginTop: 16,
-            padding: "12px 16px",
-            background: "var(--color-surface)",
-            borderRadius: 8,
-            border: "1px solid var(--color-border)",
+      <div className="ui-facture-stage">
+        <InvoiceDocument
+          practice={{
+            practiceName: practice?.practiceName ?? "Practice",
+            contactEmail: practice?.contactEmail,
+            contactPhone: practice?.contactPhone,
+            addressLine1: practice?.addressLine1,
+            addressLine2: practice?.addressLine2,
+            city: practice?.city,
+            region: practice?.region,
+            postalCode: practice?.postalCode,
+            country: practice?.country,
+            invoiceFooter: practice?.invoiceFooter,
           }}
-        >
-          <p className="ui-eyebrow" style={{ marginBottom: 4 }}>
-            Notes
-          </p>
-          <p style={{ margin: 0 }}>{invoice.notes}</p>
-        </div>
-      ) : null}
-
-      {print ? (
-        <div
-          id="print-invoice"
-          style={{
-            marginTop: 32,
-            padding: "24px 28px",
-            border: "1px solid var(--color-border)",
-            borderRadius: 10,
-            background: "var(--color-surface)",
+          invoice={{
+            documentLabel,
+            documentNumber: invoice.invoiceNumber ?? "DRAFT",
+            statusLabel: statusLabel(invoice.status),
+            clientName: invoice.clientName ?? "Client",
+            issueDate: invoice.issueDate,
+            dueDate: invoice.dueDate,
+            currency: invoice.currency,
+            subtotal: invoice.subtotal,
+            discountType: invoice.discountType,
+            discountValue: invoice.discountValue,
+            discountAmount: invoice.discountAmount,
+            taxRatePercent: invoice.taxRatePercent,
+            taxAmount: invoice.taxAmount,
+            total: invoice.total,
+            notes: invoice.notes,
+            items: invoice.items,
           }}
-        >
-          <h2 style={{ margin: "0 0 4px" }}>{print.practice.practiceName}</h2>
-          <p className="ui-muted" style={{ margin: "0 0 2px", fontSize: 13 }}>
-            {[
-              print.practice.addressLine1,
-              print.practice.city,
-              print.practice.region,
-              print.practice.postalCode,
-              print.practice.country,
-            ]
-              .filter(Boolean)
-              .join(", ")}
-          </p>
-          {print.practice.contactEmail || print.practice.contactPhone ? (
-            <p className="ui-muted" style={{ margin: "0 0 16px", fontSize: 13 }}>
-              {[print.practice.contactEmail, print.practice.contactPhone]
-                .filter(Boolean)
-                .join(" · ")}
-            </p>
-          ) : null}
-          <hr
-            style={{ border: "none", borderTop: "1px solid var(--color-border)", margin: "12px 0" }}
-          />
-          <div style={{ display: "grid", gap: 4, fontSize: 14 }}>
-            <p style={{ margin: 0 }}>
-              <strong>Invoice:</strong> {print.invoice.invoiceNumber ?? "Draft"} ·{" "}
-              <strong>Status:</strong> {statusLabel(print.invoice.status)}
-            </p>
-            <p style={{ margin: 0 }}>
-              <strong>Issued:</strong> {formatDateOnly(print.invoice.issueDate)} ·{" "}
-              <strong>Due:</strong> {formatDateOnly(print.invoice.dueDate)}
-            </p>
-            <p style={{ margin: 0 }}>
-              <strong>Bill to:</strong> {print.invoice.clientName ?? "Client"}
-            </p>
-          </div>
-          {print.practice.invoiceFooter ? (
-            <p style={{ marginTop: 16, fontSize: 12, color: "var(--color-muted)" }}>
-              {print.practice.invoiceFooter}
-            </p>
-          ) : null}
-        </div>
-      ) : null}
+        />
+      </div>
     </section>
   );
 }
