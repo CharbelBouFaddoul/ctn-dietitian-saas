@@ -4,6 +4,7 @@ import { EntitlementsModule } from "../entitlements/entitlements.module";
 import { AiModule } from "../ai/ai.module";
 import { AutomationModule } from "../automation/automation.module";
 import { FoodsModule } from "../foods/foods.module";
+import { NotificationsModule } from "../notifications/notifications.module";
 import { OrganizationModule } from "../organizations/organization.module";
 import { AdminAuditService } from "./admin-audit.service";
 import { AdminCatalogController } from "./admin-catalog.controller";
@@ -22,7 +23,15 @@ import { AdminDietitianService } from "./admin-dietitian.service";
 import { PlatformRolesGuard } from "./guards/platform-roles.guard";
 
 @Module({
-  imports: [AuthModule, OrganizationModule, EntitlementsModule, FoodsModule, AiModule, AutomationModule],
+  imports: [
+    AuthModule,
+    OrganizationModule,
+    EntitlementsModule,
+    FoodsModule,
+    AiModule,
+    AutomationModule,
+    NotificationsModule,
+  ],
   controllers: [
     AdminMeController,
     AdminOrganizationsController,

@@ -7,6 +7,7 @@ import { useParams, usePathname, useRouter } from "next/navigation";
 import { Alert, AppShell, Button, LoadingState, type NavSection } from "@nutrition-saas/ui";
 import { ApiError, api, logout } from "../../../lib/api";
 import { loginPathFor, resolveSessionHome } from "../../../lib/session-home";
+import { NotificationBell } from "../../../lib/use-notifications";
 import { PracticeNavIcons } from "./practice-nav-icons";
 
 interface OrgDetail {
@@ -168,6 +169,7 @@ export function PracticeShell({ children }: { children: ReactNode }) {
         { href: `${base}/clients`, label: "Clients", icon: PracticeNavIcons.clients },
         { href: `${base}/calendar`, label: "Calendar", icon: PracticeNavIcons.calendar },
         { href: `${base}/messages`, label: "Messages", icon: PracticeNavIcons.messages },
+        { href: `${base}/notifications`, label: "Notifications", icon: PracticeNavIcons.messages },
       ],
     },
     {
@@ -239,6 +241,11 @@ export function PracticeShell({ children }: { children: ReactNode }) {
         collapsible
         footer={
           <div className="ui-stack">
+            <NotificationBell
+              mode={{ kind: "practice", organizationId }}
+              enabled={state === "ok"}
+              placement="above"
+            />
             <Link href="/practice" className="ui-nav-link">
               All organizations
             </Link>
@@ -246,6 +253,13 @@ export function PracticeShell({ children }: { children: ReactNode }) {
               Sign out
             </Button>
           </div>
+        }
+        topbarActions={
+          <NotificationBell
+            mode={{ kind: "practice", organizationId }}
+            enabled={state === "ok"}
+            placement="below"
+          />
         }
       >
         {banner ? <div style={{ marginBottom: 16 }}>{banner}</div> : null}

@@ -7,6 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { AppShell, Button, LoadingState, type NavSection } from "@nutrition-saas/ui";
 import { ApiError, api, logout } from "../../../lib/api";
 import { loginPathFor, resolveSessionHome } from "../../../lib/session-home";
+import { NotificationBell } from "../../../lib/use-notifications";
 import { PatientNavIcons } from "./patient-nav-icons";
 
 interface PortalMe {
@@ -110,7 +111,10 @@ export default function ClientPortalLayout({ children }: { children: ReactNode }
     },
     {
       label: "Communication",
-      items: [{ href: "/client/messages", label: "Messages", icon: PatientNavIcons.messages }],
+      items: [
+        { href: "/client/messages", label: "Messages", icon: PatientNavIcons.messages },
+        { href: "/client/notifications", label: "Notifications", icon: PatientNavIcons.messages },
+      ],
     },
     {
       label: "Documents & billing",
@@ -139,6 +143,12 @@ export default function ClientPortalLayout({ children }: { children: ReactNode }
       collapsible
       footer={
         <div style={{ display: "grid", gap: 8 }}>
+          <NotificationBell
+            key={me?.client.id ?? "portal"}
+            mode={{ kind: "portal" }}
+            enabled={state === "ok"}
+            placement="above"
+          />
           {connections.length > 1 ? (
             <label className="ui-field" style={{ margin: 0 }}>
               <span style={{ fontSize: 12 }}>Active practice</span>
@@ -160,6 +170,14 @@ export default function ClientPortalLayout({ children }: { children: ReactNode }
             Sign out
           </Button>
         </div>
+      }
+      topbarActions={
+        <NotificationBell
+          key={`top-${me?.client.id ?? "portal"}`}
+          mode={{ kind: "portal" }}
+          enabled={state === "ok"}
+          placement="below"
+        />
       }
     >
       {children}

@@ -7,43 +7,41 @@ import {
   EmptyState,
   Section,
   Skeleton,
-  StatusBadge,
 } from "@nutrition-saas/ui";
 import { api } from "../../../lib/api";
-import { formatMoney } from "../../../lib/format";
 import { errorMessage } from "../../../lib/humanize-error";
-import { statusLabel } from "../../../lib/practice-labels";
+import { formatDate } from "../../../lib/format";
 import { PatientAccents } from "./patient-accents";
 
-interface PortalMe {
-  client: { firstName: string; lastName: string; displayName: string | null };
-  practiceName?: string | null;
-}
-
-interface PortalPlan {
-  plan: { name: string; description: string | null } | null;
-}
-
-interface Summary {
-  food: { presented: { energyKcal: number | null; proteinG: number | null } };
-  water: { totalLiters: number };
-  exercise: { totalDurationMinutes: number };
-  sleep: { durationMinutes: number | null } | null;
-  habits: { completed: number; total: number };
-}
-
-interface Message {
-  id: string;
-  body: string;
-  createdAt: string;
-}
-
-interface Invoice {
-  id: string;
-  invoiceNumber: string | null;
-  status: string;
-  total: number;
-  currency: string;
+interface PortalDashboard {
+  me: {
+    client: { firstName: string; lastName: string; displayName: string | null };
+    practiceName?: string | null;
+  };
+  upcomingAppointment: {
+    id: string;
+    title: string;
+    startAt: string;
+    endAt: string;
+    status: string;
+  } | null;
+  messages: {
+    preview: Array<{ id: string; body: string; createdAt: string }>;
+    unreadCount: number;
+  };
+  notifications: {
+    recent: Array<{ id: string; title: string; body: string; readAt: string | null; createdAt: string }>;
+    unreadCount: number;
+  };
+  tracking: {
+    food: { presented: { energyKcal: number | null; proteinG: number | null } };
+    water: { totalLiters: number };
+    exercise: { totalDurationMinutes: number };
+    sleep: { durationMinutes: number | null } | null;
+    habits: { completed: number; total: number };
+  };
+  mealPlan: { name: string; description: string | null } | null;
+  quickLinks: Array<{ href: string; label: string }>;
 }
 
 function greetingForNow(now = new Date()): string {
@@ -67,42 +65,28 @@ function todayLabel(now = new Date()): string {
 }
 
 export default function ClientHomePage() {
-  const [me, setMe] = useState<PortalMe | null>(null);
-  const [plan, setPlan] = useState<PortalPlan | null>(null);
-  const [tracking, setTracking] = useState<Summary | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [data, setData] = useState<PortalDashboard | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    void Promise.all([
-      api<PortalMe>("/api/v1/portal/me"),
-      api<PortalPlan>("/api/v1/portal/meal-plan"),
-      api<Summary>("/api/v1/portal/tracking/summary"),
-      api<{ messages?: Message[] } | Message[]>("/api/v1/portal/conversation/messages").catch(() => []),
-      api<Invoice[]>("/api/v1/portal/invoices").catch(() => []),
-    ])
-      .then(([meData, planData, trackingData, messageData, invoiceData]) => {
-        setMe(meData);
-        setPlan(planData);
-        setTracking(trackingData);
-        setMessages(Array.isArray(messageData) ? messageData : (messageData.messages ?? []));
-        setInvoices(invoiceData);
-      })
+    setLoading(true);
+    void api<PortalDashboard>("/api/v1/portal/dashboard")
+      .then(setData)
       .catch((err) => setError(errorMessage(err, "Unable to load your home")))
       .finally(() => setLoading(false));
   }, []);
 
   const greeting = useMemo(() => greetingForNow(), []);
   const dateLabel = useMemo(() => todayLabel(), []);
+  const me = data?.me ?? null;
+  const tracking = data?.tracking ?? null;
   const name =
     me?.client.displayName?.trim() ||
     `${me?.client.firstName ?? ""} ${me?.client.lastName ?? ""}`.trim() ||
     "there";
   const firstName = name.split(" ")[0] ?? name;
-  const openInvoices = invoices.filter((row) => !["PAID", "CANCELLED", "VOID"].includes(row.status));
-  const latestMessage = messages[messages.length - 1];
+  const latestMessage = data?.messages.preview[data.messages.preview.length - 1];
 
   const metrics = [
     {
@@ -161,7 +145,29 @@ export default function ClientHomePage() {
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
 
-      <Section title="Today’s focus" description="A quick pulse on what you’ve logged so far." tone="mint">
+      <Section
+        title="Upcoming appointment"
+        description="Your next scheduled visit with this practice."
+        actions={
+          <Link href="/client" className="ui-link">
+            Home
+          </Link>
+        }
+      >
+        {loading ? (
+          <Skeleton style={{ height: 40, width: "70%" }} />
+        ) : data?.upcomingAppointment ? (
+          <div className="ui-client-spotlight">
+            <span className="ui-client-spotlight__badge">Scheduled</span>
+            <h3>{data.upcomingAppointment.title}</h3>
+            <p className="ui-muted">{formatDate(data.upcomingAppointment.startAt)}</p>
+          </div>
+        ) : (
+          <EmptyState title="No upcoming appointment">Nothing scheduled with this practice yet.</EmptyState>
+        )}
+      </Section>
+
+      <Section title="Today’s tracking" description="A quick pulse on what you’ve logged so far." tone="mint">
         {loading ? (
           <div className="ui-client-metrics">
             <Skeleton style={{ height: 88 }} />
@@ -192,34 +198,32 @@ export default function ClientHomePage() {
       </Section>
 
       <nav className="ui-client-quick" aria-label="Quick links">
-        <Link href="/client/plan" className="ui-client-quick__item" data-tone="plan">
-          <span className="ui-client-quick__icon">{PatientAccents.plan}</span>
-          <span>
-            <strong>My Plan</strong>
-            <span className="ui-muted">Meals for the week</span>
-          </span>
-        </Link>
-        <Link href="/client/tracking" className="ui-client-quick__item" data-tone="food">
-          <span className="ui-client-quick__icon">{PatientAccents.food}</span>
-          <span>
-            <strong>Tracking</strong>
-            <span className="ui-muted">Food, water & habits</span>
-          </span>
-        </Link>
-        <Link href="/client/messages" className="ui-client-quick__item" data-tone="messages">
-          <span className="ui-client-quick__icon">{PatientAccents.messages}</span>
-          <span>
-            <strong>Messages</strong>
-            <span className="ui-muted">Chat with your dietitian</span>
-          </span>
-        </Link>
-        <Link href="/client/documents" className="ui-client-quick__item" data-tone="documents">
-          <span className="ui-client-quick__icon">{PatientAccents.documents}</span>
-          <span>
-            <strong>Documents</strong>
-            <span className="ui-muted">Shared files</span>
-          </span>
-        </Link>
+        {(data?.quickLinks ?? [
+          { href: "/client/plan", label: "My Plan" },
+          { href: "/client/tracking", label: "Tracking" },
+          { href: "/client/messages", label: "Messages" },
+          { href: "/client/documents", label: "Documents" },
+        ]).map((link) => (
+          <Link
+            key={link.href}
+            href={link.href}
+            className="ui-client-quick__item"
+            data-tone={link.label.toLowerCase().includes("plan") ? "plan" : "food"}
+          >
+            <span className="ui-client-quick__icon">
+              {link.href.includes("plan")
+                ? PatientAccents.plan
+                : link.href.includes("track")
+                  ? PatientAccents.food
+                  : link.href.includes("message")
+                    ? PatientAccents.messages
+                    : PatientAccents.documents}
+            </span>
+            <span>
+              <strong>{link.label}</strong>
+            </span>
+          </Link>
+        ))}
       </nav>
 
       <div className="ui-client-home__grid">
@@ -233,12 +237,12 @@ export default function ClientHomePage() {
         >
           {loading ? (
             <Skeleton style={{ height: 48, width: "80%" }} />
-          ) : plan?.plan ? (
+          ) : data?.mealPlan ? (
             <div className="ui-client-spotlight">
               <span className="ui-client-spotlight__badge">Active</span>
-              <h3>{plan.plan.name}</h3>
-              {plan.plan.description ? (
-                <p className="ui-muted">{plan.plan.description}</p>
+              <h3>{data.mealPlan.name}</h3>
+              {data.mealPlan.description ? (
+                <p className="ui-muted">{data.mealPlan.description}</p>
               ) : (
                 <p className="ui-muted">Your published meal plan from your dietitian.</p>
               )}
@@ -252,6 +256,11 @@ export default function ClientHomePage() {
 
         <Section
           title="Messages"
+          description={
+            data?.messages.unreadCount
+              ? `${data.messages.unreadCount} unread`
+              : "Recent conversation preview"
+          }
           actions={
             <Link href="/client/messages" className="ui-link">
               Open
@@ -273,28 +282,34 @@ export default function ClientHomePage() {
             </EmptyState>
           )}
         </Section>
-      </div>
 
-      {openInvoices.length > 0 ? (
-        <Section title="Billing" description="Invoices that still need attention.">
-          <ul className="ui-client-invoice-list">
-            {openInvoices.slice(0, 3).map((invoice) => (
-              <li key={invoice.id}>
-                <div>
-                  <strong>{invoice.invoiceNumber ?? "Invoice"}</strong>
-                  <div className="ui-muted">{formatMoney(invoice.total, invoice.currency)}</div>
-                </div>
-                <StatusBadge status={invoice.status} label={statusLabel(invoice.status)} />
-              </li>
-            ))}
-          </ul>
-          <div className="ui-client-actions">
-            <Link href="/client/invoices" className="ui-link">
-              View all invoices
-            </Link>
-          </div>
+        <Section
+          title="Notifications"
+          description={
+            data?.notifications.unreadCount
+              ? `${data.notifications.unreadCount} unread`
+              : "Recent updates"
+          }
+        >
+          {loading ? (
+            <Skeleton style={{ height: 40, width: "90%" }} />
+          ) : (data?.notifications.recent ?? []).length === 0 ? (
+            <EmptyState title="No notifications">You’re all caught up.</EmptyState>
+          ) : (
+            <ul className="ui-client-invoice-list">
+              {data!.notifications.recent.map((row) => (
+                <li key={row.id}>
+                  <div>
+                    <strong>{row.title}</strong>
+                    <div className="ui-muted">{row.body}</div>
+                  </div>
+                  {!row.readAt ? <span className="ui-muted">New</span> : null}
+                </li>
+              ))}
+            </ul>
+          )}
         </Section>
-      ) : null}
+      </div>
     </section>
   );
 }

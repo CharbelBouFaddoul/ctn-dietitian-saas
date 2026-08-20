@@ -16,13 +16,21 @@ import { seedPlatformSettings } from "./platform-settings.seed";
 export class PlatformSettingsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getPublic(): Promise<PlatformSettingsPayload> {
+  async getPublic(): Promise<Omit<PlatformSettingsPayload, "emailNotificationsEnabled">> {
+    const row = await this.ensureSingleton();
+    const full = this.toPayload(row);
+    const { emailNotificationsEnabled: _email, ...publicPayload } = full;
+    return publicPayload;
+  }
+
+  async getAdmin(): Promise<PlatformSettingsPayload> {
     const row = await this.ensureSingleton();
     return this.toPayload(row);
   }
 
-  async getAdmin(): Promise<PlatformSettingsPayload> {
-    return this.getPublic();
+  async isEmailNotificationsEnabled(): Promise<boolean> {
+    const row = await this.ensureSingleton();
+    return row.emailNotificationsEnabled ?? DEFAULT_PLATFORM_SETTINGS.emailNotificationsEnabled;
   }
 
   async update(input: UpdatePlatformSettingsDto): Promise<PlatformSettingsPayload> {
@@ -36,6 +44,9 @@ export class PlatformSettingsService {
     if (input.ctaHref !== undefined) data.ctaHref = input.ctaHref;
     if (input.ctaVisible !== undefined) data.ctaVisible = input.ctaVisible;
     if (input.registrationEnabled !== undefined) data.registrationEnabled = input.registrationEnabled;
+    if (input.emailNotificationsEnabled !== undefined) {
+      data.emailNotificationsEnabled = input.emailNotificationsEnabled;
+    }
     if (input.dietitianSignInLabel !== undefined) data.dietitianSignInLabel = input.dietitianSignInLabel;
     if (input.patientSignInLabel !== undefined) data.patientSignInLabel = input.patientSignInLabel;
     if (input.footerDescription !== undefined) data.footerDescription = input.footerDescription;
@@ -79,6 +90,7 @@ export class PlatformSettingsService {
     ctaHref: string;
     ctaVisible: boolean;
     registrationEnabled: boolean;
+    emailNotificationsEnabled: boolean;
     dietitianSignInLabel: string;
     patientSignInLabel: string;
     footerDescription: string;
@@ -99,6 +111,8 @@ export class PlatformSettingsService {
       ctaHref: row.ctaHref || DEFAULT_PLATFORM_SETTINGS.ctaHref,
       ctaVisible: row.ctaVisible,
       registrationEnabled: row.registrationEnabled ?? DEFAULT_PLATFORM_SETTINGS.registrationEnabled,
+      emailNotificationsEnabled:
+        row.emailNotificationsEnabled ?? DEFAULT_PLATFORM_SETTINGS.emailNotificationsEnabled,
       dietitianSignInLabel: row.dietitianSignInLabel || DEFAULT_PLATFORM_SETTINGS.dietitianSignInLabel,
       patientSignInLabel: row.patientSignInLabel || DEFAULT_PLATFORM_SETTINGS.patientSignInLabel,
       footerDescription: row.footerDescription || DEFAULT_PLATFORM_SETTINGS.footerDescription,

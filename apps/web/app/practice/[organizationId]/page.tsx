@@ -34,6 +34,15 @@ interface Dashboard {
   paidThisMonth: number;
   invoicedThisMonth: number;
   needsAttention: Array<{ clientId: string; clientName: string; clientEmail?: string | null; reasons: string[] }>;
+  recentlyActive?: Array<{ clientId: string; clientName: string; clientEmail?: string | null }>;
+  todayAppointments: Array<{
+    id: string;
+    title: string;
+    startAt: string;
+    clientId: string;
+    clientName: string;
+    clientEmail?: string | null;
+  }>;
   upcomingAppointments: Array<{
     id: string;
     title: string;
@@ -42,6 +51,22 @@ interface Dashboard {
     clientName: string;
     clientEmail?: string | null;
   }>;
+  recentConversations: Array<{
+    id: string;
+    clientId: string;
+    clientName: string;
+    preview: string | null;
+    lastMessageAt: string | null;
+    unreadCount: number;
+  }>;
+  recentNotifications: Array<{
+    id: string;
+    title: string;
+    body: string;
+    readAt: string | null;
+    createdAt: string;
+  }>;
+  unreadNotificationCount: number;
   recentActivity: Array<{
     id: string;
     type: string;
@@ -65,6 +90,39 @@ function todayLabel(now = new Date()): string {
     month: "long",
     day: "numeric",
   });
+}
+
+function AppointmentTable({
+  rows,
+  organizationId,
+}: {
+  rows: Dashboard["todayAppointments"];
+  organizationId: string;
+}) {
+  return (
+    <Table>
+      <thead>
+        <tr>
+          <th>When</th>
+          <th>Client</th>
+          <th>Title</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => (
+          <tr key={row.id}>
+            <Td label="When">{formatDate(row.startAt)}</Td>
+            <Td label="Client">
+              <Link href={`/practice/${organizationId}/clients/${row.clientId}`} className="ui-link">
+                {clientIdentityLine({ id: row.clientId, displayName: row.clientName, email: row.clientEmail })}
+              </Link>
+            </Td>
+            <Td label="Title">{row.title}</Td>
+          </tr>
+        ))}
+      </tbody>
+    </Table>
+  );
 }
 
 export default function PracticeDashboardPage() {
@@ -152,28 +210,21 @@ export default function PracticeDashboardPage() {
       </div>
 
       <nav className="ui-practice-quick" aria-label="Quick links">
-        <Link href={`/practice/${organizationId}/clients`} className="ui-practice-quick__item" data-tone="clients">
+        <Link href={`/practice/${organizationId}/clients`} className="ui-practice-quick__item">
           <span className="ui-practice-quick__icon">{PracticeAccents.clients}</span>
           <span>
             <strong>Clients</strong>
-            <span className="ui-muted">Roster & profiles</span>
+            <span className="ui-muted">Roster & records</span>
           </span>
         </Link>
-        <Link href={`/practice/${organizationId}/calendar`} className="ui-practice-quick__item" data-tone="schedule">
-          <span className="ui-practice-quick__icon">{PracticeAccents.schedule}</span>
-          <span>
-            <strong>Calendar</strong>
-            <span className="ui-muted">Appointments</span>
-          </span>
-        </Link>
-        <Link href={`/practice/${organizationId}/messages`} className="ui-practice-quick__item" data-tone="messages">
+        <Link href={`/practice/${organizationId}/messages`} className="ui-practice-quick__item">
           <span className="ui-practice-quick__icon">{PracticeAccents.messages}</span>
           <span>
             <strong>Messages</strong>
-            <span className="ui-muted">Client conversations</span>
+            <span className="ui-muted">Inbox</span>
           </span>
         </Link>
-        <Link href={`/practice/${organizationId}/tasks`} className="ui-practice-quick__item" data-tone="tasks">
+        <Link href={`/practice/${organizationId}/tasks`} className="ui-practice-quick__item">
           <span className="ui-practice-quick__icon">{PracticeAccents.tasks}</span>
           <span>
             <strong>Tasks</strong>
@@ -185,55 +236,107 @@ export default function PracticeDashboardPage() {
       <div className="ui-practice-dash__layout">
         <div className="ui-practice-dash__primary">
           <Section
-            title="Today’s schedule"
-            description="Upcoming appointments from your practice calendar."
+            title="Today’s appointments"
+            description="Scheduled for today."
             tone="mint"
             actions={
               <Link href={`/practice/${organizationId}/calendar`} className="ui-link">
-                View all
+                Calendar
               </Link>
             }
           >
             {loading ? (
-              <div className="ui-stack">
-                <Skeleton style={{ height: 18, width: "70%" }} />
-                <Skeleton style={{ height: 18, width: "55%" }} />
-                <Skeleton style={{ height: 18, width: "62%" }} />
-              </div>
-            ) : (data?.upcomingAppointments ?? []).length === 0 ? (
+              <Skeleton style={{ height: 60 }} />
+            ) : (data?.todayAppointments ?? []).length === 0 ? (
               <EmptyState
-                title="No upcoming appointments"
+                title="Nothing today"
                 action={
                   <Link href={`/practice/${organizationId}/calendar`} className="ui-btn ui-btn--secondary ui-btn--sm">
                     Open calendar
                   </Link>
                 }
               >
-                Nothing scheduled yet. Book from a client workspace or the calendar.
+                No appointments scheduled for today.
               </EmptyState>
             ) : (
-              <Table>
-                <thead>
-                  <tr>
-                    <th>When</th>
-                    <th>Client</th>
-                    <th>Title</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(data?.upcomingAppointments ?? []).map((row) => (
-                    <tr key={row.id}>
-                      <Td label="When">{formatDate(row.startAt)}</Td>
-                      <Td label="Client">
-                        <Link href={`/practice/${organizationId}/clients/${row.clientId}`} className="ui-link">
-                          {clientIdentityLine({ id: row.clientId, displayName: row.clientName, email: row.clientEmail })}
-                        </Link>
-                      </Td>
-                      <Td label="Title">{row.title}</Td>
-                    </tr>
-                  ))}
-                </tbody>
-              </Table>
+              <AppointmentTable rows={data!.todayAppointments} organizationId={organizationId} />
+            )}
+          </Section>
+
+          <Section
+            title="Upcoming"
+            description="Next appointments after today."
+            actions={
+              <Link href={`/practice/${organizationId}/calendar`} className="ui-link">
+                View calendar
+              </Link>
+            }
+          >
+            {loading ? (
+              <Skeleton style={{ height: 60 }} />
+            ) : (data?.upcomingAppointments ?? []).length === 0 ? (
+              <EmptyState title="No upcoming appointments">Nothing booked after today.</EmptyState>
+            ) : (
+              <AppointmentTable rows={data!.upcomingAppointments} organizationId={organizationId} />
+            )}
+          </Section>
+
+          <Section
+            title="Recent messages"
+            description="Latest conversations across clients."
+            actions={
+              <Link href={`/practice/${organizationId}/messages`} className="ui-link">
+                View messages
+              </Link>
+            }
+          >
+            {loading ? (
+              <Skeleton style={{ height: 48 }} />
+            ) : (data?.recentConversations ?? []).length === 0 ? (
+              <EmptyState title="No messages yet">Client conversations will appear here.</EmptyState>
+            ) : (
+              <ul className="ui-practice-list">
+                {data!.recentConversations.map((row) => (
+                  <li key={row.id}>
+                    <Link href={`/practice/${organizationId}/messages`} className="ui-link">
+                      {row.clientName}
+                    </Link>
+                    <span className="ui-muted">
+                      {row.preview ?? "—"}
+                      {row.unreadCount > 0 ? ` · ${row.unreadCount} unread` : ""}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Section>
+
+          <Section
+            title="Notifications"
+            description={
+              data?.unreadNotificationCount
+                ? `${data.unreadNotificationCount} unread`
+                : "Recent practice alerts"
+            }
+            actions={
+              <Link href={`/practice/${organizationId}/notifications`} className="ui-link">
+                View all
+              </Link>
+            }
+          >
+            {loading ? (
+              <Skeleton style={{ height: 48 }} />
+            ) : (data?.recentNotifications ?? []).length === 0 ? (
+              <EmptyState title="No notifications">You’re caught up.</EmptyState>
+            ) : (
+              <ul className="ui-practice-list">
+                {data!.recentNotifications.map((row) => (
+                  <li key={row.id}>
+                    <strong>{row.title}</strong>
+                    <span className="ui-muted">{row.body}</span>
+                  </li>
+                ))}
+              </ul>
             )}
           </Section>
 

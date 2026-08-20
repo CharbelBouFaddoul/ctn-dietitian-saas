@@ -33,6 +33,8 @@ export interface PlatformSettingsPayload {
   ctaHref: string;
   ctaVisible: boolean;
   registrationEnabled: boolean;
+  /** Product notification emails (invoice, automation). Auth emails always send. */
+  emailNotificationsEnabled: boolean;
   dietitianSignInLabel: string;
   patientSignInLabel: string;
   footerDescription: string;
@@ -59,6 +61,7 @@ export const DEFAULT_PLATFORM_SETTINGS: PlatformSettingsPayload = {
   ctaHref: "/auth/dietitian/register",
   ctaVisible: true,
   registrationEnabled: false,
+  emailNotificationsEnabled: false,
   dietitianSignInLabel: "Sign in as Dietitian",
   patientSignInLabel: "Sign in as Patient",
   footerDescription:

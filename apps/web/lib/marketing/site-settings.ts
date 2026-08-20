@@ -31,6 +31,7 @@ export interface SiteSettings {
   ctaHref: string;
   ctaVisible: boolean;
   registrationEnabled: boolean;
+  emailNotificationsEnabled?: boolean;
   dietitianSignInLabel: string;
   patientSignInLabel: string;
   footerDescription: string;
@@ -57,6 +58,7 @@ export const FALLBACK_SITE_SETTINGS: SiteSettings = {
   ctaHref: "/auth/dietitian/register",
   ctaVisible: true,
   registrationEnabled: false,
+  emailNotificationsEnabled: false,
   dietitianSignInLabel: "Sign in as Dietitian",
   patientSignInLabel: "Sign in as Patient",
   footerDescription:

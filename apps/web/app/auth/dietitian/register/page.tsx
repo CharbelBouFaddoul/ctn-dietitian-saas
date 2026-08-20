@@ -2,17 +2,28 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Alert, Button, Field, Input, PasswordInput, LoadingState } from "@nutrition-saas/ui";
 import { API_URL, api } from "../../../../lib/api";
 import { errorMessage } from "../../../../lib/humanize-error";
+import { resolveSessionHome } from "../../../../lib/session-home";
 import { AuthShell } from "../../auth-shell";
 
 export default function DietitianRegisterPage() {
+  const router = useRouter();
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    void resolveSessionHome("dietitian").then((home) => {
+      if (home.kind !== "unauthenticated") {
+        router.replace(home.path);
+      }
+    });
+  }, [router]);
 
   useEffect(() => {
     void fetch(`${API_URL}/api/v1/public/site-settings`)

@@ -1,11 +1,12 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
-import type { AppointmentStatus } from "@prisma/client";
+import type { AppointmentStatus, NotificationType } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { SecurityEventLogger } from "../auth/security-event.logger";
 import type { TenantContext } from "../organizations/tenant.types";
 import { legacyOrganizationId, tenantWhere } from "../organizations/tenant-scope";
 import { TimelineService } from "../timeline/timeline.service";
 import { ClientAccessService } from "../clients/client-access.service";
+import { NotificationService } from "../notifications/notification.service";
 
 @Injectable()
 export class AppointmentService {
@@ -14,6 +15,7 @@ export class AppointmentService {
     private readonly access: ClientAccessService,
     private readonly timeline: TimelineService,
     private readonly security: SecurityEventLogger,
+    private readonly notifications: NotificationService,
   ) {}
 
   async listForClient(tenant: TenantContext, clientId: string) {
@@ -97,6 +99,15 @@ export class AppointmentService {
       targetType: "appointment",
       targetId: appointment.id,
     });
+    await this.notifyAppointmentParties({
+      tenant,
+      clientId,
+      appointmentId: appointment.id,
+      title: appointment.title,
+      type: "APPOINTMENT_CREATED",
+      body: `Appointment scheduled: ${appointment.title}`,
+      excludeUserId: tenant.userId,
+    });
     return this.toResponse(appointment);
   }
 
@@ -144,7 +155,61 @@ export class AppointmentService {
       targetId: appointment.id,
       metadata: { status },
     });
+
+    const notifType: NotificationType =
+      status === "CANCELLED" ? "APPOINTMENT_CANCELLED" : "APPOINTMENT_UPDATED";
+    await this.notifyAppointmentParties({
+      tenant,
+      clientId,
+      appointmentId: appointment.id,
+      title: appointment.title,
+      type: notifType,
+      body:
+        status === "CANCELLED"
+          ? `Appointment cancelled: ${appointment.title}`
+          : `Appointment updated (${status}): ${appointment.title}`,
+      excludeUserId: tenant.userId,
+    });
     return this.toResponse(appointment);
+  }
+
+  private async notifyAppointmentParties(input: {
+    tenant: TenantContext;
+    clientId: string;
+    appointmentId: string;
+    title: string;
+    type: NotificationType;
+    body: string;
+    excludeUserId?: string;
+  }) {
+    const account = await this.prisma.dietitianAccount.findUnique({
+      where: { id: input.tenant.organizationId },
+      select: { userId: true },
+    });
+    const portal = await this.prisma.clientAccount.findUnique({
+      where: { clientId: input.clientId },
+      select: { userId: true, status: true },
+    });
+    const recipients = new Set<string>();
+    if (account?.userId) recipients.add(account.userId);
+    if (portal?.userId && portal.status === "ACTIVE") recipients.add(portal.userId);
+    if (input.excludeUserId) recipients.delete(input.excludeUserId);
+
+    await Promise.all(
+      [...recipients].map((userId) =>
+        this.notifications.create({
+          organizationId: input.tenant.organizationId,
+          legacyOrganizationId: legacyOrganizationId(input.tenant),
+          userId,
+          clientId: input.clientId,
+          type: input.type,
+          title: input.title,
+          body: input.body,
+          targetType: "appointment",
+          targetId: input.appointmentId,
+        }),
+      ),
+    );
   }
 
   private toResponse(row: {

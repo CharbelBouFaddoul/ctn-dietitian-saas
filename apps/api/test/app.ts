@@ -198,7 +198,7 @@ export async function resetAuthDatabase(prisma: PrismaService): Promise<void> {
   await seedPlatformSettings(prisma);
   // Existing e2e suites rely on self-serve register/org create; Phase 3 gate defaults off.
   await prisma.platformSettings.updateMany({
-    data: { registrationEnabled: true },
+    data: { registrationEnabled: true, emailNotificationsEnabled: false },
   });
 }
 

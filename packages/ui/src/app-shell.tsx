@@ -50,6 +50,7 @@ export function AppShell({
   navSections,
   pathname,
   footer,
+  topbarActions,
   children,
   linkComponent: Link = DefaultLink,
   variant = "sidebar",
@@ -64,6 +65,8 @@ export function AppShell({
   navSections?: NavSection[];
   pathname?: string;
   footer?: ReactNode;
+  /** Optional controls shown in the mobile top bar (e.g. notification bell). */
+  topbarActions?: ReactNode;
   children: ReactNode;
   linkComponent?: ShellLink;
   variant?: "sidebar" | "client";
@@ -98,9 +101,12 @@ export function AppShell({
           <strong>{brand}</strong>
           {meta ? <span className="ui-muted">{meta}</span> : null}
         </div>
-        <Button variant="secondary" size="sm" onClick={() => setOpen(true)} aria-label="Open navigation">
-          Menu
-        </Button>
+        <div className="ui-app__topbar-actions">
+          {topbarActions}
+          <Button variant="secondary" size="sm" onClick={() => setOpen(true)} aria-label="Open navigation">
+            Menu
+          </Button>
+        </div>
       </div>
       <div className="ui-app">
         {open ? (

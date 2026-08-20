@@ -692,6 +692,13 @@ enum NotificationType {
   INVOICE_SENT
   TASK_ASSIGNED
   AUTOMATION
+  APPOINTMENT_CREATED
+  APPOINTMENT_UPDATED
+  APPOINTMENT_CANCELLED
+  CLIENT_JOINED
+  SUBSCRIPTION_GRACE
+  SUBSCRIPTION_READ_ONLY
+  SUBSCRIPTION_LOCKED
 }
 
 enum InvoiceStatus {
@@ -1887,6 +1894,7 @@ model PlatformSettings {
   contactAddress         String?          @map("contact_address") @db.Text
   contactHours           String?          @map("contact_hours")
   registrationEnabled    Boolean          @default(false) @map("registration_enabled")
+  emailNotificationsEnabled Boolean       @default(false) @map("email_notifications_enabled")
   createdAt              DateTime         @default(now()) @map("created_at") @db.Timestamptz
   updatedAt              DateTime         @updatedAt @map("updated_at") @db.Timestamptz
 

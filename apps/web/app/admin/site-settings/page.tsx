@@ -37,6 +37,7 @@ export default function AdminSiteSettingsPage() {
   const [ctaHref, setCtaHref] = useState("");
   const [ctaVisible, setCtaVisible] = useState(true);
   const [registrationEnabled, setRegistrationEnabled] = useState(false);
+  const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState(false);
   const [dietitianSignInLabel, setDietitianSignInLabel] = useState("");
   const [patientSignInLabel, setPatientSignInLabel] = useState("");
   const [footerDescription, setFooterDescription] = useState("");
@@ -55,6 +56,7 @@ export default function AdminSiteSettingsPage() {
     setCtaHref(data.ctaHref);
     setCtaVisible(data.ctaVisible);
     setRegistrationEnabled(data.registrationEnabled);
+    setEmailNotificationsEnabled(data.emailNotificationsEnabled === true);
     setDietitianSignInLabel(data.dietitianSignInLabel);
     setPatientSignInLabel(data.patientSignInLabel);
     setFooterDescription(data.footerDescription);
@@ -126,6 +128,7 @@ export default function AdminSiteSettingsPage() {
           ctaHref,
           ctaVisible,
           registrationEnabled,
+          emailNotificationsEnabled,
           dietitianSignInLabel,
           patientSignInLabel,
           footerDescription,
@@ -178,6 +181,16 @@ export default function AdminSiteSettingsPage() {
                 onChange={(event) => setRegistrationEnabled(event.target.checked)}
               />
               Allow dietitian and patient self-registration
+            </label>
+          </Field>
+          <Field label="Product email notifications">
+            <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <input
+                type="checkbox"
+                checked={emailNotificationsEnabled}
+                onChange={(event) => setEmailNotificationsEnabled(event.target.checked)}
+              />
+              Send product emails (invoices, automation). Auth emails always send.
             </label>
           </Field>
           <Field label="Dietitian sign-in label">

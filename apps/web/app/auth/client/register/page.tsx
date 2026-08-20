@@ -2,12 +2,15 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Alert, Button, Field, Input, PasswordInput, LoadingState } from "@nutrition-saas/ui";
 import { API_URL, api } from "../../../../lib/api";
 import { errorMessage } from "../../../../lib/humanize-error";
+import { resolveSessionHome } from "../../../../lib/session-home";
 import { AuthShell } from "../../auth-shell";
 
 export default function ClientRegisterPage() {
+  const router = useRouter();
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -16,6 +19,14 @@ export default function ClientRegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    void resolveSessionHome("client").then((home) => {
+      if (home.kind !== "unauthenticated") {
+        router.replace(home.path);
+      }
+    });
+  }, [router]);
 
   useEffect(() => {
     void fetch(`${API_URL}/api/v1/public/site-settings`)

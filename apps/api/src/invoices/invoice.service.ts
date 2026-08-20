@@ -351,13 +351,7 @@ export class InvoiceService {
       where: { clientId: invoice.clientId },
       include: { user: true },
     });
-    if (clientAccount?.user.email) {
-      await this.email.sendInvoiceNotification(
-        clientAccount.user.email,
-        invoice.invoiceNumber ?? invoice.id,
-        decimalToNumber(invoice.total),
-        invoice.currency,
-      );
+    if (clientAccount?.userId) {
       await this.notifications.create({
         dietitianAccountId: tenant.organizationId,
         organizationId: legacyOrganizationId(tenant),
@@ -369,6 +363,14 @@ export class InvoiceService {
         targetType: "invoice",
         targetId: invoice.id,
       });
+      if (clientAccount.user.email) {
+        await this.email.sendInvoiceNotification(
+          clientAccount.user.email,
+          invoice.invoiceNumber ?? invoice.id,
+          decimalToNumber(invoice.total),
+          invoice.currency,
+        );
+      }
     }
     await this.security.record({
       type: "invoice_sent",

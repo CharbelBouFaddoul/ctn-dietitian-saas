@@ -143,8 +143,9 @@ Tenant-scoped queries via dietitianAccountId (tenantWhere)
 - Platform roles stay on `users` (`SUPER_ADMIN` \| `ADMIN`).
 - Self-serve register/org create is gated by `PlatformSettings.registrationEnabled` (default off); admins provision dietitians.
 - Patients may connect to multiple dietitians (isolated `Client` per link); clinical portal ops require a selected `Session.activeClientId` when more than one connection exists.
-- Web practice UI is `/practice/:id` (redirects from `/orgs`). Phase 5 will remount APIs and drop org shells — deferred.
+- Web practice UI is `/practice/:id` (redirects from `/orgs`). API remount under `/api/v1/dietitian` and org-shell drops remain deferred (Phase 6+).
 - Subscription access is derived (`ACTIVE` / `GRACE` / `READ_ONLY` / `LOCKED`) from period end + status; `TenantGuard` enforces mutations vs reads. See [TENANCY_MIGRATION.md](./TENANCY_MIGRATION.md).
+- Phase 5 dashboards: `GET …/practice/dashboard` (extended) and `GET /api/v1/portal/dashboard`. In-app notifications reuse `Notification` with org/portal list, unread-count, mark-one, mark-all-read; shells poll unread. `PlatformSettings.emailNotificationsEnabled` (default off, admin-only) gates product emails only.
 
 ---
 
@@ -434,7 +435,7 @@ notifications (in-app)
 
 **Documents:** binary on `FILE_STORAGE_PATH`; metadata in PostgreSQL. Authenticated download only — no public URLs. Visibility `INTERNAL` (staff only) or `SHARED` (client + staff). Magic-byte validation; `MAX_DOCUMENT_BYTES` configurable.
 
-**Notifications:** in-app only in Phase 9. Created synchronously on message send / document share.
+**Notifications:** in-app via `Notification` (Phase 5 extended types + mark-all-read). Shells poll unread-count. Product emails (invoice, automation) gated by `emailNotificationsEnabled` (default off); auth emails always send.
 
 ---
 

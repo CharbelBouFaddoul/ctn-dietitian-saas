@@ -43,6 +43,7 @@ import { OrganizationLifecycleService } from "./organization-lifecycle.service";
 import { OrganizationService } from "./organization.service";
 import { EntitlementService, publicEntitlement } from "../entitlements/entitlement.service";
 import { SubscriptionLifecycleService } from "../entitlements/subscription-lifecycle.service";
+import { NotificationService } from "../notifications/notification.service";
 import type { TenantContext } from "./tenant.types";
 import { ORGANIZATION_ACCESS_DENIED } from "./tenant.types";
 
@@ -57,6 +58,7 @@ export class OrganizationController {
     private readonly lifecycle: OrganizationLifecycleService,
     private readonly entitlements: EntitlementService,
     private readonly subscriptionLifecycle: SubscriptionLifecycleService,
+    private readonly notifications: NotificationService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -183,6 +185,11 @@ export class OrganizationController {
     const access =
       tenant.subscriptionAccess ??
       (await this.subscriptionLifecycle.getAccessForAccount(organizationId));
+    await this.notifications.notifySubscriptionAccessIfNeeded({
+      dietitianAccountId: organizationId,
+      accessState: access.accessState,
+      currentPeriodEnd: access.currentPeriodEnd,
+    });
     return {
       accessState: access.accessState,
       status: access.status,

@@ -1,6 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { AppEnv } from "@nutrition-saas/validation";
+import { PlatformSettingsService } from "../platform-settings/platform-settings.service";
 import { EMAIL_PROVIDER, type EmailProvider } from "./email.provider";
 
 @Injectable()
@@ -8,6 +9,7 @@ export class EmailService {
   constructor(
     @Inject(EMAIL_PROVIDER) private readonly provider: EmailProvider,
     private readonly config: ConfigService<AppEnv, true>,
+    private readonly platformSettings: PlatformSettingsService,
   ) {}
 
   async sendVerification(to: string, rawToken: string): Promise<void> {
@@ -64,12 +66,16 @@ export class EmailService {
     });
   }
 
+  /** Product email — gated by PlatformSettings.emailNotificationsEnabled. */
   async sendInvoiceNotification(
     to: string,
     invoiceNumber: string,
     total: number,
     currency: string,
   ): Promise<void> {
+    if (!(await this.platformSettings.isEmailNotificationsEnabled())) {
+      return;
+    }
     await this.provider.send({
       to,
       subject: `Invoice ${invoiceNumber}`,
@@ -82,7 +88,11 @@ export class EmailService {
     });
   }
 
+  /** Product email — gated by PlatformSettings.emailNotificationsEnabled. */
   async sendAutomationMessage(to: string, subject: string, body: string): Promise<void> {
+    if (!(await this.platformSettings.isEmailNotificationsEnabled())) {
+      return;
+    }
     await this.provider.send({
       to,
       subject,

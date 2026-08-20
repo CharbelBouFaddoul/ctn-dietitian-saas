@@ -133,6 +133,11 @@ export class OrgMessagingController {
     return { count };
   }
 
+  @Post("notifications/read-all")
+  async markAllNotificationsRead(@CurrentTenant() tenant: TenantContext) {
+    return this.notifications.markAllRead(tenant.userId, tenant.organizationId);
+  }
+
   @Patch("notifications/:notificationId/read")
   async markNotificationRead(
     @CurrentTenant() tenant: TenantContext,

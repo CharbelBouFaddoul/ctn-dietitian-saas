@@ -1,6 +1,6 @@
 # Tenancy Migration Status
 
-Tracks the DietitianAccount tenancy restructure (Phases 1–5).
+Tracks the DietitianAccount tenancy restructure (Phases 1–6+).
 
 | Phase | Scope | Status |
 |-------|--------|--------|
@@ -8,7 +8,8 @@ Tracks the DietitianAccount tenancy restructure (Phases 1–5).
 | **Phase 2** | Auth cutover / persona isolation (dietitian ↔ portal mutual exclusion); TenantGuard owner-only synthetic role | **Done** |
 | **Phase 3** | Product cutover: `registrationEnabled` gate, admin dietitian provision + `DIETITIAN_ACTIVATION`, portal multi-connection + `Session.activeClientId`, web `/practice` remount, patient connection switcher | **Done** |
 | **Phase 4** | Subscription lifecycle (ACTIVE → GRACE 3d → READ_ONLY 7d → LOCKED), period dates, CLIENT_LIMIT seeds, centralized TenantGuard enforcement | **Done** |
-| **Phase 5** | API remount `/api/v1/dietitian`, `DietitianGuard`, drop org membership shells / dual-write / legacy org tables | **Deferred** |
+| **Phase 5** | Practice/portal dashboards, notification types + mark-all-read + bell UI, `emailNotificationsEnabled` product-email gate, auth-route redirects | **Done** |
+| **Phase 6+** | API remount `/api/v1/dietitian`, `DietitianGuard`, drop org membership shells / dual-write / legacy org tables | **Deferred** |
 
 ## Phase 4 notes
 
@@ -22,7 +23,15 @@ Tracks the DietitianAccount tenancy restructure (Phases 1–5).
 - Patients keep portal access when dietitian is locked; **new joins** blocked for LOCKED practices.
 - No payment provider. API path remains `/api/v1/organizations/:organizationId`.
 
-## Phase 5 (not started)
+## Phase 5 notes
+
+- Reuses `Notification` + `NotificationService` (no second notification system). New types: `APPOINTMENT_*`, `CLIENT_JOINED`, `SUBSCRIPTION_*`.
+- `POST …/notifications/read-all` on org + portal; shells poll unread-count (no WebSockets).
+- `PlatformSettings.emailNotificationsEnabled` default **false** (admin-only): gates invoice + automation product emails; auth emails always send.
+- Practice dashboard extended (`todayAppointments`, conversations, notifications). Portal: `GET /api/v1/portal/dashboard`.
+- Auth: client login + both register pages redirect when a session already exists.
+
+## Phase 6+ (deferred remount)
 
 - Remount practice APIs under `/api/v1/dietitian`
 - Replace TenantGuard with DietitianGuard

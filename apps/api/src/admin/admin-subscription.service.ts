@@ -4,6 +4,7 @@ import type { BillingCycle, SubscriptionStatus } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { SecurityEventLogger } from "../auth/security-event.logger";
 import { SubscriptionLifecycleService } from "../entitlements/subscription-lifecycle.service";
+import { NotificationService } from "../notifications/notification.service";
 import { tenantWhere } from "../organizations/tenant-scope";
 import type { AdminActor } from "./admin-actor";
 import { ADMIN_MESSAGES } from "./admin.messages";
@@ -29,6 +30,7 @@ export class AdminSubscriptionService {
     private readonly prisma: PrismaService,
     private readonly security: SecurityEventLogger,
     private readonly lifecycle: SubscriptionLifecycleService,
+    private readonly notifications: NotificationService,
   ) {}
 
   async list() {
@@ -153,6 +155,7 @@ export class AdminSubscriptionService {
       },
     });
 
+    await this.emitSubscriptionAccessNotification(organizationId, subscription);
     return this.toResponse(subscription);
   }
 
@@ -218,6 +221,7 @@ export class AdminSubscriptionService {
       },
     });
 
+    await this.emitSubscriptionAccessNotification(organizationId, subscription);
     return this.toResponse(subscription);
   }
 
@@ -260,6 +264,7 @@ export class AdminSubscriptionService {
       },
     });
 
+    await this.emitSubscriptionAccessNotification(organizationId, subscription);
     return this.toResponse(subscription);
   }
 
@@ -271,6 +276,26 @@ export class AdminSubscriptionService {
       return "subscription_cancelled";
     }
     return "subscription_changed";
+  }
+
+  private async emitSubscriptionAccessNotification(
+    dietitianAccountId: string,
+    subscription: {
+      status: string;
+      currentPeriodEnd: Date | null;
+      plan: { slug: string; name: string };
+    },
+  ) {
+    const access = this.lifecycle.derive({
+      status: subscription.status,
+      currentPeriodEnd: subscription.currentPeriodEnd,
+      plan: subscription.plan,
+    });
+    await this.notifications.notifySubscriptionAccessIfNeeded({
+      dietitianAccountId,
+      accessState: access.accessState,
+      currentPeriodEnd: subscription.currentPeriodEnd,
+    });
   }
 
   private async requireAccount(dietitianAccountId: string) {

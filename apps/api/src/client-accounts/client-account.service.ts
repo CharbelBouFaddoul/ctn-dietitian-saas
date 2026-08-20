@@ -18,6 +18,7 @@ import type { TenantContext } from "../organizations/tenant.types";
 import { legacyOrganizationId, tenantWhere } from "../organizations/tenant-scope";
 import { TimelineService } from "../timeline/timeline.service";
 import { ClientAccessService } from "../clients/client-access.service";
+import { NotificationService } from "../notifications/notification.service";
 import {
   CLIENT_ACCOUNT_EXISTS,
   CLIENT_LIMIT_REACHED,
@@ -42,6 +43,7 @@ export class ClientAccountService {
     private readonly sessions: SessionService,
     private readonly timeline: TimelineService,
     private readonly security: SecurityEventLogger,
+    private readonly notifications: NotificationService,
   ) {}
 
   async get(tenant: TenantContext, clientId: string) {
@@ -390,6 +392,7 @@ export class ClientAccountService {
       targetId: portalAccount.id,
       metadata: { clientId, source: "practice_join" },
     });
+    await this.notifyDietitianClientJoined(dietitianAccountId, clientId, organizationId);
 
     return this.connectedResult(dietitianAccountId, clientId);
   }
@@ -485,6 +488,7 @@ export class ClientAccountService {
       targetId: account.id,
       metadata: { clientId },
     });
+    await this.notifyDietitianClientJoined(dietitianAccountId, clientId, organizationId);
 
     return this.connectedResult(dietitianAccountId, clientId);
   }
@@ -526,7 +530,43 @@ export class ClientAccountService {
       targetId: accountId,
       metadata: { clientId },
     });
+    await this.notifyDietitianClientJoined(
+      dietitianAccountId,
+      clientId,
+      accountRow.legacyOrganizationId ?? accountRow.id,
+    );
     return this.connectedResult(dietitianAccountId, clientId);
+  }
+
+  private async notifyDietitianClientJoined(
+    dietitianAccountId: string,
+    clientId: string,
+    legacyOrganizationId: string,
+  ) {
+    const account = await this.prisma.dietitianAccount.findUnique({
+      where: { id: dietitianAccountId },
+      select: { userId: true },
+    });
+    if (!account) return;
+    const client = await this.prisma.client.findUnique({
+      where: { id: clientId },
+      select: { displayName: true, firstName: true, lastName: true },
+    });
+    const name =
+      client?.displayName?.trim() ||
+      `${client?.firstName ?? ""} ${client?.lastName ?? ""}`.trim() ||
+      "A patient";
+    await this.notifications.create({
+      organizationId: dietitianAccountId,
+      legacyOrganizationId,
+      userId: account.userId,
+      clientId,
+      type: "CLIENT_JOINED",
+      title: "Patient joined your practice",
+      body: `${name} connected to your practice.`,
+      targetType: "client",
+      targetId: clientId,
+    });
   }
 
   private async connectedResult(dietitianAccountId: string, clientId: string) {

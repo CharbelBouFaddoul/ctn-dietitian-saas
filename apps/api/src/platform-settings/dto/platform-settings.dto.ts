@@ -111,6 +111,13 @@ export class UpdatePlatformSettingsDto {
   @IsBoolean()
   registrationEnabled?: boolean;
 
+  @ApiPropertyOptional({
+    description: "When false, product emails (invoice, automation) are skipped. Auth emails always send.",
+  })
+  @IsOptional()
+  @IsBoolean()
+  emailNotificationsEnabled?: boolean;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()

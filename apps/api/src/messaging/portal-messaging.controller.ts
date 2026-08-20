@@ -108,6 +108,15 @@ export class PortalNotificationController {
     return { count };
   }
 
+  @Post("read-all")
+  async markAllRead(
+    @CurrentUser() user: AuthenticatedRequestUser,
+    @CurrentSession() session: AuthenticatedSession,
+  ) {
+    const client = await this.access.assertPortalAccess(user.id, { activeClientId: session.activeClientId });
+    return this.notifications.markAllRead(user.id, requireDietitianAccountId(client));
+  }
+
   @Patch(":notificationId/read")
   async markRead(
     @CurrentUser() user: AuthenticatedRequestUser,

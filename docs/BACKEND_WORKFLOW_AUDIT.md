@@ -402,7 +402,11 @@ No user
 
 **Phase 3 update (2026-08-20):** Implemented. `registrationEnabled` defaults to `false`; admin `POST /api/v1/admin/dietitians` provisions User + DietitianAccount + optional subscription + `DIETITIAN_ACTIVATION` email. Self-serve register/org create are gated. See [TENANCY_MIGRATION.md](./TENANCY_MIGRATION.md).
 
-**Phase 4 (deferred):** `/api/v1/dietitian` remount, DietitianGuard, stop dual-write, drop Organization/Member/Assignment tables — not started.
+**Phase 4 (done):** subscription lifecycle enforcement — see [TENANCY_MIGRATION.md](./TENANCY_MIGRATION.md).
+
+**Phase 5 (done):** dashboards + notifications + product email gate — remount `/api/v1/dietitian` still deferred to Phase 6+.
+
+**Phase 6+ (deferred):** `/api/v1/dietitian` remount, DietitianGuard, stop dual-write, drop Organization/Member/Assignment tables — not started.
 
 What must change later (audit only):
 
@@ -725,12 +729,13 @@ Create rule (entitlement + rule limit)
 
 | Mechanism | Used by |
 |---|---|
-| In-app `notifications` table | Messaging, documents, invoices, tasks, automations |
-| Email | Verification, password reset, invoice send, automation email |
+| In-app `notifications` table | Messaging, documents, invoices, tasks, automations, appointments, client join, subscription access |
+| Email (auth) | Verification, password reset, dietitian activation — **always send** |
+| Email (product) | Invoice send, automation `SEND_EMAIL` — gated by `PlatformSettings.emailNotificationsEnabled` (default **false**) |
 | Worker-based | Automation sweep → executor → notify/email |
 | Push/SMS | **Missing** |
 
-Endpoints: list / unread-count / mark-read on org-messaging and portal-messaging controllers (scoped by `userId`, optionally `organizationId`).
+Endpoints: list / unread-count / mark-read / **read-all** on org-messaging and portal-messaging controllers (scoped by `userId` + `dietitianAccountId`). Practice + portal shells poll unread; no WebSockets in Phase 5.
 
 ---
 
@@ -981,14 +986,15 @@ Only questions that **cannot** be answered from the repository:
 7. **Reassignment / covering dietitians:** Single assignee only, or multiple concurrent assignees with shared inbox?
 8. **STAFF role intent:** Should STAFF create invoices/appointments/meal plans and use AI, or be read-only assistants?
 9. **Subscription on org create:** Auto-attach trial/standard ACTIVE plan, require admin before any use, or allow ungated features without a plan?
-10. **When subscription expires/suspends:** ✅ Phase 4 — derived ACTIVE → GRACE (3d) → READ_ONLY (7d) → LOCKED; TenantGuard enforces; patients keep historical portal access; joins blocked when LOCKED; automations skip READ_ONLY/LOCKED.
+10. **When subscription expires/suspends:** ✅ Phase 4 — derived ACTIVE → GRACE (3d) → READ_ONLY (7d) → LOCKED; TenantGuard enforces; patients keep historical portal access; joins blocked when LOCKED; automations skip READ_ONLY/LOCKED. Phase 5 emits deduped `SUBSCRIPTION_*` in-app notifications.
 11. **CLIENT_LIMIT defaults:** ✅ Phase 4 — standard 25 / pro 100 / premium 300 (seed upsert).
 12. **Which features should become plan-gated next** beyond AI/automation/client limit (messaging? documents? storage?).
-13. **Appointments for patients:** In-portal visibility/reschedule/cancel required for this version?
+13. **Appointments for patients:** ✅ Phase 5 — upcoming appointment on portal dashboard + `APPOINTMENT_*` in-app notifications; full calendar/reschedule still Phase 7.
 14. **First SUPER_ADMIN bootstrap:** Manual SQL, CLI, or break-glass invite — what is the official ops process?
 15. **Account states required for provisioning era:** e.g. INVITED, ACTIVATION_PENDING, PROVISIONED — which states are mandatory?
 16. **Dietitian leaves practice:** Auto-unassign clients, force reassignment, transfer ownership rules beyond current deactivate?
 17. **Payment collection:** Stay manual “mark paid”, or integrate a PSP?
+18. **Product email default:** ✅ Phase 5 — `emailNotificationsEnabled` defaults false; admin toggle; auth emails unaffected.
 
 ---
 
