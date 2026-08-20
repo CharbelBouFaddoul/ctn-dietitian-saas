@@ -54,7 +54,7 @@ export default function InvoicesPage() {
     const suffix = query.toString() ? `?${query.toString()}` : "";
     const [invoices, clientList] = await Promise.all([
       api<ListResponse>(`/api/v1/organizations/${organizationId}/invoices${suffix}`),
-      api<{ items: ClientRow[] }>(`/api/v1/organizations/${organizationId}/clients?pageSize=100`),
+      api<{ items: ClientRow[] }>(`/api/v1/organizations/${organizationId}/clients?pageSize=50`),
     ]);
     setData(invoices);
     setClients(clientList.items);

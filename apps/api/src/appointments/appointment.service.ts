@@ -26,16 +26,18 @@ export class AppointmentService {
 
   async listUpcoming(tenant: TenantContext) {
     const visible = this.access.visibleWhere(tenant);
+    const from = new Date();
+    from.setDate(from.getDate() - 30);
     const rows = await this.prisma.appointment.findMany({
       where: {
         organizationId: tenant.organizationId,
-        status: "SCHEDULED",
-        startAt: { gte: new Date() },
+        startAt: { gte: from },
+        status: { not: "CANCELLED" },
         client: visible,
       },
       include: { client: true },
       orderBy: { startAt: "asc" },
-      take: 20,
+      take: 100,
     });
     return rows.map((row) => ({
       ...this.toResponse(row),
@@ -44,6 +46,7 @@ export class AppointmentService {
         displayName: row.client.displayName,
         firstName: row.client.firstName,
         lastName: row.client.lastName,
+        email: row.client.email,
       },
     }));
   }

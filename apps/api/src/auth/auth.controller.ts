@@ -10,7 +10,7 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { Throttle, ThrottlerGuard } from "@nestjs/throttler";
+import { SkipThrottle, Throttle, ThrottlerGuard } from "@nestjs/throttler";
 import { THROTTLE_NAMES } from "@nutrition-saas/config";
 import {
   ApiBadRequestResponse,
@@ -99,6 +99,7 @@ export class AuthController {
   }
 
   @Post("logout")
+  @SkipThrottle({ [THROTTLE_NAMES.AUTH]: true })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: "Sign out",
@@ -121,6 +122,7 @@ export class AuthController {
   }
 
   @Get("me")
+  @SkipThrottle({ [THROTTLE_NAMES.AUTH]: true })
   @UseGuards(SessionGuard)
   @ApiCookieAuth()
   @ApiOperation({ summary: "Current authenticated user and session" })
@@ -202,6 +204,7 @@ export class AuthController {
   }
 
   @Post("sessions/revoke-all")
+  @SkipThrottle({ [THROTTLE_NAMES.AUTH]: true })
   @HttpCode(HttpStatus.OK)
   @UseGuards(SessionGuard)
   @ApiCookieAuth()
