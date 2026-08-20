@@ -23,6 +23,17 @@ const EXACT_COPY: Record<string, string> = {
   "Invalid credentials": "Email or password is incorrect.",
   "Email is not verified": "Verify your email before signing in.",
   "Account is disabled": "This account is no longer active.",
+  "Appointment end must be after start": "End time must be after the start time.",
+  "Appointment overlaps an existing appointment":
+    "That time overlaps another appointment. Choose a free slot.",
+  "Resolve or reject the pending reschedule before editing":
+    "Accept or reject the pending reschedule before editing this appointment.",
+  "Cancelled appointments cannot be edited": "Cancelled appointments can’t be edited.",
+  "Only upcoming appointments can be cancelled": "Only upcoming appointments can be cancelled.",
+  "A reschedule proposal is already pending": "A reschedule proposal is already pending.",
+  "No pending reschedule proposal": "There’s no pending reschedule to respond to.",
+  "You cannot accept your own reschedule proposal": "Wait for the other party to accept this proposal.",
+  "You cannot reject your own reschedule proposal": "Wait for the other party to respond to this proposal.",
 };
 
 const GENERIC_500 = "Something went wrong. Please try again.";

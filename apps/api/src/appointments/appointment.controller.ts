@@ -1,6 +1,15 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, UseGuards } from "@nestjs/common";
-import { ApiCookieAuth, ApiProperty, ApiPropertyOptional, ApiTags } from "@nestjs/swagger";
-import { IsDateString, IsEnum, IsOptional, IsString, IsUUID, MaxLength, MinLength } from "class-validator";
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from "@nestjs/common";
+import { ApiCookieAuth, ApiTags } from "@nestjs/swagger";
 import { SessionGuard } from "../auth/guards/session.guard";
 import { CurrentTenant } from "../dietitian/decorators/current-tenant.decorator";
 import { DietitianGuard } from "../dietitian/guards/dietitian.guard";
@@ -8,45 +17,13 @@ import type { DietitianTenantContext } from "../dietitian/dietitian.types";
 import { ClientActionRequired } from "../clients/decorators/client-action.decorator";
 import { ClientAccessGuard } from "../clients/guards/client-access.guard";
 import { AppointmentService } from "./appointment.service";
-
-class CreateAppointmentDto {
-  @ApiProperty()
-  @IsString()
-  @MinLength(2)
-  @MaxLength(120)
-  title!: string;
-
-  @ApiProperty()
-  @IsDateString()
-  startAt!: string;
-
-  @ApiProperty()
-  @IsDateString()
-  endAt!: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsUUID()
-  assignedUserId?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  @MaxLength(2000)
-  notes?: string;
-}
-
-class UpdateAppointmentStatusDto {
-  @ApiProperty({ enum: ["SCHEDULED", "COMPLETED", "CANCELLED", "NO_SHOW"] })
-  @IsEnum(["SCHEDULED", "COMPLETED", "CANCELLED", "NO_SHOW"])
-  status!: "SCHEDULED" | "COMPLETED" | "CANCELLED" | "NO_SHOW";
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  @MaxLength(2000)
-  notes?: string;
-}
+import {
+  AppointmentRangeQueryDto,
+  CreateAppointmentDto,
+  ProposeRescheduleDto,
+  UpdateAppointmentDto,
+  UpdateAppointmentStatusDto,
+} from "./dto/appointment.dto";
 
 @ApiTags("appointments")
 @ApiCookieAuth()
@@ -56,8 +33,63 @@ export class AppointmentController {
   constructor(private readonly appointments: AppointmentService) {}
 
   @Get("appointments")
-  upcoming(@CurrentTenant() tenant: DietitianTenantContext) {
-    return this.appointments.listUpcoming(tenant);
+  listRange(@CurrentTenant() tenant: DietitianTenantContext, @Query() query: AppointmentRangeQueryDto) {
+    return this.appointments.listInRange(tenant, query.from, query.to);
+  }
+
+  @Get("appointments/:appointmentId")
+  getOne(
+    @CurrentTenant() tenant: DietitianTenantContext,
+    @Param("appointmentId", ParseUUIDPipe) appointmentId: string,
+  ) {
+    return this.appointments.getForPractice(tenant, appointmentId);
+  }
+
+  @Patch("appointments/:appointmentId")
+  updateOne(
+    @CurrentTenant() tenant: DietitianTenantContext,
+    @Param("appointmentId", ParseUUIDPipe) appointmentId: string,
+    @Body() body: UpdateAppointmentDto,
+  ) {
+    return this.appointments.update(tenant, appointmentId, body);
+  }
+
+  @Post("appointments/:appointmentId/cancel")
+  cancel(
+    @CurrentTenant() tenant: DietitianTenantContext,
+    @Param("appointmentId", ParseUUIDPipe) appointmentId: string,
+  ) {
+    return this.appointments.cancelForPractice(tenant, appointmentId);
+  }
+
+  @Post("appointments/:appointmentId/propose-reschedule")
+  proposeReschedule(
+    @CurrentTenant() tenant: DietitianTenantContext,
+    @Param("appointmentId", ParseUUIDPipe) appointmentId: string,
+    @Body() body: ProposeRescheduleDto,
+  ) {
+    return this.appointments.proposeRescheduleForPractice(
+      tenant,
+      appointmentId,
+      body.startAt,
+      body.endAt,
+    );
+  }
+
+  @Post("appointments/:appointmentId/accept-reschedule")
+  acceptReschedule(
+    @CurrentTenant() tenant: DietitianTenantContext,
+    @Param("appointmentId", ParseUUIDPipe) appointmentId: string,
+  ) {
+    return this.appointments.acceptRescheduleForPractice(tenant, appointmentId);
+  }
+
+  @Post("appointments/:appointmentId/reject-reschedule")
+  rejectReschedule(
+    @CurrentTenant() tenant: DietitianTenantContext,
+    @Param("appointmentId", ParseUUIDPipe) appointmentId: string,
+  ) {
+    return this.appointments.rejectRescheduleForPractice(tenant, appointmentId);
   }
 
   @Get("clients/:clientId/appointments")

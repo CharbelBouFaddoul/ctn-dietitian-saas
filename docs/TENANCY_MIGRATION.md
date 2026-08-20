@@ -73,3 +73,4 @@ No Organization layer. No OrganizationMember. No STAFF tenancy. No `organization
 - `GET …/clients/:clientId/portfolio` is read/composition-only.
 - Timeline tab uses paginated `GET …/timeline?before=&limit=`.
 - Portal `GET /api/v1/portal/me` includes lightweight personal + dietary/lifestyle + practice name.
+- **Product Phase 6 (calendar + appointments):** extends `Appointment` with `category`, `RESCHEDULE_PENDING`, and proposal fields; practice calendar month/week/day; portal appointments under `activeClientId`; REST + notifications only (no appointment WebSockets); no Organization.

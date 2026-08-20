@@ -70,14 +70,14 @@ export function StatusBadge({
   const raw = status ?? "";
   const resolvedTone =
     tone ??
-    (/(PAID|COMPLETED|PUBLISHED|ACTIVE|CONNECTED|SUCCESS)/i.test(raw)
+    (/(PAID|COMPLETED|PUBLISHED|ACTIVE|CONNECTED|SUCCESS|SCHEDULED)/i.test(raw)
       ? "success"
-      : /(OVERDUE|CANCELLED|FAILED|DANGER|EXPIRED|DENIED)/i.test(raw)
+      : /(OVERDUE|CANCELLED|FAILED|DANGER|EXPIRED|DENIED|NO_SHOW)/i.test(raw)
         ? "danger"
-        : /(PENDING|DRAFT|WAITING|OPEN|SENT|ISSUED|PAUSED|WARNING)/i.test(raw)
+        : /(PENDING|DRAFT|WAITING|OPEN|SENT|ISSUED|PAUSED|WARNING|RESCHEDULE)/i.test(raw)
           ? "warning"
           : "neutral");
-  const text = label ?? raw;
+  const text = label ?? raw.replaceAll("_", " ").replace(/\b\w/g, (c) => c.toUpperCase());
   return <Badge tone={resolvedTone}>{text}</Badge>;
 }
 

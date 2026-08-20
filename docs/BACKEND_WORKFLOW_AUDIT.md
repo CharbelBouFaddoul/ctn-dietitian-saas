@@ -993,7 +993,7 @@ Only questions that **cannot** be answered from the repository:
 10. **When subscription expires/suspends:** ✅ Phase 4 — derived ACTIVE → GRACE (3d) → READ_ONLY (7d) → LOCKED; TenantGuard enforces; patients keep historical portal access; joins blocked when LOCKED; automations skip READ_ONLY/LOCKED. Phase 5 emits deduped `SUBSCRIPTION_*` in-app notifications.
 11. **CLIENT_LIMIT defaults:** ✅ Phase 4 — standard 25 / pro 100 / premium 300 (seed upsert).
 12. **Which features should become plan-gated next** beyond AI/automation/client limit (messaging? documents? storage?).
-13. **Appointments for patients:** ✅ Phase 5 — upcoming appointment on portal dashboard + `APPOINTMENT_*` in-app notifications; full calendar/reschedule still Phase 7.
+13. **Appointments for patients:** ✅ Product Phase 6 — portal `/api/v1/portal/appointments` (list/detail/cancel/propose/accept/reject) scoped by `activeClientId`; practice month/week/day calendar; reschedule proposal workflow (`RESCHEDULE_PENDING`); overlap checks; `APPOINTMENT_RESCHEDULE_*` notifications.
 14. **First SUPER_ADMIN bootstrap:** Manual SQL, CLI, or break-glass invite — what is the official ops process?
 15. **Account states required for provisioning era:** e.g. INVITED, ACTIVATION_PENDING, PROVISIONED — which states are mandatory?
 16. **Dietitian leaves practice:** Auto-unassign clients, force reassignment, transfer ownership rules beyond current deactivate?

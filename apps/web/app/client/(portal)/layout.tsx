@@ -114,6 +114,7 @@ export default function ClientPortalLayout({ children }: { children: ReactNode }
       label: "Communication",
       items: [
         { href: "/client/messages", label: "Messages", icon: PatientNavIcons.messages },
+        { href: "/client/appointments", label: "Appointments", icon: PatientNavIcons.appointments },
         { href: "/client/notifications", label: "Notifications", icon: PatientNavIcons.messages },
       ],
     },

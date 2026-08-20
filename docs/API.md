@@ -183,8 +183,14 @@ Session + `TenantGuard`. Client-scoped routes also run `ClientAccessGuard` / `Cl
 | GET/POST/PATCH | `/assessment-templates` | Member; write not STAFF | Platform + org templates; schema edits bump `version` |
 | GET/POST | `/clients/:clientId/assessments` | Read / manageRecords | Start stores `templateVersion` |
 | PATCH/POST complete | `/clients/:clientId/assessments/:assessmentId` | manageRecords | Completed rows are not rewritten when templates change |
-| GET | `/appointments` | Member | Upcoming scheduled appointments for visible clients |
-| GET/POST/PATCH | `/clients/:clientId/appointments` | Read / manageRecords | UTC `timestamptz`; org timezone for local display |
+| GET | `/appointments?from=&to=` | Member | Calendar range (UTC). Omitting range defaults to upcoming-friendly window. Includes client summary; excludes `CANCELLED` |
+| GET | `/appointments/:appointmentId` | Member | Appointment detail (incl. category + pending proposal fields) |
+| PATCH | `/appointments/:appointmentId` | manageRecords | Edit title/category/notes/times/client while `SCHEDULED`; blocked while `RESCHEDULE_PENDING` |
+| POST | `/appointments/:appointmentId/cancel` | manageRecords | Cancel (`CANCELLED`); clears pending proposal |
+| POST | `/appointments/:appointmentId/propose-reschedule` | manageRecords | Body `{ startAt, endAt }` → `RESCHEDULE_PENDING` |
+| POST | `/appointments/:appointmentId/accept-reschedule` | manageRecords | Non-proposer only; applies proposed times → `SCHEDULED` |
+| POST | `/appointments/:appointmentId/reject-reschedule` | manageRecords | Non-proposer only; discards proposal → `SCHEDULED` |
+| GET/POST/PATCH | `/clients/:clientId/appointments` | Read / manageRecords | Per-client list/create; status PATCH (`SCHEDULED`/`COMPLETED`/`CANCELLED`/`NO_SHOW`). Create accepts `category` |
 | GET | `/foods` | Member | Server-side search (`q`, `category`, `sourceId`, `page`, `pageSize` ≤ 50) |
 | GET | `/foods/categories` | Member | Distinct active categories |
 | GET | `/foods/:foodId` | Member | Effective food: global + org override + `overriddenFields` |
@@ -285,6 +291,21 @@ Read-only. `ClientAccessService` `read`. Same summary/list shapes as portal.
 | POST | `/messages` | Send message (persists; emits realtime) |
 | POST | `/read` | Mark read (persists; emits realtime) |
 
+### Appointments — portal (`/api/v1/portal/appointments`)
+
+Scoped to `Session.activeClientId` + `ClientAccount` (never trust a browser `clientId` alone).
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/` | List appointments for the active connection |
+| GET | `/:appointmentId` | Detail |
+| POST | `/:appointmentId/cancel` | Patient cancel |
+| POST | `/:appointmentId/propose-reschedule` | Patient proposes `{ startAt, endAt }` |
+| POST | `/:appointmentId/accept-reschedule` | Accept dietitian proposal |
+| POST | `/:appointmentId/reject-reschedule` | Reject dietitian proposal |
+
+Statuses: `SCHEDULED`, `RESCHEDULE_PENDING`, `CANCELLED`, `COMPLETED`, `NO_SHOW`. Categories: `CONSULTATION`, `FOLLOW_UP`, `ASSESSMENT`, `MEAL_PLAN`, `OTHER`. Overlap prevention is per `dietitianAccountId` for `SCHEDULED`/`RESCHEDULE_PENDING`. Appointment changes use REST + `NotificationService` (no Socket.IO appointment events).
+
 ### Messaging — practice (`/api/v1/dietitian/:dietitianAccountId`)
 
 | Method | Path | Description |
@@ -308,7 +329,7 @@ List, upload, download, share/unshare (`PATCH visibility`), archive.
 
 Practice: `GET/PATCH/POST /api/v1/dietitian/:dietitianAccountId/notifications` (+ `/unread-count`, `/:id/read`, `/read-all`).
 Portal: `/api/v1/portal/notifications` (same operations; scoped by `activeClientId` → dietitianAccountId).
-Types include messages, documents, invoices, tasks, appointments, client join, subscription lifecycle, and `MEAL_PLAN_PUBLISHED`. In-app only (email is separate and gated).
+Types include messages, documents, invoices, tasks, appointments (`APPOINTMENT_CREATED` / `UPDATED` / `CANCELLED` / `RESCHEDULE_PROPOSED` / `RESCHEDULE_ACCEPTED` / `RESCHEDULE_REJECTED`), client join, subscription lifecycle, and `MEAL_PLAN_PUBLISHED`. In-app only (email is separate and gated).
 
 ### Invoices — portal (`/api/v1/portal/invoices`)
 

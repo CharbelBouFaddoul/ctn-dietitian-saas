@@ -65,6 +65,7 @@ model User {
   templatesCreated        AssessmentTemplate[]     @relation("TemplateCreatedBy")
   appointmentsCreated     Appointment[]            @relation("AppointmentCreatedBy")
   appointmentsAssigned    Appointment[]            @relation("AppointmentAssignedUser")
+  appointmentsProposed    Appointment[]            @relation("AppointmentProposedBy")
   foodOverridesCreated    FoodOverride[]           @relation("FoodOverrideCreatedBy")
   recipesCreated          Recipe[]                 @relation("RecipeCreatedBy")
   mealPlansCreated        MealPlan[]               @relation("MealPlanCreatedBy")
@@ -497,6 +498,15 @@ enum AppointmentStatus {
   COMPLETED
   CANCELLED
   NO_SHOW
+  RESCHEDULE_PENDING
+}
+
+enum AppointmentCategory {
+  CONSULTATION
+  FOLLOW_UP
+  ASSESSMENT
+  MEAL_PLAN
+  OTHER
 }
 
 enum TimelineEventType {
@@ -590,6 +600,9 @@ enum NotificationType {
   APPOINTMENT_CREATED
   APPOINTMENT_UPDATED
   APPOINTMENT_CANCELLED
+  APPOINTMENT_RESCHEDULE_PROPOSED
+  APPOINTMENT_RESCHEDULE_ACCEPTED
+  APPOINTMENT_RESCHEDULE_REJECTED
   CLIENT_JOINED
   SUBSCRIPTION_GRACE
   SUBSCRIPTION_READ_ONLY
@@ -921,23 +934,28 @@ model ClientMeasurement {
 }
 
 model Appointment {
-  id                 String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  dietitianAccountId String            @map("dietitian_account_id") @db.Uuid
-  clientId           String            @map("client_id") @db.Uuid
-  assignedUserId     String?           @map("assigned_user_id") @db.Uuid
+  id                 String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  dietitianAccountId String              @map("dietitian_account_id") @db.Uuid
+  clientId           String              @map("client_id") @db.Uuid
+  assignedUserId     String?             @map("assigned_user_id") @db.Uuid
   title              String
-  startAt            DateTime          @map("start_at") @db.Timestamptz
-  endAt              DateTime          @map("end_at") @db.Timestamptz
-  status             AppointmentStatus @default(SCHEDULED)
-  notes              String?           @db.Text
-  createdById        String?           @map("created_by_id") @db.Uuid
-  createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt          DateTime          @updatedAt @map("updated_at") @db.Timestamptz
+  category           AppointmentCategory @default(CONSULTATION)
+  startAt            DateTime            @map("start_at") @db.Timestamptz
+  endAt              DateTime            @map("end_at") @db.Timestamptz
+  status             AppointmentStatus   @default(SCHEDULED)
+  notes              String?             @db.Text
+  proposedStartAt    DateTime?           @map("proposed_start_at") @db.Timestamptz
+  proposedEndAt      DateTime?           @map("proposed_end_at") @db.Timestamptz
+  proposedByUserId   String?             @map("proposed_by_user_id") @db.Uuid
+  createdById        String?             @map("created_by_id") @db.Uuid
+  createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime            @updatedAt @map("updated_at") @db.Timestamptz
 
   dietitianAccount DietitianAccount @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
   client           Client           @relation(fields: [clientId], references: [id], onDelete: Restrict)
   assignedUser     User?            @relation("AppointmentAssignedUser", fields: [assignedUserId], references: [id], onDelete: SetNull)
   createdBy        User?            @relation("AppointmentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  proposedBy       User?            @relation("AppointmentProposedBy", fields: [proposedByUserId], references: [id], onDelete: SetNull)
 
   @@index([dietitianAccountId, startAt])
   @@index([dietitianAccountId, clientId])

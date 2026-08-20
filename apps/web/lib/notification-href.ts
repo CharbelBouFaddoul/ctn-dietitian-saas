@@ -25,7 +25,9 @@ export function hrefForNotification(
       case "message":
         return "/client/messages";
       case "appointment":
-        return "/client";
+        return item.targetId
+          ? `/client/appointments?appointmentId=${item.targetId}`
+          : "/client/appointments";
       case "document":
         return "/client/documents";
       case "invoice":
@@ -36,6 +38,7 @@ export function hrefForNotification(
       default:
         if (item.type === "MEAL_PLAN_PUBLISHED") return "/client/plan";
         if (item.type === "NEW_MESSAGE") return "/client/messages";
+        if (item.type.startsWith("APPOINTMENT_")) return "/client/appointments";
         if (item.type === "INVOICE_SENT") return "/client/invoices";
         if (item.type === "DOCUMENT_SHARED") return "/client/documents";
         return "/client/notifications";
@@ -48,7 +51,9 @@ export function hrefForNotification(
     case "message":
       return clientId ? `${base}/messages?clientId=${clientId}` : `${base}/messages`;
     case "appointment":
-      return `${base}/calendar`;
+      return item.targetId
+        ? `${base}/calendar?appointmentId=${item.targetId}`
+        : `${base}/calendar`;
     case "client":
       return clientId ? `${base}/clients/${clientId}` : `${base}/clients`;
     case "document":

@@ -9,11 +9,13 @@ export function Dialog({
   title,
   children,
   onClose,
+  className,
 }: {
   open: boolean;
   title: string;
   children: ReactNode;
   onClose: () => void;
+  className?: string;
 }) {
   const headingId = useId();
   useEffect(() => {
@@ -29,11 +31,21 @@ export function Dialog({
   return (
     <>
       <div className="ui-dialog-backdrop" onClick={onClose} />
-      <div className="ui-dialog" role="dialog" aria-modal="true" aria-labelledby={headingId}>
-        <h2 id={headingId} className="ui-card__title">
-          {title}
-        </h2>
-        {children}
+      <div
+        className={["ui-dialog", className].filter(Boolean).join(" ")}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={headingId}
+      >
+        <div className="ui-dialog__head">
+          <h2 id={headingId} className="ui-dialog__title">
+            {title}
+          </h2>
+          <button type="button" className="ui-dialog__close" onClick={onClose} aria-label="Close">
+            ×
+          </button>
+        </div>
+        <div className="ui-dialog__body">{children}</div>
       </div>
     </>
   );

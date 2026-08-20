@@ -48,7 +48,7 @@ export class PracticeDashboardService {
       this.prisma.appointment.findMany({
         where: {
           ...tenantWhere(tenant.dietitianAccountId),
-          status: "SCHEDULED",
+          status: { in: ["SCHEDULED", "RESCHEDULE_PENDING"] },
           startAt: { gte: startOfToday, lte: endOfToday },
           client: visible,
         },
@@ -59,7 +59,7 @@ export class PracticeDashboardService {
       this.prisma.appointment.findMany({
         where: {
           ...tenantWhere(tenant.dietitianAccountId),
-          status: "SCHEDULED",
+          status: { in: ["SCHEDULED", "RESCHEDULE_PENDING"] },
           startAt: { gt: endOfToday },
           client: visible,
         },
