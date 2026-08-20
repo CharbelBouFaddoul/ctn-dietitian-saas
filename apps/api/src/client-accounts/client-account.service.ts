@@ -191,8 +191,55 @@ export class ClientAccountService {
 
   async join(userId: string, input: { code: string; firstName?: string; lastName?: string }) {
     await this.assertCanUsePortalOnboarding(userId);
+    const { invitation, dietitianAccountId } = await this.requireUsableJoinInvitation(input.code);
 
-    const normalized = this.tokens.normalizeJoinCode(input.code);
+    if (!invitation.clientId) {
+      return this.joinPractice(userId, dietitianAccountId, invitation.createdById, input);
+    }
+
+    if (invitation.usedAt) {
+      throw new BadRequestException(JOIN_CODE_USED);
+    }
+
+    return this.joinExistingClient(userId, invitation.clientId, dietitianAccountId, this.tokens.normalizeJoinCode(input.code));
+  }
+
+  /**
+   * Preview-only: validates a practice join code and returns safe identity for confirm UI.
+   * Does not create Client/ClientAccount. Browser must still send the code to POST /join.
+   */
+  async resolveJoinCode(userId: string, input: { code: string }) {
+    await this.assertCanUsePortalOnboarding(userId);
+    const { invitation, dietitianAccountId } = await this.requireUsableJoinInvitation(input.code);
+
+    if (invitation.clientId) {
+      // Per-client codes skip resolve-confirm preview; patient joins directly.
+      throw new BadRequestException(JOIN_CODE_INVALID);
+    }
+
+    const identity = await this.safePracticeIdentity(dietitianAccountId);
+    const existing = await this.prisma.clientAccount.findFirst({
+      where: { userId, dietitianAccountId, status: "ACTIVE" },
+    });
+    if (existing) {
+      return {
+        status: "already_connected" as const,
+        practiceName: identity.practiceName,
+        dietitianDisplayName: identity.dietitianDisplayName,
+        clientId: existing.clientId,
+      };
+    }
+
+    return {
+      status: "ok" as const,
+      practiceName: identity.practiceName,
+      dietitianDisplayName: identity.dietitianDisplayName,
+      clientId: null,
+    };
+  }
+
+  private async requireUsableJoinInvitation(code: string) {
+    const normalized = this.tokens.normalizeJoinCode(code);
     if (normalized.length !== 8) {
       throw new BadRequestException(JOIN_CODE_INVALID);
     }
@@ -206,20 +253,31 @@ export class ClientAccountService {
       throw new BadRequestException(JOIN_CODE_EXPIRED);
     }
 
+    const account = await this.prisma.dietitianAccount.findUnique({ where: { id: dietitianAccountId } });
+    if (!account || account.status !== "ACTIVE") {
+      throw new BadRequestException(JOIN_CODE_INVALID);
+    }
+
     const access = await this.lifecycle.getAccessForAccount(dietitianAccountId);
     if (access.accessState === "LOCKED") {
       throw new ForbiddenException(JOIN_PRACTICE_LOCKED);
     }
 
-    if (!invitation.clientId) {
-      return this.joinPractice(userId, dietitianAccountId, invitation.createdById, input);
-    }
+    return { invitation, dietitianAccountId };
+  }
 
-    if (invitation.usedAt) {
-      throw new BadRequestException(JOIN_CODE_USED);
-    }
-
-    return this.joinExistingClient(userId, invitation.clientId, dietitianAccountId, normalized);
+  private async safePracticeIdentity(dietitianAccountId: string) {
+    const account = await this.prisma.dietitianAccount.findUniqueOrThrow({
+      where: { id: dietitianAccountId },
+      include: { settings: true, user: true },
+    });
+    const practiceName =
+      account.settings?.practiceName?.trim() || account.displayName;
+    const dietitianDisplayName =
+      [account.user.firstName, account.user.lastName].filter(Boolean).join(" ").trim() ||
+      account.professionalTitle?.trim() ||
+      account.displayName;
+    return { practiceName, dietitianDisplayName };
   }
 
   async portalMe(userId: string, activeClientId?: string | null) {
@@ -311,7 +369,13 @@ export class ClientAccountService {
         (row.dietitianAccountId) === dietitianAccountId,
     );
     if (activeSame) {
-      throw new ConflictException(JOIN_ALREADY_CONNECTED);
+      const identity = await this.safePracticeIdentity(dietitianAccountId);
+      return {
+        status: "already_connected" as const,
+        practiceName: identity.practiceName,
+        dietitianDisplayName: identity.dietitianDisplayName,
+        clientId: activeSame.clientId,
+      };
     }
     const existingForDietitian = userAccounts.find(
       (row) => (row.dietitianAccountId) === dietitianAccountId,
@@ -554,9 +618,11 @@ export class ClientAccountService {
   }
 
   private async connectedResult(dietitianAccountId: string, clientId: string) {
+    const identity = await this.safePracticeIdentity(dietitianAccountId);
     return {
-      status: "connected" as const,
-      practiceName: await this.practiceNameForAccount(dietitianAccountId),
+      status: "joined" as const,
+      practiceName: identity.practiceName,
+      dietitianDisplayName: identity.dietitianDisplayName,
       clientId,
     };
   }

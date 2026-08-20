@@ -7,7 +7,7 @@ Tracks the DietitianAccount tenancy restructure (Phases 1–7) and Phase 2.5 cle
 | **Phase 1** | `DietitianAccount` + dual-write with Organization; path param still `:organizationId` (= account id); `dietitianAccountId` on tenant rows; backfill | **Done** |
 | **Phase 2** | Auth cutover / persona isolation (dietitian ↔ portal mutual exclusion); TenantGuard owner-only synthetic role | **Done** |
 | **Phase 2.5** | Remove Organization runtime shells/aliases; rename false `organizationId` → `dietitianAccountId`; drop membership assignment API | **Done** |
-| **Phase 3** | Product cutover: `registrationEnabled` gate, admin dietitian provision + `DIETITIAN_ACTIVATION`, portal multi-connection + `Session.activeClientId`, web `/practice` remount, patient connection switcher | **Done** |
+| **Phase 3** | Product cutover: `registrationEnabled` gate, admin dietitian provision + `DIETITIAN_ACTIVATION`, portal multi-connection + `Session.activeClientId`, reusable practice join codes, resolve-then-confirm join UX | **Done** |
 | **Phase 4** | Subscription lifecycle (ACTIVE → GRACE 3d → READ_ONLY 7d → LOCKED), period dates, CLIENT_LIMIT seeds, centralized TenantGuard enforcement | **Done** |
 | **Phase 5** | Practice/portal dashboards, notification types + mark-all-read + bell UI, `emailNotificationsEnabled` product-email gate, auth-route redirects | **Done** |
 | **Phase 6** | Client Portfolio aggregate + chart tab IA, timeline pagination, assessment read-only GET, portal profile enrichment | **Done** |
@@ -41,6 +41,14 @@ No Organization layer. No OrganizationMember. No STAFF tenancy. No `organization
 - `ClientAssignment` rekeyed to `userId`; Appointment/Task use `assignedUserId`. Assignments are **not** used for authorization.
 - Admin: `/api/v1/admin/dietitians/:dietitianAccountId`. Web: `/practice/:dietitianAccountId`.
 - Portal unchanged: `ClientAccount` + `Session.activeClientId`.
+
+## Phase 3 notes
+
+- Reusable practice join codes: `InvitationToken` `CLIENT_INVITE` with `clientId=null` and `dietitianAccountId` set; redeem does **not** consume the token.
+- Resolve-then-confirm: `POST /api/v1/portal/join-code/resolve` (preview identity only) → `POST /api/v1/portal/join` (confirm; browser never chooses `dietitianAccountId` as authority).
+- Join responses: `{ status: "joined" | "already_connected", practiceName, dietitianDisplayName, clientId, … }`.
+- Connected patients may open `/client/join` to link another practice; portal layout connection switcher uses `Session.activeClientId`.
+- Isolation: `assertPortalAccess` + `DietitianGuard`; no Organization / STAFF reintroduction.
 
 ## Phase 4 notes
 

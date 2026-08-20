@@ -120,7 +120,7 @@ describe("client join codes", () => {
       .set("Cookie", session.cookie)
       .send({ code: code.toLowerCase() })
       .expect(201);
-    expect(joined.body.status).toBe("connected");
+    expect(joined.body.status).toBe("joined");
 
     const me = await request(ctx.app.getHttpServer()).get("/api/v1/portal/me").set("Cookie", session.cookie).expect(200);
     expect(me.body.client.id).toBe(client.body.id);
@@ -216,7 +216,7 @@ describe("client join codes", () => {
       .set("Cookie", portalA)
       .send({ code: otherCode.code })
       .expect(201)
-      .expect((res) => expect(res.body.status).toBe("connected"));
+      .expect((res) => expect(res.body.status).toBe("joined"));
 
     const connections = await request(ctx.app.getHttpServer())
       .get("/api/v1/portal/connections")
@@ -309,7 +309,7 @@ describe("client join codes", () => {
       .set("Cookie", session.cookie)
       .send({ code })
       .expect(201);
-    expect(joined.body.status).toBe("connected");
+    expect(joined.body.status).toBe("joined");
 
     const me = await request(ctx.app.getHttpServer()).get("/api/v1/portal/me").set("Cookie", session.cookie).expect(200);
     expect(me.body.client.firstName).toBe("Sam");
@@ -344,8 +344,11 @@ describe("client join codes", () => {
       .post("/api/v1/portal/join")
       .set("Cookie", session.cookie)
       .send({ code, firstName: "Sam", lastName: "Taylor" })
-      .expect(409)
-      .expect((res) => expect(res.body.message).toBe(JOIN_ALREADY_CONNECTED));
+      .expect(201)
+      .expect((res) => {
+        expect(res.body.status).toBe("already_connected");
+        expect(res.body.clientId).toBe(me.body.client.id);
+      });
   });
 
   it("invalidates a practice code on regenerate and enforces the client limit at join", async () => {

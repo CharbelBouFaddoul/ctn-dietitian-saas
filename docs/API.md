@@ -242,6 +242,10 @@ Published versions reject content mutations (`400` “Published versions cannot 
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | GET | `/api/v1/portal/me` | Session + active client account | Portal identity |
+| POST | `/api/v1/portal/join-code/resolve` | Patient session | Preview practice join code: `{ status: "ok" \| "already_connected", practiceName, dietitianDisplayName, clientId? }`. Invalid/expired/non-practice codes reject like join |
+| POST | `/api/v1/portal/join` | Patient session | Confirm join with the same code. Creates `Client` + `ClientAccount` when new; `{ status: "joined" \| "already_connected", … }`. Does not consume reusable practice invites |
+| GET | `/api/v1/portal/connections` | Patient session | List linked practices / client accounts |
+| POST | `/api/v1/portal/connections/active` | Patient session | Set `Session.activeClientId` for portal scoping |
 | GET | `/api/v1/portal/meal-plan` | Session + active client account | Current published plan snapshot only. Drafts and superseded versions are not returned. `{ plan: null }` when none exists |
 
 Portal cookies cannot call dietitian meal-plan routes.

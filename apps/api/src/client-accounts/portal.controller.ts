@@ -51,6 +51,14 @@ export class PortalController {
     return this.accounts.setActiveConnection(user.id, session.id, body.clientId);
   }
 
+  @Post("join-code/resolve")
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ [THROTTLE_NAMES.AUTH]: {} })
+  resolveJoinCode(@CurrentUser() user: AuthenticatedRequestUser, @Body() body: JoinCodeDto) {
+    return this.accounts.resolveJoinCode(user.id, body);
+  }
+
   @Post("join")
   @HttpCode(HttpStatus.CREATED)
   @UseGuards(ThrottlerGuard)
@@ -61,7 +69,11 @@ export class PortalController {
     @Body() body: JoinCodeDto,
   ) {
     const result = await this.accounts.join(user.id, body);
-    if (result.status === "connected" && result.clientId && !session.activeClientId) {
+    if (
+      (result.status === "joined" || result.status === "already_connected") &&
+      result.clientId &&
+      !session.activeClientId
+    ) {
       await this.accounts.setActiveConnection(user.id, session.id, result.clientId);
     }
     return result;
