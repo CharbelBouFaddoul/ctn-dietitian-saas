@@ -1,7 +1,20 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import {
+  Alert,
+  Button,
+  EmptyState,
+  Field,
+  Input,
+  LoadingState,
+  PageHeader,
+  Section,
+  Select,
+} from "@nutrition-saas/ui";
 import { api } from "../../../../lib/api";
+import { errorMessage } from "../../../../lib/humanize-error";
+import { unitLabel } from "../../../../lib/practice-labels";
 
 interface Nutrition {
   energyKcal: number | null;
@@ -13,12 +26,15 @@ interface Nutrition {
 
 interface Summary {
   date: string;
-  timezone: string;
   food: { logCount: number; presented: Nutrition };
   water: { totalMl: number; totalLiters: number };
   exercise: { totalDurationMinutes: number };
   sleep: { durationMinutes: number | null; quality: number | null } | null;
-  habits: { total: number; completed: number; items: Array<{ habitKey: string; habitLabel: string; completed: boolean }> };
+  habits: {
+    total: number;
+    completed: number;
+    items: Array<{ habitKey: string; habitLabel: string; completed: boolean }>;
+  };
 }
 
 interface FoodLog {
@@ -36,6 +52,8 @@ const DEFAULT_HABITS = [
   { key: "exercise", label: "Exercise" },
   { key: "sleep_target", label: "Sleep before midnight" },
 ];
+
+const UNITS = ["g", "kg", "oz", "lb", "ml", "l", "fl_oz"] as const;
 
 function formatKcal(value: number | null): string {
   return value === null ? "—" : `${value} kcal`;
@@ -55,6 +73,7 @@ export default function ClientTrackingPage() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [foodLogs, setFoodLogs] = useState<FoodLog[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const [foodQuery, setFoodQuery] = useState("");
   const [foodHits, setFoodHits] = useState<Array<{ id: string; name: string }>>([]);
   const [quantity, setQuantity] = useState("100");
@@ -79,161 +98,248 @@ export default function ClientTrackingPage() {
   }
 
   useEffect(() => {
-    void load().catch((err) => setError(err instanceof Error ? err.message : "Unable to load tracking"));
+    void load().catch((err) => setError(errorMessage(err, "Unable to load tracking")));
   }, []);
 
+  async function run(action: () => Promise<void>, fallback: string) {
+    setError(null);
+    setBusy(true);
+    try {
+      await action();
+    } catch (err) {
+      setError(errorMessage(err, fallback));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function searchFoods() {
-    const result = await api<{ items: Array<{ id: string; name: string }> }>(
-      `/api/v1/portal/foods?q=${encodeURIComponent(foodQuery)}&pageSize=8`,
-    );
-    setFoodHits(result.items);
+    await run(async () => {
+      const result = await api<{ items: Array<{ id: string; name: string }> }>(
+        `/api/v1/portal/foods?q=${encodeURIComponent(foodQuery)}&pageSize=8`,
+      );
+      setFoodHits(result.items);
+    }, "Unable to search foods");
   }
 
   async function addFood(foodId: string) {
-    await api("/api/v1/portal/tracking/food-logs", {
-      method: "POST",
-      body: JSON.stringify({ foodId, quantity: Number(quantity), unit }),
-    });
-    setFoodHits([]);
-    await load(date);
+    await run(async () => {
+      await api("/api/v1/portal/tracking/food-logs", {
+        method: "POST",
+        body: JSON.stringify({ foodId, quantity: Number(quantity), unit }),
+      });
+      setFoodHits([]);
+      await load(date);
+    }, "Unable to add food");
   }
 
   async function addWater(event: FormEvent) {
     event.preventDefault();
-    await api("/api/v1/portal/tracking/water-logs", {
-      method: "POST",
-      body: JSON.stringify({ amount: Number(waterAmount), unit: "ml" }),
-    });
-    await load(date);
+    await run(async () => {
+      await api("/api/v1/portal/tracking/water-logs", {
+        method: "POST",
+        body: JSON.stringify({ amount: Number(waterAmount), unit: "ml" }),
+      });
+      await load(date);
+    }, "Unable to add water");
   }
 
   async function addExercise(event: FormEvent) {
     event.preventDefault();
-    await api("/api/v1/portal/tracking/exercise-logs", {
-      method: "POST",
-      body: JSON.stringify({ activityType, durationMinutes: Number(duration) }),
-    });
-    await load(date);
+    await run(async () => {
+      await api("/api/v1/portal/tracking/exercise-logs", {
+        method: "POST",
+        body: JSON.stringify({ activityType, durationMinutes: Number(duration) }),
+      });
+      await load(date);
+    }, "Unable to add exercise");
   }
 
   async function saveSleep(event: FormEvent) {
     event.preventDefault();
-    await api("/api/v1/portal/tracking/sleep", {
-      method: "PUT",
-      body: JSON.stringify({ date, bedtime: bedtime ? new Date(bedtime).toISOString() : undefined, wakeTime: wakeTime ? new Date(wakeTime).toISOString() : undefined }),
-    });
-    await load(date);
+    await run(async () => {
+      await api("/api/v1/portal/tracking/sleep", {
+        method: "PUT",
+        body: JSON.stringify({
+          date,
+          bedtime: bedtime ? new Date(bedtime).toISOString() : undefined,
+          wakeTime: wakeTime ? new Date(wakeTime).toISOString() : undefined,
+        }),
+      });
+      await load(date);
+    }, "Unable to save sleep");
   }
 
   async function toggleHabit(habitKey: string, habitLabel: string, completed: boolean) {
-    await api("/api/v1/portal/tracking/habits", {
-      method: "PUT",
-      body: JSON.stringify({ habitKey, habitLabel, date, completed: !completed }),
-    });
-    await load(date);
+    await run(async () => {
+      await api("/api/v1/portal/tracking/habits", {
+        method: "PUT",
+        body: JSON.stringify({ habitKey, habitLabel, date, completed: !completed }),
+      });
+      await load(date);
+    }, "Unable to update habit");
   }
 
   return (
     <section>
-      <h1>Tracking</h1>
-      {error ? <p style={{ color: "var(--color-danger)" }}>{error}</p> : null}
+      <PageHeader
+        eyebrow="Daily log"
+        title="Tracking"
+        description="Log food, water, movement, sleep, and habits for the day."
+        actions={
+          summary ? (
+            <div className="ui-row">
+              <Button variant="secondary" size="sm" onClick={() => void load(shiftDate(date, -1))}>
+                Previous
+              </Button>
+              <Input
+                type="date"
+                value={date}
+                onChange={(event) => void load(event.target.value)}
+                aria-label="Tracking date"
+                style={{ width: "auto" }}
+              />
+              <Button variant="secondary" size="sm" onClick={() => void load(shiftDate(date, 1))}>
+                Next
+              </Button>
+            </div>
+          ) : null
+        }
+      />
+      {error ? <Alert tone="danger">{error}</Alert> : null}
+      {!summary ? <LoadingState>Loading today’s tracking…</LoadingState> : null}
+
       {summary ? (
-        <>
-          <p style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-            <button type="button" onClick={() => void load(shiftDate(date, -1))}>
-              Previous
-            </button>
-            <input type="date" value={date} onChange={(event) => void load(event.target.value)} />
-            <button type="button" onClick={() => void load(shiftDate(date, 1))}>
-              Next
-            </button>
-            <span style={{ color: "var(--color-muted)" }}>{summary.timezone}</span>
-          </p>
-          <div style={{ display: "grid", gap: 12 }}>
-            <article style={{ background: "var(--color-surface)", padding: 12, borderRadius: 8 }}>
-              <strong>Food</strong> · {formatKcal(summary.food.presented.energyKcal)} · P {summary.food.presented.proteinG ?? "—"}g
-              <ul>
+        <div className="ui-client-stack">
+          <Section
+            className="ui-client-panel ui-client-panel--food"
+            title="Food"
+            description={`${formatKcal(summary.food.presented.energyKcal)} · Protein ${summary.food.presented.proteinG ?? "—"} g`}
+            tone="mint"
+          >
+            {foodLogs.length === 0 ? (
+              <EmptyState title="No food logged yet">Search and add foods below.</EmptyState>
+            ) : (
+              <ul className="ui-client-meal-items">
                 {foodLogs.map((row) => (
                   <li key={row.id}>
-                    {row.foodName} · {row.quantity}
-                    {row.unit} · {formatKcal(row.presented.energyKcal)}
+                    <span>{row.foodName}</span>
+                    <span className="ui-muted">
+                      {row.quantity} {unitLabel(row.unit)} · {formatKcal(row.presented.energyKcal)}
+                    </span>
                   </li>
                 ))}
               </ul>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
-                <input value={foodQuery} onChange={(event) => setFoodQuery(event.target.value)} placeholder="Search food" />
-                <input style={{ width: 70 }} value={quantity} onChange={(event) => setQuantity(event.target.value)} />
-                <select value={unit} onChange={(event) => setUnit(event.target.value)}>
-                  {["g", "kg", "oz", "lb", "ml", "l", "fl_oz"].map((item) => (
+            )}
+            <div className="ui-inline-form" style={{ marginTop: 12 }}>
+              <Field label="Search food">
+                <Input value={foodQuery} onChange={(event) => setFoodQuery(event.target.value)} placeholder="Food name" />
+              </Field>
+              <Field label="Amount">
+                <Input value={quantity} onChange={(event) => setQuantity(event.target.value)} />
+              </Field>
+              <Field label="Unit">
+                <Select value={unit} onChange={(event) => setUnit(event.target.value)}>
+                  {UNITS.map((item) => (
                     <option key={item} value={item}>
-                      {item}
+                      {unitLabel(item)}
                     </option>
                   ))}
-                </select>
-                <button type="button" onClick={() => void searchFoods()}>
+                </Select>
+              </Field>
+              <div className="ui-inline-form__action">
+                <Button type="button" disabled={busy} onClick={() => void searchFoods()}>
                   Find
-                </button>
+                </Button>
+              </div>
+            </div>
+            {foodHits.length > 0 ? (
+              <div className="ui-row" style={{ marginTop: 10, flexWrap: "wrap" }}>
                 {foodHits.map((hit) => (
-                  <button key={hit.id} type="button" onClick={() => void addFood(hit.id)}>
+                  <Button key={hit.id} type="button" size="sm" variant="secondary" disabled={busy} onClick={() => void addFood(hit.id)}>
                     Add {hit.name}
-                  </button>
+                  </Button>
                 ))}
               </div>
-            </article>
-            <article style={{ background: "var(--color-surface)", padding: 12, borderRadius: 8 }}>
-              <strong>Water</strong> · {(summary.water.totalLiters).toFixed(1)} L
-              <form onSubmit={(event) => void addWater(event)} style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                <input value={waterAmount} onChange={(event) => setWaterAmount(event.target.value)} />
-                <span>ml</span>
-                <button type="submit">Add</button>
-              </form>
-            </article>
-            <article style={{ background: "var(--color-surface)", padding: 12, borderRadius: 8 }}>
-              <strong>Exercise</strong> · {summary.exercise.totalDurationMinutes} min
-              <form onSubmit={(event) => void addExercise(event)} style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-                <input value={activityType} onChange={(event) => setActivityType(event.target.value)} />
-                <input style={{ width: 70 }} value={duration} onChange={(event) => setDuration(event.target.value)} />
-                <span>min</span>
-                <button type="submit">Add</button>
-              </form>
-            </article>
-            <article style={{ background: "var(--color-surface)", padding: 12, borderRadius: 8 }}>
-              <strong>Sleep</strong> ·{" "}
-              {summary.sleep?.durationMinutes ? `${Math.floor(summary.sleep.durationMinutes / 60)}h ${summary.sleep.durationMinutes % 60}m` : "—"}
-              <form onSubmit={(event) => void saveSleep(event)} style={{ display: "grid", gap: 8, marginTop: 8 }}>
-                <label>
-                  Bedtime
-                  <input type="datetime-local" value={bedtime} onChange={(event) => setBedtime(event.target.value)} />
-                </label>
-                <label>
-                  Wake
-                  <input type="datetime-local" value={wakeTime} onChange={(event) => setWakeTime(event.target.value)} />
-                </label>
-                <button type="submit">Save sleep</button>
-              </form>
-            </article>
-            <article style={{ background: "var(--color-surface)", padding: 12, borderRadius: 8 }}>
-              <strong>Habits</strong> · {summary.habits.completed}/{summary.habits.total || DEFAULT_HABITS.length} complete
-              <ul style={{ listStyle: "none", padding: 0 }}>
-                {habitState.map((habit) => (
-                  <li key={habit.key}>
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={habit.completed}
-                        onChange={() => void toggleHabit(habit.key, habit.label, habit.completed)}
-                      />{" "}
-                      {habit.label}
-                    </label>
-                  </li>
-                ))}
-              </ul>
-            </article>
-          </div>
-        </>
-      ) : (
-        <p>Loading…</p>
-      )}
+            ) : null}
+          </Section>
+
+          <Section className="ui-client-panel ui-client-panel--water" title="Water" description={`${summary.water.totalLiters.toFixed(1)} L today`}>
+            <form onSubmit={(event) => void addWater(event)} className="ui-inline-form">
+              <Field label="Amount (ml)">
+                <Input value={waterAmount} onChange={(event) => setWaterAmount(event.target.value)} />
+              </Field>
+              <div className="ui-inline-form__action">
+                <Button type="submit" disabled={busy}>
+                  Add water
+                </Button>
+              </div>
+            </form>
+          </Section>
+
+          <Section className="ui-client-panel ui-client-panel--exercise" title="Exercise" description={`${summary.exercise.totalDurationMinutes} min today`}>
+            <form onSubmit={(event) => void addExercise(event)} className="ui-inline-form">
+              <Field label="Activity">
+                <Input value={activityType} onChange={(event) => setActivityType(event.target.value)} />
+              </Field>
+              <Field label="Minutes">
+                <Input value={duration} onChange={(event) => setDuration(event.target.value)} />
+              </Field>
+              <div className="ui-inline-form__action">
+                <Button type="submit" disabled={busy}>
+                  Add exercise
+                </Button>
+              </div>
+            </form>
+          </Section>
+
+          <Section
+            className="ui-client-panel ui-client-panel--sleep"
+            title="Sleep"
+            description={
+              summary.sleep?.durationMinutes
+                ? `${Math.floor(summary.sleep.durationMinutes / 60)}h ${summary.sleep.durationMinutes % 60}m`
+                : "Not logged yet"
+            }
+          >
+            <form onSubmit={(event) => void saveSleep(event)} className="ui-inline-form">
+              <Field label="Bedtime">
+                <Input type="datetime-local" value={bedtime} onChange={(event) => setBedtime(event.target.value)} />
+              </Field>
+              <Field label="Wake time">
+                <Input type="datetime-local" value={wakeTime} onChange={(event) => setWakeTime(event.target.value)} />
+              </Field>
+              <div className="ui-inline-form__action">
+                <Button type="submit" disabled={busy}>
+                  Save sleep
+                </Button>
+              </div>
+            </form>
+          </Section>
+
+          <Section
+            className="ui-client-panel ui-client-panel--habits"
+            title="Habits"
+            description={`${summary.habits.completed} of ${summary.habits.total || DEFAULT_HABITS.length} complete`}
+          >
+            <ul className="ui-client-habit-list">
+              {habitState.map((habit) => (
+                <li key={habit.key}>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={habit.completed}
+                      disabled={busy}
+                      onChange={() => void toggleHabit(habit.key, habit.label, habit.completed)}
+                    />
+                    <span>{habit.label}</span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          </Section>
+        </div>
+      ) : null}
     </section>
   );
 }

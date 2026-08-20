@@ -1,7 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  Alert,
+  EmptyState,
+  LoadingState,
+  PageHeader,
+  Section,
+} from "@nutrition-saas/ui";
 import { api } from "../../../../lib/api";
+import { errorMessage } from "../../../../lib/humanize-error";
+import { unitLabel } from "../../../../lib/practice-labels";
 
 interface Nutrition {
   energyKcal: number | null;
@@ -37,25 +46,26 @@ interface PortalPlan {
   plan: {
     name: string;
     description: string | null;
-    versionNumber: number;
     publishedAt: string | null;
     snapshot: Snapshot;
   } | null;
 }
 
 function kcal(value: number | null): string {
-  return value === null ? "—" : `${value} kcal`;
+  return value === null ? "" : `${value} kcal`;
 }
 
 export default function ClientPlanPage() {
   const [data, setData] = useState<PortalPlan | null>(null);
   const [dayIndex, setDayIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     void api<PortalPlan>("/api/v1/portal/meal-plan")
       .then(setData)
-      .catch((err) => setError(err instanceof Error ? err.message : "Unable to load plan"));
+      .catch((err) => setError(errorMessage(err, "Unable to load your meal plan")))
+      .finally(() => setLoading(false));
   }, []);
 
   const plan = data?.plan;
@@ -63,56 +73,79 @@ export default function ClientPlanPage() {
 
   return (
     <section>
-      <h1>Meal plan</h1>
-      {error ? <p style={{ color: "var(--color-danger)" }}>{error}</p> : null}
-      {!plan ? <p>No published meal plan yet.</p> : null}
+      <PageHeader
+        eyebrow="Nutrition"
+        title="My Plan"
+        description="Your current nutrition plan from your dietitian."
+      />
+      {error ? <Alert tone="danger">{error}</Alert> : null}
+      {loading ? <LoadingState>Loading your plan…</LoadingState> : null}
+      {!loading && !plan ? (
+        <Section title="My Plan" tone="muted">
+          <EmptyState title="No meal plan yet">
+            When your dietitian publishes a plan for you, it will show up here day by day.
+          </EmptyState>
+        </Section>
+      ) : null}
       {plan ? (
         <>
-          <p>
-            {plan.name} · version {plan.versionNumber}
-          </p>
-          {plan.description ? <p>{plan.description}</p> : null}
-          <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 8 }}>
-            {plan.snapshot.days.map((item, index) => (
-              <button
-                key={item.dayNumber}
-                type="button"
-                onClick={() => setDayIndex(index)}
-                style={{
-                  padding: "0.5rem 0.75rem",
-                  borderRadius: 8,
-                  border: 0,
-                  background: index === dayIndex ? "var(--color-accent)" : "var(--color-surface)",
-                  color: index === dayIndex ? "#fff" : "inherit",
-                }}
-              >
-                {item.title ?? `Day ${item.dayNumber}`}
-              </button>
-            ))}
-          </div>
+          <Section title={plan.name} description={plan.description || undefined} tone="mint">
+            {plan.publishedAt ? (
+              <p className="ui-muted" style={{ margin: 0 }}>
+                Updated {new Date(plan.publishedAt).toLocaleDateString()}
+              </p>
+            ) : null}
+          </Section>
+
           {day ? (
-            <>
-              <h2>
-                {day.title ?? `Day ${day.dayNumber}`} · {kcal(day.presented.energyKcal)}
-              </h2>
-              {day.notes ? <p>{day.notes}</p> : null}
+            <Section
+              title={day.title ?? `Day ${day.dayNumber}`}
+              description={
+                [
+                  kcal(day.presented.energyKcal),
+                  day.presented.proteinG != null ? `Protein ${day.presented.proteinG} g` : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ") || undefined
+              }
+            >
+              <div className="ui-client-plan-day" role="tablist" aria-label="Plan days">
+                {plan.snapshot.days.map((item, index) => (
+                  <button
+                    key={item.dayNumber}
+                    type="button"
+                    className={index === dayIndex ? "is-active" : undefined}
+                    onClick={() => setDayIndex(index)}
+                  >
+                    {item.title ?? `Day ${item.dayNumber}`}
+                  </button>
+                ))}
+              </div>
+              {day.notes ? <p className="ui-muted">{day.notes}</p> : null}
               {day.meals.map((meal) => (
-                <article key={meal.name} style={{ marginBottom: 16 }}>
-                  <h3>
-                    {meal.name} · {kcal(meal.presented.energyKcal)}
-                  </h3>
-                  {meal.notes ? <p style={{ color: "var(--color-muted)" }}>{meal.notes}</p> : null}
-                  <ul>
+                <details key={meal.name} className="ui-client-meal" open>
+                  <summary>
+                    <span>{meal.name}</span>
+                    <span className="ui-muted">{kcal(meal.presented.energyKcal) || " "}</span>
+                  </summary>
+                  {meal.notes ? <p className="ui-muted">{meal.notes}</p> : null}
+                  <ul className="ui-client-meal-items">
                     {meal.items.map((item, index) => (
                       <li key={`${item.food?.name ?? item.recipe?.name}-${index}`}>
-                        {item.food?.name ?? item.recipe?.name} · {item.quantity} {item.unit} · {kcal(item.presented.energyKcal)}
-                        {item.notes ? ` · ${item.notes}` : ""}
+                        <span>
+                          {item.food?.name ?? item.recipe?.name}
+                          {item.notes ? ` — ${item.notes}` : ""}
+                        </span>
+                        <span className="ui-muted">
+                          {item.quantity} {unitLabel(item.unit)}
+                          {item.presented.energyKcal != null ? ` · ${item.presented.energyKcal} kcal` : ""}
+                        </span>
                       </li>
                     ))}
                   </ul>
-                </article>
+                </details>
               ))}
-            </>
+            </Section>
           ) : null}
         </>
       ) : null}

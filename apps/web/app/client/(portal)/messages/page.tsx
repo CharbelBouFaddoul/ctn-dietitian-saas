@@ -1,8 +1,18 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import Link from "next/link";
+import {
+  Alert,
+  Button,
+  EmptyState,
+  Field,
+  LoadingState,
+  PageHeader,
+  Textarea,
+} from "@nutrition-saas/ui";
 import { api } from "../../../../lib/api";
+import { formatDate } from "../../../../lib/format";
+import { errorMessage } from "../../../../lib/humanize-error";
 
 interface Conversation {
   id: string;
@@ -27,6 +37,8 @@ export default function ClientMessagesPage() {
   const [me, setMe] = useState<Me | null>(null);
   const [body, setBody] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
 
   async function load() {
     const profile = await api<Me>("/api/v1/portal/me");
@@ -35,11 +47,13 @@ export default function ClientMessagesPage() {
     setMe(profile);
     setConversation(conv);
     setMessages(rows);
-    await api("/api/v1/portal/conversation/read", { method: "POST", body: JSON.stringify({}) });
+    await api("/api/v1/portal/conversation/read", { method: "POST", body: JSON.stringify({}) }).catch(() => undefined);
   }
 
   useEffect(() => {
-    void load().catch((err) => setError(err instanceof Error ? err.message : "Unable to load messages"));
+    void load()
+      .catch((err) => setError(errorMessage(err, "Unable to load messages")))
+      .finally(() => setLoading(false));
     const timer = setInterval(() => {
       void load().catch(() => undefined);
     }, 15000);
@@ -49,54 +63,71 @@ export default function ClientMessagesPage() {
   async function send(event: FormEvent) {
     event.preventDefault();
     if (!body.trim()) return;
-    await api("/api/v1/portal/conversation/messages", { method: "POST", body: JSON.stringify({ body }) });
-    setBody("");
-    await load();
+    setSending(true);
+    setError(null);
+    try {
+      await api("/api/v1/portal/conversation/messages", { method: "POST", body: JSON.stringify({ body }) });
+      setBody("");
+      await load();
+    } catch (err) {
+      setError(errorMessage(err, "Unable to send message"));
+    } finally {
+      setSending(false);
+    }
   }
 
   return (
-    <div>
-      <h1>Messages</h1>
-      {error ? <p style={{ color: "crimson" }}>{error}</p> : null}
-      {conversation && conversation.unreadCount > 0 ? (
-        <p style={{ color: "var(--color-muted)" }}>{conversation.unreadCount} unread</p>
+    <section>
+      <PageHeader
+        eyebrow="Conversation"
+        title="Messages"
+        description="Chat with your dietitian about your plan and progress."
+      />
+      {error ? <Alert tone="danger">{error}</Alert> : null}
+      {loading ? <LoadingState>Loading conversation…</LoadingState> : null}
+
+      {!loading ? (
+        <div className="ui-client-chat">
+          {conversation && conversation.unreadCount > 0 ? (
+            <p className="ui-muted" style={{ margin: 0 }}>
+              {conversation.unreadCount} unread
+            </p>
+          ) : null}
+          <div className="ui-client-chat__bubbles">
+            {messages.length === 0 ? (
+              <EmptyState title="No messages yet">
+                Send a note to your dietitian when you have a question.
+              </EmptyState>
+            ) : (
+              messages.map((message) => {
+                const mine = me?.user.id === message.senderUserId;
+                return (
+                  <div
+                    key={message.id}
+                    className={`ui-client-bubble ${mine ? "ui-client-bubble--mine" : "ui-client-bubble--theirs"}`}
+                  >
+                    <div style={{ whiteSpace: "pre-wrap" }}>{message.body}</div>
+                    <time>{formatDate(message.createdAt)}</time>
+                  </div>
+                );
+              })
+            )}
+          </div>
+          <form className="ui-client-chat__composer" onSubmit={(event) => void send(event)}>
+            <Field label="Message">
+              <Textarea
+                value={body}
+                onChange={(event) => setBody(event.target.value)}
+                rows={3}
+                placeholder="Write a message…"
+              />
+            </Field>
+            <Button type="submit" disabled={sending || !body.trim()}>
+              {sending ? "Sending…" : "Send"}
+            </Button>
+          </form>
+        </div>
       ) : null}
-      <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 }}>
-        {messages.map((message) => {
-          const mine = me?.user.id === message.senderUserId;
-          return (
-            <div
-              key={message.id}
-              style={{
-                alignSelf: mine ? "flex-end" : "flex-start",
-                background: mine ? "var(--color-accent-soft, #eef6ff)" : "var(--color-surface, #f5f5f5)",
-                padding: "10px 12px",
-                borderRadius: 12,
-                maxWidth: "85%",
-              }}
-            >
-              <div>{message.body}</div>
-              <div style={{ fontSize: 12, color: "var(--color-muted)", marginTop: 4 }}>
-                {new Date(message.createdAt).toLocaleString()}
-              </div>
-            </div>
-          );
-        })}
-        {messages.length === 0 ? <p style={{ color: "var(--color-muted)" }}>No messages yet.</p> : null}
-      </div>
-      <form onSubmit={(event) => void send(event).catch((err) => setError(err instanceof Error ? err.message : "Send failed"))}>
-        <textarea
-          value={body}
-          onChange={(event) => setBody(event.target.value)}
-          rows={3}
-          placeholder="Write a message..."
-          style={{ width: "100%", marginBottom: 8 }}
-        />
-        <button type="submit">Send</button>
-      </form>
-      <p style={{ marginTop: 16 }}>
-        <Link href="/client">Back home</Link>
-      </p>
-    </div>
+    </section>
   );
 }

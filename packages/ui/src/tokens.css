@@ -93,10 +93,36 @@
 }
 
 [data-theme="client"] {
-  --color-bg: #faf8f5;
-  --color-accent: #0f766e;
+  --color-bg: #faf9f7;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f5faf8;
+  --color-text: #0f172a;
+  --color-muted: #64748b;
+  --color-accent: #0d9488;
+  --color-accent-hover: #0f766e;
   --color-accent-soft: #ecfdf8;
-  --sidebar-width: 220px;
+  --color-border: #e8eeec;
+  --color-danger: #dc2626;
+  --color-danger-soft: #fee2e2;
+  --color-success: #16a34a;
+  --color-success-soft: #dcfce7;
+  --color-warning: #d97706;
+  --color-warning-soft: #fef3c7;
+  --color-info: #2563eb;
+  --color-info-soft: #dbeafe;
+  --focus-ring: 0 0 0 3px rgb(13 148 136 / 24%);
+  --sidebar-width: 240px;
+  --radius: 14px;
+  --client-deep-teal: #0f766e;
+  --client-teal: #0d9488;
+  --client-navy: #0f172a;
+  --client-warm-white: #faf9f7;
+  --client-soft-mint: #f0fdfa;
+  --client-pale: #ecfdf8;
+  --client-coral: #ea580c;
+  --client-sky: #0284c7;
+  --client-violet: #7c3aed;
+  --client-amber: #d97706;
 }
 
 [data-theme="marketing"] {

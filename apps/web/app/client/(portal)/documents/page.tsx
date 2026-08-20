@@ -1,7 +1,14 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import Link from "next/link";
+import {
+  Alert,
+  Button,
+  EmptyState,
+  LoadingState,
+  PageHeader,
+  Section,
+} from "@nutrition-saas/ui";
 import { api, apiUrl } from "../../../../lib/api";
 import { errorMessage } from "../../../../lib/humanize-error";
 
@@ -13,8 +20,15 @@ interface DocumentRow {
   createdAt: string;
 }
 
+function typeLabel(mimeType: string, filename: string): string {
+  if (mimeType.includes("pdf") || filename.toLowerCase().endsWith(".pdf")) return "PDF";
+  if (mimeType.startsWith("image/")) return "Image";
+  if (filename.toLowerCase().endsWith(".docx")) return "Document";
+  return "File";
+}
+
 export default function ClientDocumentsPage() {
-  const [documents, setDocuments] = useState<DocumentRow[]>([]);
+  const [documents, setDocuments] = useState<DocumentRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
 
@@ -33,6 +47,7 @@ export default function ClientDocumentsPage() {
     const file = fileInput.files?.[0];
     if (!file) return;
     setUploading(true);
+    setError(null);
     try {
       const body = new FormData();
       body.append("file", file);
@@ -58,33 +73,58 @@ export default function ClientDocumentsPage() {
   }
 
   return (
-    <div>
-      <h1>Documents</h1>
-      <p style={{ color: "var(--color-muted)" }}>Files shared with you by your dietitian.</p>
-      {error ? <p style={{ color: "crimson" }}>{error}</p> : null}
-      <form onSubmit={(event) => void upload(event)} style={{ marginBottom: 20 }}>
-        <input type="file" name="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.docx,application/pdf,image/*" />
-        <button type="submit" disabled={uploading} style={{ marginLeft: 8 }}>
-          {uploading ? "Uploading..." : "Upload"}
-        </button>
-      </form>
-      <ul style={{ listStyle: "none", padding: 0, display: "grid", gap: 12 }}>
-        {documents.map((doc) => (
-          <li key={doc.id} style={{ border: "1px solid var(--color-border)", borderRadius: 8, padding: 12 }}>
-            <strong>{doc.filename}</strong>
-            <div style={{ fontSize: 13, color: "var(--color-muted)" }}>
-              {(doc.sizeBytes / 1024).toFixed(1)} KB · {new Date(doc.createdAt).toLocaleDateString()}
-            </div>
-            <a href={downloadUrl(doc.id)} style={{ color: "var(--color-accent)" }}>
-              Download
-            </a>
-          </li>
-        ))}
-      </ul>
-      {documents.length === 0 ? <p style={{ color: "var(--color-muted)" }}>No shared documents yet.</p> : null}
-      <p style={{ marginTop: 16 }}>
-        <Link href="/client">Back home</Link>
-      </p>
-    </div>
+    <section>
+      <PageHeader
+        eyebrow="Library"
+        title="Documents"
+        description="Files shared with you by your dietitian — and anything you upload."
+      />
+      {error ? <Alert tone="danger">{error}</Alert> : null}
+
+      <div className="ui-client-stack">
+        <Section title="Upload" description="Share a file with your dietitian." tone="muted">
+          <form onSubmit={(event) => void upload(event)} className="ui-client-upload">
+            <input
+              type="file"
+              name="file"
+              accept=".pdf,.png,.jpg,.jpeg,.webp,.docx,application/pdf,image/*"
+              aria-label="Choose a file"
+            />
+            <Button type="submit" disabled={uploading}>
+              {uploading ? "Uploading…" : "Upload"}
+            </Button>
+          </form>
+        </Section>
+
+        {documents === null ? <LoadingState>Loading documents…</LoadingState> : null}
+        {documents && documents.length === 0 ? (
+          <Section title="Your files">
+            <EmptyState title="No documents yet">
+              Shared files from your dietitian will appear here.
+            </EmptyState>
+          </Section>
+        ) : null}
+        {documents && documents.length > 0 ? (
+          <Section title="Your files">
+            <ul className="ui-client-doc-list">
+              {documents.map((doc) => (
+                <li key={doc.id}>
+                  <div>
+                    <strong>{doc.filename}</strong>
+                    <div className="ui-muted">
+                      {typeLabel(doc.mimeType, doc.filename)} · {(doc.sizeBytes / 1024).toFixed(1)} KB ·{" "}
+                      {new Date(doc.createdAt).toLocaleDateString()}
+                    </div>
+                  </div>
+                  <a className="ui-btn ui-btn--secondary ui-btn--sm" href={downloadUrl(doc.id)}>
+                    Download
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </Section>
+        ) : null}
+      </div>
+    </section>
   );
 }

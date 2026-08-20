@@ -115,7 +115,7 @@ export function AppShell({
           <div className="ui-app__sidebar-head">
             <div className="ui-app__identity">
               <p className="ui-eyebrow">
-                {theme === "admin" ? "Platform" : theme === "practice" ? "Practice" : "Portal"}
+                {theme === "admin" ? "Platform" : theme === "practice" ? "Practice" : "My care"}
               </p>
               <p className="ui-app__brand">{brand}</p>
               {meta ? <p className="ui-app__meta">{meta}</p> : null}

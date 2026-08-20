@@ -55,10 +55,10 @@ export default function ClientJoinPage() {
         method: "POST",
         body: JSON.stringify({ code }),
       });
-      setSuccess(`You're now connected to ${result.practiceName ?? "your practice"}.`);
-      setTimeout(() => router.replace("/client"), 800);
+      setSuccess(`You’re now connected to ${result.practiceName ?? "your dietitian"}.`);
+      setTimeout(() => router.replace("/client"), 900);
     } catch (err) {
-      setError(errorMessage(err, "That code didn't work."));
+      setError(errorMessage(err, "That code didn’t work. Check with your dietitian and try again."));
     } finally {
       setPending(false);
     }
@@ -74,21 +74,21 @@ export default function ClientJoinPage() {
   }
 
   return (
-    <main className="ui-auth">
-      <section className="ui-card ui-auth__card">
+    <main className="ui-client-join" data-theme="client">
+      <section className="ui-client-join__card">
         <div className="ui-row" style={{ justifyContent: "space-between" }}>
-          <p className="ui-eyebrow">Client portal</p>
+          <p className="ui-eyebrow">Patient portal</p>
           <Button variant="ghost" size="sm" onClick={() => void onLogout()}>
             Sign out
           </Button>
         </div>
-        <h1 style={{ margin: "0.35rem 0 0.75rem", fontSize: "1.75rem" }}>Join your dietitian</h1>
+        <h1>Join your dietitian</h1>
         <p className="ui-muted">
-          Enter the short practice code they sent you, like K7XM-42QP. We’ll add you to their list using the name and
-          email from your account.
+          Enter the short practice code they shared with you. We’ll connect your account using the name and email you
+          already registered with.
         </p>
         <form onSubmit={(event) => void onSubmit(event)}>
-          <Field label="Join code">
+          <Field label="Practice code">
             <Input
               className="ui-code"
               value={code}
@@ -99,7 +99,7 @@ export default function ClientJoinPage() {
             />
           </Field>
           <Button type="submit" block disabled={pending}>
-            {pending ? "Connecting…" : "Connect"}
+            {pending ? "Joining…" : "Join practice"}
           </Button>
         </form>
         {success ? (

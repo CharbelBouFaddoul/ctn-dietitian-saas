@@ -1,9 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import {
+  Alert,
+  Button,
+  EmptyState,
+  LoadingState,
+  PageHeader,
+  Section,
+  StatusBadge,
+  Table,
+  Td,
+} from "@nutrition-saas/ui";
 import { api } from "../../../../lib/api";
-import { humanizeLabel } from "@nutrition-saas/ui";
+import { formatDateOnly, formatMoney } from "../../../../lib/format";
+import { errorMessage } from "../../../../lib/humanize-error";
+import { statusLabel } from "../../../../lib/practice-labels";
 
 interface InvoiceRow {
   id: string;
@@ -28,75 +40,122 @@ interface InvoicePayload {
 }
 
 export default function ClientInvoicesPage() {
-  const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
+  const [invoices, setInvoices] = useState<InvoiceRow[] | null>(null);
   const [selected, setSelected] = useState<InvoicePayload | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  async function load() {
-    setInvoices(await api<InvoiceRow[]>("/api/v1/portal/invoices"));
-  }
+  const [loadingDetail, setLoadingDetail] = useState(false);
 
   useEffect(() => {
-    void load().catch((err) => setError(err instanceof Error ? err.message : "Unable to load invoices"));
+    void api<InvoiceRow[]>("/api/v1/portal/invoices")
+      .then(setInvoices)
+      .catch((err) => setError(errorMessage(err, "Unable to load invoices")));
   }, []);
 
   async function open(id: string) {
-    setSelected(await api<InvoicePayload>(`/api/v1/portal/invoices/${id}`));
+    setLoadingDetail(true);
+    setError(null);
+    try {
+      setSelected(await api<InvoicePayload>(`/api/v1/portal/invoices/${id}`));
+    } catch (err) {
+      setError(errorMessage(err, "Unable to open invoice"));
+    } finally {
+      setLoadingDetail(false);
+    }
   }
 
   return (
-    <div>
-      <h1>Invoices</h1>
-      <p style={{ color: "var(--color-muted)" }}>View invoices shared by your dietitian. You cannot change amounts or status here.</p>
-      {error ? <p style={{ color: "crimson" }}>{error}</p> : null}
-      <ul style={{ listStyle: "none", padding: 0, display: "grid", gap: 12 }}>
-        {invoices.map((invoice) => (
-          <li key={invoice.id} style={{ border: "1px solid var(--color-border)", borderRadius: 8, padding: 12 }}>
-            <button type="button" onClick={() => void open(invoice.id)} style={{ background: "none", border: 0, padding: 0, color: "var(--color-accent)", cursor: "pointer" }}>
-              {invoice.invoiceNumber ?? "Invoice"}
-            </button>
-            <div style={{ fontSize: 13, color: "var(--color-muted)" }}>
-              {humanizeLabel(invoice.status)} · due {invoice.dueDate ?? "—"} · {invoice.total.toFixed(2)} {invoice.currency}
-            </div>
-          </li>
-        ))}
-      </ul>
-      {invoices.length === 0 ? <p>No invoices yet.</p> : null}
+    <section>
+      <PageHeader
+        eyebrow="Billing"
+        title="Invoices"
+        description="Invoices from your dietitian. Amounts and status are set by their practice."
+      />
+      {error ? <Alert tone="danger">{error}</Alert> : null}
+
+      {invoices === null ? <LoadingState>Loading invoices…</LoadingState> : null}
+      {invoices && invoices.length === 0 ? (
+        <Section title="All invoices" tone="muted">
+          <EmptyState title="No invoices yet">
+            When your dietitian shares an invoice, you’ll see it here.
+          </EmptyState>
+        </Section>
+      ) : null}
+
+      {invoices && invoices.length > 0 ? (
+        <Section title="All invoices">
+          <ul className="ui-client-invoice-list">
+            {invoices.map((invoice) => (
+              <li key={invoice.id}>
+                <div>
+                  <button
+                    type="button"
+                    className="ui-link"
+                    style={{ background: "none", border: 0, padding: 0, cursor: "pointer", font: "inherit" }}
+                    onClick={() => void open(invoice.id)}
+                  >
+                    {invoice.invoiceNumber ?? "Invoice"}
+                  </button>
+                  <div className="ui-muted">
+                    Due {formatDateOnly(invoice.dueDate) || "—"} · {formatMoney(invoice.total, invoice.currency)}
+                  </div>
+                </div>
+                <div className="ui-row">
+                  <StatusBadge status={invoice.status} label={statusLabel(invoice.status)} />
+                  <Button size="sm" variant="secondary" onClick={() => void open(invoice.id)}>
+                    View
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      ) : null}
+
+      {loadingDetail ? <LoadingState>Opening invoice…</LoadingState> : null}
 
       {selected ? (
-        <section style={{ marginTop: 24, borderTop: "1px solid var(--color-border)", paddingTop: 16 }}>
-          <h2>{selected.invoice.invoiceNumber}</h2>
-          <p>{selected.practice.practiceName}</p>
-          <p>
-            Status: {humanizeLabel(selected.invoice.status)} · Due: {selected.invoice.dueDate ?? "—"}
-          </p>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <Section
+          title={selected.invoice.invoiceNumber ?? "Invoice"}
+          description={`${selected.practice.practiceName} · Due ${formatDateOnly(selected.invoice.dueDate) || "—"}`}
+          actions={<StatusBadge status={selected.invoice.status} label={statusLabel(selected.invoice.status)} />}
+        >
+          <Table>
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Qty</th>
+                <th>Amount</th>
+              </tr>
+            </thead>
             <tbody>
               {selected.invoice.items.map((item) => (
-                <tr key={item.description}>
-                  <td>{item.description}</td>
-                  <td>{item.quantity}</td>
-                  <td>{item.lineTotal.toFixed(2)}</td>
+                <tr key={`${item.description}-${item.lineTotal}`}>
+                  <Td label="Item">{item.description}</Td>
+                  <Td label="Qty">{item.quantity}</Td>
+                  <Td label="Amount">{formatMoney(item.lineTotal, selected.invoice.currency)}</Td>
                 </tr>
               ))}
             </tbody>
-          </table>
-          <p>
-            <strong>Total:</strong> {selected.invoice.total.toFixed(2)} {selected.invoice.currency}
+          </Table>
+          <p style={{ marginTop: 12 }}>
+            <strong>Total:</strong> {formatMoney(selected.invoice.total, selected.invoice.currency)}
           </p>
-          {selected.invoice.notes ? <p>{selected.invoice.notes}</p> : null}
-          {selected.practice.invoiceFooter ? <p style={{ fontSize: 13 }}>{selected.practice.invoiceFooter}</p> : null}
-          <button type="button" onClick={() => window.print()}>
-            Print
-          </button>
-        </section>
+          {selected.invoice.notes ? <p className="ui-muted">{selected.invoice.notes}</p> : null}
+          {selected.practice.invoiceFooter ? (
+            <p className="ui-muted" style={{ fontSize: 13 }}>
+              {selected.practice.invoiceFooter}
+            </p>
+          ) : null}
+          <div className="ui-row" style={{ marginTop: 12 }}>
+            <Button variant="secondary" onClick={() => window.print()}>
+              Print
+            </Button>
+            <Button variant="ghost" onClick={() => setSelected(null)}>
+              Close
+            </Button>
+          </div>
+        </Section>
       ) : null}
-
-      <p style={{ marginTop: 16 }}>
-        <Link href="/client" style={{ color: "var(--color-accent)" }}>
-          Back to home
-        </Link>
-      </p>
-    </div>
+    </section>
   );
 }
