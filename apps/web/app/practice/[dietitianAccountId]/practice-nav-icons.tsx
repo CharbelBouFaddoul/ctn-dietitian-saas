@@ -36,6 +36,12 @@ export const PracticeNavIcons = {
       <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
     </Icon>
   ),
+  notifications: (
+    <Icon>
+      <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+      <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+    </Icon>
+  ),
   mealPlans: (
     <Icon>
       <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />

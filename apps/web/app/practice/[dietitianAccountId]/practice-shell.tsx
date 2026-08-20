@@ -170,7 +170,7 @@ export function PracticeShell({ children }: { children: ReactNode }) {
         { href: `${base}/clients`, label: "Clients", icon: PracticeNavIcons.clients },
         { href: `${base}/calendar`, label: "Calendar", icon: PracticeNavIcons.calendar },
         { href: `${base}/messages`, label: "Messages", icon: PracticeNavIcons.messages },
-        { href: `${base}/notifications`, label: "Notifications", icon: PracticeNavIcons.messages },
+        { href: `${base}/notifications`, label: "Notifications", icon: PracticeNavIcons.notifications },
       ],
     },
     {

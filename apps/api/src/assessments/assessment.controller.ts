@@ -1,6 +1,28 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, UseGuards } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from "@nestjs/common";
 import { ApiCookieAuth, ApiProperty, ApiPropertyOptional, ApiTags } from "@nestjs/swagger";
-import { IsEnum, IsObject, IsOptional, IsString, IsUUID, MaxLength, MinLength } from "class-validator";
+import {
+  IsArray,
+  IsBoolean,
+  IsEnum,
+  IsObject,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  MinLength,
+  ValidateNested,
+} from "class-validator";
+import { Type } from "class-transformer";
 import { SessionGuard } from "../auth/guards/session.guard";
 import { CurrentTenant } from "../dietitian/decorators/current-tenant.decorator";
 import { DietitianGuard } from "../dietitian/guards/dietitian.guard";
@@ -9,6 +31,7 @@ import { ClientActionRequired } from "../clients/decorators/client-action.decora
 import { ClientAccessGuard } from "../clients/guards/client-access.guard";
 import { AssessmentService } from "./assessment.service";
 import type { Prisma } from "@prisma/client";
+import { ASSESSMENT_QUESTION_TYPES, type AssessmentQuestionType } from "./assessment-schema";
 
 class CreateTemplateDto {
   @ApiProperty()
@@ -23,9 +46,10 @@ class CreateTemplateDto {
   @MaxLength(500)
   description?: string;
 
-  @ApiProperty()
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsObject()
-  schema!: Record<string, unknown>;
+  schema?: Record<string, unknown>;
 }
 
 class UpdateTemplateDto {
@@ -51,6 +75,66 @@ class UpdateTemplateDto {
   @IsOptional()
   @IsEnum(["ACTIVE", "INACTIVE", "ARCHIVED"])
   status?: "ACTIVE" | "INACTIVE" | "ARCHIVED";
+}
+
+class QuestionOptionDto {
+  @ApiProperty()
+  @IsString()
+  id!: string;
+
+  @ApiProperty()
+  @IsString()
+  label!: string;
+}
+
+class UpsertQuestionDto {
+  @ApiProperty({ default: "main" })
+  @IsOptional()
+  @IsString()
+  sectionId?: string;
+
+  @ApiProperty()
+  @IsString()
+  id!: string;
+
+  @ApiProperty({ enum: ASSESSMENT_QUESTION_TYPES })
+  @IsEnum(ASSESSMENT_QUESTION_TYPES)
+  type!: AssessmentQuestionType;
+
+  @ApiProperty()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(500)
+  label!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  required?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  active?: boolean;
+
+  @ApiPropertyOptional({ type: [QuestionOptionDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => QuestionOptionDto)
+  options?: QuestionOptionDto[];
+}
+
+class ReorderQuestionsDto {
+  @ApiProperty({ default: "main" })
+  @IsOptional()
+  @IsString()
+  sectionId?: string;
+
+  @ApiProperty({ type: [String] })
+  @IsArray()
+  @IsString({ each: true })
+  orderedIds!: string[];
 }
 
 class StartAssessmentDto {
@@ -80,15 +164,26 @@ export class AssessmentController {
   constructor(private readonly assessments: AssessmentService) {}
 
   @Get("assessment-templates")
-  listTemplates(@CurrentTenant() tenant: DietitianTenantContext) {
-    return this.assessments.listTemplates(tenant);
+  listTemplates(
+    @CurrentTenant() tenant: DietitianTenantContext,
+    @Query("includeInactive") includeInactive?: string,
+  ) {
+    return this.assessments.listTemplates(tenant, includeInactive === "true" || includeInactive === "1");
+  }
+
+  @Get("assessment-templates/:templateId")
+  getTemplate(
+    @CurrentTenant() tenant: DietitianTenantContext,
+    @Param("templateId", ParseUUIDPipe) templateId: string,
+  ) {
+    return this.assessments.getTemplate(tenant, templateId);
   }
 
   @Post("assessment-templates")
   createTemplate(@CurrentTenant() tenant: DietitianTenantContext, @Body() body: CreateTemplateDto) {
     return this.assessments.createTemplate(tenant, {
       ...body,
-      schema: body.schema as Prisma.InputJsonValue,
+      schema: body.schema as Prisma.InputJsonValue | undefined,
     });
   }
 
@@ -102,6 +197,45 @@ export class AssessmentController {
       ...body,
       schema: body.schema as Prisma.InputJsonValue | undefined,
     });
+  }
+
+  @Post("assessment-templates/:templateId/questions")
+  upsertQuestion(
+    @CurrentTenant() tenant: DietitianTenantContext,
+    @Param("templateId", ParseUUIDPipe) templateId: string,
+    @Body() body: UpsertQuestionDto,
+  ) {
+    return this.assessments.upsertTemplateQuestion(tenant, templateId, body.sectionId ?? "main", {
+      id: body.id,
+      type: body.type,
+      label: body.label,
+      required: body.required,
+      active: body.active,
+      options: body.options,
+    });
+  }
+
+  @Post("assessment-templates/:templateId/questions/reorder")
+  reorderQuestions(
+    @CurrentTenant() tenant: DietitianTenantContext,
+    @Param("templateId", ParseUUIDPipe) templateId: string,
+    @Body() body: ReorderQuestionsDto,
+  ) {
+    return this.assessments.reorderTemplateQuestions(
+      tenant,
+      templateId,
+      body.sectionId ?? "main",
+      body.orderedIds,
+    );
+  }
+
+  @Post("assessment-templates/:templateId/questions/:questionId/deactivate")
+  deactivateQuestion(
+    @CurrentTenant() tenant: DietitianTenantContext,
+    @Param("templateId", ParseUUIDPipe) templateId: string,
+    @Param("questionId") questionId: string,
+  ) {
+    return this.assessments.deactivateTemplateQuestion(tenant, templateId, questionId);
   }
 
   @Get("clients/:clientId/assessments")

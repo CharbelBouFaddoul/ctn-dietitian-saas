@@ -147,8 +147,8 @@ Tenant-scoped queries via dietitianAccountId (tenantWhere)
 - Subscription access is derived (`ACTIVE` / `GRACE` / `READ_ONLY` / `LOCKED`) from period end + status; `DietitianGuard` enforces mutations vs reads. See [TENANCY_MIGRATION.md](./TENANCY_MIGRATION.md).
 - Phase 5 dashboards: `GET …/practice/dashboard` (extended) and `GET /api/v1/portal/dashboard`. In-app notifications reuse `Notification` with practice/portal list, unread-count, mark-one, mark-all-read; shells poll unread. `PlatformSettings.emailNotificationsEnabled` (default off, admin-only) gates product emails only.
 - Phase 6 client portfolio: `GET …/clients/:clientId/portfolio` composes identity, profile, latest measurements/BMI, goals, assessment, meal plan, appointment, messages, small recent timeline, and missing/alerts. Portal profile is read-only lightweight fields for the active connection.
-- Phase 7: canonical tenant key is `dietitianAccountId`. Admin manages accounts at `/api/v1/admin/dietitians`. Portal remains `ClientAccount` + `activeClientId`.
-
+- Phase 7 (tenancy remount): canonical tenant key is `dietitianAccountId`. Admin manages accounts at `/api/v1/admin/dietitians`. Portal remains `ClientAccount` + `activeClientId`.
+- **Product Phase 7 (portfolio / evolution / assessments):** practice chart adds Evolution (`GET …/evolution` + SVG charts), assessment question editor + `schemaSnapshot`, portal `/assessments` + `/evolution`. Distinct from tenancy Phase 7 above.
 ---
 
 ## 3. Authorization

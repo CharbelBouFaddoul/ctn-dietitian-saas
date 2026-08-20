@@ -3,6 +3,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import type { DietitianTenantContext } from "../dietitian/dietitian.types";
 import { tenantWhere } from "../dietitian/tenant-scope";
 import { ClientService } from "./client.service";
+import { computeBmi } from "../client-measurements/client-measurement.service";
 
 const RECENT_TIMELINE_LIMIT = 6;
 const MESSAGE_PREVIEW_LIMIT = 5;
@@ -104,6 +105,39 @@ export class ClientPortfolioService {
     const latestAssessment = (completed ?? assessments[0])
       ? mapAssessment(completed ?? assessments[0]!)
       : null;
+
+    const weightSeries = measurements
+      .filter((m) => m.type === "WEIGHT")
+      .slice()
+      .sort((a, b) => a.measuredAt.getTime() - b.measuredAt.getTime());
+    const heightSeries = measurements
+      .filter((m) => m.type === "HEIGHT")
+      .slice()
+      .sort((a, b) => a.measuredAt.getTime() - b.measuredAt.getTime());
+    let evolutionSummary: {
+      weightDelta: number | null;
+      weightUnit: string | null;
+      bmiBaseline: number | null;
+      bmiCurrent: number | null;
+      pointCount: number;
+    } | null = null;
+    if (weightSeries.length >= 2) {
+      const first = weightSeries[0]!;
+      const last = weightSeries[weightSeries.length - 1]!;
+      const firstH = heightSeries.filter((h) => h.measuredAt.getTime() <= first.measuredAt.getTime()).at(-1);
+      const lastH = heightSeries.filter((h) => h.measuredAt.getTime() <= last.measuredAt.getTime()).at(-1);
+      evolutionSummary = {
+        weightDelta: Math.round((Number(last.value) - Number(first.value)) * 1000) / 1000,
+        weightUnit: last.unit,
+        bmiBaseline: firstH
+          ? computeBmi(Number(first.value), first.unit, Number(firstH.value), firstH.unit)
+          : null,
+        bmiCurrent: lastH
+          ? computeBmi(Number(last.value), last.unit, Number(lastH.value), lastH.unit)
+          : bmi,
+        pointCount: weightSeries.length,
+      };
+    }
 
     const published = mealPlan?.versions[0] ?? null;
     const activeMealPlan = mealPlan
@@ -229,6 +263,7 @@ export class ClientPortfolioService {
         : null,
       latestMeasurements,
       bmi,
+      evolutionSummary,
       primaryGoal: primaryGoal
         ? {
             id: primaryGoal.id,
@@ -265,14 +300,16 @@ export class ClientPortfolioService {
       missing,
       alerts,
       quickLinks: [
+        { tab: "evolution", label: "Evolution" },
         { tab: "personal", label: "Personal information" },
-        { tab: "goals", label: "Goals" },
         { tab: "assessments", label: "Assessments" },
         { tab: "meal-plan", label: "Meal plans" },
         { tab: "tracking", label: "Tracking" },
-        { tab: "timeline", label: "Timeline" },
         { tab: "appointments", label: "Appointments" },
         { tab: "messages", label: "Messages" },
+        { tab: "documents", label: "Documents" },
+        { tab: "timeline", label: "Timeline" },
+        { tab: "goals", label: "Goals" },
       ],
     };
   }
@@ -295,26 +332,4 @@ function mapAssessment(row: {
     createdAt: row.createdAt.toISOString(),
     completedAt: row.completedAt?.toISOString() ?? null,
   };
-}
-
-/** BMI from kg + cm when units allow; null otherwise. */
-function computeBmi(
-  weight: number | null,
-  weightUnit: string | null,
-  height: number | null,
-  heightUnit: string | null,
-): number | null {
-  if (weight == null || height == null || weight <= 0 || height <= 0) return null;
-  let kg = weight;
-  let cm = height;
-  const wu = (weightUnit ?? "kg").toLowerCase();
-  const hu = (heightUnit ?? "cm").toLowerCase();
-  if (wu === "lb" || wu === "lbs") kg = weight * 0.453592;
-  if (hu === "in" || hu === "inch" || hu === "inches") cm = height * 2.54;
-  else if (hu === "m" || hu === "meter" || hu === "metres" || hu === "meters") cm = height * 100;
-  if (kg <= 0 || cm <= 0) return null;
-  const m = cm / 100;
-  const bmi = kg / (m * m);
-  if (!Number.isFinite(bmi)) return null;
-  return Math.round(bmi * 10) / 10;
 }

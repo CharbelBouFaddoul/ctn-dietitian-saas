@@ -5,10 +5,12 @@ import { DietitianModule } from "../dietitian/dietitian.module";
 import { TimelineModule } from "../timeline/timeline.module";
 import { ClientMeasurementController } from "./client-measurement.controller";
 import { ClientMeasurementService } from "./client-measurement.service";
+import { PortalEvolutionController } from "./portal-evolution.controller";
 
 @Module({
   imports: [AuthModule, DietitianModule, ClientsModule, TimelineModule],
-  controllers: [ClientMeasurementController],
+  controllers: [ClientMeasurementController, PortalEvolutionController],
   providers: [ClientMeasurementService],
+  exports: [ClientMeasurementService],
 })
 export class ClientMeasurementsModule {}

@@ -410,6 +410,8 @@ No user
 
 **Phase 6 (done):** client portfolio aggregate, chart tab IA, timeline pagination, assessment GET-by-id, portal `me` profile enrichment. Profile photo upload still deferred.
 
+**Product Phase 7 (done):** Evolution API/UI (measurement series, BMI, baseline/current comparison, date filters, SVG charts); assessment schema contract + question editor (add/edit/deactivate/reorder); `Assessment.schemaSnapshot` on start; portal assessments submit + portal evolution; chart tab reorder (Overview → Evolution → Assessments → …). Tenancy “Phase 7” remount remains historical/done separately.
+
 **Phase 7 (done):** practice APIs remounted to `/api/v1/dietitian/:dietitianAccountId`; `DietitianGuard` + `DietitianTenantContext`; Organization dual-write stopped; `organizationId` / Organization / OrganizationMember / OrganizationSettings removed after backfill; admin at `/admin/dietitians`; web clients updated. Remount complete — no further Organization tenancy shell.
 
 What must change later (audit only):

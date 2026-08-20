@@ -896,6 +896,8 @@ model Assessment {
   templateVersion    Int              @map("template_version")
   status             AssessmentStatus @default(DRAFT)
   responses          Json?
+  /// Frozen copy of template.schema at start — preserves historical response interpretation.
+  schemaSnapshot     Json?            @map("schema_snapshot")
   startedAt          DateTime?        @map("started_at") @db.Timestamptz
   completedAt        DateTime?        @map("completed_at") @db.Timestamptz
   createdById        String?          @map("created_by_id") @db.Uuid

@@ -209,7 +209,7 @@ export default function CalendarPage() {
     setSaving(true);
     setFormError(null);
     try {
-      let startAt = combineLocalDateTime(form.date, form.startTime);
+      const startAt = combineLocalDateTime(form.date, form.startTime);
       let endAt = combineLocalDateTime(form.date, form.endTime);
       const startMs = new Date(startAt).getTime();
       const endMs = new Date(endAt).getTime();

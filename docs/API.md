@@ -176,13 +176,15 @@ Session + `TenantGuard`. Client-scoped routes also run `ClientAccessGuard` / `Cl
 | GET/PATCH | `/clients/:clientId/profile` | Read / update | Extended practice profile |
 | GET/POST | `/clients/:clientId/goals` | Read / manageRecords | Lightweight care-plan goals |
 | POST | `/clients/:clientId/goals/:goalId/complete` or `/cancel` | manageRecords | Goal lifecycle |
-| GET/POST | `/clients/:clientId/measurements` | Read / manageRecords | Typed rows; stored in kg/cm/% |
+| GET/POST | `/clients/:clientId/measurements` | Read / manageRecords | Typed rows; stored in kg/cm/%; optional `type`, `from`, `to` filters on GET |
+| GET | `/clients/:clientId/evolution` | Read | Measurement series, BMI series, baseline/current comparison, date range |
 | GET | `/clients/:clientId/timeline` | Read | Organization-scoped **and** client-access scoped |
 | GET/POST | `/tags` | Member; create not STAFF | Organization tags |
 | PUT | `/clients/:clientId/tags` | update | Replace client tags (org-scoped tag IDs only) |
-| GET/POST/PATCH | `/assessment-templates` | Member; write not STAFF | Platform + org templates; schema edits bump `version` |
-| GET/POST | `/clients/:clientId/assessments` | Read / manageRecords | Start stores `templateVersion` |
-| PATCH/POST complete | `/clients/:clientId/assessments/:assessmentId` | manageRecords | Completed rows are not rewritten when templates change |
+| GET/POST/PATCH | `/assessment-templates` | Member; write not STAFF | Templates; schema edits bump `version`. Question helpers: `POST …/questions`, `…/questions/reorder`, `…/questions/:id/deactivate` |
+| GET | `/assessment-templates/:templateId` | Member | Template with parsed schema contract |
+| GET/POST | `/clients/:clientId/assessments` | Read / manageRecords | Start stores `templateVersion` + `schemaSnapshot` |
+| GET/PATCH/POST complete | `/clients/:clientId/assessments/:assessmentId` | Read / manageRecords | GET returns snapshot schema; completed rows are not rewritten when templates change |
 | GET | `/appointments?from=&to=` | Member | Calendar range (UTC). Omitting range defaults to upcoming-friendly window. Includes client summary; excludes `CANCELLED` |
 | GET | `/appointments/:appointmentId` | Member | Appointment detail (incl. category + pending proposal fields) |
 | PATCH | `/appointments/:appointmentId` | manageRecords | Edit title/category/notes/times/client while `SCHEDULED`; blocked while `RESCHEDULE_PENDING` |
@@ -305,6 +307,20 @@ Scoped to `Session.activeClientId` + `ClientAccount` (never trust a browser `cli
 | POST | `/:appointmentId/reject-reschedule` | Reject dietitian proposal |
 
 Statuses: `SCHEDULED`, `RESCHEDULE_PENDING`, `CANCELLED`, `COMPLETED`, `NO_SHOW`. Categories: `CONSULTATION`, `FOLLOW_UP`, `ASSESSMENT`, `MEAL_PLAN`, `OTHER`. Overlap prevention is per `dietitianAccountId` for `SCHEDULED`/`RESCHEDULE_PENDING`. Appointment changes use REST + `NotificationService` (no Socket.IO appointment events).
+
+### Assessments & evolution — portal
+
+Scoped to `Session.activeClientId` + `ClientAccount`.
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/v1/portal/assessments` | List assessments for the active client |
+| GET | `/api/v1/portal/assessments/:assessmentId` | Detail (schema from `schemaSnapshot`) |
+| PATCH | `/api/v1/portal/assessments/:assessmentId` | Save draft responses |
+| POST | `/api/v1/portal/assessments/:assessmentId/complete` | Submit |
+| GET | `/api/v1/portal/evolution` | Measurement evolution for the active client (`?from=&to=`) |
+
+Assessment templates use a JSON schema contract (`sections[].questions[]` with types `TEXT`, `TEXTAREA`, `NUMBER`, `BOOLEAN`, `SINGLE_CHOICE`, `MULTI_CHOICE`). Deactivating a question soft-flags `active: false`. Started assessments freeze `schemaSnapshot` so historical responses stay readable after template edits.
 
 ### Messaging — practice (`/api/v1/dietitian/:dietitianAccountId`)
 

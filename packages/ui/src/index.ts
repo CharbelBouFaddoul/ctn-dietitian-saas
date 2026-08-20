@@ -37,3 +37,5 @@ export type {
   BrandDisplayMode,
   AuthLayoutAudience,
 } from "./marketing";
+export { LineChart } from "./line-chart";
+export type { LineChartPoint, LineChartProps } from "./line-chart";

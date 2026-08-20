@@ -1,6 +1,7 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, UseGuards } from "@nestjs/common";
 import { ApiCookieAuth, ApiProperty, ApiPropertyOptional, ApiTags } from "@nestjs/swagger";
 import { IsDateString, IsEnum, IsNumber, IsOptional, IsString, MaxLength } from "class-validator";
+import type { MeasurementType } from "@prisma/client";
 import { SessionGuard } from "../auth/guards/session.guard";
 import { CurrentTenant } from "../dietitian/decorators/current-tenant.decorator";
 import { DietitianGuard } from "../dietitian/guards/dietitian.guard";
@@ -33,19 +34,52 @@ class CreateMeasurementDto {
   notes?: string;
 }
 
+class MeasurementQueryDto {
+  @ApiPropertyOptional({ enum: ["WEIGHT", "HEIGHT", "WAIST", "HIPS", "BODY_FAT", "MUSCLE_MASS"] })
+  @IsOptional()
+  @IsEnum(["WEIGHT", "HEIGHT", "WAIST", "HIPS", "BODY_FAT", "MUSCLE_MASS"])
+  type?: MeasurementType;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsDateString()
+  from?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsDateString()
+  to?: string;
+}
+
 @ApiTags("client-measurements")
 @ApiCookieAuth()
 @UseGuards(SessionGuard, DietitianGuard, ClientAccessGuard)
-@Controller("api/v1/dietitian/:dietitianAccountId/clients/:clientId/measurements")
+@Controller("api/v1/dietitian/:dietitianAccountId/clients/:clientId")
 export class ClientMeasurementController {
   constructor(private readonly measurements: ClientMeasurementService) {}
 
-  @Get()
-  list(@CurrentTenant() tenant: DietitianTenantContext, @Param("clientId", ParseUUIDPipe) clientId: string) {
-    return this.measurements.list(tenant, clientId);
+  @Get("measurements")
+  list(
+    @CurrentTenant() tenant: DietitianTenantContext,
+    @Param("clientId", ParseUUIDPipe) clientId: string,
+    @Query() query: MeasurementQueryDto,
+  ) {
+    return this.measurements.list(tenant, clientId, query);
   }
 
-  @Post()
+  @Get("evolution")
+  evolution(
+    @CurrentTenant() tenant: DietitianTenantContext,
+    @Param("clientId", ParseUUIDPipe) clientId: string,
+    @Query() query: MeasurementQueryDto,
+  ) {
+    return this.measurements.evolution(tenant, clientId, {
+      from: query.from,
+      to: query.to,
+    });
+  }
+
+  @Post("measurements")
   @ClientActionRequired("manageRecords")
   create(
     @CurrentTenant() tenant: DietitianTenantContext,

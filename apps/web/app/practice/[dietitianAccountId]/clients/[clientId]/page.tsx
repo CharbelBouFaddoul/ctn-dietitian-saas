@@ -27,6 +27,8 @@ import {
 } from "@nutrition-saas/ui";
 import { AiPanel } from "../../../../../components/ai-panel";
 import { JoinCodePanel } from "../../../../../components/join-code-panel";
+import { ClientAssessmentsPanel } from "../../../../../components/client-assessments-panel";
+import { ClientEvolutionPanel } from "../../../../../components/client-evolution-panel";
 import { api, apiUrl } from "../../../../../lib/api";
 import { formatDate, formatMoney, nutritionLabel } from "../../../../../lib/format";
 import { errorMessage } from "../../../../../lib/humanize-error";
@@ -36,6 +38,7 @@ import { usePractice } from "../../practice-shell";
 
 type Tab =
   | "overview"
+  | "evolution"
   | "personal"
   | "assessments"
   | "goals"
@@ -51,16 +54,17 @@ type Tab =
 
 const tabs: Array<{ id: Tab; label: string }> = [
   { id: "overview", label: "Overview" },
-  { id: "personal", label: "Personal" },
+  { id: "evolution", label: "Evolution" },
   { id: "assessments", label: "Assessments" },
-  { id: "goals", label: "Goals" },
-  { id: "meal-plan", label: "Meal Plan" },
+  { id: "meal-plan", label: "Meal Plans" },
   { id: "tracking", label: "Tracking" },
-  { id: "messages", label: "Messages" },
   { id: "documents", label: "Documents" },
-  { id: "invoices", label: "Invoices" },
+  { id: "messages", label: "Messages" },
   { id: "appointments", label: "Appointments" },
+  { id: "personal", label: "Personal" },
+  { id: "goals", label: "Goals" },
   { id: "timeline", label: "Timeline" },
+  { id: "invoices", label: "Invoices" },
   { id: "ai", label: "AI" },
   { id: "portal", label: "Portal" },
 ];
@@ -103,6 +107,13 @@ type Portfolio = {
     measuredAt: string;
   }>;
   bmi: number | null;
+  evolutionSummary: {
+    weightDelta: number | null;
+    weightUnit: string | null;
+    bmiBaseline: number | null;
+    bmiCurrent: number | null;
+    pointCount: number;
+  } | null;
   primaryGoal: {
     id: string;
     title: string;
@@ -187,20 +198,6 @@ type GoalRow = {
   targetValue: number | null;
   targetUnit: string | null;
   targetDate: string | null;
-};
-
-type AssessmentRow = {
-  id: string;
-  status: string;
-  templateName: string;
-  templateVersion: number;
-  createdAt: string;
-  completedAt: string | null;
-};
-
-type AssessmentDetail = AssessmentRow & {
-  responses: unknown;
-  schema: unknown;
 };
 
 type TimelineRow = {
@@ -329,11 +326,6 @@ function ClientWorkspacePage() {
   const [goalTitle, setGoalTitle] = useState("");
   const [goalDescription, setGoalDescription] = useState("");
 
-  const [templates, setTemplates] = useState<Array<{ id: string; name: string; version: number }>>([]);
-  const [templateId, setTemplateId] = useState("");
-  const [assessments, setAssessments] = useState<AssessmentRow[]>([]);
-  const [selectedAssessment, setSelectedAssessment] = useState<AssessmentDetail | null>(null);
-
   const [plans, setPlans] = useState<Array<{ id: string; name: string; status: string; client: { id: string } }>>([]);
 
   const [trackingSummary, setTrackingSummary] = useState<{
@@ -398,19 +390,16 @@ function ClientWorkspacePage() {
   async function load() {
     setError(null);
     try {
-      const [portfolioData, account, tagRows, templateRows, planRows] = await Promise.all([
+      const [portfolioData, account, tagRows, planRows] = await Promise.all([
         api<Portfolio>(`${base}/portfolio`),
         api<NonNullable<typeof portalAccount>>(`${base}/account`),
         api<Array<{ id: string; name: string }>>(`${orgBase}/tags`),
-        api<typeof templates>(`${orgBase}/assessment-templates`),
         api<{ items: typeof plans }>(`${orgBase}/meal-plans`),
       ]);
       applyPortfolio(portfolioData);
       setPortalAccount(account);
       setOrgTags(tagRows);
-      setTemplates(templateRows);
       setPlans(planRows.items.filter((plan) => plan.client.id === clientId));
-      if (!templateId && templateRows[0]) setTemplateId(templateRows[0].id);
     } catch (err) {
       setError(errorMessage(err, "Unable to load client"));
     }
@@ -419,11 +408,6 @@ function ClientWorkspacePage() {
   async function loadGoals() {
     const rows = await api<GoalRow[]>(`${base}/goals`);
     setGoals(rows);
-  }
-
-  async function loadAssessments() {
-    const rows = await api<AssessmentRow[]>(`${base}/assessments`);
-    setAssessments(rows);
   }
 
   async function loadMeasurements() {
@@ -461,11 +445,6 @@ function ClientWorkspacePage() {
   useEffect(() => {
     if (tab !== "goals") return;
     void loadGoals().catch((err) => setError(errorMessage(err, "Unable to load goals")));
-  }, [tab, base]);
-
-  useEffect(() => {
-    if (tab !== "assessments") return;
-    void loadAssessments().catch((err) => setError(errorMessage(err, "Unable to load assessments")));
   }, [tab, base]);
 
   useEffect(() => {
@@ -625,6 +604,21 @@ function ClientWorkspacePage() {
               <span className="ui-client-chart__metric-label">Unread messages</span>
               <span className="ui-client-chart__metric-value">{portfolio.recentMessages.unreadCount}</span>
             </div>
+            <div className="ui-client-chart__metric">
+              <span className="ui-client-chart__metric-label">Evolution</span>
+              <span className="ui-client-chart__metric-value">
+                {portfolio.evolutionSummary
+                  ? `Δ weight ${portfolio.evolutionSummary.weightDelta ?? "—"} ${
+                      portfolio.evolutionSummary.weightUnit ?? ""
+                    }`.trim()
+                  : "Need 2+ weights"}
+              </span>
+              {portfolio.evolutionSummary?.bmiCurrent != null ? (
+                <span className="ui-muted">
+                  BMI {portfolio.evolutionSummary.bmiBaseline ?? "—"} → {portfolio.evolutionSummary.bmiCurrent}
+                </span>
+              ) : null}
+            </div>
           </div>
 
           {(portfolio.alerts.length > 0 || Object.values(portfolio.missing).some(Boolean)) && (
@@ -688,6 +682,11 @@ function ClientWorkspacePage() {
             </Section>
           ) : null}
         </div>
+      ) : null}
+
+      {/* ── EVOLUTION ── */}
+      {tab === "evolution" ? (
+        <ClientEvolutionPanel base={base} allowManage={allowManage} onError={setError} />
       ) : null}
 
       {/* ── PERSONAL ── */}
@@ -933,111 +932,15 @@ function ClientWorkspacePage() {
 
       {/* ── ASSESSMENTS ── */}
       {tab === "assessments" ? (
-        <div className="ui-client-chart__panel ui-stack">
-          {templates.length > 0 ? (
-            <Section title="Start an assessment">
-              <form
-                className="ui-client-chart__toolbar"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void api(`${base}/assessments`, { method: "POST", body: JSON.stringify({ templateId }) })
-                    .then(() => {
-                      setSelectedAssessment(null);
-                      return Promise.all([loadAssessments(), loadPortfolio()]);
-                    })
-                    .catch((err) => setError(errorMessage(err, "Unable to start assessment")));
-                }}
-              >
-                <Field label="Template">
-                  <Select value={templateId} onChange={(event) => setTemplateId(event.target.value)}>
-                    {templates.map((template) => (
-                      <option key={template.id} value={template.id}>
-                        {template.name} (v{template.version})
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-                <Button type="submit" disabled={!templateId || !allowManage}>
-                  Start assessment
-                </Button>
-              </form>
-            </Section>
-          ) : null}
-
-          <Section title="Assessments">
-            {assessments.length === 0 ? (
-              <EmptyState title="No assessments yet" />
-            ) : (
-              <ul className="ui-client-chart__list">
-                {assessments.map((row) => (
-                  <li key={row.id}>
-                    <button
-                      type="button"
-                      className="ui-link"
-                      style={{ background: "none", border: 0, padding: 0, cursor: "pointer", fontWeight: 500 }}
-                      onClick={() => {
-                        void api<AssessmentDetail>(`${base}/assessments/${row.id}`)
-                          .then(setSelectedAssessment)
-                          .catch((err) => setError(errorMessage(err, "Unable to load assessment")));
-                      }}
-                    >
-                      {row.templateName} <span className="ui-muted">v{row.templateVersion}</span>
-                    </button>
-                    <StatusBadge status={row.status} label={humanizeLabel(row.status)} />
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Section>
-
-          {selectedAssessment ? (
-            <Section
-              title={`${selectedAssessment.templateName} · ${humanizeLabel(selectedAssessment.status)}`}
-              actions={
-                <Button variant="secondary" size="sm" onClick={() => setSelectedAssessment(null)}>
-                  Close
-                </Button>
-              }
-            >
-              <div className="ui-stack" style={{ gap: 12 }}>
-                <div>
-                  <div className="ui-muted" style={{ marginBottom: 4 }}>
-                    Responses
-                  </div>
-                  <pre
-                    style={{
-                      margin: 0,
-                      padding: 12,
-                      borderRadius: 8,
-                      background: "var(--ui-surface-muted, #f6f7f9)",
-                      overflow: "auto",
-                      fontSize: 12,
-                    }}
-                  >
-                    {JSON.stringify(selectedAssessment.responses ?? null, null, 2)}
-                  </pre>
-                </div>
-                <div>
-                  <div className="ui-muted" style={{ marginBottom: 4 }}>
-                    Schema
-                  </div>
-                  <pre
-                    style={{
-                      margin: 0,
-                      padding: 12,
-                      borderRadius: 8,
-                      background: "var(--ui-surface-muted, #f6f7f9)",
-                      overflow: "auto",
-                      fontSize: 12,
-                    }}
-                  >
-                    {JSON.stringify(selectedAssessment.schema ?? null, null, 2)}
-                  </pre>
-                </div>
-              </div>
-            </Section>
-          ) : null}
-        </div>
+        <ClientAssessmentsPanel
+          base={base}
+          orgBase={orgBase}
+          allowManage={allowManage}
+          onError={setError}
+          onPortfolioRefresh={async () => {
+            await loadPortfolio();
+          }}
+        />
       ) : null}
 
       {/* ── GOALS ── */}

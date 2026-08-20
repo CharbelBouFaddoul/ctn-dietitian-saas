@@ -5,10 +5,12 @@ import { DietitianModule } from "../dietitian/dietitian.module";
 import { TimelineModule } from "../timeline/timeline.module";
 import { AssessmentController } from "./assessment.controller";
 import { AssessmentService } from "./assessment.service";
+import { PortalAssessmentsController } from "./portal-assessments.controller";
 
 @Module({
   imports: [AuthModule, DietitianModule, ClientsModule, TimelineModule],
-  controllers: [AssessmentController],
+  controllers: [AssessmentController, PortalAssessmentsController],
   providers: [AssessmentService],
+  exports: [AssessmentService],
 })
 export class AssessmentsModule {}

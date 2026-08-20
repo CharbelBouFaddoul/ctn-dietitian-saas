@@ -108,6 +108,7 @@ export default function ClientPortalLayout({ children }: { children: ReactNode }
         { href: "/client/plan", label: "My Plan", icon: PatientNavIcons.plan },
         { href: "/client/tracking", label: "Tracking", icon: PatientNavIcons.tracking },
         { href: "/client/progress", label: "Progress", icon: PatientNavIcons.progress },
+        { href: "/client/assessments", label: "Assessments", icon: PatientNavIcons.assessments },
       ],
     },
     {
@@ -115,7 +116,7 @@ export default function ClientPortalLayout({ children }: { children: ReactNode }
       items: [
         { href: "/client/messages", label: "Messages", icon: PatientNavIcons.messages },
         { href: "/client/appointments", label: "Appointments", icon: PatientNavIcons.appointments },
-        { href: "/client/notifications", label: "Notifications", icon: PatientNavIcons.messages },
+        { href: "/client/notifications", label: "Notifications", icon: PatientNavIcons.notifications },
       ],
     },
     {
