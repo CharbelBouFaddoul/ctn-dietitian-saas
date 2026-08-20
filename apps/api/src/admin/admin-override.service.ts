@@ -5,7 +5,7 @@ import type { AdminActor } from "./admin-actor";
 import { ADMIN_MESSAGES } from "./admin.messages";
 import type { UpsertFeatureOverrideDto } from "./dto/admin.dto";
 
-/** Phase 1: organizationId argument is DietitianAccount.id */
+/** Admin APIs: dietitianAccountId argument is DietitianAccount.id */
 @Injectable()
 export class AdminOverrideService {
   constructor(
@@ -13,10 +13,10 @@ export class AdminOverrideService {
     private readonly security: SecurityEventLogger,
   ) {}
 
-  async upsert(organizationId: string, featureKey: string, input: UpsertFeatureOverrideDto, actor: AdminActor) {
-    const account = await this.prisma.dietitianAccount.findUnique({ where: { id: organizationId } });
+  async upsert(dietitianAccountId: string, featureKey: string, input: UpsertFeatureOverrideDto, actor: AdminActor) {
+    const account = await this.prisma.dietitianAccount.findUnique({ where: { id: dietitianAccountId } });
     if (!account) {
-      throw new NotFoundException(ADMIN_MESSAGES.organizationNotFound);
+      throw new NotFoundException(ADMIN_MESSAGES.dietitianAccountNotFound);
     }
 
     const feature = await this.prisma.feature.findUnique({ where: { key: featureKey } });
@@ -30,10 +30,10 @@ export class AdminOverrideService {
 
     const override = await this.prisma.featureOverride.upsert({
       where: {
-        dietitianAccountId_featureId: { dietitianAccountId: organizationId, featureId: feature.id },
+        dietitianAccountId_featureId: { dietitianAccountId, featureId: feature.id },
       },
       create: {
-        dietitianAccountId: organizationId,
+        dietitianAccountId,
         featureId: feature.id,
         enabled: input.enabled ?? null,
         limitValue: input.limitValue ?? null,
@@ -51,7 +51,7 @@ export class AdminOverrideService {
       type: "feature_override_upserted",
       outcome: "success",
       userId: actor.userId,
-      dietitianAccountId: organizationId,
+      dietitianAccountId,
       ipAddress: actor.ipAddress,
       userAgent: actor.userAgent,
       requestId: actor.requestId,
@@ -74,7 +74,7 @@ export class AdminOverrideService {
     };
   }
 
-  async remove(organizationId: string, featureKey: string, actor: AdminActor) {
+  async remove(dietitianAccountId: string, featureKey: string, actor: AdminActor) {
     const feature = await this.prisma.feature.findUnique({ where: { key: featureKey } });
     if (!feature) {
       throw new NotFoundException(ADMIN_MESSAGES.featureNotFound);
@@ -82,7 +82,7 @@ export class AdminOverrideService {
 
     const existing = await this.prisma.featureOverride.findUnique({
       where: {
-        dietitianAccountId_featureId: { dietitianAccountId: organizationId, featureId: feature.id },
+        dietitianAccountId_featureId: { dietitianAccountId, featureId: feature.id },
       },
     });
     if (!existing) {
@@ -94,7 +94,7 @@ export class AdminOverrideService {
       type: "feature_override_removed",
       outcome: "success",
       userId: actor.userId,
-      dietitianAccountId: organizationId,
+      dietitianAccountId,
       ipAddress: actor.ipAddress,
       userAgent: actor.userAgent,
       requestId: actor.requestId,

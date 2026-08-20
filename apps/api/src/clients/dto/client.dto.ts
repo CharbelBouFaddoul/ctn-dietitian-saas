@@ -58,12 +58,7 @@ export class CreateClientDto {
   @ApiPropertyOptional({ enum: ["PENDING", "ACTIVE", "INACTIVE"] })
   @IsOptional()
   @IsEnum(["PENDING", "ACTIVE", "INACTIVE"])
-  status?: "PENDING" | "ACTIVE" | "INACTIVE";
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsUUID()
-  assignedMemberId?: string;
+      status?: "PENDING" | "ACTIVE" | "INACTIVE";
 
   @ApiPropertyOptional({ type: [String] })
   @IsOptional()
@@ -131,11 +126,6 @@ export class ListClientsQueryDto {
   @IsOptional()
   @IsUUID()
   tagId?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsUUID()
-  assignedMemberId?: string;
 
   @ApiPropertyOptional()
   @IsOptional()

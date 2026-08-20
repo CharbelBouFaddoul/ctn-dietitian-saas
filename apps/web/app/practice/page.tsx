@@ -7,12 +7,11 @@ import { ApiError, api } from "../../lib/api";
 import { errorMessage } from "../../lib/humanize-error";
 import { loginPathFor, resolveSessionHome } from "../../lib/session-home";
 
-interface Org {
+interface DietitianAccount {
   id: string;
   name: string;
   slug: string;
   status: string;
-  role: string;
 }
 
 /** Phase 3: no multi-practice picker — land on the sole/first account. */
@@ -38,9 +37,9 @@ export default function PracticeIndexPage() {
           router.replace(home.path);
           return;
         }
-        const orgs = await api<Org[]>("/api/v1/dietitian");
+        const accounts = await api<DietitianAccount[]>("/api/v1/dietitian");
         if (cancelled) return;
-        const first = orgs[0];
+        const first = accounts[0];
         if (first) {
           router.replace(`/practice/${first.id}`);
           return;

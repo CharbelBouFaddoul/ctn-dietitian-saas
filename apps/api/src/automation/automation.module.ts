@@ -3,7 +3,7 @@ import { AuthModule } from "../auth/auth.module";
 import { EmailModule } from "../email/email.module";
 import { EntitlementsModule } from "../entitlements/entitlements.module";
 import { NotificationsModule } from "../notifications/notifications.module";
-import { OrganizationModule } from "../organizations/organization.module";
+import { DietitianModule } from "../dietitian/dietitian.module";
 import { TasksModule } from "../tasks/tasks.module";
 import { AutomationEvaluatorService } from "./automation-evaluator.service";
 import { AutomationExecutorService } from "./automation-executor.service";
@@ -16,7 +16,7 @@ import { AutomationService } from "./automation.service";
 @Module({
   imports: [
     AuthModule,
-    OrganizationModule,
+    DietitianModule,
     EntitlementsModule,
     NotificationsModule,
     EmailModule,

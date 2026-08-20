@@ -42,7 +42,7 @@ interface Entitlement {
   overrideReason: string | null;
 }
 
-interface OrgDetail {
+interface DietitianDetail {
   id: string;
   name: string;
   slug: string;
@@ -71,10 +71,10 @@ function defaultPeriodEndIso(): string {
   return d.toISOString().slice(0, 16);
 }
 
-export default function AdminOrganizationDetailPage() {
+export default function AdminDietitianDetailPage() {
   const params = useParams<{ id: string }>();
-  const organizationId = params.id;
-  const [org, setOrg] = useState<OrgDetail | null>(null);
+  const dietitianAccountId = params.id;
+  const [dietitian, setDietitian] = useState<DietitianDetail | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [planId, setPlanId] = useState("");
   const [periodEnd, setPeriodEnd] = useState(defaultPeriodEndIso());
@@ -85,10 +85,10 @@ export default function AdminOrganizationDetailPage() {
   async function load() {
     try {
       const [detail, catalog] = await Promise.all([
-        api<OrgDetail>(`/api/v1/admin/dietitians/${organizationId}`),
+        api<DietitianDetail>(`/api/v1/admin/dietitians/${dietitianAccountId}`),
         api<Plan[]>("/api/v1/admin/plans"),
       ]);
-      setOrg(detail);
+      setDietitian(detail);
       setPlans(catalog.filter((plan) => plan.status === "ACTIVE"));
       setPlanId(detail.subscription?.plan.id ?? catalog.find((plan) => plan.slug === "standard")?.id ?? "");
       if (detail.subscription?.currentPeriodEnd) {
@@ -96,13 +96,13 @@ export default function AdminOrganizationDetailPage() {
       }
       setError(null);
     } catch (err) {
-      setError(errorMessage(err, "Unable to load organization"));
+      setError(errorMessage(err, "Unable to load dietitian"));
     }
   }
 
   useEffect(() => {
     void load();
-  }, [organizationId]);
+  }, [dietitianAccountId]);
 
   async function run(action: () => Promise<void>, fallback: string) {
     setBusy(true);
@@ -117,17 +117,17 @@ export default function AdminOrganizationDetailPage() {
     }
   }
 
-  if (!org && !error) {
-    return <LoadingState>Loading organization…</LoadingState>;
+  if (!dietitian && !error) {
+    return <LoadingState>Loading dietitian…</LoadingState>;
   }
 
-  if (!org) {
+  if (!dietitian) {
     return (
       <section>
-        <PageHeader title="Organization" description="Unable to load this organization." />
+        <PageHeader title="Dietitian" description="Unable to load this dietitian." />
         {error ? <Alert tone="danger">{error}</Alert> : null}
         <Link href="/admin/dietitians" className="ui-link">
-          Back to organizations
+          Back to dietitians
         </Link>
       </section>
     );
@@ -137,8 +137,8 @@ export default function AdminOrganizationDetailPage() {
     <section>
       <PageHeader
         eyebrow="Platform"
-        title={org.name}
-        description={`${org.slug} · Organization ${statusLabel(org.status)} · ${org.subscription?.plan.name ?? "No plan"}`}
+        title={dietitian.name}
+        description={`${dietitian.slug} · Practice ${statusLabel(dietitian.status)} · ${dietitian.subscription?.plan.name ?? "No plan"}`}
         actions={
           <Link href="/admin/dietitians" className="ui-btn ui-btn--secondary ui-btn--sm">
             Back
@@ -147,35 +147,35 @@ export default function AdminOrganizationDetailPage() {
       />
       {error ? <Alert tone="danger">{error}</Alert> : null}
 
-      <Section title="Organization status" tone="mint">
+      <Section title="Practice status" tone="mint">
         <div className="ui-row" style={{ marginBottom: 12 }}>
-          <StatusBadge status={org.status} label={statusLabel(org.status)} />
-          {org.subscription ? (
-            <StatusBadge status={org.subscription.status} label={`Subscription · ${statusLabel(org.subscription.status)}`} />
+          <StatusBadge status={dietitian.status} label={statusLabel(dietitian.status)} />
+          {dietitian.subscription ? (
+            <StatusBadge status={dietitian.subscription.status} label={`Subscription · ${statusLabel(dietitian.subscription.status)}`} />
           ) : null}
         </div>
         <div className="ui-admin-actions">
-          <Button disabled={busy} onClick={() => void run(() => api(`/api/v1/admin/dietitians/${organizationId}/status`, { method: "PATCH", body: JSON.stringify({ status: "ACTIVE" }) }).then(() => undefined), "Unable to activate")}>
+          <Button disabled={busy} onClick={() => void run(() => api(`/api/v1/admin/dietitians/${dietitianAccountId}/status`, { method: "PATCH", body: JSON.stringify({ status: "ACTIVE" }) }).then(() => undefined), "Unable to activate")}>
             Activate
           </Button>
-          <Button variant="secondary" disabled={busy} onClick={() => void run(() => api(`/api/v1/admin/dietitians/${organizationId}/status`, { method: "PATCH", body: JSON.stringify({ status: "SUSPENDED" }) }).then(() => undefined), "Unable to suspend")}>
+          <Button variant="secondary" disabled={busy} onClick={() => void run(() => api(`/api/v1/admin/dietitians/${dietitianAccountId}/status`, { method: "PATCH", body: JSON.stringify({ status: "SUSPENDED" }) }).then(() => undefined), "Unable to suspend")}>
             Suspend
           </Button>
-          <Button variant="secondary" disabled={busy} onClick={() => void run(() => api(`/api/v1/admin/dietitians/${organizationId}/status`, { method: "PATCH", body: JSON.stringify({ status: "ARCHIVED" }) }).then(() => undefined), "Unable to archive")}>
+          <Button variant="secondary" disabled={busy} onClick={() => void run(() => api(`/api/v1/admin/dietitians/${dietitianAccountId}/status`, { method: "PATCH", body: JSON.stringify({ status: "ARCHIVED" }) }).then(() => undefined), "Unable to archive")}>
             Archive
           </Button>
         </div>
       </Section>
 
       <Section title="Subscription">
-        {org.subscription ? (
+        {dietitian.subscription ? (
           <p className="ui-muted" style={{ marginBottom: 12 }}>
-            Access: <strong>{org.subscription.accessState ?? "—"}</strong>
+            Access: <strong>{dietitian.subscription.accessState ?? "—"}</strong>
             {" · "}
-            Clients: {org.subscription.clientCount ?? "—"}
-            {org.subscription.clientLimit != null ? ` / ${org.subscription.clientLimit}` : " / unlimited"}
+            Clients: {dietitian.subscription.clientCount ?? "—"}
+            {dietitian.subscription.clientLimit != null ? ` / ${dietitian.subscription.clientLimit}` : " / unlimited"}
             {" · "}
-            Period end: {org.subscription.currentPeriodEnd ?? "Open-ended"}
+            Period end: {dietitian.subscription.currentPeriodEnd ?? "Open-ended"}
           </p>
         ) : null}
         <form
@@ -183,7 +183,7 @@ export default function AdminOrganizationDetailPage() {
             event.preventDefault();
             void run(
               () =>
-                api(`/api/v1/admin/dietitians/${organizationId}/subscription`, {
+                api(`/api/v1/admin/dietitians/${dietitianAccountId}/subscription`, {
                   method: "PUT",
                   body: JSON.stringify({
                     planId,
@@ -222,7 +222,7 @@ export default function AdminOrganizationDetailPage() {
             onClick={() =>
               void run(
                 () =>
-                  api(`/api/v1/admin/dietitians/${organizationId}/subscription/renew`, {
+                  api(`/api/v1/admin/dietitians/${dietitianAccountId}/subscription/renew`, {
                     method: "POST",
                     body: JSON.stringify({
                       planId: planId || undefined,
@@ -235,19 +235,19 @@ export default function AdminOrganizationDetailPage() {
           >
             Renew / reactivate
           </Button>
-          <Button variant="secondary" disabled={busy} onClick={() => void run(() => api(`/api/v1/admin/dietitians/${organizationId}/subscription`, { method: "PATCH", body: JSON.stringify({ status: "ACTIVE" }) }).then(() => undefined), "Unable to reactivate")}>
+          <Button variant="secondary" disabled={busy} onClick={() => void run(() => api(`/api/v1/admin/dietitians/${dietitianAccountId}/subscription`, { method: "PATCH", body: JSON.stringify({ status: "ACTIVE" }) }).then(() => undefined), "Unable to reactivate")}>
             Set ACTIVE
           </Button>
-          <Button variant="secondary" disabled={busy} onClick={() => void run(() => api(`/api/v1/admin/dietitians/${organizationId}/subscription`, { method: "PATCH", body: JSON.stringify({ status: "SUSPENDED" }) }).then(() => undefined), "Unable to suspend subscription")}>
+          <Button variant="secondary" disabled={busy} onClick={() => void run(() => api(`/api/v1/admin/dietitians/${dietitianAccountId}/subscription`, { method: "PATCH", body: JSON.stringify({ status: "SUSPENDED" }) }).then(() => undefined), "Unable to suspend subscription")}>
             Suspend subscription
           </Button>
-          <Button variant="secondary" disabled={busy} onClick={() => void run(() => api(`/api/v1/admin/dietitians/${organizationId}/subscription`, { method: "PATCH", body: JSON.stringify({ status: "CANCELLED" }) }).then(() => undefined), "Unable to cancel subscription")}>
+          <Button variant="secondary" disabled={busy} onClick={() => void run(() => api(`/api/v1/admin/dietitians/${dietitianAccountId}/subscription`, { method: "PATCH", body: JSON.stringify({ status: "CANCELLED" }) }).then(() => undefined), "Unable to cancel subscription")}>
             Cancel subscription
           </Button>
         </div>
       </Section>
 
-      <Section title="Effective entitlements" description="Plan defaults with optional organization overrides.">
+      <Section title="Effective entitlements" description="Plan defaults with optional practice overrides.">
         <Field label="Override reason">
           <Input value={reason} onChange={(event) => setReason(event.target.value)} />
         </Field>
@@ -263,7 +263,7 @@ export default function AdminOrganizationDetailPage() {
             </tr>
           </thead>
           <tbody>
-            {org.entitlements.map((row) => (
+            {dietitian.entitlements.map((row) => (
               <tr key={row.key}>
                 <Td label="Feature">
                   <strong>{row.name || featureLabel(row.key)}</strong>
@@ -278,10 +278,10 @@ export default function AdminOrganizationDetailPage() {
                 <Td label="Source">{humanizeLabel(row.source)}</Td>
                 <Td label="Actions">
                   <div className="ui-admin-actions" style={{ margin: 0 }}>
-                    <Button size="sm" disabled={busy} onClick={() => void run(() => api(`/api/v1/admin/dietitians/${organizationId}/overrides/${row.key}`, { method: "PUT", body: JSON.stringify({ enabled: true, limitValue: row.valueType === "LIMIT" ? row.limit ?? 0 : null, reason }) }).then(() => undefined), "Unable to enable")}>
+                    <Button size="sm" disabled={busy} onClick={() => void run(() => api(`/api/v1/admin/dietitians/${dietitianAccountId}/overrides/${row.key}`, { method: "PUT", body: JSON.stringify({ enabled: true, limitValue: row.valueType === "LIMIT" ? row.limit ?? 0 : null, reason }) }).then(() => undefined), "Unable to enable")}>
                       Enable
                     </Button>
-                    <Button size="sm" variant="secondary" disabled={busy} onClick={() => void run(() => api(`/api/v1/admin/dietitians/${organizationId}/overrides/${row.key}`, { method: "PUT", body: JSON.stringify({ enabled: false, limitValue: row.limit, reason }) }).then(() => undefined), "Unable to disable")}>
+                    <Button size="sm" variant="secondary" disabled={busy} onClick={() => void run(() => api(`/api/v1/admin/dietitians/${dietitianAccountId}/overrides/${row.key}`, { method: "PUT", body: JSON.stringify({ enabled: false, limitValue: row.limit, reason }) }).then(() => undefined), "Unable to disable")}>
                       Disable
                     </Button>
                     {row.valueType === "LIMIT" ? (
@@ -294,7 +294,7 @@ export default function AdminOrganizationDetailPage() {
                           if (next === null) return;
                           void run(
                             () =>
-                              api(`/api/v1/admin/dietitians/${organizationId}/overrides/${row.key}`, {
+                              api(`/api/v1/admin/dietitians/${dietitianAccountId}/overrides/${row.key}`, {
                                 method: "PUT",
                                 body: JSON.stringify({ enabled: row.enabled, limitValue: Number(next), reason }),
                               }).then(() => undefined),
@@ -305,7 +305,7 @@ export default function AdminOrganizationDetailPage() {
                         Limit
                       </Button>
                     ) : null}
-                    <Button size="sm" variant="ghost" disabled={busy} onClick={() => void run(() => api(`/api/v1/admin/dietitians/${organizationId}/overrides/${row.key}`, { method: "DELETE" }).then(() => undefined), "Unable to remove override")}>
+                    <Button size="sm" variant="ghost" disabled={busy} onClick={() => void run(() => api(`/api/v1/admin/dietitians/${dietitianAccountId}/overrides/${row.key}`, { method: "DELETE" }).then(() => undefined), "Unable to remove override")}>
                       Remove
                     </Button>
                   </div>

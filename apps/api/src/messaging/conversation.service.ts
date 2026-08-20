@@ -47,10 +47,10 @@ export class ConversationService {
     return conversation;
   }
 
-  async listInbox(organizationId: string, clientIds: string[]) {
+  async listInbox(dietitianAccountId: string, clientIds: string[]) {
     if (clientIds.length === 0) return [];
     const rows = await this.prisma.conversation.findMany({
-      where: { dietitianAccountId: organizationId, clientId: { in: clientIds }, status: "ACTIVE" },
+      where: { dietitianAccountId, clientId: { in: clientIds }, status: "ACTIVE" },
       orderBy: [{ lastMessageAt: "desc" }, { updatedAt: "desc" }],
       include: {
         client: { select: { id: true, firstName: true, lastName: true, displayName: true } },

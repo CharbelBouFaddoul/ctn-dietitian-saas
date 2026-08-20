@@ -42,7 +42,7 @@ export class AutomationExecutorService {
       include: { settings: true },
     });
     if (!account || account.status !== "ACTIVE") {
-      await this.skipRun(rule, candidate.triggerKey, "organization_inactive");
+      await this.skipRun(rule, candidate.triggerKey, "dietitian_inactive");
       return;
     }
 

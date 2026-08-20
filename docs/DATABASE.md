@@ -1,5 +1,7 @@
 # Database
 
+> **Tenancy (current):** Active schema scopes practice data with `dietitian_account_id` (not `organization_id`). Organization / organization_members tables were dropped in Phase 7. Treat `organization_id` table notes below as historical unless reconciled with `schema.prisma`. See [TENANCY_MIGRATION.md](./TENANCY_MIGRATION.md).
+
 **Status:** Phase 9 messaging and documents implemented. Prisma migration `20260818050000_messaging_documents`.  
 **Rule:** Do not create every table in Phase 1. Add models in the phase that needs them. Always use Prisma migrations. Never edit production schema by hand.
 

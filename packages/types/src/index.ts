@@ -28,11 +28,7 @@ export interface AuthMeResponse {
   session: PublicSession;
 }
 
-export type OrganizationStatus = "PENDING" | "ACTIVE" | "SUSPENDED" | "ARCHIVED";
-
-export type OrganizationRole = "OWNER" | "DIETITIAN" | "STAFF";
-
-export type MembershipStatus = "ACTIVE" | "DEACTIVATED";
+export type DietitianAccountStatus = "PENDING" | "ACTIVE" | "SUSPENDED" | "ARCHIVED";
 
 export type WeightUnit = "kg" | "lb";
 
@@ -43,15 +39,7 @@ export type DateFormat = "YYYY_MM_DD" | "DD_MM_YYYY" | "MM_DD_YYYY";
 export interface TenantContextView {
   dietitianAccountId: string;
   displayName: string;
-  accountStatus: OrganizationStatus;
-}
-
-export interface PublicOrganization {
-  id: string;
-  name: string;
-  slug: string;
-  status: OrganizationStatus;
-  createdAt: string;
+  accountStatus: DietitianAccountStatus;
 }
 
 export type CatalogStatus = "ACTIVE" | "INACTIVE" | "ARCHIVED";

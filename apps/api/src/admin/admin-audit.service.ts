@@ -6,10 +6,10 @@ import { PrismaService } from "../prisma/prisma.service";
 export class AdminAuditService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async list(filters: { q?: string; action?: string; organizationId?: string }) {
+  async list(filters: { q?: string; action?: string; dietitianAccountId?: string }) {
     const where: Prisma.AuditLogWhereInput = {
       ...(filters.action ? { action: filters.action } : {}),
-      ...(filters.organizationId ? { dietitianAccountId: filters.organizationId } : {}),
+      ...(filters.dietitianAccountId ? { dietitianAccountId: filters.dietitianAccountId } : {}),
       ...(filters.q
         ? {
             OR: [
@@ -42,7 +42,7 @@ export class AdminAuditService {
       actor: log.actor
         ? { id: log.actor.id, email: log.actor.email, platformRole: log.actor.platformRole }
         : null,
-      organization: log.dietitianAccount
+      dietitianAccount: log.dietitianAccount
         ? {
             id: log.dietitianAccount.id,
             name: log.dietitianAccount.displayName,

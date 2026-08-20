@@ -11,7 +11,7 @@ type AccountStatus = "ACTIVE" | "SUSPENDED" | "ARCHIVED";
 
 /** Admin APIs: dietitianAccountId path param is DietitianAccount.id */
 @Injectable()
-export class AdminOrganizationService {
+export class AdminDietitianAccountService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly lifecycle: DietitianLifecycleService,
@@ -38,9 +38,9 @@ export class AdminOrganizationService {
     return accounts.map((account) => this.toListItem(account));
   }
 
-  async get(organizationId: string) {
-    const account = await this.requireAccount(organizationId);
-    const entitlements = await this.entitlements.listEffective(organizationId);
+  async get(dietitianAccountId: string) {
+    const account = await this.requireAccount(dietitianAccountId);
+    const entitlements = await this.entitlements.listEffective(dietitianAccountId);
     return {
       id: account.id,
       name: account.displayName,
@@ -59,46 +59,37 @@ export class AdminOrganizationService {
             dateFormat: account.settings.dateFormat,
           }
         : null,
-      members: [
-        {
-          id: account.id,
-          userId: account.userId,
-          email: account.user.email,
-          role: "OWNER",
-          status: "ACTIVE",
-        },
-      ],
       subscription: account.subscription
-        ? await this.subscriptions.getForOrganization(organizationId)
+        ? await this.subscriptions.getForDietitianAccount(dietitianAccountId)
         : null,
       entitlements,
     };
   }
 
-  async setStatus(organizationId: string, status: AccountStatus, actor: AdminActor) {
-    await this.requireAccount(organizationId);
+  async setStatus(dietitianAccountId: string, status: AccountStatus, actor: AdminActor) {
+    await this.requireAccount(dietitianAccountId);
     if (status !== "ACTIVE" && status !== "SUSPENDED" && status !== "ARCHIVED") {
       throw new BadRequestException("Invalid dietitian account status");
     }
-    const organization = await this.lifecycle.setStatus(organizationId, status, actor.userId);
+    const account = await this.lifecycle.setStatus(dietitianAccountId, status, actor.userId);
     await this.security.record({
-      type: "admin_organization_status_changed",
+      type: "admin_dietitian_account_status_changed",
       outcome: "success",
       userId: actor.userId,
-      dietitianAccountId: organizationId,
+      dietitianAccountId,
       ipAddress: actor.ipAddress,
       userAgent: actor.userAgent,
       requestId: actor.requestId,
-      targetType: "organization",
-      targetId: organizationId,
+      targetType: "dietitian_account",
+      targetId: dietitianAccountId,
       metadata: { status },
     });
-    return organization;
+    return account;
   }
 
-  async entitlementsFor(organizationId: string) {
-    await this.requireAccount(organizationId);
-    return this.entitlements.listEffective(organizationId);
+  async entitlementsFor(dietitianAccountId: string) {
+    await this.requireAccount(dietitianAccountId);
+    return this.entitlements.listEffective(dietitianAccountId);
   }
 
   private async requireAccount(dietitianAccountId: string) {
@@ -106,12 +97,11 @@ export class AdminOrganizationService {
       where: { id: dietitianAccountId },
       include: {
         settings: true,
-        user: true,
         subscription: { include: { plan: true } },
       },
     });
     if (!account) {
-      throw new NotFoundException(ADMIN_MESSAGES.organizationNotFound);
+      throw new NotFoundException(ADMIN_MESSAGES.dietitianAccountNotFound);
     }
     return account;
   }

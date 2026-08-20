@@ -68,9 +68,9 @@ describe("Phase 10 invoices, tasks, and analytics", () => {
     return created.body as { id: string };
   }
 
-  async function createClient(cookie: string, organizationId: string, body: Record<string, unknown> = {}) {
+  async function createClient(cookie: string, dietitianAccountId: string, body: Record<string, unknown> = {}) {
     return request(ctx.app.getHttpServer())
-      .post(`/api/v1/dietitian/${organizationId}/clients`)
+      .post(`/api/v1/dietitian/${dietitianAccountId}/clients`)
       .set("Cookie", cookie)
       .send({ firstName: "Pat", lastName: "Client", email: email("client"), ...body });
   }

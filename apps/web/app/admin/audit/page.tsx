@@ -26,7 +26,7 @@ interface AuditRow {
   targetType: string | null;
   createdAt: string;
   actor: { email: string } | null;
-  organization: { name: string } | null;
+  dietitianAccount: { name: string } | null;
   metadata: Record<string, unknown> | null;
 }
 
@@ -59,7 +59,7 @@ export default function AdminAuditPage() {
       <PageHeader
         eyebrow="Operations"
         title="Audit"
-        description="Readable history of platform actions across organizations and users."
+        description="Readable history of platform actions across dietitians and users."
       />
       {error ? <Alert tone="danger">{error}</Alert> : null}
 
@@ -82,7 +82,7 @@ export default function AdminAuditPage() {
                 <th>When</th>
                 <th>Action</th>
                 <th>Actor</th>
-                <th>Organization</th>
+                <th>Practice</th>
                 <th>Result</th>
                 <th></th>
               </tr>
@@ -100,7 +100,7 @@ export default function AdminAuditPage() {
                     ) : null}
                   </Td>
                   <Td label="Actor">{row.actor?.email ?? "System"}</Td>
-                  <Td label="Organization">{row.organization?.name ?? "—"}</Td>
+                  <Td label="Practice">{row.dietitianAccount?.name ?? "—"}</Td>
                   <Td label="Result">
                     <StatusBadge status={row.result} label={statusLabel(row.result)} />
                   </Td>

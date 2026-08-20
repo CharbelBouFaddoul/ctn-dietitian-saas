@@ -19,6 +19,7 @@ import {
 import { api } from "../../../../../lib/api";
 import { errorMessage } from "../../../../../lib/humanize-error";
 import { unitLabel } from "../../../../../lib/practice-labels";
+import { usePractice } from "../../practice-shell";
 
 type NutrientKey =
   | "energyKcal"
@@ -83,8 +84,8 @@ function fmtVal(value: number | null): string {
 export default function FoodDetailPage() {
   const params = useParams<{ dietitianAccountId: string; foodId: string }>();
   const { dietitianAccountId, foodId } = params;
+  const practice = usePractice();
   const [food, setFood] = useState<EffectiveFood | null>(null);
-  const [role, setRole] = useState<string>("");
   const [draft, setDraft] = useState<Record<NutrientKey, string>>({
     energyKcal: "",
     proteinG: "",
@@ -101,16 +102,12 @@ export default function FoodDetailPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [saveBusy, setSaveBusy] = useState(false);
 
-  const canOverride = role === "OWNER" || role === "DIETITIAN";
+  const canOverride = practice.role === "OWNER" || practice.role === "DIETITIAN";
 
   async function load() {
     setError(null);
-    const [detail, org] = await Promise.all([
-      api<EffectiveFood>(`/api/v1/dietitian/${dietitianAccountId}/foods/${foodId}`),
-      api<{ role: string }>(`/api/v1/dietitian/${dietitianAccountId}`),
-    ]);
+    const detail = await api<EffectiveFood>(`/api/v1/dietitian/${dietitianAccountId}/foods/${foodId}`);
     setFood(detail);
-    setRole(org.role);
     const next = { ...draft };
     for (const item of NUTRIENTS) {
       const overridden = detail.overriddenFields.includes(item.key);

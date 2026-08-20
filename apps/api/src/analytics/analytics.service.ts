@@ -387,9 +387,9 @@ export class AnalyticsService {
     };
   }
 
-  private async requireSettings(organizationId: string) {
+  private async requireSettings(dietitianAccountId: string) {
     const settings = await this.prisma.dietitianSettings.findUnique({
-      where: { dietitianAccountId: organizationId },
+      where: { dietitianAccountId },
     });
     return settings ?? { timezone: "UTC", currency: "USD" };
   }
@@ -472,18 +472,18 @@ export class AnalyticsService {
     return map;
   }
 
-  private async activeMealPlanByClient(organizationId: string, clientIds: string[]) {
+  private async activeMealPlanByClient(dietitianAccountId: string, clientIds: string[]) {
     const rows = await this.prisma.mealPlan.findMany({
-      where: { ...tenantWhere(organizationId), clientId: { in: clientIds }, status: "ACTIVE" },
+      where: { ...tenantWhere(dietitianAccountId), clientId: { in: clientIds }, status: "ACTIVE" },
       select: { clientId: true },
     });
     return new Set(rows.map((r) => r.clientId));
   }
 
-  private async overdueInvoicesByClient(organizationId: string, clientIds: string[]) {
+  private async overdueInvoicesByClient(dietitianAccountId: string, clientIds: string[]) {
     const rows = await this.prisma.invoice.findMany({
       where: {
-        ...tenantWhere(organizationId),
+        ...tenantWhere(dietitianAccountId),
         clientId: { in: clientIds },
         status: "OVERDUE",
         archivedAt: null,
@@ -493,10 +493,10 @@ export class AnalyticsService {
     return new Set(rows.map((r) => r.clientId));
   }
 
-  private async overdueTasksByClient(organizationId: string, clientIds: string[]) {
+  private async overdueTasksByClient(dietitianAccountId: string, clientIds: string[]) {
     const rows = await this.prisma.task.findMany({
       where: {
-        ...tenantWhere(organizationId),
+        ...tenantWhere(dietitianAccountId),
         clientId: { in: clientIds },
         archivedAt: null,
         status: { in: ["TODO", "IN_PROGRESS"] },

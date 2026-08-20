@@ -11,7 +11,7 @@ export class AutomationUsageService {
     private readonly entitlements: EntitlementService,
   ) {}
 
-  /** Phase 1: organizationId argument is DietitianAccount.id */
+  /** dietitianAccountId is DietitianAccount.id */
   async getUsageSummary(dietitianAccountId: string) {
     const [enabled, ruleLimit, executionLimit, usage] = await Promise.all([
       this.entitlements.can(dietitianAccountId, FEATURE_KEYS.AUTOMATION),

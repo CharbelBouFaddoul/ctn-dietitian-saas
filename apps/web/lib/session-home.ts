@@ -12,7 +12,7 @@ interface AuthMe {
   user: { platformRole: string | null };
 }
 
-interface OrgRow {
+interface DietitianAccountRow {
   id: string;
 }
 
@@ -28,7 +28,7 @@ export function loginPathFor(kind: Exclude<SessionKind, "unauthenticated">): str
 
 export function pickSessionHome(input: {
   platformRole: string | null;
-  organizationIds: string[];
+  dietitianAccountIds: string[];
   hasPortal: boolean;
   audience?: SessionAudience;
 }): SessionHome {
@@ -36,18 +36,18 @@ export function pickSessionHome(input: {
     return { kind: "admin", path: "/admin" };
   }
   if (input.audience === "client") {
-    if (input.organizationIds.length >= 1) {
-      const organizationId = input.organizationIds[0];
-      if (organizationId) {
-        return { kind: "dietitian", path: `/practice/${organizationId}` };
+    if (input.dietitianAccountIds.length >= 1) {
+      const dietitianAccountId = input.dietitianAccountIds[0];
+      if (dietitianAccountId) {
+        return { kind: "dietitian", path: `/practice/${dietitianAccountId}` };
       }
     }
     return { kind: "client", path: input.hasPortal ? "/client" : "/client/join" };
   }
-  if (input.organizationIds.length >= 1) {
-    const organizationId = input.organizationIds[0];
-    if (organizationId) {
-      return { kind: "dietitian", path: `/practice/${organizationId}` };
+  if (input.dietitianAccountIds.length >= 1) {
+    const dietitianAccountId = input.dietitianAccountIds[0];
+    if (dietitianAccountId) {
+      return { kind: "dietitian", path: `/practice/${dietitianAccountId}` };
     }
   }
   if (input.hasPortal) {
@@ -67,10 +67,10 @@ export async function resolveSessionHome(audience?: SessionAudience): Promise<Se
     throw err;
   }
 
-  let organizationIds: string[] = [];
+  let dietitianAccountIds: string[] = [];
   try {
-    const orgs = await api<OrgRow[]>("/api/v1/dietitian");
-    organizationIds = orgs.map((org) => org.id);
+    const accounts = await api<DietitianAccountRow[]>("/api/v1/dietitian");
+    dietitianAccountIds = accounts.map((account) => account.id);
   } catch (err) {
     if (!(err instanceof ApiError && (err.status === 401 || err.status === 403))) {
       throw err;
@@ -78,7 +78,7 @@ export async function resolveSessionHome(audience?: SessionAudience): Promise<Se
   }
 
   let hasPortal = false;
-  if (organizationIds.length === 0 && !me.user.platformRole) {
+  if (dietitianAccountIds.length === 0 && !me.user.platformRole) {
     try {
       const onboarding = await api<PortalOnboarding>("/api/v1/portal/onboarding");
       hasPortal = onboarding.status === "connected";
@@ -91,7 +91,7 @@ export async function resolveSessionHome(audience?: SessionAudience): Promise<Se
 
   return pickSessionHome({
     platformRole: me.user.platformRole,
-    organizationIds,
+    dietitianAccountIds,
     hasPortal,
     audience,
   });

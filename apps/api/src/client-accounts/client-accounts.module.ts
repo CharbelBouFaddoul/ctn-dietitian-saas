@@ -5,7 +5,7 @@ import { EntitlementsModule } from "../entitlements/entitlements.module";
 import { MealPlansModule } from "../meal-plans/meal-plans.module";
 import { MessagingModule } from "../messaging/messaging.module";
 import { NotificationsModule } from "../notifications/notifications.module";
-import { OrganizationModule } from "../organizations/organization.module";
+import { DietitianModule } from "../dietitian/dietitian.module";
 import { TimelineModule } from "../timeline/timeline.module";
 import { TrackingModule } from "../tracking/tracking.module";
 import { ClientAccountController } from "./client-account.controller";
@@ -18,7 +18,7 @@ import { PracticeJoinCodeController } from "./practice-join-code.controller";
 @Module({
   imports: [
     AuthModule,
-    OrganizationModule,
+    DietitianModule,
     ClientsModule,
     EntitlementsModule,
     TimelineModule,

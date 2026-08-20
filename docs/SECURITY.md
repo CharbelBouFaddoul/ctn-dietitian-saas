@@ -1,5 +1,7 @@
 # Security
 
+> **Tenancy (current):** Practice authorization is `DietitianAccount` ownership via `DietitianGuard` (`dietitianAccountId`). OrganizationMember / `TenantGuard` / `organization_id` narratives below are historical unless updated. See [TENANCY_MIGRATION.md](./TENANCY_MIGRATION.md).
+
 **Status:** Phase 13 production hardening implemented  
 **Full model:** [ARCHITECTURE.md](./ARCHITECTURE.md), master specification §64–85
 

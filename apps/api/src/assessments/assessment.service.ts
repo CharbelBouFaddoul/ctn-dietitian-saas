@@ -175,9 +175,9 @@ export class AssessmentService {
     return this.toResponse(assessment);
   }
 
-  private async requireAssessment(organizationId: string, clientId: string, assessmentId: string) {
+  private async requireAssessment(dietitianAccountId: string, clientId: string, assessmentId: string) {
     const assessment = await this.prisma.assessment.findFirst({
-      where: { id: assessmentId, clientId, ...tenantWhere(organizationId) },
+      where: { id: assessmentId, clientId, ...tenantWhere(dietitianAccountId) },
     });
     if (!assessment) {
       throw new NotFoundException("Assessment not found");

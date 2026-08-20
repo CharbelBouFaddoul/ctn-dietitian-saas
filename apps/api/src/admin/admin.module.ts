@@ -5,7 +5,7 @@ import { AiModule } from "../ai/ai.module";
 import { AutomationModule } from "../automation/automation.module";
 import { FoodsModule } from "../foods/foods.module";
 import { NotificationsModule } from "../notifications/notifications.module";
-import { OrganizationModule } from "../organizations/organization.module";
+import { DietitianModule } from "../dietitian/dietitian.module";
 import { AdminAuditService } from "./admin-audit.service";
 import { AdminCatalogController } from "./admin-catalog.controller";
 import { AdminCatalogService } from "./admin-catalog.service";
@@ -13,7 +13,7 @@ import { AdminFoodsController } from "./admin-foods.controller";
 import { AdminListsController } from "./admin-lists.controller";
 import { AdminMeController } from "./admin-me.controller";
 import { AdminDietitiansManageController } from "./admin-dietitians-manage.controller";
-import { AdminOrganizationService } from "./admin-organization.service";
+import { AdminDietitianAccountService } from "./admin-dietitian-account.service";
 import { AdminOverrideService } from "./admin-override.service";
 import { AdminSubscriptionService } from "./admin-subscription.service";
 import { AdminUsersController } from "./admin-users.controller";
@@ -27,7 +27,7 @@ import { PlatformRolesGuard } from "./guards/platform-roles.guard";
 @Module({
   imports: [
     AuthModule,
-    OrganizationModule,
+    DietitianModule,
     EntitlementsModule,
     FoodsModule,
     AiModule,
@@ -46,7 +46,7 @@ import { PlatformRolesGuard } from "./guards/platform-roles.guard";
   ],
   providers: [
     PlatformRolesGuard,
-    AdminOrganizationService,
+    AdminDietitianAccountService,
     AdminSubscriptionService,
     AdminOverrideService,
     AdminUserService,

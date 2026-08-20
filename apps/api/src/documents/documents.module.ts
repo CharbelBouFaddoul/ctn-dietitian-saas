@@ -1,7 +1,7 @@
 import { Module } from "@nestjs/common";
 import { AuthModule } from "../auth/auth.module";
 import { ClientsModule } from "../clients/clients.module";
-import { OrganizationModule } from "../organizations/organization.module";
+import { DietitianModule } from "../dietitian/dietitian.module";
 import { TimelineModule } from "../timeline/timeline.module";
 import { NotificationsModule } from "../notifications/notifications.module";
 import { MessagingModule } from "../messaging/messaging.module";
@@ -11,7 +11,7 @@ import { ClientDocumentsController, PortalDocumentsController } from "./document
 @Module({
   imports: [
     AuthModule,
-    OrganizationModule,
+    DietitianModule,
     ClientsModule,
     TimelineModule,
     NotificationsModule,

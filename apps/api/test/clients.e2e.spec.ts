@@ -13,7 +13,6 @@ import {
   resetAuthDatabase,
   type AuthTestContext,
 } from "./app";
-import { MULTI_MEMBER_UNSUPPORTED } from "../src/dietitian/dietitian.service";
 
 const PASSWORD = "ValidPass12";
 const SETTINGS = {
@@ -73,11 +72,11 @@ describe("Phase 5 practice clients", () => {
 
   async function createClient(
     cookie: string,
-    organizationId: string,
+    dietitianAccountId: string,
     body: Record<string, unknown> = {},
   ) {
     return request(ctx.app.getHttpServer())
-      .post(`/api/v1/dietitian/${organizationId}/clients`)
+      .post(`/api/v1/dietitian/${dietitianAccountId}/clients`)
       .set("Cookie", cookie)
       .send({
         firstName: "Ada",
@@ -181,11 +180,9 @@ describe("Phase 5 practice clients", () => {
       .expect(403);
 
     await request(ctx.app.getHttpServer())
-      .post(`/api/v1/dietitian/${org.id}/clients/${first.body.id}/assignments`)
+      .get(`/api/v1/dietitian/${org.id}/clients/${first.body.id}/assignments`)
       .set("Cookie", owner.cookie)
-      .send({ organizationMemberId: org.id })
-      .expect(400)
-      .expect((res) => expect(res.body.message).toBe(MULTI_MEMBER_UNSUPPORTED));
+      .expect(404);
   });
 
   it("creates a client portal account without making the client a practice member", async () => {

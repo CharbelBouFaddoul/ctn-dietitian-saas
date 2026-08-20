@@ -14,12 +14,11 @@ import { seedEntitlementCatalog } from "../src/entitlements/catalog.seed";
 import { seedPlatformAssessmentTemplate } from "../src/assessments/platform-template.seed";
 import { seedPlatformSettings } from "../src/platform-settings/platform-settings.seed";
 import { PlatformSettingsModule } from "../src/platform-settings/platform-settings.module";
-import { OrganizationModule } from "../src/organizations/organization.module";
+import { DietitianModule } from "../src/dietitian/dietitian.module";
 import { DietitianLifecycleService } from "../src/dietitian/dietitian-lifecycle.service";
 import { TimelineModule } from "../src/timeline/timeline.module";
 import { ClientsModule } from "../src/clients/clients.module";
 import { ClientAccountsModule } from "../src/client-accounts/client-accounts.module";
-import { ClientAssignmentsModule } from "../src/client-assignments/client-assignments.module";
 import { ClientProfilesModule } from "../src/client-profiles/client-profiles.module";
 import { ClientGoalsModule } from "../src/client-goals/client-goals.module";
 import { ClientTagsModule } from "../src/client-tags/client-tags.module";
@@ -78,12 +77,11 @@ export async function createAuthTestApp(): Promise<AuthTestContext> {
       PrismaModule,
       EmailModule,
       AuthModule,
-      OrganizationModule,
+      DietitianModule,
       AdminModule,
       TimelineModule,
       ClientsModule,
       ClientAccountsModule,
-      ClientAssignmentsModule,
       ClientProfilesModule,
       ClientGoalsModule,
       ClientTagsModule,

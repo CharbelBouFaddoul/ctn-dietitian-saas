@@ -82,18 +82,18 @@ describe("Phase 12 automation", () => {
     return created.body as { id: string };
   }
 
-  async function createClient(cookie: string, organizationId: string) {
+  async function createClient(cookie: string, dietitianAccountId: string) {
     const res = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/dietitian/${organizationId}/clients`)
+      .post(`/api/v1/dietitian/${dietitianAccountId}/clients`)
       .set("Cookie", cookie)
       .send({ firstName: "Pat", lastName: "Client", email: email("client") })
       .expect(201);
     return res.body as { id: string };
   }
 
-  function createRule(cookie: string, organizationId: string, overrides: Record<string, unknown> = {}) {
+  function createRule(cookie: string, dietitianAccountId: string, overrides: Record<string, unknown> = {}) {
     return request(ctx.app.getHttpServer())
-      .post(`/api/v1/dietitian/${organizationId}/automations`)
+      .post(`/api/v1/dietitian/${dietitianAccountId}/automations`)
       .set("Cookie", cookie)
       .send({
         name: "Inactive follow-up",
@@ -203,7 +203,7 @@ describe("Phase 12 automation", () => {
       where: { dietitianAccountId: org.id, triggerKey: `client-inactive:${client.id}:2026-08-19` },
     });
     expect(run?.status).toBe("SKIPPED");
-    expect(run?.errorCode).toBe("organization_inactive");
+    expect(run?.errorCode).toBe("dietitian_inactive");
   });
 
   it("rejects unknown template variables and skips cancelled appointments", async () => {

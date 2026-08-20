@@ -101,7 +101,7 @@ class UpdateTaskDto {
   dueAt?: string | null;
 }
 
-@ApiTags("organizations")
+@ApiTags("dietitian")
 @ApiCookieAuth()
 @UseGuards(SessionGuard, DietitianGuard)
 @Controller("api/v1/dietitian/:dietitianAccountId/tasks")
@@ -167,7 +167,7 @@ export class TasksController {
   }
 }
 
-@ApiTags("organizations")
+@ApiTags("dietitian")
 @ApiCookieAuth()
 @UseGuards(SessionGuard, DietitianGuard, ClientAccessGuard)
 @Controller("api/v1/dietitian/:dietitianAccountId/clients/:clientId/tasks")

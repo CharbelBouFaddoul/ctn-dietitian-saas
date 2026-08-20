@@ -30,8 +30,6 @@ export const SUPPORTED_CURRENCIES = [
   "LBP",
 ] as const;
 
-export const ORGANIZATION_ROLES = ["OWNER", "DIETITIAN", "STAFF"] as const;
-
 export const PLATFORM_ROLES = ["SUPER_ADMIN", "ADMIN"] as const;
 
 export const PLAN_SLUGS = ["standard", "pro", "premium"] as const;

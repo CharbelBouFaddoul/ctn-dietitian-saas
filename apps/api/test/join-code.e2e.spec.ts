@@ -69,9 +69,9 @@ describe("client join codes", () => {
     return created.body as { id: string; name: string };
   }
 
-  async function createClient(cookie: string, organizationId: string, body: Record<string, unknown> = {}) {
+  async function createClient(cookie: string, dietitianAccountId: string, body: Record<string, unknown> = {}) {
     return request(ctx.app.getHttpServer())
-      .post(`/api/v1/dietitian/${organizationId}/clients`)
+      .post(`/api/v1/dietitian/${dietitianAccountId}/clients`)
       .set("Cookie", cookie)
       .send({ firstName: "Ada", lastName: "Lovelace", email: email("client"), ...body });
   }

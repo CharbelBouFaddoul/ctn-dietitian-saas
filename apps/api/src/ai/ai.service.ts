@@ -59,11 +59,11 @@ export class AiService {
     @Inject(AI_PROVIDER) private readonly provider: AiProvider,
   ) {}
 
-  async getUsageSummary(organizationId: string) {
+  async getUsageSummary(dietitianAccountId: string) {
     const [enabled, limit, usage] = await Promise.all([
-      this.entitlements.can(organizationId, FEATURE_KEYS.AI),
-      this.entitlements.limit(organizationId, FEATURE_KEYS.AI_REQUEST_LIMIT),
-      this.usage.getUsage(organizationId),
+      this.entitlements.can(dietitianAccountId, FEATURE_KEYS.AI),
+      this.entitlements.limit(dietitianAccountId, FEATURE_KEYS.AI_REQUEST_LIMIT),
+      this.usage.getUsage(dietitianAccountId),
     ]);
     const used = usage.requestCount;
     const remaining = limit === null ? null : Math.max(0, limit - used);
@@ -145,7 +145,7 @@ export class AiService {
     userInput?: string;
     schema: z.ZodSchema<T>;
   }): Promise<AiGenerationResult<T>> {
-    const organizationId = input.tenant.dietitianAccountId;
+    const dietitianAccountId = input.tenant.dietitianAccountId;
     const promptVersion = AI_PROMPT_VERSIONS[input.action];
     const correlationId = randomUUID();
 
@@ -153,10 +153,10 @@ export class AiService {
       throw new ServiceUnavailableException("AI is not enabled in this environment");
     }
 
-    const aiEnabled = await this.entitlements.can(organizationId, FEATURE_KEYS.AI);
+    const aiEnabled = await this.entitlements.can(dietitianAccountId, FEATURE_KEYS.AI);
     if (!aiEnabled) {
       await this.recordRejected({
-        organizationId,
+        dietitianAccountId,
         userId: input.tenant.userId,
         clientId: input.clientId,
         action: input.action,
@@ -168,7 +168,7 @@ export class AiService {
         type: "ai_request_denied",
         outcome: "failure",
         userId: input.tenant.userId,
-        dietitianAccountId: organizationId,
+        dietitianAccountId,
         targetType: "client",
         targetId: input.clientId,
         reason: "entitlement_denied",
@@ -176,10 +176,10 @@ export class AiService {
       throw new ForbiddenException("AI is not enabled for this organization");
     }
 
-    const limit = await this.entitlements.limit(organizationId, FEATURE_KEYS.AI_REQUEST_LIMIT);
+    const limit = await this.entitlements.limit(dietitianAccountId, FEATURE_KEYS.AI_REQUEST_LIMIT);
     if (limit === null || limit <= 0) {
       await this.recordRejected({
-        organizationId,
+        dietitianAccountId,
         userId: input.tenant.userId,
         clientId: input.clientId,
         action: input.action,
@@ -190,10 +190,10 @@ export class AiService {
       throw new ForbiddenException("AI request limit is not available");
     }
 
-    const reservation = await this.usage.reserveRequest(organizationId, limit);
+    const reservation = await this.usage.reserveRequest(dietitianAccountId, limit);
     if (!reservation.allowed) {
       await this.recordRejected({
-        organizationId,
+        dietitianAccountId,
         userId: input.tenant.userId,
         clientId: input.clientId,
         action: input.action,
@@ -205,7 +205,7 @@ export class AiService {
         type: "ai_request_denied",
         outcome: "failure",
         userId: input.tenant.userId,
-        dietitianAccountId: organizationId,
+        dietitianAccountId,
         targetType: "client",
         targetId: input.clientId,
         reason: "limit_exceeded",
@@ -215,7 +215,7 @@ export class AiService {
 
     const request = await this.prisma.aiRequest.create({
       data: {
-        dietitianAccountId: organizationId,
+        dietitianAccountId,
         userId: input.tenant.userId,
         clientId: input.clientId,
         action: input.action,
@@ -284,7 +284,7 @@ export class AiService {
           type: "ai_generation_failed",
           outcome: "failure",
           userId: input.tenant.userId,
-          dietitianAccountId: organizationId,
+          dietitianAccountId,
           targetType: "ai_request",
           targetId: request.id,
           reason: category,
@@ -314,8 +314,7 @@ export class AiService {
   }
 
   private async recordRejected(input: {
-    organizationId: string;
-    legacyOrganizationId?: string | null;
+    dietitianAccountId: string;
     userId: string;
     clientId: string;
     action: AiAction;
@@ -325,7 +324,7 @@ export class AiService {
   }) {
     await this.prisma.aiRequest.create({
       data: {
-        dietitianAccountId: input.organizationId,
+        dietitianAccountId: input.dietitianAccountId,
         userId: input.userId,
         clientId: input.clientId,
         action: input.action,

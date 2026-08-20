@@ -5,10 +5,10 @@ import { slugify } from "@nutrition-saas/utilities";
 import { PrismaService } from "../prisma/prisma.service";
 import { SecurityEventLogger } from "../auth/security-event.logger";
 import type {
-  CreateOrganizationDto,
-  OrganizationSettingsInputDto,
-  UpdateOrganizationSettingsDto,
-} from "../organizations/dto/organization.dto";
+  CreateDietitianDto,
+  DietitianSettingsInputDto,
+  UpdateDietitianSettingsDto,
+} from "./dto/dietitian.dto";
 
 @Injectable()
 export class DietitianService {
@@ -17,7 +17,7 @@ export class DietitianService {
     private readonly security: SecurityEventLogger,
   ) {}
 
-  async create(userId: string, input: CreateOrganizationDto) {
+  async create(userId: string, input: CreateDietitianDto) {
     const existingAccount = await this.prisma.dietitianAccount.findUnique({ where: { userId } });
     if (existingAccount) {
       throw new ConflictException("User already has a dietitian account");
@@ -90,7 +90,7 @@ export class DietitianService {
     });
   }
 
-  async updateSettings(dietitianAccountId: string, settings: UpdateOrganizationSettingsDto) {
+  async updateSettings(dietitianAccountId: string, settings: UpdateDietitianSettingsDto) {
     const data = this.settingsData(settings);
     return this.prisma.dietitianSettings.update({
       where: { dietitianAccountId },
@@ -150,8 +150,8 @@ export class DietitianService {
     };
   }
 
-  private settingsData(settings: OrganizationSettingsInputDto | UpdateOrganizationSettingsDto) {
-    const update = settings as UpdateOrganizationSettingsDto;
+  private settingsData(settings: DietitianSettingsInputDto | UpdateDietitianSettingsDto) {
+    const update = settings as UpdateDietitianSettingsDto;
     return {
       timezone: settings.timezone,
       locale: settings.locale,

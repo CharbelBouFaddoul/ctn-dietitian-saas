@@ -25,14 +25,14 @@ import type { AuthenticatedRequestUser } from "../auth/auth.types";
 import { PrismaService } from "../prisma/prisma.service";
 import { assertRegistrationEnabled } from "../platform-settings/registration-gate";
 import {
-  CreateOrganizationDto,
-  UpdateOrganizationDto,
-  UpdateOrganizationSettingsDto,
-} from "../organizations/dto/organization.dto";
+  CreateDietitianDto,
+  UpdateDietitianDto,
+  UpdateDietitianSettingsDto,
+} from "./dto/dietitian.dto";
 import {
-  OrganizationResponseDto,
-  OrganizationSettingsResponseDto,
-} from "../organizations/dto/responses.dto";
+  DietitianAccountResponseDto,
+  DietitianSettingsResponseDto,
+} from "./dto/responses.dto";
 import { CurrentTenant } from "./decorators/current-tenant.decorator";
 import { DietitianGuard } from "./guards/dietitian.guard";
 import { DietitianLifecycleService } from "./dietitian-lifecycle.service";
@@ -64,22 +64,22 @@ export class DietitianController {
     description:
       "Creates DietitianAccount + DietitianSettings only. Self-serve create requires registrationEnabled.",
   })
-  @ApiOkResponse({ type: OrganizationResponseDto })
+  @ApiOkResponse({ type: DietitianAccountResponseDto })
   async create(
     @CurrentUser() user: AuthenticatedRequestUser,
-    @Body() body: CreateOrganizationDto,
-  ): Promise<OrganizationResponseDto> {
+    @Body() body: CreateDietitianDto,
+  ): Promise<DietitianAccountResponseDto> {
     await assertRegistrationEnabled(this.prisma);
     const created = await this.dietitians.create(user.id, body);
     if (!created) {
       throw new ForbiddenException(DIETITIAN_ACCESS_DENIED);
     }
-    return created as OrganizationResponseDto;
+    return created as DietitianAccountResponseDto;
   }
 
   @Get()
   @ApiOperation({ summary: "List dietitian accounts owned by the current user" })
-  @ApiOkResponse({ type: [OrganizationResponseDto] })
+  @ApiOkResponse({ type: [DietitianAccountResponseDto] })
   listMine(@CurrentUser() user: AuthenticatedRequestUser) {
     return this.dietitians.listForUser(user.id);
   }
@@ -87,7 +87,7 @@ export class DietitianController {
   @Get(":dietitianAccountId")
   @UseGuards(DietitianGuard)
   @ApiOperation({ summary: "Get dietitian account with tenant context" })
-  @ApiOkResponse({ type: OrganizationResponseDto })
+  @ApiOkResponse({ type: DietitianAccountResponseDto })
   @ApiForbiddenResponse()
   @ApiUnauthorizedResponse()
   async getOne(
@@ -115,7 +115,7 @@ export class DietitianController {
   async update(
     @CurrentUser() user: AuthenticatedRequestUser,
     @Param("dietitianAccountId", ParseUUIDPipe) dietitianAccountId: string,
-    @Body() body: UpdateOrganizationDto,
+    @Body() body: UpdateDietitianDto,
   ) {
     await this.dietitians.updateName(dietitianAccountId, body.name);
     const updated = await this.dietitians.getForUser(user.id, dietitianAccountId);
@@ -128,10 +128,10 @@ export class DietitianController {
   @Get(":dietitianAccountId/settings")
   @UseGuards(DietitianGuard)
   @ApiOperation({ summary: "Get practice settings" })
-  @ApiOkResponse({ type: OrganizationSettingsResponseDto })
+  @ApiOkResponse({ type: DietitianSettingsResponseDto })
   async getSettings(
     @Param("dietitianAccountId", ParseUUIDPipe) dietitianAccountId: string,
-  ): Promise<OrganizationSettingsResponseDto> {
+  ): Promise<DietitianSettingsResponseDto> {
     const settings = await this.dietitians.getSettings(dietitianAccountId);
     if (!settings) {
       throw new NotFoundException("Settings not found");
@@ -144,8 +144,8 @@ export class DietitianController {
   @ApiOperation({ summary: "Update practice settings" })
   async updateSettings(
     @Param("dietitianAccountId", ParseUUIDPipe) dietitianAccountId: string,
-    @Body() body: UpdateOrganizationSettingsDto,
-  ): Promise<OrganizationSettingsResponseDto> {
+    @Body() body: UpdateDietitianSettingsDto,
+  ): Promise<DietitianSettingsResponseDto> {
     const settings = await this.dietitians.updateSettings(dietitianAccountId, body);
     return this.dietitians.toSettingsResponse(settings);
   }

@@ -21,14 +21,14 @@ import type { AuthenticatedRequestUser } from "../auth/auth.types";
 import { AiService } from "../ai/ai.service";
 import { AutomationService } from "../automation/automation.service";
 import { adminActor } from "./admin-actor";
-import { AdminOrganizationService } from "./admin-organization.service";
+import { AdminDietitianAccountService } from "./admin-dietitian-account.service";
 import { AdminOverrideService } from "./admin-override.service";
 import { AdminSubscriptionService } from "./admin-subscription.service";
 import {
   AdminSearchQueryDto,
   AssignSubscriptionDto,
   RenewSubscriptionDto,
-  UpdateOrganizationStatusDto,
+  UpdateDietitianAccountStatusDto,
   UpdateSubscriptionStatusDto,
   UpsertFeatureOverrideDto,
 } from "./dto/admin.dto";
@@ -40,7 +40,7 @@ import { PlatformRolesGuard } from "./guards/platform-roles.guard";
 @Controller("api/v1/admin/dietitians")
 export class AdminDietitiansManageController {
   constructor(
-    private readonly dietitians: AdminOrganizationService,
+    private readonly dietitians: AdminDietitianAccountService,
     private readonly subscriptions: AdminSubscriptionService,
     private readonly overrides: AdminOverrideService,
     private readonly ai: AiService,
@@ -77,7 +77,7 @@ export class AdminDietitiansManageController {
     @CurrentUser() user: AuthenticatedRequestUser,
     @Req() req: Request,
     @Param("dietitianAccountId", ParseUUIDPipe) dietitianAccountId: string,
-    @Body() body: UpdateOrganizationStatusDto,
+    @Body() body: UpdateDietitianAccountStatusDto,
   ) {
     return this.dietitians.setStatus(dietitianAccountId, body.status, adminActor(user, req));
   }
@@ -91,7 +91,7 @@ export class AdminDietitiansManageController {
   @Get(":dietitianAccountId/subscription")
   @ApiOperation({ summary: "Get the dietitian account subscription" })
   getSubscription(@Param("dietitianAccountId", ParseUUIDPipe) dietitianAccountId: string) {
-    return this.subscriptions.getForOrganization(dietitianAccountId);
+    return this.subscriptions.getForDietitianAccount(dietitianAccountId);
   }
 
   @Put(":dietitianAccountId/subscription")

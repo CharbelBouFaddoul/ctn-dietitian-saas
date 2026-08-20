@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
-export class OrganizationSettingsResponseDto {
+export class DietitianSettingsResponseDto {
   @ApiProperty()
   timezone!: string;
 
@@ -71,7 +71,7 @@ export class OrganizationSettingsResponseDto {
   emailReplyTo!: string | null;
 }
 
-export class OrganizationResponseDto {
+export class DietitianAccountResponseDto {
   @ApiProperty()
   id!: string;
 
@@ -84,55 +84,20 @@ export class OrganizationResponseDto {
   @ApiProperty({ enum: ["PENDING", "ACTIVE", "SUSPENDED", "ARCHIVED"] })
   status!: string;
 
-  @ApiProperty({ enum: ["OWNER", "DIETITIAN", "STAFF"] })
-  role!: string;
-
-  @ApiProperty({ enum: ["ACTIVE", "DEACTIVATED"] })
-  membershipStatus!: string;
-
   @ApiProperty()
   createdAt!: string;
 
-  @ApiPropertyOptional({ type: OrganizationSettingsResponseDto })
-  settings?: OrganizationSettingsResponseDto;
-}
-
-export class OrganizationMemberResponseDto {
-  @ApiProperty()
-  id!: string;
-
-  @ApiProperty()
-  userId!: string;
-
-  @ApiProperty()
-  email!: string;
-
-  @ApiProperty({ enum: ["OWNER", "DIETITIAN", "STAFF"] })
-  role!: string;
-
-  @ApiProperty({ enum: ["ACTIVE", "DEACTIVATED"] })
-  status!: string;
-
-  @ApiProperty()
-  joinedAt!: string;
-
-  @ApiProperty({ nullable: true, type: String })
-  deactivatedAt!: string | null;
+  @ApiPropertyOptional({ type: DietitianSettingsResponseDto })
+  settings?: DietitianSettingsResponseDto;
 }
 
 export class DietitianTenantContextResponseDto {
   @ApiProperty()
-  organizationId!: string;
+  dietitianAccountId!: string;
 
   @ApiProperty()
-  organizationName!: string;
+  displayName!: string;
 
   @ApiProperty()
-  organizationStatus!: string;
-
-  @ApiProperty()
-  membershipId!: string;
-
-  @ApiProperty()
-  role!: string;
+  accountStatus!: string;
 }

@@ -103,7 +103,6 @@ export class ClientService {
     this.access.assertCanCreate(tenant);
     await this.assertClientLimit(tenant.dietitianAccountId);
 
-    // Phase 1: assignedMemberId is ignored (no multi-member assignments).
     const client = await this.prisma.$transaction(async (tx) => {
       const created = await tx.client.create({
         data: {
@@ -322,7 +321,7 @@ export class ClientService {
       status: client.status,
       createdAt: client.createdAt.toISOString(),
       assignedTo: client.dietitianAccount
-        ? { membershipId: client.dietitianAccount.id, email: client.dietitianAccount.user.email }
+        ? { dietitianAccountId: client.dietitianAccount.id, email: client.dietitianAccount.user.email }
         : null,
       tags: client.tags.map((row) => row.tag),
       portalStatus: client.account?.status ?? null,
@@ -359,7 +358,7 @@ export class ClientService {
         ? [
             {
               id: owner.id,
-              membershipId: owner.id,
+              dietitianAccountId: owner.id,
               email: owner.user.email,
               assignedAt: owner.createdAt.toISOString(),
               unassignedAt: null,

@@ -1,30 +1,46 @@
 # Tenancy Migration Status
 
-Tracks the DietitianAccount tenancy restructure (Phases 1–7).
+Tracks the DietitianAccount tenancy restructure (Phases 1–7) and Phase 2.5 cleanup.
 
 | Phase | Scope | Status |
 |-------|--------|--------|
 | **Phase 1** | `DietitianAccount` + dual-write with Organization; path param still `:organizationId` (= account id); `dietitianAccountId` on tenant rows; backfill | **Done** |
 | **Phase 2** | Auth cutover / persona isolation (dietitian ↔ portal mutual exclusion); TenantGuard owner-only synthetic role | **Done** |
+| **Phase 2.5** | Remove Organization runtime shells/aliases; rename false `organizationId` → `dietitianAccountId`; drop membership assignment API | **Done** |
 | **Phase 3** | Product cutover: `registrationEnabled` gate, admin dietitian provision + `DIETITIAN_ACTIVATION`, portal multi-connection + `Session.activeClientId`, web `/practice` remount, patient connection switcher | **Done** |
 | **Phase 4** | Subscription lifecycle (ACTIVE → GRACE 3d → READ_ONLY 7d → LOCKED), period dates, CLIENT_LIMIT seeds, centralized TenantGuard enforcement | **Done** |
 | **Phase 5** | Practice/portal dashboards, notification types + mark-all-read + bell UI, `emailNotificationsEnabled` product-email gate, auth-route redirects | **Done** |
 | **Phase 6** | Client Portfolio aggregate + chart tab IA, timeline pagination, assessment read-only GET, portal profile enrichment | **Done** |
 | **Phase 7** | API remount `/api/v1/dietitian`, `DietitianGuard`, stop dual-write, drop Organization/OrganizationMember/OrganizationSettings + `organizationId` columns | **Done** |
 
+## Canonical model (after Phase 7 + 2.5)
+
+```text
+Dietitian User → DietitianAccount (1:1) → practice domain
+Patient User → ClientAccount → Client → DietitianAccount
+```
+
+No Organization layer. No OrganizationMember. No STAFF tenancy. No `organizationId` fallback.
+
+## Phase 2.5 notes
+
+- Deleted `apps/api/src/organizations/` compatibility shim (`OrganizationModule` re-export).
+- Live DTOs live under `apps/api/src/dietitian/dto/` (`CreateDietitianDto`, etc.).
+- Admin service renamed to `AdminDietitianAccountService`; admin APIs remain `/api/v1/admin/dietitians`.
+- Removed ClientAssignment HTTP API (assignments are not authorization).
+- Web: removed `/admin/organizations` redirect pages; **`next.config` `/orgs` → `/practice` redirects retained** (intentional URL compatibility only).
+- Historical Prisma migrations unchanged. Schema already Organization-free since Phase 7.
+
 ## Phase 7 notes
 
 - Canonical practice tenant: **`DietitianAccount`**. Path: `/api/v1/dietitian/:dietitianAccountId`.
-- **`DietitianGuard`** replaces `TenantGuard`; context is `DietitianTenantContext` (`dietitianAccountId`, `displayName`, `accountStatus`, `subscriptionAccess`). No synthetic membership/role fields.
+- **`DietitianGuard`** replaces `TenantGuard`; context is `DietitianTenantContext` (`dietitianAccountId`, `displayName`, `accountStatus`, `subscriptionAccess`).
 - Practice authorization is **single-owner** (`DietitianAccount.userId`). No `OrganizationMember` / OrgRoles.
-- Account create writes **only** `DietitianAccount` + `DietitianSettings` (plus existing subscription attach where applicable). No Organization dual-write.
-- Domain rows are scoped by required **`dietitianAccountId`**. Legacy `organizationId` columns and Organization shell tables removed (migration `20260820210000_phase7_dietitian_tenancy`).
+- Account create writes **only** `DietitianAccount` + `DietitianSettings` (plus existing subscription attach where applicable).
+- Domain rows are scoped by required **`dietitianAccountId`**. Legacy Organization shell tables removed (migration `20260820210000_phase7_dietitian_tenancy`).
 - `ClientAssignment` rekeyed to `userId`; Appointment/Task use `assignedUserId`. Assignments are **not** used for authorization.
-- Admin practice resources: `/api/v1/admin/dietitians/:dietitianAccountId` (provision remains `POST /api/v1/admin/dietitians`).
-- Web practice API clients use `/api/v1/dietitian`; browser routes stay `/practice/:dietitianAccountId`. `/orgs` redirects retained. Admin UI: `/admin/dietitians` (thin `/admin/organizations` redirects).
+- Admin: `/api/v1/admin/dietitians/:dietitianAccountId`. Web: `/practice/:dietitianAccountId`.
 - Portal unchanged: `ClientAccount` + `Session.activeClientId`.
-- Phase 4–6 product behavior preserved (lifecycle, notifications, portfolio).
-- Profile photo upload still deferred. No payment provider.
 
 ## Phase 4 notes
 

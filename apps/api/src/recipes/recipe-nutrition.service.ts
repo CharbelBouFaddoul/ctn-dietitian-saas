@@ -47,8 +47,8 @@ export interface RecipeNutritionResult {
 export class RecipeNutritionService {
   constructor(private readonly foods: FoodService) {}
 
-  loadFoods(organizationId: string, foodIds: string[]) {
-    return this.foods.getEffectiveMany(organizationId, foodIds);
+  loadFoods(dietitianAccountId: string, foodIds: string[]) {
+    return this.foods.getEffectiveMany(dietitianAccountId, foodIds);
   }
 
   async calculate(

@@ -75,7 +75,7 @@ export class ClientAccountService {
       outcome: "success",
       userId: tenant.userId,
       dietitianAccountId: tenant.dietitianAccountId,
-      targetType: "organization",
+      targetType: "dietitian_account",
       targetId: tenant.dietitianAccountId,
     });
     return { ...issued, status: "active" as const };
@@ -93,7 +93,7 @@ export class ClientAccountService {
       outcome: "success",
       userId: tenant.userId,
       dietitianAccountId: tenant.dietitianAccountId,
-      targetType: "organization",
+      targetType: "dietitian_account",
       targetId: tenant.dietitianAccountId,
     });
     return { status: "none" as const, expiresAt: null, hint: null, code: null };

@@ -263,8 +263,8 @@ export class AutomationService {
     return this.usage.getUsageSummary(tenant.dietitianAccountId);
   }
 
-  async getAdminSummary(organizationId: string) {
-    const scope = tenantWhere(organizationId);
+  async getAdminSummary(dietitianAccountId: string) {
+    const scope = tenantWhere(dietitianAccountId);
     const [ruleCount, activeRules, recentFailures, executionCount] = await Promise.all([
       this.prisma.automationRule.count({ where: { ...scope, archivedAt: null } }),
       this.prisma.automationRule.count({ where: { ...scope, status: "ACTIVE", archivedAt: null } }),
@@ -275,10 +275,10 @@ export class AutomationService {
           createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
         },
       }),
-      this.usage.getExecutionCount(organizationId),
+      this.usage.getExecutionCount(dietitianAccountId),
     ]);
     return {
-      organizationId,
+      dietitianAccountId,
       ruleCount,
       activeRules,
       recentFailures,
@@ -304,9 +304,9 @@ export class AutomationService {
     return `${rule.name} — ${parts.join(". ")}`;
   }
 
-  private async findRule(organizationId: string, automationId: string) {
+  private async findRule(dietitianAccountId: string, automationId: string) {
     const row = await this.prisma.automationRule.findFirst({
-      where: { id: automationId, ...tenantWhere(organizationId) },
+      where: { id: automationId, ...tenantWhere(dietitianAccountId) },
     });
     if (!row) {
       throw new NotFoundException("Automation rule not found");

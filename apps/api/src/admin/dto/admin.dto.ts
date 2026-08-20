@@ -38,10 +38,10 @@ export class AdminAuditQueryDto extends AdminSearchQueryDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsUUID()
-  organizationId?: string;
+  dietitianAccountId?: string;
 }
 
-export class UpdateOrganizationStatusDto {
+export class UpdateDietitianAccountStatusDto {
   @ApiProperty({ enum: ["ACTIVE", "SUSPENDED", "ARCHIVED"] })
   @IsEnum(["ACTIVE", "SUSPENDED", "ARCHIVED"])
   status!: "ACTIVE" | "SUSPENDED" | "ARCHIVED";

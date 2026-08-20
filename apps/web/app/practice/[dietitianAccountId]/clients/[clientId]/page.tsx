@@ -829,7 +829,7 @@ function ClientWorkspacePage() {
 
           <Section title="Tags">
             {orgTags.length === 0 ? (
-              <EmptyState title="No organization tags yet" />
+              <EmptyState title="No practice tags yet" />
             ) : (
               <form
                 onSubmit={(event) => {

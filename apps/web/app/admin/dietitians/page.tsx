@@ -19,7 +19,7 @@ import { statusLabel } from "../../../lib/admin-labels";
 import { api } from "../../../lib/api";
 import { errorMessage } from "../../../lib/humanize-error";
 
-interface OrgRow {
+interface DietitianRow {
   id: string;
   name: string;
   slug: string;
@@ -27,18 +27,18 @@ interface OrgRow {
   subscription: { status: string; plan: { name: string; slug: string } } | null;
 }
 
-export default function AdminOrganizationsPage() {
-  const [rows, setRows] = useState<OrgRow[] | null>(null);
+export default function AdminDietitiansPage() {
+  const [rows, setRows] = useState<DietitianRow[] | null>(null);
   const [q, setQ] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   async function load(search = q) {
     try {
       const path = search ? `/api/v1/admin/dietitians?q=${encodeURIComponent(search)}` : "/api/v1/admin/dietitians";
-      setRows(await api<OrgRow[]>(path));
+      setRows(await api<DietitianRow[]>(path));
       setError(null);
     } catch (err) {
-      setError(errorMessage(err, "Unable to load organizations"));
+      setError(errorMessage(err, "Unable to load dietitians"));
     }
   }
 
@@ -55,12 +55,12 @@ export default function AdminOrganizationsPage() {
     <section>
       <PageHeader
         eyebrow="Platform"
-        title="Organizations"
+        title="Dietitians"
         description="Practices on the platform — status, plan, and subscription."
       />
       {error ? <Alert tone="danger">{error}</Alert> : null}
 
-      <Section title="All organizations">
+      <Section title="All dietitians">
         <form onSubmit={onSearch} className="ui-admin-toolbar">
           <Field label="Search">
             <Input value={q} onChange={(event) => setQ(event.target.value)} placeholder="Name or slug" />
@@ -68,15 +68,15 @@ export default function AdminOrganizationsPage() {
           <Button type="submit">Search</Button>
         </form>
 
-        {rows === null ? <LoadingState>Loading organizations…</LoadingState> : null}
+        {rows === null ? <LoadingState>Loading dietitians…</LoadingState> : null}
         {rows && rows.length === 0 ? (
-          <EmptyState title="No organizations found">Try a different search, or wait for practices to join.</EmptyState>
+          <EmptyState title="No dietitians found">Try a different search, or wait for practices to join.</EmptyState>
         ) : null}
         {rows && rows.length > 0 ? (
           <Table>
             <thead>
               <tr>
-                <th>Organization</th>
+                <th>Practice</th>
                 <th>Status</th>
                 <th>Plan</th>
                 <th>Subscription</th>
@@ -85,7 +85,7 @@ export default function AdminOrganizationsPage() {
             <tbody>
               {rows.map((row) => (
                 <tr key={row.id}>
-                  <Td label="Organization">
+                  <Td label="Practice">
                     <Link href={`/admin/dietitians/${row.id}`} className="ui-link">
                       {row.name}
                     </Link>

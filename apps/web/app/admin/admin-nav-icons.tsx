@@ -17,7 +17,7 @@ export const AdminNavIcons = {
       <rect x="3" y="16" width="7" height="5" rx="1.5" />
     </Icon>
   ),
-  organizations: (
+  dietitians: (
     <Icon>
       <path d="M3 21h18" />
       <path d="M5 21V7l7-4 7 4v14" />

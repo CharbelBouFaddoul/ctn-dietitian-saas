@@ -256,17 +256,17 @@ export class RecipeService {
     return this.get(tenant, recipe.id);
   }
 
-  async requireActive(organizationId: string, recipeId: string) {
-    const recipe = await this.requireRecipe(organizationId, recipeId);
+  async requireActive(dietitianAccountId: string, recipeId: string) {
+    const recipe = await this.requireRecipe(dietitianAccountId, recipeId);
     if (recipe.status !== "ACTIVE") {
       throw new BadRequestException("Archived recipes cannot be used in new meal plans");
     }
     return recipe;
   }
 
-  async requireRecipe(organizationId: string, recipeId: string) {
+  async requireRecipe(dietitianAccountId: string, recipeId: string) {
     const recipe = await this.prisma.recipe.findFirst({
-      where: { id: recipeId, ...tenantWhere(organizationId) },
+      where: { id: recipeId, ...tenantWhere(dietitianAccountId) },
     });
     if (!recipe) {
       throw new NotFoundException("Recipe not found");

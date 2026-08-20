@@ -22,7 +22,7 @@ import {
 } from "class-validator";
 import { IanaTimeZoneConstraint, LocaleConstraint } from "./settings.validators";
 
-export class OrganizationSettingsInputDto {
+export class DietitianSettingsInputDto {
   @ApiProperty({ example: "UTC" })
   @IsString()
   @Validate(IanaTimeZoneConstraint)
@@ -50,7 +50,7 @@ export class OrganizationSettingsInputDto {
   dateFormat!: (typeof DATE_FORMATS)[number];
 }
 
-export class CreateOrganizationDto {
+export class CreateDietitianDto {
   @ApiProperty({ example: "North Clinic" })
   @IsString()
   @MinLength(2)
@@ -64,13 +64,13 @@ export class CreateOrganizationDto {
   @MaxLength(64)
   slug?: string;
 
-  @ApiProperty({ type: OrganizationSettingsInputDto })
+  @ApiProperty({ type: DietitianSettingsInputDto })
   @ValidateNested()
-  @Type(() => OrganizationSettingsInputDto)
-  settings!: OrganizationSettingsInputDto;
+  @Type(() => DietitianSettingsInputDto)
+  settings!: DietitianSettingsInputDto;
 }
 
-export class UpdateOrganizationDto {
+export class UpdateDietitianDto {
   @ApiProperty({ example: "North Clinic" })
   @IsString()
   @MinLength(2)
@@ -78,7 +78,7 @@ export class UpdateOrganizationDto {
   name!: string;
 }
 
-export class UpdateOrganizationSettingsDto extends OrganizationSettingsInputDto {
+export class UpdateDietitianSettingsDto extends DietitianSettingsInputDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()

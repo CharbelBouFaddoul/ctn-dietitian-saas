@@ -88,9 +88,9 @@ describe("phase5 dashboard + notifications", () => {
     return created.body as { id: string };
   }
 
-  async function createClient(cookie: string, organizationId: string, clientEmail?: string) {
+  async function createClient(cookie: string, dietitianAccountId: string, clientEmail?: string) {
     const res = await request(ctx.app.getHttpServer())
-      .post(`/api/v1/dietitian/${organizationId}/clients`)
+      .post(`/api/v1/dietitian/${dietitianAccountId}/clients`)
       .set("Cookie", cookie)
       .send({
         firstName: "Pat",

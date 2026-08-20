@@ -10,12 +10,15 @@ import { loginPathFor, resolveSessionHome } from "../../../lib/session-home";
 import { NotificationBell } from "../../../lib/use-notifications";
 import { PracticeNavIcons } from "./practice-nav-icons";
 
-interface OrgDetail {
+interface PracticeDetail {
   id: string;
   name: string;
-  role: string;
   status: string;
-  context?: { membershipId: string; role: string };
+  context?: {
+    dietitianAccountId: string;
+    displayName: string;
+    accountStatus: string;
+  };
 }
 
 interface SubscriptionAccess {
@@ -33,7 +36,6 @@ interface PracticeContextValue {
   dietitianAccountId: string;
   name: string;
   role: string;
-  membershipId: string;
   subscriptionAccess: SubscriptionAccess | null;
 }
 
@@ -59,7 +61,7 @@ export function PracticeShell({ children }: { children: ReactNode }) {
   const dietitianAccountId = params.dietitianAccountId;
   const pathname = usePathname();
   const router = useRouter();
-  const [org, setOrg] = useState<OrgDetail | null>(null);
+  const [practice, setPractice] = useState<PracticeDetail | null>(null);
   const [access, setAccess] = useState<SubscriptionAccess | null>(null);
   const [state, setState] = useState<"loading" | "ok" | "locked" | "unauth" | "forbidden">("loading");
 
@@ -73,18 +75,17 @@ export function PracticeShell({ children }: { children: ReactNode }) {
         if (cancelled) return;
         setAccess(accessData);
         if (accessData.accessState === "LOCKED") {
-          setOrg({
+          setPractice({
             id: dietitianAccountId,
             name: accessData.planName ? `${accessData.planName} practice` : "Practice",
-            role: "OWNER",
             status: "ACTIVE",
           });
           setState("locked");
           return;
         }
-        const orgData = await api<OrgDetail>(`/api/v1/dietitian/${dietitianAccountId}`);
+        const practiceData = await api<PracticeDetail>(`/api/v1/dietitian/${dietitianAccountId}`);
         if (cancelled) return;
-        setOrg(orgData);
+        setPractice(practiceData);
         setState("ok");
       } catch (error) {
         if (cancelled) return;
@@ -99,10 +100,9 @@ export function PracticeShell({ children }: { children: ReactNode }) {
           error.message.toLowerCase().includes("locked")
         ) {
           setState("locked");
-          setOrg({
+          setPractice({
             id: dietitianAccountId,
             name: "Practice",
-            role: "OWNER",
             status: "ACTIVE",
           });
           return;
@@ -132,7 +132,7 @@ export function PracticeShell({ children }: { children: ReactNode }) {
     router.replace(loginPathFor("dietitian"));
   }
 
-  if (state === "loading" || !org) {
+  if (state === "loading" || !practice) {
     return <LoadingState>Loading practice…</LoadingState>;
   }
 
@@ -156,7 +156,8 @@ export function PracticeShell({ children }: { children: ReactNode }) {
     );
   }
 
-  const membershipId = org.context?.membershipId ?? "";
+  // Single-owner practices: owner is the only practice role.
+  const role = "OWNER";
   const base = `/practice/${dietitianAccountId}`;
   const navSections: NavSection[] = [
     {
@@ -225,16 +226,15 @@ export function PracticeShell({ children }: { children: ReactNode }) {
     <PracticeContext.Provider
       value={{
         dietitianAccountId,
-        name: org.name,
-        role: org.role,
-        membershipId,
+        name: practice.name,
+        role,
         subscriptionAccess: access,
       }}
     >
       <AppShell
         theme="practice"
-        brand={org.name}
-        meta={roleLabel(org.role)}
+        brand={practice.name}
+        meta={roleLabel(role)}
         navSections={navSections}
         pathname={pathname}
         linkComponent={Link}
@@ -246,9 +246,6 @@ export function PracticeShell({ children }: { children: ReactNode }) {
               enabled={state === "ok"}
               placement="above"
             />
-            <Link href="/practice" className="ui-nav-link">
-              All organizations
-            </Link>
             <Button variant="ghost" size="sm" onClick={() => void onLogout()}>
               Sign out
             </Button>

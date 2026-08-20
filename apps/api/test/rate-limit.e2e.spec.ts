@@ -91,7 +91,7 @@ describe("ai and messaging rate limiting", () => {
     return { cookie: `ns_session=${cookieValue(login.headers["set-cookie"])}` };
   }
 
-  async function createProOrg(cookie: string) {
+  async function createProAccount(cookie: string) {
     const org = await request(ctx.app.getHttpServer())
       .post("/api/v1/dietitian")
       .set("Cookie", cookie)
@@ -103,13 +103,13 @@ describe("ai and messaging rate limiting", () => {
       .set("Cookie", cookie)
       .send({ firstName: "Pat", lastName: "Client", email: email("client") })
       .expect(201);
-    return { orgId: org.body.id as string, clientId: client.body.id as string, cookie };
+    return { dietitianAccountId: org.body.id as string, clientId: client.body.id as string, cookie };
   }
 
   it("rate limits AI generation endpoints", async () => {
     const owner = await registerVerifyLogin();
-    const { orgId, clientId, cookie } = await createProOrg(owner.cookie);
-    const path = `/api/v1/dietitian/${orgId}/clients/${clientId}/ai/client-summary`;
+    const { dietitianAccountId, clientId, cookie } = await createProAccount(owner.cookie);
+    const path = `/api/v1/dietitian/${dietitianAccountId}/clients/${clientId}/ai/client-summary`;
 
     expect((await request(ctx.app.getHttpServer()).post(path).set("Cookie", cookie).send({})).status).toBe(201);
     expect((await request(ctx.app.getHttpServer()).post(path).set("Cookie", cookie).send({})).status).toBe(201);
@@ -118,8 +118,8 @@ describe("ai and messaging rate limiting", () => {
 
   it("rate limits org messaging sends", async () => {
     const owner = await registerVerifyLogin();
-    const { orgId, clientId, cookie } = await createProOrg(owner.cookie);
-    const path = `/api/v1/dietitian/${orgId}/clients/${clientId}/conversation/messages`;
+    const { dietitianAccountId, clientId, cookie } = await createProAccount(owner.cookie);
+    const path = `/api/v1/dietitian/${dietitianAccountId}/clients/${clientId}/conversation/messages`;
     const body = { body: "Hello" };
 
     expect((await request(ctx.app.getHttpServer()).post(path).set("Cookie", cookie).send(body)).status).toBe(201);

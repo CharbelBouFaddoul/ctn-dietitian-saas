@@ -95,7 +95,7 @@ export class PortalDocumentsController {
   }
 }
 
-@ApiTags("organizations")
+@ApiTags("dietitian")
 @ApiCookieAuth()
 @UseGuards(SessionGuard, DietitianGuard)
 @Controller("api/v1/dietitian/:dietitianAccountId/clients/:clientId/documents")

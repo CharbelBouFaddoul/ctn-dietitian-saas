@@ -1,6 +1,7 @@
 const EXACT_COPY: Record<string, string> = {
   "Client access denied":
     "You don’t have access to this client. It may be unassigned or assigned to someone else.",
+  "Dietitian account access denied": "You don’t have access to this practice.",
   "Organization access denied": "You don’t have access to this practice.",
   "Authentication required": "Sign in to continue.",
   "Platform administration is not available": "This area is for platform administrators only.",
@@ -13,6 +14,10 @@ const EXACT_COPY: Record<string, string> = {
   "This join code has already been used.": "This join code has already been used.",
   "Your account is already connected to a client profile.": "Your account is already connected to a client profile.",
   "This account cannot join a client portal.": "This account cannot join a client portal.",
+  "Client limit reached for this practice":
+    "This practice has reached its client limit. Ask your dietitian to upgrade or free a spot.",
+  "Client limit reached for this dietitian account":
+    "This practice has reached its client limit. Ask your dietitian to upgrade or free a spot.",
   "Client limit reached for this organization":
     "This practice has reached its client limit. Ask your dietitian to upgrade or free a spot.",
   "Invalid credentials": "Email or password is incorrect.",

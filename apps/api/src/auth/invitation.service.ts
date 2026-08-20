@@ -19,8 +19,7 @@ export interface CreateInvitationInput {
   createdById?: string;
   ttlSeconds?: number;
   clientId?: string;
-  /** DietitianAccount.id (Phase 1 path id). Also written to organizationId for legacy. */
-  organizationId?: string;
+  /** DietitianAccount.id */
   dietitianAccountId?: string;
 }
 
@@ -61,7 +60,7 @@ export class InvitationService {
     });
   }
 
-  /** Phase 1: organizationId argument is DietitianAccount.id */
+  /** dietitianAccountId is DietitianAccount.id */
   async deleteUnusedPracticeInvites(dietitianAccountId: string): Promise<void> {
     await this.prisma.invitationToken.deleteMany({
       where: {
@@ -73,7 +72,7 @@ export class InvitationService {
     });
   }
 
-  /** Phase 1: organizationId argument is DietitianAccount.id */
+  /** dietitianAccountId is DietitianAccount.id */
   async findOpenPracticeInvite(dietitianAccountId: string): Promise<InvitationToken | null> {
     return this.prisma.invitationToken.findFirst({
       where: {
@@ -111,7 +110,7 @@ export class InvitationService {
 
   private async insert(input: CreateInvitationInput, tokenHash: string): Promise<InvitationToken> {
     const ttl = input.ttlSeconds ?? this.config.get("INVITATION_TTL_SECONDS", { infer: true }) ?? 60 * 60 * 24 * 7;
-    const dietitianAccountId = input.dietitianAccountId ?? input.organizationId ?? null;
+    const dietitianAccountId = input.dietitianAccountId ?? null;
     return this.prisma.invitationToken.create({
       data: {
         tokenHash,

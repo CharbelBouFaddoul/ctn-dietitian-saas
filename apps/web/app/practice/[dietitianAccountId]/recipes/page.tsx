@@ -77,7 +77,7 @@ export default function RecipesPage() {
     <section>
       <PageHeader
         title="Recipes"
-        description="Organization recipes. Nutrition is calculated from effective foods."
+        description="Practice recipes. Nutrition is calculated from effective foods."
         actions={
           <Link href={`/practice/${dietitianAccountId}/recipes/new`} className="ui-btn ui-btn--secondary">
             New recipe

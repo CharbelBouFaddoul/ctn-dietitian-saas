@@ -2,7 +2,7 @@ import { Module } from "@nestjs/common";
 import { AuthModule } from "../auth/auth.module";
 import { ClientsModule } from "../clients/clients.module";
 import { FoodsModule } from "../foods/foods.module";
-import { OrganizationModule } from "../organizations/organization.module";
+import { DietitianModule } from "../dietitian/dietitian.module";
 import { TimelineModule } from "../timeline/timeline.module";
 import { ClientTrackingController } from "./client-tracking.controller";
 import { FoodLogNutritionService } from "./food-log-nutrition.service";
@@ -17,7 +17,7 @@ import {
 } from "./water-exercise-sleep-habit.service";
 
 @Module({
-  imports: [AuthModule, OrganizationModule, ClientsModule, FoodsModule, TimelineModule],
+  imports: [AuthModule, DietitianModule, ClientsModule, FoodsModule, TimelineModule],
   controllers: [PortalTrackingController, ClientTrackingController],
   providers: [
     TrackingTimezoneService,

@@ -26,7 +26,7 @@ interface AuditRow {
   result: string;
   createdAt: string;
   actor: { email: string } | null;
-  organization: { name: string } | null;
+  dietitianAccount: { name: string } | null;
 }
 
 function countFrom(payload: ListResponse | unknown[]): number {
@@ -35,7 +35,7 @@ function countFrom(payload: ListResponse | unknown[]): number {
 }
 
 export default function AdminHomePage() {
-  const [orgs, setOrgs] = useState<number | null>(null);
+  const [dietitians, setDietitians] = useState<number | null>(null);
   const [users, setUsers] = useState<number | null>(null);
   const [subs, setSubs] = useState<number | null>(null);
   const [health, setHealth] = useState<string | null>(null);
@@ -47,12 +47,12 @@ export default function AdminHomePage() {
     void (async () => {
       setLoading(true);
       try {
-        const [orgList, userList, subList] = await Promise.all([
+        const [dietitianList, userList, subList] = await Promise.all([
           api<ListResponse | unknown[]>("/api/v1/admin/dietitians"),
           api<ListResponse | unknown[]>("/api/v1/admin/users"),
           api<ListResponse | unknown[]>("/api/v1/admin/subscriptions"),
         ]);
-        setOrgs(countFrom(orgList));
+        setDietitians(countFrom(dietitianList));
         setUsers(countFrom(userList));
         setSubs(countFrom(subList));
       } catch (err) {
@@ -82,7 +82,7 @@ export default function AdminHomePage() {
       <PageHeader
         eyebrow="Platform"
         title="Dashboard"
-        description="What is happening across organizations, members, and subscriptions."
+        description="What is happening across dietitians, users, and subscriptions."
       />
       {error ? <Alert tone="danger">{error}</Alert> : null}
 
@@ -92,8 +92,8 @@ export default function AdminHomePage() {
         ) : (
           <>
             <div className="ui-admin-metric">
-              <span className="ui-admin-metric__label">Organizations</span>
-              <strong className="ui-admin-metric__value">{orgs ?? "—"}</strong>
+              <span className="ui-admin-metric__label">Dietitians</span>
+              <strong className="ui-admin-metric__value">{dietitians ?? "—"}</strong>
               <Link href="/admin/dietitians" className="ui-link" style={{ fontSize: 13 }}>
                 Manage
               </Link>
@@ -159,7 +159,7 @@ export default function AdminHomePage() {
                   <strong>{auditActionLabel(row.action)}</strong>
                   <span className="ui-muted">
                     {row.actor?.email ?? "System"}
-                    {row.organization?.name ? ` · ${row.organization.name}` : ""} · {formatDate(row.createdAt)}
+                    {row.dietitianAccount?.name ? ` · ${row.dietitianAccount.name}` : ""} · {formatDate(row.createdAt)}
                   </span>
                 </li>
               ))}

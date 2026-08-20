@@ -33,8 +33,8 @@ Admin panel / Dietitian platform / Client PWA
 | Surface | Audience | App |
 |---|---|---|
 | Platform admin | SUPER_ADMIN, ADMIN | `apps/web` `/admin` |
-| Dietitian/practice | OWNER, DIETITIAN, STAFF | `apps/web` `/orgs/:organizationId` (dashboard, clients, foods, recipes, meal plans, settings) |
-| Client portal | Client account | `apps/web` `/client` (Phase 5 account + Phase 7 published meal plan; tracking in Phase 8) |
+| Dietitian/practice | Dietitian account owner | `apps/web` `/practice/:dietitianAccountId` (dashboard, clients, foods, recipes, meal plans, settings) |
+| Client portal | Client account | `apps/web` `/client` (portal connections via `ClientAccount`) |
 
 Stage 2 native apps consume the same `/api/v1`. Business logic stays in the API.
 
@@ -121,29 +121,29 @@ Authentication is **identity only**. NestJS `AuthModule` answers who the caller 
 - Raw session/verification/reset/invitation tokens are HMAC-hashed with `AUTH_TOKEN_SECRET` before insert
 - Frontend never stores auth tokens in `localStorage` and never supplies trusted role or organization IDs
 - User lifecycle: `PENDING` → `ACTIVE` after email verification; `SUSPENDED` / `ARCHIVED` cannot authenticate
-- `users.platform_role` is nullable `SUPER_ADMIN` \| `ADMIN` only. Organization roles stay off `users`
+- `users.platform_role` is nullable `SUPER_ADMIN` \| `ADMIN` only. Practice access is DietitianAccount ownership, not org roles on `users`.
 
-**Authorization** (what this user may access) is dietitian-account ownership via TenantGuard on `/api/v1/organizations/:organizationId` (path id = `DietitianAccount.id`). Portal patients use `ClientAccount` links and never practice membership. See [TENANCY_MIGRATION.md](./TENANCY_MIGRATION.md).
+**Authorization** (what this user may access) is dietitian-account ownership via `DietitianGuard` on `/api/v1/dietitian/:dietitianAccountId`. Portal patients use `ClientAccount` links and never practice membership. See [TENANCY_MIGRATION.md](./TENANCY_MIGRATION.md).
 
 See [SECURITY.md](./SECURITY.md) and [API.md](./API.md).
 
-### 2.4 Organizations / DietitianAccount tenancy (Phases 1–3)
+### 2.4 DietitianAccount tenancy (Phases 1–7 + 2.5)
 
-Runtime tenant root is **`DietitianAccount`** (1:1 with the owning User). Legacy `Organization` / `OrganizationMember` rows are still dual-written for compatibility; API paths remain `/organizations/:organizationId` where the id is the dietitian account id.
+Runtime tenant root is **`DietitianAccount`** (1:1 with the owning User). There is **no** active Organization / OrganizationMember layer (removed Phase 7; aliases cleaned Phase 2.5).
 
 ```text
 Authenticated User
        ↓
-DietitianAccount ownership (TenantGuard)
+DietitianAccount ownership (DietitianGuard)
   or ClientAccount + Session.activeClientId (portal)
        ↓
 Tenant-scoped queries via dietitianAccountId (tenantWhere)
 ```
 
 - Platform roles stay on `users` (`SUPER_ADMIN` \| `ADMIN`).
-- Self-serve register/org create is gated by `PlatformSettings.registrationEnabled` (default off); admins provision dietitians.
+- Self-serve register/practice create is gated by `PlatformSettings.registrationEnabled` (default off); admins provision dietitians.
 - Patients may connect to multiple dietitians (isolated `Client` per link); clinical portal ops require a selected `Session.activeClientId` when more than one connection exists.
-- Web practice UI is `/practice/:dietitianAccountId`. Practice APIs are `/api/v1/dietitian/:dietitianAccountId` with `DietitianGuard`. Organization dual-write and org shell tables are removed (Phase 7).
+- Web practice UI is `/practice/:dietitianAccountId`. Practice APIs are `/api/v1/dietitian/:dietitianAccountId` with `DietitianGuard`.
 - Subscription access is derived (`ACTIVE` / `GRACE` / `READ_ONLY` / `LOCKED`) from period end + status; `DietitianGuard` enforces mutations vs reads. See [TENANCY_MIGRATION.md](./TENANCY_MIGRATION.md).
 - Phase 5 dashboards: `GET …/practice/dashboard` (extended) and `GET /api/v1/portal/dashboard`. In-app notifications reuse `Notification` with practice/portal list, unread-count, mark-one, mark-all-read; shells poll unread. `PlatformSettings.emailNotificationsEnabled` (default off, admin-only) gates product emails only.
 - Phase 6 client portfolio: `GET …/clients/:clientId/portfolio` composes identity, profile, latest measurements/BMI, goals, assessment, meal plan, appointment, messages, small recent timeline, and missing/alerts. Portal profile is read-only lightweight fields for the active connection.

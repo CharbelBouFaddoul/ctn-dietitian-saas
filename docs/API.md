@@ -1,5 +1,7 @@
 # API
 
+> **Tenancy (current):** Practice APIs live under `/api/v1/dietitian/:dietitianAccountId` with `DietitianGuard`. There is no active `/api/v1/organizations/*` practice API. See [TENANCY_MIGRATION.md](./TENANCY_MIGRATION.md). Sections below that still document Organization membership routes are historical and not live.
+
 **Status:** Phase 13 production hardening implemented  
 **Base URL:** `/api/v1`  
 **OpenAPI (development):** `/api/docs`

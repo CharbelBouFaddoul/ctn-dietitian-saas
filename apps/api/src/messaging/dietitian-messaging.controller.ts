@@ -24,11 +24,11 @@ import { MarkConversationReadDto, MessagePaginationQueryDto, SendMessageDto } fr
 import { NotificationService } from "../notifications/notification.service";
 import { PrismaService } from "../prisma/prisma.service";
 
-@ApiTags("organizations")
+@ApiTags("dietitian")
 @ApiCookieAuth()
 @UseGuards(SessionGuard, DietitianGuard)
 @Controller("api/v1/dietitian/:dietitianAccountId")
-export class OrgMessagingController {
+export class DietitianMessagingController {
   constructor(
     private readonly access: ClientAccessService,
     private readonly conversations: ConversationService,

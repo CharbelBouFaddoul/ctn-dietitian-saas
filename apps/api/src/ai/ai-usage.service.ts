@@ -6,7 +6,7 @@ import { PrismaService } from "../prisma/prisma.service";
 export class AiUsageService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** Phase 1: organizationId argument is DietitianAccount.id */
+  /** dietitianAccountId is DietitianAccount.id */
   async getUsage(dietitianAccountId: string, periodKey?: string) {
     const key = periodKey ?? (await this.currentPeriodKey(dietitianAccountId));
     const row = await this.prisma.aiUsage.findUnique({

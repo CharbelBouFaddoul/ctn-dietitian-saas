@@ -24,7 +24,7 @@ export class EntitlementService {
     private readonly lifecycle: SubscriptionLifecycleService,
   ) {}
 
-  /** Phase 1: organizationId argument is DietitianAccount.id */
+  /** dietitianAccountId is DietitianAccount.id */
   async can(dietitianAccountId: string, featureKey: string): Promise<boolean> {
     const result = await this.resolve(dietitianAccountId, featureKey);
     return result.enabled;

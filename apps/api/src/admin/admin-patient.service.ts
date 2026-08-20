@@ -37,7 +37,7 @@ export class AdminPatientService {
       where: { id: input.dietitianAccountId },
     });
     if (!account) {
-      throw new NotFoundException(ADMIN_MESSAGES.organizationNotFound);
+      throw new NotFoundException(ADMIN_MESSAGES.dietitianAccountNotFound);
     }
     this.lifecycle.assertOperable(account.status);
 

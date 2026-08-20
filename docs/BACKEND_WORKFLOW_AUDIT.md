@@ -1,5 +1,7 @@
 # Backend Workflow Audit
 
+> **Superseded for tenancy:** Phases 7 and 2.5 removed Organization / OrganizationMember from the active runtime. Canonical practice tenant is `DietitianAccount` (`/api/v1/dietitian/:dietitianAccountId`). Treat Organization membership narratives below as historical audit notes unless explicitly labeled current. See [TENANCY_MIGRATION.md](./TENANCY_MIGRATION.md).
+
 **Status:** Audit only — no architecture, schema, API, or business-logic changes in this phase.  
 **Date:** 2026-08-20  
 **Source of truth:** Repository implementation under `apps/api` (Prisma + NestJS) and related web session routing in `apps/web`.  

@@ -23,7 +23,7 @@ export type RenewSubscriptionInput = {
   billingCycle?: BillingCycle | null;
 };
 
-/** Phase 1: organizationId argument is DietitianAccount.id */
+/** Admin APIs: dietitianAccountId argument is DietitianAccount.id */
 @Injectable()
 export class AdminSubscriptionService {
   constructor(
@@ -58,7 +58,7 @@ export class AdminSubscriptionService {
           status: subscription.status,
           accessState: enriched.accessState,
           currentPeriodEnd: subscription.currentPeriodEnd?.toISOString() ?? null,
-          organization: subscription.dietitianAccount
+          dietitianAccount: subscription.dietitianAccount
             ? {
                 id: subscription.dietitianAccount.id,
                 name: subscription.dietitianAccount.displayName,
@@ -80,17 +80,17 @@ export class AdminSubscriptionService {
     );
   }
 
-  async getForOrganization(organizationId: string) {
-    await this.requireAccount(organizationId);
+  async getForDietitianAccount(dietitianAccountId: string) {
+    await this.requireAccount(dietitianAccountId);
     const subscription = await this.prisma.subscription.findUnique({
-      where: { dietitianAccountId: organizationId },
+      where: { dietitianAccountId },
       include: { plan: true },
     });
     return subscription ? this.toResponse(subscription) : null;
   }
 
-  async assign(organizationId: string, input: AssignSubscriptionInput, actor: AdminActor) {
-    await this.requireAccount(organizationId);
+  async assign(dietitianAccountId: string, input: AssignSubscriptionInput, actor: AdminActor) {
+    await this.requireAccount(dietitianAccountId);
     const plan = await this.prisma.plan.findUnique({ where: { id: input.planId } });
     if (!plan) {
       throw new NotFoundException(ADMIN_MESSAGES.planNotFound);
@@ -101,7 +101,7 @@ export class AdminSubscriptionService {
 
     const status = input.status ?? "ACTIVE";
     const existing = await this.prisma.subscription.findUnique({
-      where: { dietitianAccountId: organizationId },
+      where: { dietitianAccountId },
     });
     const now = this.lifecycle.now();
     const periodEnd = parseOptionalDate(input.currentPeriodEnd, "currentPeriodEnd");
@@ -125,7 +125,7 @@ export class AdminSubscriptionService {
         })
       : await this.prisma.subscription.create({
           data: {
-            dietitianAccountId: organizationId,
+            dietitianAccountId,
             planId: input.planId,
             status,
             startedAt: status === "ACTIVE" ? now : null,
@@ -140,7 +140,7 @@ export class AdminSubscriptionService {
       type: existing ? "subscription_changed" : "subscription_assigned",
       outcome: "success",
       userId: actor.userId,
-      dietitianAccountId: organizationId,
+      dietitianAccountId,
       ipAddress: actor.ipAddress,
       userAgent: actor.userAgent,
       requestId: actor.requestId,
@@ -153,13 +153,13 @@ export class AdminSubscriptionService {
       },
     });
 
-    await this.emitSubscriptionAccessNotification(organizationId, subscription);
+    await this.emitSubscriptionAccessNotification(dietitianAccountId, subscription);
     return this.toResponse(subscription);
   }
 
-  async renew(organizationId: string, input: RenewSubscriptionInput, actor: AdminActor) {
+  async renew(dietitianAccountId: string, input: RenewSubscriptionInput, actor: AdminActor) {
     const existing = await this.prisma.subscription.findUnique({
-      where: { dietitianAccountId: organizationId },
+      where: { dietitianAccountId },
       include: { plan: true },
     });
     if (!existing) {
@@ -205,7 +205,7 @@ export class AdminSubscriptionService {
       type: "subscription_renewed",
       outcome: "success",
       userId: actor.userId,
-      dietitianAccountId: organizationId,
+      dietitianAccountId,
       ipAddress: actor.ipAddress,
       userAgent: actor.userAgent,
       requestId: actor.requestId,
@@ -218,13 +218,13 @@ export class AdminSubscriptionService {
       },
     });
 
-    await this.emitSubscriptionAccessNotification(organizationId, subscription);
+    await this.emitSubscriptionAccessNotification(dietitianAccountId, subscription);
     return this.toResponse(subscription);
   }
 
-  async setStatus(organizationId: string, status: SubscriptionStatus, actor: AdminActor) {
+  async setStatus(dietitianAccountId: string, status: SubscriptionStatus, actor: AdminActor) {
     const existing = await this.prisma.subscription.findUnique({
-      where: { dietitianAccountId: organizationId },
+      where: { dietitianAccountId },
       include: { plan: true },
     });
     if (!existing) {
@@ -247,7 +247,7 @@ export class AdminSubscriptionService {
       type: this.statusAction(status),
       outcome: "success",
       userId: actor.userId,
-      dietitianAccountId: organizationId,
+      dietitianAccountId,
       ipAddress: actor.ipAddress,
       userAgent: actor.userAgent,
       requestId: actor.requestId,
@@ -260,7 +260,7 @@ export class AdminSubscriptionService {
       },
     });
 
-    await this.emitSubscriptionAccessNotification(organizationId, subscription);
+    await this.emitSubscriptionAccessNotification(dietitianAccountId, subscription);
     return this.toResponse(subscription);
   }
 
@@ -299,7 +299,7 @@ export class AdminSubscriptionService {
       where: { id: dietitianAccountId },
     });
     if (!account) {
-      throw new NotFoundException(ADMIN_MESSAGES.organizationNotFound);
+      throw new NotFoundException(ADMIN_MESSAGES.dietitianAccountNotFound);
     }
     return account;
   }

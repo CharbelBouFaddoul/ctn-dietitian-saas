@@ -150,7 +150,7 @@ export class PortalInvoicesController {
   }
 }
 
-@ApiTags("organizations")
+@ApiTags("dietitian")
 @ApiCookieAuth()
 @UseGuards(SessionGuard, DietitianGuard)
 @Controller("api/v1/dietitian/:dietitianAccountId")

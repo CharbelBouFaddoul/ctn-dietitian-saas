@@ -2,7 +2,7 @@ import { Module } from "@nestjs/common";
 import { AuthModule } from "../auth/auth.module";
 import { ClientsModule } from "../clients/clients.module";
 import { EmailModule } from "../email/email.module";
-import { OrganizationModule } from "../organizations/organization.module";
+import { DietitianModule } from "../dietitian/dietitian.module";
 import { TimelineModule } from "../timeline/timeline.module";
 import { NotificationsModule } from "../notifications/notifications.module";
 import { InvoiceNumberService } from "./invoice-number.service";
@@ -12,7 +12,7 @@ import { OrganizationInvoicesController, PortalInvoicesController } from "./invo
 @Module({
   imports: [
     AuthModule,
-    OrganizationModule,
+    DietitianModule,
     ClientsModule,
     TimelineModule,
     NotificationsModule,

@@ -8,7 +8,7 @@ interface ErrorContext {
   method?: string;
   statusCode?: number;
   userId?: string;
-  organizationId?: string;
+  dietitianAccountId?: string;
 }
 
 @Injectable()
