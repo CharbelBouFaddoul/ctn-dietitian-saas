@@ -1,4 +1,5 @@
 import type { MembershipStatus, OrganizationRole, OrganizationStatus } from "@nutrition-saas/types";
+import type { SubscriptionAccessSnapshot } from "../entitlements/subscription-lifecycle.service";
 
 /**
  * Phase 2 tenant context.
@@ -21,6 +22,8 @@ export interface TenantContext {
   membershipStatus: MembershipStatus;
   /** Legacy Organization.id when known (forensics writes). */
   legacyOrganizationId?: string | null;
+  /** Phase 4 derived subscription access (set by TenantGuard). */
+  subscriptionAccess?: SubscriptionAccessSnapshot;
 }
 
 export const ORGANIZATION_ACCESS_DENIED = "Organization access denied";

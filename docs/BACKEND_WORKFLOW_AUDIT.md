@@ -981,8 +981,8 @@ Only questions that **cannot** be answered from the repository:
 7. **Reassignment / covering dietitians:** Single assignee only, or multiple concurrent assignees with shared inbox?
 8. **STAFF role intent:** Should STAFF create invoices/appointments/meal plans and use AI, or be read-only assistants?
 9. **Subscription on org create:** Auto-attach trial/standard ACTIVE plan, require admin before any use, or allow ungated features without a plan?
-10. **When subscription expires/suspends:** Immediate feature lock, grace period, read-only mode, what happens to existing patients and active automations?
-11. **CLIENT_LIMIT defaults:** Seeded plans are unlimited — what are real commercial limits per plan?
+10. **When subscription expires/suspends:** ✅ Phase 4 — derived ACTIVE → GRACE (3d) → READ_ONLY (7d) → LOCKED; TenantGuard enforces; patients keep historical portal access; joins blocked when LOCKED; automations skip READ_ONLY/LOCKED.
+11. **CLIENT_LIMIT defaults:** ✅ Phase 4 — standard 25 / pro 100 / premium 300 (seed upsert).
 12. **Which features should become plan-gated next** beyond AI/automation/client limit (messaging? documents? storage?).
 13. **Appointments for patients:** In-portal visibility/reschedule/cancel required for this version?
 14. **First SUPER_ADMIN bootstrap:** Manual SQL, CLI, or break-glass invite — what is the official ops process?

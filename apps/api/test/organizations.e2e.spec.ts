@@ -3,6 +3,7 @@ import request from "supertest";
 import { ORGANIZATION_ACCESS_DENIED, ORGANIZATION_UNAVAILABLE } from "../src/organizations/tenant.types";
 import { MULTI_MEMBER_UNSUPPORTED } from "../src/organizations/organization.service";
 import {
+  activateStandardSubscription,
   createAuthTestApp,
   cookieValue,
   extractEmailedToken,
@@ -67,6 +68,7 @@ describe("organizations and tenant isolation", () => {
     expect(created.body.role).toBe("OWNER");
     expect(created.body.status).toBe("ACTIVE");
     expect(created.body.settings.timezone).toBe("UTC");
+    await activateStandardSubscription(ctx.prisma, created.body.id);
 
     const listed = await request(ctx.app.getHttpServer())
       .get("/api/v1/organizations")
@@ -116,6 +118,8 @@ describe("organizations and tenant isolation", () => {
       .set("Cookie", bob.cookie)
       .send({ name: "Bob Org", settings: SETTINGS })
       .expect(201);
+    await activateStandardSubscription(ctx.prisma, orgA.body.id);
+    await activateStandardSubscription(ctx.prisma, orgB.body.id);
 
     const read = await request(ctx.app.getHttpServer())
       .get(`/api/v1/organizations/${orgB.body.id}`)
@@ -173,6 +177,7 @@ describe("organizations and tenant isolation", () => {
       .send({ name: "Role Forge", settings: SETTINGS })
       .expect(201);
     expect(org.body.role).toBe("OWNER");
+    await activateStandardSubscription(ctx.prisma, org.body.id);
 
     // DTO validation rejects invalid roles before the multi-member gate.
     const addAdmin = await request(ctx.app.getHttpServer())
@@ -191,6 +196,7 @@ describe("organizations and tenant isolation", () => {
       .set("Cookie", owner.cookie)
       .send({ name: "Members Org", settings: SETTINGS })
       .expect(201);
+    await activateStandardSubscription(ctx.prisma, org.body.id);
 
     const add = await request(ctx.app.getHttpServer())
       .post(`/api/v1/organizations/${org.body.id}/members`)
@@ -250,6 +256,7 @@ describe("organizations and tenant isolation", () => {
       .set("Cookie", suspendedOwner.cookie)
       .send({ name: "Suspended Org", settings: SETTINGS })
       .expect(201);
+    await activateStandardSubscription(ctx.prisma, suspended.body.id);
     await ctx.lifecycle.setStatus(suspended.body.id, "SUSPENDED");
     const suspendedAccess = await request(ctx.app.getHttpServer())
       .patch(`/api/v1/organizations/${suspended.body.id}/settings`)
@@ -270,6 +277,7 @@ describe("organizations and tenant isolation", () => {
       .set("Cookie", archivedOwner.cookie)
       .send({ name: "Archived Org", settings: SETTINGS })
       .expect(201);
+    await activateStandardSubscription(ctx.prisma, archived.body.id);
     await request(ctx.app.getHttpServer())
       .post(`/api/v1/organizations/${archived.body.id}/archive`)
       .set("Cookie", archivedOwner.cookie)
@@ -289,6 +297,7 @@ describe("organizations and tenant isolation", () => {
       .set("Cookie", owner.cookie)
       .send({ name: "Owner Safety", settings: SETTINGS })
       .expect(201);
+    await activateStandardSubscription(ctx.prisma, org.body.id);
 
     const members = await request(ctx.app.getHttpServer())
       .get(`/api/v1/organizations/${org.body.id}/members`)

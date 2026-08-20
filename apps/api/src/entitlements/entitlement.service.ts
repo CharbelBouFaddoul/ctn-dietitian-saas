@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import type { EntitlementResult, EntitlementSource } from "@nutrition-saas/types";
 import { PrismaService } from "../prisma/prisma.service";
+import { SubscriptionLifecycleService } from "./subscription-lifecycle.service";
 
 const DENY: EntitlementResult = { enabled: false, limit: null, source: "default" };
 
@@ -18,7 +19,10 @@ export interface EffectiveFeatureEntitlement extends EntitlementResult {
 
 @Injectable()
 export class EntitlementService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly lifecycle: SubscriptionLifecycleService,
+  ) {}
 
   /** Phase 1: organizationId argument is DietitianAccount.id */
   async can(dietitianAccountId: string, featureKey: string): Promise<boolean> {
@@ -39,8 +43,18 @@ export class EntitlementService {
 
     const subscription = await this.prisma.subscription.findUnique({
       where: { dietitianAccountId },
+      include: { plan: true },
     });
-    if (!subscription || subscription.status !== "ACTIVE") {
+    const access = this.lifecycle.derive(
+      subscription
+        ? {
+            status: subscription.status,
+            currentPeriodEnd: subscription.currentPeriodEnd,
+            plan: subscription.plan,
+          }
+        : null,
+    );
+    if (!this.lifecycle.entitlementsActive(access.accessState) || !subscription) {
       return DENY;
     }
 
@@ -70,6 +84,17 @@ export class EntitlementService {
       this.prisma.featureOverride.findMany({ where: { dietitianAccountId } }),
     ]);
 
+    const access = this.lifecycle.derive(
+      subscription
+        ? {
+            status: subscription.status,
+            currentPeriodEnd: subscription.currentPeriodEnd,
+            plan: subscription.plan,
+          }
+        : null,
+    );
+    const entitled = this.lifecycle.entitlementsActive(access.accessState);
+
     const overrideByFeature = new Map(overrides.map((row) => [row.featureId, row]));
     const planFeatureByFeature = new Map(
       (subscription?.plan.planFeatures ?? []).map((row) => [row.featureId, row]),
@@ -79,9 +104,7 @@ export class EntitlementService {
       const planFeature = planFeatureByFeature.get(feature.id) ?? null;
       const override = overrideByFeature.get(feature.id) ?? null;
       const resolved =
-        feature.status === "ACTIVE" && subscription?.status === "ACTIVE"
-          ? this.combine(planFeature, override)
-          : DENY;
+        feature.status === "ACTIVE" && entitled ? this.combine(planFeature, override) : DENY;
 
       return {
         key: feature.key,

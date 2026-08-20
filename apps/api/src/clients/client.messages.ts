@@ -9,5 +9,7 @@ export const JOIN_CODE_EXPIRED = "This join code has expired. Ask your dietitian
 export const JOIN_CODE_USED = "This join code has already been used.";
 export const JOIN_ALREADY_CONNECTED = "Your account is already connected to a client profile.";
 export const JOIN_NOT_ALLOWED = "This account cannot join a client portal.";
+export const JOIN_PRACTICE_LOCKED =
+  "This practice is not accepting new connections right now. Ask your dietitian after their subscription is renewed.";
 export const PORTAL_CONNECTION_REQUIRED =
   "Select an active practice connection before continuing.";

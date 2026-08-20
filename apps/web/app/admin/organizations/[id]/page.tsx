@@ -47,7 +47,15 @@ interface OrgDetail {
   name: string;
   slug: string;
   status: string;
-  subscription: { id: string; status: string; plan: Plan } | null;
+  subscription: {
+    id: string;
+    status: string;
+    accessState?: string;
+    currentPeriodEnd?: string | null;
+    clientCount?: number | null;
+    clientLimit?: number | null;
+    plan: Plan;
+  } | null;
   entitlements: Entitlement[];
 }
 
@@ -57,12 +65,19 @@ function formatValue(enabled: boolean | null, limit: number | null): string {
   return limit === null ? flag || "—" : `${flag} · ${limit}`.trim();
 }
 
+function defaultPeriodEndIso(): string {
+  const d = new Date();
+  d.setUTCMonth(d.getUTCMonth() + 1);
+  return d.toISOString().slice(0, 16);
+}
+
 export default function AdminOrganizationDetailPage() {
   const params = useParams<{ id: string }>();
   const organizationId = params.id;
   const [org, setOrg] = useState<OrgDetail | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [planId, setPlanId] = useState("");
+  const [periodEnd, setPeriodEnd] = useState(defaultPeriodEndIso());
   const [reason, setReason] = useState("Admin override");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -76,6 +91,9 @@ export default function AdminOrganizationDetailPage() {
       setOrg(detail);
       setPlans(catalog.filter((plan) => plan.status === "ACTIVE"));
       setPlanId(detail.subscription?.plan.id ?? catalog.find((plan) => plan.slug === "standard")?.id ?? "");
+      if (detail.subscription?.currentPeriodEnd) {
+        setPeriodEnd(detail.subscription.currentPeriodEnd.slice(0, 16));
+      }
       setError(null);
     } catch (err) {
       setError(errorMessage(err, "Unable to load organization"));
@@ -150,6 +168,16 @@ export default function AdminOrganizationDetailPage() {
       </Section>
 
       <Section title="Subscription">
+        {org.subscription ? (
+          <p className="ui-muted" style={{ marginBottom: 12 }}>
+            Access: <strong>{org.subscription.accessState ?? "—"}</strong>
+            {" · "}
+            Clients: {org.subscription.clientCount ?? "—"}
+            {org.subscription.clientLimit != null ? ` / ${org.subscription.clientLimit}` : " / unlimited"}
+            {" · "}
+            Period end: {org.subscription.currentPeriodEnd ?? "Open-ended"}
+          </p>
+        ) : null}
         <form
           onSubmit={(event) => {
             event.preventDefault();
@@ -157,7 +185,11 @@ export default function AdminOrganizationDetailPage() {
               () =>
                 api(`/api/v1/admin/organizations/${organizationId}/subscription`, {
                   method: "PUT",
-                  body: JSON.stringify({ planId, status: "ACTIVE" }),
+                  body: JSON.stringify({
+                    planId,
+                    status: "ACTIVE",
+                    currentPeriodEnd: periodEnd ? new Date(periodEnd).toISOString() : null,
+                  }),
                 }).then(() => undefined),
               "Unable to assign plan",
             );
@@ -173,13 +205,38 @@ export default function AdminOrganizationDetailPage() {
               ))}
             </Select>
           </Field>
+          <Field label="Period end (UTC)">
+            <Input
+              type="datetime-local"
+              value={periodEnd}
+              onChange={(event) => setPeriodEnd(event.target.value)}
+            />
+          </Field>
           <Button type="submit" disabled={busy}>
             Assign plan
           </Button>
         </form>
         <div className="ui-admin-actions">
+          <Button
+            disabled={busy}
+            onClick={() =>
+              void run(
+                () =>
+                  api(`/api/v1/admin/organizations/${organizationId}/subscription/renew`, {
+                    method: "POST",
+                    body: JSON.stringify({
+                      planId: planId || undefined,
+                      currentPeriodEnd: periodEnd ? new Date(periodEnd).toISOString() : null,
+                    }),
+                  }).then(() => undefined),
+                "Unable to renew",
+              )
+            }
+          >
+            Renew / reactivate
+          </Button>
           <Button variant="secondary" disabled={busy} onClick={() => void run(() => api(`/api/v1/admin/organizations/${organizationId}/subscription`, { method: "PATCH", body: JSON.stringify({ status: "ACTIVE" }) }).then(() => undefined), "Unable to reactivate")}>
-            Reactivate subscription
+            Set ACTIVE
           </Button>
           <Button variant="secondary" disabled={busy} onClick={() => void run(() => api(`/api/v1/admin/organizations/${organizationId}/subscription`, { method: "PATCH", body: JSON.stringify({ status: "SUSPENDED" }) }).then(() => undefined), "Unable to suspend subscription")}>
             Suspend subscription

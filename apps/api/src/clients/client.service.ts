@@ -261,6 +261,13 @@ export class ClientService {
     if (!existing) {
       throw new NotFoundException(CLIENT_ACCESS_DENIED);
     }
+    if (
+      status === "ACTIVE" &&
+      existing.status !== "ACTIVE" &&
+      existing.status !== "PENDING"
+    ) {
+      await this.assertClientLimit(tenant.organizationId);
+    }
     await this.prisma.client.update({
       where: { id: clientId },
       data: { status, archivedAt: null },

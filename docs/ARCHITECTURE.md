@@ -143,7 +143,8 @@ Tenant-scoped queries via dietitianAccountId (tenantWhere)
 - Platform roles stay on `users` (`SUPER_ADMIN` \| `ADMIN`).
 - Self-serve register/org create is gated by `PlatformSettings.registrationEnabled` (default off); admins provision dietitians.
 - Patients may connect to multiple dietitians (isolated `Client` per link); clinical portal ops require a selected `Session.activeClientId` when more than one connection exists.
-- Web practice UI is `/practice/:id` (redirects from `/orgs`). Phase 4 will remount APIs and drop org shells — deferred.
+- Web practice UI is `/practice/:id` (redirects from `/orgs`). Phase 5 will remount APIs and drop org shells — deferred.
+- Subscription access is derived (`ACTIVE` / `GRACE` / `READ_ONLY` / `LOCKED`) from period end + status; `TenantGuard` enforces mutations vs reads. See [TENANCY_MIGRATION.md](./TENANCY_MIGRATION.md).
 
 ---
 
@@ -167,7 +168,7 @@ Authenticated?
 
 Client portal sessions require `client_accounts.status = ACTIVE` and `clients.status = ACTIVE`. Archived/inactive clients and deactivated accounts cannot authenticate normally. The `users` identity is retained.
 
-`CLIENT_LIMIT` is enforced through `EntitlementService` on client create (count of `PENDING` + `ACTIVE` clients). Plan catalog defaults are unlimited (`limit_value` null). Do not hardcode commercial seat counts in controllers.
+`CLIENT_LIMIT` is enforced through `EntitlementService` on client create/restore-to-ACTIVE and practice join (count of `PENDING` + `ACTIVE` clients). Seeded plan limits: standard **25**, pro **100**, premium **300** (admin overrides via `FeatureOverride`). Do not hardcode commercial seat counts in controllers.
 → Usage limit valid? (when applicable)
 → Resource visible to this actor?
 → Execute
@@ -261,7 +262,7 @@ EntitlementService
 Resolution order:
 
 1. Feature must exist and be globally `ACTIVE`. Otherwise `{ enabled: false, limit: null, source: "default" }`. A globally inactive feature cannot be turned on by an organization override. This still runs inside `EntitlementService` (it does not skip subscription checks).
-2. The organization must have an **ACTIVE** subscription. Missing, pending, suspended, cancelled, or expired subscriptions deny. There is no unlimited default.
+2. Derived subscription access must be **ACTIVE** or **GRACE** (from `SubscriptionLifecycleService`). Missing/pending/suspended/cancelled subscriptions, and READ_ONLY/LOCKED phases, deny gated features. Open-ended ACTIVE (`currentPeriodEnd` null) remains entitled.
 3. Organization override, if present. Nullable override fields inherit the other field from the plan (`enabled` and/or `limit_value`).
 4. Plan feature for the subscribed plan (`enabled` + optional `limit_value`).
 5. Default deny / unavailable.

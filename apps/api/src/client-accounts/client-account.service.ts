@@ -13,6 +13,7 @@ import { InvitationService } from "../auth/invitation.service";
 import { TokenService } from "../auth/token.service";
 import { SessionService } from "../auth/session.service";
 import { EntitlementService } from "../entitlements/entitlement.service";
+import { SubscriptionLifecycleService } from "../entitlements/subscription-lifecycle.service";
 import type { TenantContext } from "../organizations/tenant.types";
 import { legacyOrganizationId, tenantWhere } from "../organizations/tenant-scope";
 import { TimelineService } from "../timeline/timeline.service";
@@ -25,6 +26,7 @@ import {
   JOIN_CODE_INVALID,
   JOIN_CODE_USED,
   JOIN_NOT_ALLOWED,
+  JOIN_PRACTICE_LOCKED,
 } from "../clients/client.messages";
 import { deriveConnectionStatus } from "../clients/portal-connection";
 
@@ -34,6 +36,7 @@ export class ClientAccountService {
     private readonly prisma: PrismaService,
     private readonly access: ClientAccessService,
     private readonly entitlements: EntitlementService,
+    private readonly lifecycle: SubscriptionLifecycleService,
     private readonly invitations: InvitationService,
     private readonly tokens: TokenService,
     private readonly sessions: SessionService,
@@ -205,6 +208,11 @@ export class ClientAccountService {
     }
     if (invitation.expiresAt.getTime() <= Date.now()) {
       throw new BadRequestException(JOIN_CODE_EXPIRED);
+    }
+
+    const access = await this.lifecycle.getAccessForAccount(dietitianAccountId);
+    if (access.accessState === "LOCKED") {
+      throw new ForbiddenException(JOIN_PRACTICE_LOCKED);
     }
 
     if (!invitation.clientId) {

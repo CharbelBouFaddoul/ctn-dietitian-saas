@@ -5,6 +5,7 @@ import type { AutomationRule, Prisma } from "@prisma/client";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { EmailService } from "../email/email.service";
 import { EntitlementService } from "../entitlements/entitlement.service";
+import { SubscriptionLifecycleService } from "../entitlements/subscription-lifecycle.service";
 import { NotificationService } from "../notifications/notification.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { TaskService } from "../tasks/task.service";
@@ -22,6 +23,7 @@ export class AutomationExecutorService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly entitlements: EntitlementService,
+    private readonly lifecycle: SubscriptionLifecycleService,
     private readonly usage: AutomationUsageService,
     private readonly templates: AutomationTemplateService,
     private readonly notifications: NotificationService,
@@ -37,6 +39,16 @@ export class AutomationExecutorService {
     });
     if (!account || account.status !== "ACTIVE") {
       await this.skipRun(rule, candidate.triggerKey, "organization_inactive");
+      return;
+    }
+
+    const access = await this.lifecycle.getAccessForAccount(dietitianAccountId);
+    if (!this.lifecycle.entitlementsActive(access.accessState)) {
+      await this.skipRun(
+        rule,
+        candidate.triggerKey,
+        access.accessState === "READ_ONLY" ? "subscription_read_only" : "subscription_locked",
+      );
       return;
     }
 

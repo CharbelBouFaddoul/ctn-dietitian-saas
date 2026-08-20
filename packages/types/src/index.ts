@@ -66,12 +66,29 @@ export type FeatureValueType = "BOOLEAN" | "LIMIT";
 
 export type SubscriptionStatus = "PENDING" | "ACTIVE" | "SUSPENDED" | "CANCELLED" | "EXPIRED";
 
+/** Derived practice access (not a persisted SubscriptionStatus). */
+export type DietitianAccessState = "ACTIVE" | "GRACE" | "READ_ONLY" | "LOCKED";
+
 export type EntitlementSource = "override" | "plan" | "default";
 
 export interface EntitlementResult {
   enabled: boolean;
   limit: number | null;
   source: EntitlementSource;
+}
+
+export interface SubscriptionAccessView {
+  accessState: DietitianAccessState;
+  status: SubscriptionStatus | null;
+  planSlug: string | null;
+  planName: string | null;
+  currentPeriodStart: string | null;
+  currentPeriodEnd: string | null;
+  graceEndsAt: string | null;
+  readOnlyEndsAt: string | null;
+  daysRemainingInPhase: number | null;
+  clientCount: number | null;
+  clientLimit: number | null;
 }
 
 export type HealthCheckStatus = "up" | "down";

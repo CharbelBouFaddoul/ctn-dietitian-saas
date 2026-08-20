@@ -67,7 +67,11 @@ export class AdminDietitianService {
 
     let subscription = null;
     if (input.planId) {
-      subscription = await this.subscriptions.assign(account.id, input.planId, actor, "ACTIVE");
+      subscription = await this.subscriptions.assign(
+        account.id,
+        { planId: input.planId, status: "ACTIVE" },
+        actor,
+      );
     }
 
     const { rawToken } = await this.invitations.create({

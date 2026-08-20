@@ -57,6 +57,18 @@ export const SUBSCRIPTION_STATUSES = [
   "EXPIRED",
 ] as const;
 
+/** Derived practice access windows after currentPeriodEnd (UTC hours, not calendar midnights). */
+export const SUBSCRIPTION_GRACE_DAYS = 3;
+export const SUBSCRIPTION_READ_ONLY_DAYS = 7;
+
+export const DIETITIAN_ACCESS_STATES = ["ACTIVE", "GRACE", "READ_ONLY", "LOCKED"] as const;
+
+export const CLIENT_LIMIT_BY_PLAN_SLUG = {
+  standard: 25,
+  pro: 100,
+  premium: 300,
+} as const;
+
 export const THROTTLE_NAMES = {
   AUTH: "auth",
   MESSAGING: "messaging",

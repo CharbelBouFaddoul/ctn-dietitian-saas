@@ -42,6 +42,7 @@ import { MembershipService } from "./membership.service";
 import { OrganizationLifecycleService } from "./organization-lifecycle.service";
 import { OrganizationService } from "./organization.service";
 import { EntitlementService, publicEntitlement } from "../entitlements/entitlement.service";
+import { SubscriptionLifecycleService } from "../entitlements/subscription-lifecycle.service";
 import type { TenantContext } from "./tenant.types";
 import { ORGANIZATION_ACCESS_DENIED } from "./tenant.types";
 
@@ -55,6 +56,7 @@ export class OrganizationController {
     private readonly members: MembershipService,
     private readonly lifecycle: OrganizationLifecycleService,
     private readonly entitlements: EntitlementService,
+    private readonly subscriptionLifecycle: SubscriptionLifecycleService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -165,6 +167,33 @@ export class OrganizationController {
   ) {
     const rows = await this.entitlements.listEffective(organizationId);
     return rows.map(publicEntitlement);
+  }
+
+  @Get(":organizationId/subscription-access")
+  @UseGuards(TenantGuard)
+  @ApiOperation({
+    summary: "Derived subscription access state for practice UI",
+    description:
+      "Allowed even when LOCKED so the practice shell can show the locked screen. Mutations remain blocked.",
+  })
+  async subscriptionAccess(
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @CurrentTenant() tenant: TenantContext,
+  ) {
+    const access =
+      tenant.subscriptionAccess ??
+      (await this.subscriptionLifecycle.getAccessForAccount(organizationId));
+    return {
+      accessState: access.accessState,
+      status: access.status,
+      planSlug: access.planSlug,
+      planName: access.planName,
+      currentPeriodStart: access.currentPeriodStart?.toISOString() ?? null,
+      currentPeriodEnd: access.currentPeriodEnd?.toISOString() ?? null,
+      graceEndsAt: access.graceEndsAt?.toISOString() ?? null,
+      readOnlyEndsAt: access.readOnlyEndsAt?.toISOString() ?? null,
+      daysRemainingInPhase: access.daysRemainingInPhase,
+    };
   }
 
   @Get(":organizationId/members")

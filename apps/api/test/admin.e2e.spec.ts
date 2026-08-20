@@ -5,6 +5,7 @@ import { FEATURE_KEYS } from "@nutrition-saas/config";
 import { ADMIN_MESSAGES } from "../src/admin/admin.messages";
 import { ORGANIZATION_ACCESS_DENIED } from "../src/organizations/tenant.types";
 import {
+  activateStandardSubscription,
   createAuthTestApp,
   cookieValue,
   extractEmailedToken,
@@ -153,6 +154,8 @@ describe("platform admin, entitlements, and audit", () => {
     const b = await registerVerifyLogin();
     const orgA = await createOrg(a.cookie, "Org A");
     const orgB = await createOrg(b.cookie, "Org B");
+    await activateStandardSubscription(ctx.prisma, orgA.id);
+    await activateStandardSubscription(ctx.prisma, orgB.id);
 
     const cross = await request(ctx.app.getHttpServer())
       .get(`/api/v1/organizations/${orgB.id}/entitlements`)

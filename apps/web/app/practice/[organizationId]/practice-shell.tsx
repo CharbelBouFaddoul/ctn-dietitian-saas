@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { createContext, useContext, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
-import { AppShell, Button, LoadingState, type NavSection } from "@nutrition-saas/ui";
+import { Alert, AppShell, Button, LoadingState, type NavSection } from "@nutrition-saas/ui";
 import { ApiError, api, logout } from "../../../lib/api";
 import { loginPathFor, resolveSessionHome } from "../../../lib/session-home";
 import { PracticeNavIcons } from "./practice-nav-icons";
@@ -17,11 +17,23 @@ interface OrgDetail {
   context?: { membershipId: string; role: string };
 }
 
+interface SubscriptionAccess {
+  accessState: "ACTIVE" | "GRACE" | "READ_ONLY" | "LOCKED";
+  status: string | null;
+  planSlug: string | null;
+  planName: string | null;
+  currentPeriodEnd: string | null;
+  graceEndsAt: string | null;
+  readOnlyEndsAt: string | null;
+  daysRemainingInPhase: number | null;
+}
+
 interface PracticeContextValue {
   organizationId: string;
   name: string;
   role: string;
   membershipId: string;
+  subscriptionAccess: SubscriptionAccess | null;
 }
 
 const PracticeContext = createContext<PracticeContextValue | null>(null);
@@ -47,21 +59,59 @@ export function PracticeShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [org, setOrg] = useState<OrgDetail | null>(null);
-  const [state, setState] = useState<"loading" | "ok" | "unauth" | "forbidden">("loading");
+  const [access, setAccess] = useState<SubscriptionAccess | null>(null);
+  const [state, setState] = useState<"loading" | "ok" | "locked" | "unauth" | "forbidden">("loading");
 
   useEffect(() => {
-    void api<OrgDetail>(`/api/v1/organizations/${organizationId}`)
-      .then((data) => {
-        setOrg(data);
+    let cancelled = false;
+    void (async () => {
+      try {
+        const accessData = await api<SubscriptionAccess>(
+          `/api/v1/organizations/${organizationId}/subscription-access`,
+        );
+        if (cancelled) return;
+        setAccess(accessData);
+        if (accessData.accessState === "LOCKED") {
+          setOrg({
+            id: organizationId,
+            name: accessData.planName ? `${accessData.planName} practice` : "Practice",
+            role: "OWNER",
+            status: "ACTIVE",
+          });
+          setState("locked");
+          return;
+        }
+        const orgData = await api<OrgDetail>(`/api/v1/organizations/${organizationId}`);
+        if (cancelled) return;
+        setOrg(orgData);
         setState("ok");
-      })
-      .catch((error) => {
+      } catch (error) {
+        if (cancelled) return;
         if (error instanceof ApiError && error.status === 401) {
           setState("unauth");
           return;
         }
+        if (
+          error instanceof ApiError &&
+          error.status === 403 &&
+          typeof error.message === "string" &&
+          error.message.toLowerCase().includes("locked")
+        ) {
+          setState("locked");
+          setOrg({
+            id: organizationId,
+            name: "Practice",
+            role: "OWNER",
+            status: "ACTIVE",
+          });
+          return;
+        }
         setState("forbidden");
-      });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [organizationId]);
 
   useEffect(() => {
@@ -81,8 +131,28 @@ export function PracticeShell({ children }: { children: ReactNode }) {
     router.replace(loginPathFor("dietitian"));
   }
 
-  if (state !== "ok" || !org) {
+  if (state === "loading" || !org) {
     return <LoadingState>Loading practice…</LoadingState>;
+  }
+
+  if (state === "locked") {
+    return (
+      <main style={{ padding: 32, maxWidth: 560, margin: "0 auto" }}>
+        <Alert tone="danger">
+          This practice is locked because the subscription has expired
+          {access?.planName ? ` (${access.planName})` : ""}. Contact a platform administrator to renew
+          access. Your data is preserved.
+        </Alert>
+        <div style={{ marginTop: 16, display: "flex", gap: 12 }}>
+          <Button variant="secondary" onClick={() => void onLogout()}>
+            Sign out
+          </Button>
+          <Link href="/contact" className="ui-btn ui-btn--primary">
+            Contact support
+          </Link>
+        </div>
+      </main>
+    );
   }
 
   const membershipId = org.context?.membershipId ?? "";
@@ -130,8 +200,35 @@ export function PracticeShell({ children }: { children: ReactNode }) {
     },
   ];
 
+  const banner =
+    access?.accessState === "GRACE" ? (
+      <Alert tone="warning">
+        Subscription expired
+        {access.daysRemainingInPhase != null
+          ? ` — ${access.daysRemainingInPhase} day${access.daysRemainingInPhase === 1 ? "" : "s"} left in grace`
+          : ""}
+        . Contact an administrator to renew. Practice remains fully usable during grace.
+      </Alert>
+    ) : access?.accessState === "READ_ONLY" ? (
+      <Alert tone="warning">
+        Practice is read-only
+        {access.daysRemainingInPhase != null
+          ? ` — ${access.daysRemainingInPhase} day${access.daysRemainingInPhase === 1 ? "" : "s"} remaining`
+          : ""}
+        . You can view data but cannot make changes until the subscription is renewed.
+      </Alert>
+    ) : null;
+
   return (
-    <PracticeContext.Provider value={{ organizationId, name: org.name, role: org.role, membershipId }}>
+    <PracticeContext.Provider
+      value={{
+        organizationId,
+        name: org.name,
+        role: org.role,
+        membershipId,
+        subscriptionAccess: access,
+      }}
+    >
       <AppShell
         theme="practice"
         brand={org.name}
@@ -151,6 +248,7 @@ export function PracticeShell({ children }: { children: ReactNode }) {
           </div>
         }
       >
+        {banner ? <div style={{ marginBottom: 16 }}>{banner}</div> : null}
         {children}
       </AppShell>
     </PracticeContext.Provider>

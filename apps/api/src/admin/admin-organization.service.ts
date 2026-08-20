@@ -5,6 +5,7 @@ import { OrganizationLifecycleService } from "../organizations/organization-life
 import { EntitlementService } from "../entitlements/entitlement.service";
 import type { AdminActor } from "./admin-actor";
 import { ADMIN_MESSAGES } from "./admin.messages";
+import { AdminSubscriptionService } from "./admin-subscription.service";
 
 type AccountStatus = "ACTIVE" | "SUSPENDED" | "ARCHIVED";
 
@@ -15,6 +16,7 @@ export class AdminOrganizationService {
     private readonly prisma: PrismaService,
     private readonly lifecycle: OrganizationLifecycleService,
     private readonly entitlements: EntitlementService,
+    private readonly subscriptions: AdminSubscriptionService,
     private readonly security: SecurityEventLogger,
   ) {}
 
@@ -66,7 +68,9 @@ export class AdminOrganizationService {
           status: "ACTIVE",
         },
       ],
-      subscription: account.subscription ? this.toSubscription(account.subscription) : null,
+      subscription: account.subscription
+        ? await this.subscriptions.getForOrganization(organizationId)
+        : null,
       entitlements,
     };
   }
@@ -136,26 +140,6 @@ export class AdminOrganizationService {
             plan: account.subscription.plan,
           }
         : null,
-    };
-  }
-
-  private toSubscription(subscription: {
-    id: string;
-    status: string;
-    startedAt: Date | null;
-    cancelledAt: Date | null;
-    currentPeriodStart: Date | null;
-    currentPeriodEnd: Date | null;
-    plan: { id: string; name: string; slug: string; status: string };
-  }) {
-    return {
-      id: subscription.id,
-      status: subscription.status,
-      startedAt: subscription.startedAt?.toISOString() ?? null,
-      cancelledAt: subscription.cancelledAt?.toISOString() ?? null,
-      currentPeriodStart: subscription.currentPeriodStart?.toISOString() ?? null,
-      currentPeriodEnd: subscription.currentPeriodEnd?.toISOString() ?? null,
-      plan: subscription.plan,
     };
   }
 }

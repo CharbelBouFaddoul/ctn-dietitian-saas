@@ -55,6 +55,44 @@ export class AssignSubscriptionDto {
   @IsOptional()
   @IsEnum(SUBSCRIPTION_STATUSES)
   status?: (typeof SUBSCRIPTION_STATUSES)[number];
+
+  @ApiPropertyOptional({
+    description: "ISO-8601 period end. Omit or null for open-ended ACTIVE access.",
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString()
+  currentPeriodEnd?: string | null;
+
+  @ApiPropertyOptional({ description: "ISO-8601 period start", nullable: true })
+  @IsOptional()
+  @IsString()
+  currentPeriodStart?: string | null;
+
+  @ApiPropertyOptional({ enum: ["MONTHLY", "YEARLY"], nullable: true })
+  @IsOptional()
+  @IsEnum(["MONTHLY", "YEARLY"])
+  billingCycle?: "MONTHLY" | "YEARLY" | null;
+}
+
+export class RenewSubscriptionDto {
+  @ApiPropertyOptional({ description: "Optional plan change on renew" })
+  @IsOptional()
+  @IsUUID()
+  planId?: string;
+
+  @ApiPropertyOptional({
+    description: "ISO-8601 new period end. Omit or null for open-ended.",
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString()
+  currentPeriodEnd?: string | null;
+
+  @ApiPropertyOptional({ enum: ["MONTHLY", "YEARLY"], nullable: true })
+  @IsOptional()
+  @IsEnum(["MONTHLY", "YEARLY"])
+  billingCycle?: "MONTHLY" | "YEARLY" | null;
 }
 
 export class UpdateSubscriptionStatusDto {

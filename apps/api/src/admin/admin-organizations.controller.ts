@@ -7,6 +7,7 @@ import {
   Param,
   ParseUUIDPipe,
   Patch,
+  Post,
   Put,
   Query,
   Req,
@@ -26,6 +27,7 @@ import { AdminSubscriptionService } from "./admin-subscription.service";
 import {
   AdminSearchQueryDto,
   AssignSubscriptionDto,
+  RenewSubscriptionDto,
   UpdateOrganizationStatusDto,
   UpdateSubscriptionStatusDto,
   UpsertFeatureOverrideDto,
@@ -100,12 +102,19 @@ export class AdminOrganizationsController {
     @Param("organizationId", ParseUUIDPipe) organizationId: string,
     @Body() body: AssignSubscriptionDto,
   ) {
-    return this.subscriptions.assign(
-      organizationId,
-      body.planId,
-      adminActor(user, req),
-      body.status ?? "ACTIVE",
-    );
+    return this.subscriptions.assign(organizationId, body, adminActor(user, req));
+  }
+
+  @Post(":organizationId/subscription/renew")
+  @HttpCode(200)
+  @ApiOperation({ summary: "Renew or reactivate subscription (ACTIVE + new period)" })
+  renew(
+    @CurrentUser() user: AuthenticatedRequestUser,
+    @Req() req: Request,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Body() body: RenewSubscriptionDto,
+  ) {
+    return this.subscriptions.renew(organizationId, body, adminActor(user, req));
   }
 
   @Patch(":organizationId/subscription")
