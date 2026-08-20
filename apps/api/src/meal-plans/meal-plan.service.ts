@@ -823,9 +823,9 @@ export class MealPlanService {
     return version;
   }
 
-  private async requireDay(organizationId: string, versionId: string, dayId: string) {
+  private async requireDay(dietitianAccountId: string, versionId: string, dayId: string) {
     const day = await this.prisma.mealPlanDay.findFirst({
-      where: { id: dayId, mealPlanVersionId: versionId, organizationId },
+      where: { id: dayId, mealPlanVersionId: versionId, dietitianAccountId },
     });
     if (!day) {
       throw new NotFoundException("Day not found");
@@ -833,9 +833,9 @@ export class MealPlanService {
     return day;
   }
 
-  private async requireMeal(organizationId: string, versionId: string, mealId: string) {
+  private async requireMeal(dietitianAccountId: string, versionId: string, mealId: string) {
     const meal = await this.prisma.meal.findFirst({
-      where: { id: mealId, organizationId, day: { mealPlanVersionId: versionId } },
+      where: { id: mealId, dietitianAccountId, day: { mealPlanVersionId: versionId } },
     });
     if (!meal) {
       throw new NotFoundException("Meal not found");
@@ -843,9 +843,9 @@ export class MealPlanService {
     return meal;
   }
 
-  private async requireItem(organizationId: string, versionId: string, itemId: string) {
+  private async requireItem(dietitianAccountId: string, versionId: string, itemId: string) {
     const item = await this.prisma.mealItem.findFirst({
-      where: { id: itemId, organizationId, meal: { day: { mealPlanVersionId: versionId } } },
+      where: { id: itemId, dietitianAccountId, meal: { day: { mealPlanVersionId: versionId } } },
     });
     if (!item) {
       throw new NotFoundException("Meal item not found");

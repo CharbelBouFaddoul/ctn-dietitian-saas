@@ -33,10 +33,7 @@ export class AdminUserService {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: {
-        memberships: {
-          include: { organization: true },
-          orderBy: { createdAt: "asc" },
-        },
+        dietitianAccount: true,
       },
     });
     if (!user) {
@@ -45,14 +42,14 @@ export class AdminUserService {
 
     return {
       ...this.toPublic(user),
-      memberships: user.memberships.map((membership) => ({
-        id: membership.id,
-        organizationId: membership.organizationId,
-        organizationName: membership.organization.name,
-        organizationSlug: membership.organization.slug,
-        role: membership.role,
-        status: membership.status,
-      })),
+      dietitianAccount: user.dietitianAccount
+        ? {
+            id: user.dietitianAccount.id,
+            displayName: user.dietitianAccount.displayName,
+            slug: user.dietitianAccount.slug,
+            status: user.dietitianAccount.status,
+          }
+        : null,
     };
   }
 

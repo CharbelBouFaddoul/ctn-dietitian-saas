@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
-import { ORGANIZATION_ACCESS_DENIED } from "../src/organizations/tenant.types";
+import { ORGANIZATION_ACCESS_DENIED, ORGANIZATION_UNAVAILABLE } from "../src/organizations/tenant.types";
 import { MULTI_MEMBER_UNSUPPORTED } from "../src/organizations/organization.service";
 import {
   createAuthTestApp,
@@ -256,6 +256,13 @@ describe("organizations and tenant isolation", () => {
       .set("Cookie", suspendedOwner.cookie)
       .send(SETTINGS);
     expect(suspendedAccess.status).toBe(403);
+    expect(suspendedAccess.body.message).toBe(ORGANIZATION_UNAVAILABLE);
+
+    const suspendedClients = await request(ctx.app.getHttpServer())
+      .get(`/api/v1/organizations/${suspended.body.id}/clients`)
+      .set("Cookie", suspendedOwner.cookie);
+    expect(suspendedClients.status).toBe(403);
+    expect(suspendedClients.body.message).toBe(ORGANIZATION_UNAVAILABLE);
 
     const archivedOwner = await registerVerifyLogin();
     const archived = await request(ctx.app.getHttpServer())
@@ -271,6 +278,7 @@ describe("organizations and tenant isolation", () => {
       .get(`/api/v1/organizations/${archived.body.id}`)
       .set("Cookie", archivedOwner.cookie);
     expect(archivedAccess.status).toBe(403);
+    expect(archivedAccess.body.message).toBe(ORGANIZATION_UNAVAILABLE);
   });
 
   it("rejects membership role changes and ownership transfer", async () => {

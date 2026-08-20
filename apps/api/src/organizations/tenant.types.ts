@@ -1,9 +1,11 @@
 import type { MembershipStatus, OrganizationRole, OrganizationStatus } from "@nutrition-saas/types";
 
 /**
- * Phase 1 tenant context.
+ * Phase 2 tenant context.
  * `organizationId` is the DietitianAccount.id (API path compatibility).
- * Account owners are exposed as role OWNER (no STAFF/multi-member runtime).
+ *
+ * `membershipId` / `role` / `membershipStatus` are synthetic response fields only
+ * (always account id + OWNER + ACTIVE). They are not used for authorization.
  */
 export interface TenantContext {
   userId: string;
@@ -11,9 +13,11 @@ export interface TenantContext {
   organizationId: string;
   organizationName: string;
   organizationStatus: OrganizationStatus;
-  /** Same as DietitianAccount.id in Phase 1 (no membership row). */
+  /** Synthetic: DietitianAccount.id (API/response compatibility). */
   membershipId: string;
+  /** Synthetic: always OWNER (API/response compatibility). */
   role: OrganizationRole;
+  /** Synthetic: always ACTIVE (API/response compatibility). */
   membershipStatus: MembershipStatus;
   /** Legacy Organization.id when known (forensics writes). */
   legacyOrganizationId?: string | null;

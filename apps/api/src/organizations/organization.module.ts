@@ -6,7 +6,6 @@ import { OrganizationLifecycleService } from "./organization-lifecycle.service";
 import { OrganizationService } from "./organization.service";
 import { MembershipService } from "./membership.service";
 import { TenantGuard } from "./guards/tenant.guard";
-import { OrgRolesGuard } from "./guards/org-roles.guard";
 
 @Module({
   imports: [AuthModule, EntitlementsModule],
@@ -16,14 +15,12 @@ import { OrgRolesGuard } from "./guards/org-roles.guard";
     MembershipService,
     OrganizationLifecycleService,
     TenantGuard,
-    OrgRolesGuard,
   ],
   exports: [
     OrganizationService,
     MembershipService,
     OrganizationLifecycleService,
     TenantGuard,
-    OrgRolesGuard,
   ],
 })
 export class OrganizationModule {}

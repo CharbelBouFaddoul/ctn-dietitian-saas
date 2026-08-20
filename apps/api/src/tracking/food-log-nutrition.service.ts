@@ -37,7 +37,7 @@ export class FoodLogNutritionService {
   constructor(private readonly foods: FoodService) {}
 
   async buildSnapshot(
-    organizationId: string,
+    dietitianAccountId: string,
     foodId: string,
     quantity: number,
     unit: QuantityUnit,
@@ -48,7 +48,7 @@ export class FoodLogNutritionService {
     if (!isFoodLogUnit(unit)) {
       throw new BadRequestException("Food logs must use a mass or volume unit");
     }
-    const food = await this.foods.getEffective(organizationId, foodId);
+    const food = await this.foods.getEffective(dietitianAccountId, foodId);
     try {
       const nutrition = calculateFoodNutrition(
         {
@@ -84,8 +84,8 @@ export class FoodLogNutritionService {
   }
 }
 
-export function assertClientOwnsLog(client: Client, organizationId: string, clientId: string) {
-  if (client.organizationId !== organizationId || client.id !== clientId) {
+export function assertClientOwnsLog(client: Client, dietitianAccountId: string, clientId: string) {
+  if (client.dietitianAccountId !== dietitianAccountId || client.id !== clientId) {
     throw new NotFoundException("Log not found");
   }
 }

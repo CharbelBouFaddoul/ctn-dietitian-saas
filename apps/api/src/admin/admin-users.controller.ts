@@ -24,7 +24,7 @@ export class AdminUsersController {
   }
 
   @Get(":userId")
-  @ApiOperation({ summary: "Get user and organization memberships (read-only roles)" })
+  @ApiOperation({ summary: "Get user and dietitian account ownership (read-only)" })
   get(@Param("userId", ParseUUIDPipe) userId: string) {
     return this.users.get(userId);
   }

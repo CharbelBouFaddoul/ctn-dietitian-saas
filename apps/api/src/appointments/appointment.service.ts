@@ -58,6 +58,7 @@ export class AppointmentService {
     input: { title: string; startAt: string; endAt: string; assignedMemberId?: string; notes?: string },
   ) {
     await this.access.assertCanAccess(tenant, clientId, "manageRecords");
+    void input.assignedMemberId;
     const startAt = new Date(input.startAt);
     const endAt = new Date(input.endAt);
     if (!(startAt.getTime() < endAt.getTime())) {

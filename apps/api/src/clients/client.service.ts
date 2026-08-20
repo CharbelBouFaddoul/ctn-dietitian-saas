@@ -54,10 +54,7 @@ export class ClientService {
       this.prisma.client.findMany({
         where,
         include: {
-          assignments: {
-            where: { unassignedAt: null },
-            include: { organizationMember: { include: { user: true } } },
-          },
+          dietitianAccount: { include: { user: { select: { email: true } } } },
           tags: { include: { tag: true } },
           account: true,
           invitations: {
@@ -87,10 +84,7 @@ export class ClientService {
       include: {
         profile: true,
         account: true,
-        assignments: {
-          include: { organizationMember: { include: { user: true } } },
-          orderBy: { assignedAt: "desc" },
-        },
+        dietitianAccount: { include: { user: { select: { email: true } } } },
         tags: { include: { tag: true } },
         invitations: {
           where: { purpose: "CLIENT_INVITE", usedAt: null },
@@ -317,14 +311,11 @@ export class ClientService {
     email: string | null;
     status: string;
     createdAt: Date;
-    assignments: Array<{
-      organizationMember: { id: string; user: { email: string } };
-    }>;
+    dietitianAccount: { id: string; user: { email: string } } | null;
     tags: Array<{ tag: { id: string; name: string; color: string | null } }>;
     account: { status: string } | null;
     invitations: Array<{ expiresAt: Date }>;
   }) {
-    const assignment = client.assignments[0];
     const connectionStatus = deriveConnectionStatus(client.account, client.invitations[0]);
     return {
       id: client.id,
@@ -334,8 +325,8 @@ export class ClientService {
       email: client.email,
       status: client.status,
       createdAt: client.createdAt.toISOString(),
-      assignedTo: assignment
-        ? { membershipId: assignment.organizationMember.id, email: assignment.organizationMember.user.email }
+      assignedTo: client.dietitianAccount
+        ? { membershipId: client.dietitianAccount.id, email: client.dietitianAccount.user.email }
         : null,
       tags: client.tags.map((row) => row.tag),
       portalStatus: client.account?.status ?? null,
@@ -346,16 +337,12 @@ export class ClientService {
   private toDetail(client: Client & {
     profile: object | null;
     account: { status: string; activatedAt: Date | null } | null;
-    assignments: Array<{
-      id: string;
-      assignedAt: Date;
-      unassignedAt: Date | null;
-      organizationMember: { id: string; user: { email: string } };
-    }>;
+    dietitianAccount: { id: string; user: { email: string }; createdAt: Date } | null;
     tags: Array<{ tag: { id: string; name: string; color: string | null } }>;
     invitations: Array<{ expiresAt: Date }>;
   }) {
     const connectionStatus = deriveConnectionStatus(client.account, client.invitations[0]);
+    const owner = client.dietitianAccount;
     return {
       id: client.id,
       organizationId: client.dietitianAccountId ?? client.organizationId,
@@ -373,14 +360,18 @@ export class ClientService {
       portalStatus: client.account?.status ?? null,
       portalActivatedAt: client.account?.activatedAt?.toISOString() ?? null,
       connectionStatus,
-      assignments: client.assignments.map((row) => ({
-        id: row.id,
-        membershipId: row.organizationMember.id,
-        email: row.organizationMember.user.email,
-        assignedAt: row.assignedAt.toISOString(),
-        unassignedAt: row.unassignedAt?.toISOString() ?? null,
-        active: row.unassignedAt === null,
-      })),
+      assignments: owner
+        ? [
+            {
+              id: owner.id,
+              membershipId: owner.id,
+              email: owner.user.email,
+              assignedAt: owner.createdAt.toISOString(),
+              unassignedAt: null,
+              active: true,
+            },
+          ]
+        : [],
       tags: client.tags.map((row) => row.tag),
     };
   }

@@ -23,7 +23,6 @@ import { SessionGuard } from "../auth/guards/session.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import type { AuthenticatedRequestUser } from "../auth/auth.types";
 import { CurrentTenant } from "./decorators/current-tenant.decorator";
-import { OrgRoles } from "./decorators/org-roles.decorator";
 import { AddMemberDto, ChangeMemberRoleDto, TransferOwnershipDto } from "./dto/membership.dto";
 import {
   CreateOrganizationDto,
@@ -36,7 +35,6 @@ import {
   OrganizationSettingsResponseDto,
   TenantContextResponseDto,
 } from "./dto/responses.dto";
-import { OrgRolesGuard } from "./guards/org-roles.guard";
 import { TenantGuard } from "./guards/tenant.guard";
 import { MembershipService } from "./membership.service";
 import { OrganizationLifecycleService } from "./organization-lifecycle.service";
@@ -104,16 +102,15 @@ export class OrganizationController {
         organizationId: tenant.organizationId,
         organizationName: tenant.organizationName,
         organizationStatus: tenant.organizationStatus,
-        membershipId: tenant.membershipId,
-        role: tenant.role,
+        membershipId: tenant.organizationId,
+        role: "OWNER",
       },
     };
   }
 
   @Patch(":organizationId")
-  @UseGuards(TenantGuard, OrgRolesGuard)
-  @OrgRoles("OWNER")
-  @ApiOperation({ summary: "Update organization name (OWNER)" })
+  @UseGuards(TenantGuard)
+  @ApiOperation({ summary: "Update organization name (account owner)" })
   async update(
     @CurrentUser() user: AuthenticatedRequestUser,
     @Param("organizationId", ParseUUIDPipe) organizationId: string,
@@ -142,9 +139,8 @@ export class OrganizationController {
   }
 
   @Patch(":organizationId/settings")
-  @UseGuards(TenantGuard, OrgRolesGuard)
-  @OrgRoles("OWNER")
-  @ApiOperation({ summary: "Update organization settings (OWNER)" })
+  @UseGuards(TenantGuard)
+  @ApiOperation({ summary: "Update organization settings (account owner)" })
   async updateSettings(
     @Param("organizationId", ParseUUIDPipe) organizationId: string,
     @Body() body: UpdateOrganizationSettingsDto,
@@ -179,8 +175,7 @@ export class OrganizationController {
 
   @Post(":organizationId/members")
   @HttpCode(201)
-  @UseGuards(TenantGuard, OrgRolesGuard)
-  @OrgRoles("OWNER")
+  @UseGuards(TenantGuard)
   @ApiOperation({
     summary: "Add an existing user as DIETITIAN or STAFF (OWNER)",
     description: "Does not create client accounts. Invitation workflows remain later phases.",
@@ -194,8 +189,7 @@ export class OrganizationController {
   }
 
   @Patch(":organizationId/members/:membershipId")
-  @UseGuards(TenantGuard, OrgRolesGuard)
-  @OrgRoles("OWNER")
+  @UseGuards(TenantGuard)
   @ApiOperation({ summary: "Change a member role (OWNER). Cannot remove the last OWNER." })
   changeRole(
     @CurrentUser() user: AuthenticatedRequestUser,
@@ -208,8 +202,7 @@ export class OrganizationController {
 
   @Post(":organizationId/members/:membershipId/deactivate")
   @HttpCode(201)
-  @UseGuards(TenantGuard, OrgRolesGuard)
-  @OrgRoles("OWNER")
+  @UseGuards(TenantGuard)
   @ApiOperation({ summary: "Deactivate a membership (OWNER). Cannot deactivate the last OWNER." })
   deactivate(
     @CurrentUser() user: AuthenticatedRequestUser,
@@ -221,8 +214,7 @@ export class OrganizationController {
 
   @Post(":organizationId/transfer-ownership")
   @HttpCode(201)
-  @UseGuards(TenantGuard, OrgRolesGuard)
-  @OrgRoles("OWNER")
+  @UseGuards(TenantGuard)
   @ApiOperation({
     summary: "Transfer ownership to another member (OWNER)",
     description: "Target becomes OWNER; the current user becomes DIETITIAN.",
@@ -237,8 +229,7 @@ export class OrganizationController {
 
   @Post(":organizationId/archive")
   @HttpCode(201)
-  @UseGuards(TenantGuard, OrgRolesGuard)
-  @OrgRoles("OWNER")
+  @UseGuards(TenantGuard)
   @ApiOperation({ summary: "Archive the organization (OWNER). Data is retained." })
   archive(
     @CurrentUser() user: AuthenticatedRequestUser,

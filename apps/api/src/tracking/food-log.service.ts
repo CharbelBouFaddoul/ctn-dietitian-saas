@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from "@nestjs/comm
 import { localDateKey, parseLocalDate } from "@nutrition-saas/utilities";
 import type { Client, MealLogCategory, Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
+import { requireDietitianAccountId } from "../organizations/tenant-scope";
 import { TimelineService } from "../timeline/timeline.service";
 import {
   FoodLogNutritionService,
@@ -13,7 +14,7 @@ export class TrackingTimezoneService {
   constructor(private readonly prisma: PrismaService) {}
 
   async timezoneForClient(client: Client): Promise<string> {
-    const dietitianAccountId = client.dietitianAccountId ?? client.organizationId;
+    const dietitianAccountId = requireDietitianAccountId(client);
     const settings = await this.prisma.dietitianSettings.findUnique({
       where: { dietitianAccountId },
       select: { timezone: true },
@@ -47,7 +48,7 @@ export class FoodLogService {
     const trackingDate = this.timezone.parseTrackingDate(date);
     const rows = await this.prisma.foodLog.findMany({
       where: {
-        dietitianAccountId: client.dietitianAccountId ?? client.organizationId,
+        dietitianAccountId: requireDietitianAccountId(client),
         clientId: client.id,
         trackingDate,
         status: "ACTIVE",
@@ -74,7 +75,7 @@ export class FoodLogService {
       throw new BadRequestException("consumedAt must be a valid timestamp");
     }
     const timeZone = await this.timezone.timezoneForClient(client);
-    const dietitianAccountId = client.dietitianAccountId ?? client.organizationId;
+    const dietitianAccountId = requireDietitianAccountId(client);
     const snapshot = await this.nutrition.buildSnapshot(
       dietitianAccountId,
       input.foodId,
@@ -129,7 +130,12 @@ export class FoodLogService {
       throw new BadRequestException("consumedAt must be a valid timestamp");
     }
     const timeZone = await this.timezone.timezoneForClient(client);
-    const snapshot = await this.nutrition.buildSnapshot(client.organizationId, foodId, quantity, unit);
+    const snapshot = await this.nutrition.buildSnapshot(
+      requireDietitianAccountId(client),
+      foodId,
+      quantity,
+      unit,
+    );
     const updated = await this.prisma.foodLog.update({
       where: { id: row.id },
       data: {
@@ -159,7 +165,7 @@ export class FoodLogService {
     const row = await this.prisma.foodLog.findFirst({
       where: {
         id: logId,
-        dietitianAccountId: client.dietitianAccountId ?? client.organizationId,
+        dietitianAccountId: requireDietitianAccountId(client),
         clientId: client.id,
         status: "ACTIVE",
       },

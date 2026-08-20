@@ -23,13 +23,12 @@ interface UserDetail {
   email: string;
   status: string;
   platformRole: string | null;
-  memberships: Array<{
+  dietitianAccount: {
     id: string;
-    organizationId: string;
-    organizationName: string;
-    role: string;
+    displayName: string;
+    slug: string;
     status: string;
-  }>;
+  } | null;
 }
 
 export default function AdminUserDetailPage() {
@@ -97,7 +96,7 @@ export default function AdminUserDetailPage() {
       />
       {error ? <Alert tone="danger">{error}</Alert> : null}
 
-      <Section title="Account status" tone="mint" description="Organization roles are not editable here. Membership stays organization-scoped.">
+      <Section title="Account status" tone="mint" description="Dietitian account ownership is read-only here.">
         <div className="ui-row" style={{ marginBottom: 12 }}>
           <StatusBadge status={user.status} label={statusLabel(user.status)} />
           {user.platformRole ? <StatusBadge status="ACTIVE" label={roleLabel(user.platformRole)} /> : null}
@@ -115,32 +114,33 @@ export default function AdminUserDetailPage() {
         </div>
       </Section>
 
-      <Section title="Organizations">
-        {user.memberships.length === 0 ? (
-          <EmptyState title="No memberships">This user is not in any organization yet.</EmptyState>
+      <Section title="Dietitian account">
+        {!user.dietitianAccount ? (
+          <EmptyState title="No dietitian account">This user does not own a dietitian account.</EmptyState>
         ) : (
           <Table>
             <thead>
               <tr>
-                <th>Organization</th>
+                <th>Account</th>
                 <th>Role</th>
-                <th>Membership</th>
+                <th>Status</th>
               </tr>
             </thead>
             <tbody>
-              {user.memberships.map((membership) => (
-                <tr key={membership.id}>
-                  <Td label="Organization">
-                    <Link href={`/admin/organizations/${membership.organizationId}`} className="ui-link">
-                      {membership.organizationName}
-                    </Link>
-                  </Td>
-                  <Td label="Role">{roleLabel(membership.role)}</Td>
-                  <Td label="Membership">
-                    <StatusBadge status={membership.status} label={statusLabel(membership.status)} />
-                  </Td>
-                </tr>
-              ))}
+              <tr>
+                <Td label="Account">
+                  <Link href={`/admin/organizations/${user.dietitianAccount.id}`} className="ui-link">
+                    {user.dietitianAccount.displayName}
+                  </Link>
+                </Td>
+                <Td label="Role">{roleLabel("OWNER")}</Td>
+                <Td label="Status">
+                  <StatusBadge
+                    status={user.dietitianAccount.status}
+                    label={statusLabel(user.dietitianAccount.status)}
+                  />
+                </Td>
+              </tr>
             </tbody>
           </Table>
         )}

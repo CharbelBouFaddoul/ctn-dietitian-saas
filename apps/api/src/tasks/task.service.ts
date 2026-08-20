@@ -59,9 +59,10 @@ export class TaskService {
       dueFilter = { assignedUserId: tenant.userId };
     }
 
+    void query.assignedMemberId;
+
     const where: Prisma.TaskWhereInput = {
-      dietitianAccountId: tenant.organizationId,
-      organizationId: legacyOrganizationId(tenant),
+      ...tenantWhere(tenant.organizationId),
       archivedAt: null,
       AND: [
         {
@@ -72,7 +73,7 @@ export class TaskService {
       ...(query.status ? { status: query.status } : {}),
       ...(query.priority ? { priority: query.priority } : {}),
       ...(query.clientId ? { clientId: query.clientId } : {}),
-      ...(query.assignedMemberId ? { assignedMemberId: query.assignedMemberId } : {}),
+      // assignedMemberId query filter is intentionally ignored (Phase 2: ACL via assignedUserId only).
       ...(query.search
         ? {
             OR: [

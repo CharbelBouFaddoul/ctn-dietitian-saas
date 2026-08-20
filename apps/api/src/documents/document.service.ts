@@ -16,6 +16,7 @@ import { SecurityEventLogger } from "../auth/security-event.logger";
 import { TimelineService } from "../timeline/timeline.service";
 import { NotificationService } from "../notifications/notification.service";
 import { MessagingRecipientService } from "../messaging/messaging-recipient.service";
+import { requireDietitianAccountId } from "../organizations/tenant-scope";
 import {
   assertAllowedUpload,
   detectMime,
@@ -36,9 +37,10 @@ export class DocumentService {
   ) {}
 
   async listForOrg(client: Client, includeInternal: boolean) {
+    const dietitianAccountId = requireDietitianAccountId(client);
     const rows = await this.prisma.document.findMany({
       where: {
-        dietitianAccountId: client.dietitianAccountId ?? client.organizationId,
+        dietitianAccountId,
         clientId: client.id,
         status: "ACTIVE",
         ...(includeInternal ? {} : { visibility: "SHARED" }),
@@ -50,9 +52,10 @@ export class DocumentService {
   }
 
   async listSharedForPortal(client: Client) {
+    const dietitianAccountId = requireDietitianAccountId(client);
     const rows = await this.prisma.document.findMany({
       where: {
-        dietitianAccountId: client.dietitianAccountId ?? client.organizationId,
+        dietitianAccountId,
         clientId: client.id,
         status: "ACTIVE",
         visibility: "SHARED",
@@ -64,7 +67,7 @@ export class DocumentService {
   }
 
   async getMetadata(documentId: string, client: Client, portal: boolean): Promise<Document> {
-    const document = await this.findScoped(documentId, client.dietitianAccountId ?? client.organizationId, client.id);
+    const document = await this.findScoped(documentId, requireDietitianAccountId(client), client.id);
     this.assertReadable(document, portal);
     return document;
   }
@@ -106,7 +109,7 @@ export class DocumentService {
 
     await this.storage.writeStreamToKey(storageKey, Readable.from(input.buffer));
 
-    const dietitianAccountId = input.client.dietitianAccountId ?? input.client.organizationId;
+    const dietitianAccountId = requireDietitianAccountId(input.client);
     const document = await this.prisma.document.create({
       data: {
         id: documentId,
@@ -156,7 +159,7 @@ export class DocumentService {
   }
 
   async setVisibility(documentId: string, client: Client, userId: string, visibility: DocumentVisibility) {
-    const document = await this.findScoped(documentId, client.dietitianAccountId ?? client.organizationId, client.id);
+    const document = await this.findScoped(documentId, requireDietitianAccountId(client), client.id);
     if (document.status !== "ACTIVE") {
       throw new NotFoundException("Document not found");
     }
@@ -202,7 +205,7 @@ export class DocumentService {
   }
 
   async archive(documentId: string, client: Client, userId: string) {
-    const document = await this.findScoped(documentId, client.dietitianAccountId ?? client.organizationId, client.id);
+    const document = await this.findScoped(documentId, requireDietitianAccountId(client), client.id);
     if (document.status === "ARCHIVED") {
       return this.toResponse(document);
     }
@@ -238,9 +241,9 @@ export class DocumentService {
     };
   }
 
-  async findScoped(documentId: string, organizationId: string, clientId: string) {
+  async findScoped(documentId: string, dietitianAccountId: string, clientId: string) {
     const document = await this.prisma.document.findFirst({
-      where: { id: documentId, dietitianAccountId: organizationId, clientId },
+      where: { id: documentId, dietitianAccountId, clientId },
     });
     if (!document) {
       throw new NotFoundException("Document not found");
@@ -272,7 +275,8 @@ export class DocumentService {
     const clientUserId = await this.recipients.clientPortalUserId(document.clientId);
     if (clientUserId && clientUserId !== actorUserId) {
       await this.notifications.create({
-        organizationId: document.organizationId,
+        organizationId: document.dietitianAccountId ?? document.organizationId,
+        legacyOrganizationId: document.organizationId,
         userId: clientUserId,
         clientId: document.clientId,
         type: "DOCUMENT_SHARED",
@@ -285,13 +289,16 @@ export class DocumentService {
   }
 
   private async notifyStaffDocumentUploaded(document: Document, actorUserId: string) {
-    const userIds = await this.recipients.assignedMemberUserIds(document.organizationId, document.clientId);
+    const dietitianAccountId = document.dietitianAccountId;
+    if (!dietitianAccountId) return;
+    const userIds = await this.recipients.assignedMemberUserIds(dietitianAccountId, document.clientId);
     await Promise.all(
       userIds
         .filter((id) => id !== actorUserId)
         .map((userId) =>
           this.notifications.create({
-            organizationId: document.organizationId,
+            organizationId: dietitianAccountId,
+            legacyOrganizationId: document.organizationId,
             userId,
             clientId: document.clientId,
             type: "DOCUMENT_UPLOADED",

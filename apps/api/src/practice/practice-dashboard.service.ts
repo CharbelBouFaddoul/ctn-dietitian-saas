@@ -46,14 +46,14 @@ export class PracticeDashboardService {
         this.prisma.task.count({
           where: { ...tenantWhere(tenant.organizationId),
             archivedAt: null,
-            assignedMemberId: tenant.membershipId,
+            assignedUserId: tenant.userId,
             status: { in: ["TODO", "IN_PROGRESS"] },
           },
         }),
         this.prisma.task.count({
           where: { ...tenantWhere(tenant.organizationId),
             archivedAt: null,
-            assignedMemberId: tenant.membershipId,
+            assignedUserId: tenant.userId,
             status: { in: ["TODO", "IN_PROGRESS"] },
             dueAt: { lt: now },
           },

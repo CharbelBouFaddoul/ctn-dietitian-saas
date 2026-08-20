@@ -423,10 +423,11 @@ export class AnalyticsService {
     range: { start: Date; end: Date },
   ): Promise<Map<string, Date>> {
     const map = new Map<string, Date>();
+    const scope = tenantWhere(organizationId);
     if (kind === "foodLog") {
       const rows = await this.prisma.foodLog.groupBy({
         by: ["clientId"],
-        where: { organizationId, clientId: { in: clientIds }, createdAt: { lte: range.end } },
+        where: { ...scope, clientId: { in: clientIds }, createdAt: { lte: range.end } },
         _max: { createdAt: true },
       });
       for (const row of rows) {
@@ -435,35 +436,35 @@ export class AnalyticsService {
     } else if (kind === "waterLog") {
       const rows = await this.prisma.waterLog.groupBy({
         by: ["clientId"],
-        where: { organizationId, clientId: { in: clientIds }, createdAt: { lte: range.end } },
+        where: { ...scope, clientId: { in: clientIds }, createdAt: { lte: range.end } },
         _max: { createdAt: true },
       });
       for (const row of rows) map.set(row.clientId, row._max.createdAt!);
     } else if (kind === "exerciseLog") {
       const rows = await this.prisma.exerciseLog.groupBy({
         by: ["clientId"],
-        where: { organizationId, clientId: { in: clientIds }, createdAt: { lte: range.end } },
+        where: { ...scope, clientId: { in: clientIds }, createdAt: { lte: range.end } },
         _max: { createdAt: true },
       });
       for (const row of rows) map.set(row.clientId, row._max.createdAt!);
     } else if (kind === "sleepLog") {
       const rows = await this.prisma.sleepLog.groupBy({
         by: ["clientId"],
-        where: { organizationId, clientId: { in: clientIds }, createdAt: { lte: range.end } },
+        where: { ...scope, clientId: { in: clientIds }, createdAt: { lte: range.end } },
         _max: { createdAt: true },
       });
       for (const row of rows) map.set(row.clientId, row._max.createdAt!);
     } else if (kind === "habitLog") {
       const rows = await this.prisma.habitLog.groupBy({
         by: ["clientId"],
-        where: { organizationId, clientId: { in: clientIds } },
+        where: { ...scope, clientId: { in: clientIds } },
         _max: { createdAt: true },
       });
       for (const row of rows) map.set(row.clientId, row._max.createdAt!);
     } else {
       const rows = await this.prisma.message.groupBy({
         by: ["clientId"],
-        where: { organizationId, clientId: { in: clientIds }, createdAt: { lte: range.end } },
+        where: { ...scope, clientId: { in: clientIds }, createdAt: { lte: range.end } },
         _max: { createdAt: true },
       });
       for (const row of rows) map.set(row.clientId, row._max.createdAt!);
@@ -473,7 +474,7 @@ export class AnalyticsService {
 
   private async activeMealPlanByClient(organizationId: string, clientIds: string[]) {
     const rows = await this.prisma.mealPlan.findMany({
-      where: { organizationId, clientId: { in: clientIds }, status: "ACTIVE" },
+      where: { ...tenantWhere(organizationId), clientId: { in: clientIds }, status: "ACTIVE" },
       select: { clientId: true },
     });
     return new Set(rows.map((r) => r.clientId));
@@ -482,7 +483,7 @@ export class AnalyticsService {
   private async overdueInvoicesByClient(organizationId: string, clientIds: string[]) {
     const rows = await this.prisma.invoice.findMany({
       where: {
-        organizationId,
+        ...tenantWhere(organizationId),
         clientId: { in: clientIds },
         status: "OVERDUE",
         archivedAt: null,
@@ -495,7 +496,7 @@ export class AnalyticsService {
   private async overdueTasksByClient(organizationId: string, clientIds: string[]) {
     const rows = await this.prisma.task.findMany({
       where: {
-        organizationId,
+        ...tenantWhere(organizationId),
         clientId: { in: clientIds },
         archivedAt: null,
         status: { in: ["TODO", "IN_PROGRESS"] },

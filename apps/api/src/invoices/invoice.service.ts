@@ -14,7 +14,7 @@ import { TimelineService } from "../timeline/timeline.service";
 import { NotificationService } from "../notifications/notification.service";
 import { computeLineTotal, decimalToNumber, money, sumMoney } from "./invoice-money";
 import { InvoiceNumberService } from "./invoice-number.service";
-import { legacyOrganizationId, tenantWhere } from "../organizations/tenant-scope";
+import { legacyOrganizationId, requireDietitianAccountId, tenantWhere } from "../organizations/tenant-scope";
 
 export interface InvoiceItemInput {
   description: string;
@@ -475,10 +475,11 @@ export class InvoiceService {
   }
 
   async listPortal(client: Client) {
-    await this.refreshOverdue(client.organizationId);
+    const dietitianAccountId = requireDietitianAccountId(client);
+    await this.refreshOverdue(dietitianAccountId);
     const rows = await this.prisma.invoice.findMany({
       where: {
-        dietitianAccountId: client.dietitianAccountId ?? client.organizationId,
+        dietitianAccountId,
         clientId: client.id,
         archivedAt: null,
         status: { in: PORTAL_VISIBLE },
@@ -490,11 +491,12 @@ export class InvoiceService {
   }
 
   async getPortal(client: Client, invoiceId: string) {
-    await this.refreshOverdue(client.organizationId);
+    const dietitianAccountId = requireDietitianAccountId(client);
+    await this.refreshOverdue(dietitianAccountId);
     const invoice = await this.prisma.invoice.findFirst({
       where: {
         id: invoiceId,
-        dietitianAccountId: client.dietitianAccountId ?? client.organizationId,
+        dietitianAccountId,
         clientId: client.id,
         archivedAt: null,
         status: { in: PORTAL_VISIBLE },
@@ -505,10 +507,10 @@ export class InvoiceService {
       throw new NotFoundException("Invoice not found");
     }
     const settings = await this.prisma.dietitianSettings.findUnique({
-      where: { dietitianAccountId: client.dietitianAccountId ?? client.organizationId },
+      where: { dietitianAccountId },
     });
     const org = await this.prisma.dietitianAccount.findUniqueOrThrow({
-      where: { id: client.dietitianAccountId ?? client.organizationId },
+      where: { id: dietitianAccountId },
     });
     return {
       invoice: this.toResponse(invoice),
@@ -565,12 +567,12 @@ export class InvoiceService {
     return { items: computed, subtotal, total: subtotal };
   }
 
-  private async refreshOverdue(organizationId: string) {
-    const settings = await this.prisma.dietitianSettings.findUnique({ where: { dietitianAccountId: organizationId } });
+  private async refreshOverdue(dietitianAccountId: string) {
+    const settings = await this.prisma.dietitianSettings.findUnique({ where: { dietitianAccountId } });
     const today = this.todayDate(settings?.timezone ?? "UTC");
     await this.prisma.invoice.updateMany({
       where: {
-        organizationId,
+        dietitianAccountId,
         status: { in: ["ISSUED", "SENT"] },
         dueDate: { lt: today },
         archivedAt: null,

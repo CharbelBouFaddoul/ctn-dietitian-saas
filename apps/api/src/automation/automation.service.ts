@@ -270,12 +270,13 @@ export class AutomationService {
   }
 
   async getAdminSummary(organizationId: string) {
+    const scope = tenantWhere(organizationId);
     const [ruleCount, activeRules, recentFailures, executionCount] = await Promise.all([
-      this.prisma.automationRule.count({ where: { organizationId, archivedAt: null } }),
-      this.prisma.automationRule.count({ where: { organizationId, status: "ACTIVE", archivedAt: null } }),
+      this.prisma.automationRule.count({ where: { ...scope, archivedAt: null } }),
+      this.prisma.automationRule.count({ where: { ...scope, status: "ACTIVE", archivedAt: null } }),
       this.prisma.automationRun.count({
         where: {
-          organizationId,
+          ...scope,
           status: "FAILED",
           createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
         },

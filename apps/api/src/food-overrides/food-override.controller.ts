@@ -2,8 +2,6 @@ import { Body, Controller, Delete, Get, NotFoundException, Param, ParseUUIDPipe,
 import { ApiCookieAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { SessionGuard } from "../auth/guards/session.guard";
 import { CurrentTenant } from "../organizations/decorators/current-tenant.decorator";
-import { OrgRoles } from "../organizations/decorators/org-roles.decorator";
-import { OrgRolesGuard } from "../organizations/guards/org-roles.guard";
 import { TenantGuard } from "../organizations/guards/tenant.guard";
 import type { TenantContext } from "../organizations/tenant.types";
 import { FoodService } from "../foods/food.service";
@@ -31,8 +29,6 @@ export class FoodOverrideController {
   }
 
   @Put()
-  @UseGuards(OrgRolesGuard)
-  @OrgRoles("OWNER", "DIETITIAN")
   @ApiOperation({
     summary: "Create or update an organization food override",
     description: "Never mutates the global foods row. Null fields clear that nutrient override.",
@@ -46,8 +42,6 @@ export class FoodOverrideController {
   }
 
   @Delete()
-  @UseGuards(OrgRolesGuard)
-  @OrgRoles("OWNER", "DIETITIAN")
   @ApiOperation({ summary: "Deactivate this organization's override and restore global effective values" })
   remove(@CurrentTenant() tenant: TenantContext, @Param("foodId", ParseUUIDPipe) foodId: string) {
     return this.overrides.remove(tenant, foodId);

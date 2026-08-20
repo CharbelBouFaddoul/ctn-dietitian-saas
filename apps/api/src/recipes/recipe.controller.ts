@@ -2,8 +2,6 @@ import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Put, Query, U
 import { ApiCookieAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { SessionGuard } from "../auth/guards/session.guard";
 import { CurrentTenant } from "../organizations/decorators/current-tenant.decorator";
-import { OrgRoles } from "../organizations/decorators/org-roles.decorator";
-import { OrgRolesGuard } from "../organizations/guards/org-roles.guard";
 import { TenantGuard } from "../organizations/guards/tenant.guard";
 import type { TenantContext } from "../organizations/tenant.types";
 import {
@@ -28,8 +26,6 @@ export class RecipeController {
   }
 
   @Post()
-  @UseGuards(OrgRolesGuard)
-  @OrgRoles("OWNER", "DIETITIAN")
   create(@CurrentTenant() tenant: TenantContext, @Body() body: CreateRecipeDto) {
     return this.recipes.create(tenant, body);
   }
@@ -40,8 +36,6 @@ export class RecipeController {
   }
 
   @Patch(":recipeId")
-  @UseGuards(OrgRolesGuard)
-  @OrgRoles("OWNER", "DIETITIAN")
   update(
     @CurrentTenant() tenant: TenantContext,
     @Param("recipeId", ParseUUIDPipe) recipeId: string,
@@ -51,22 +45,16 @@ export class RecipeController {
   }
 
   @Post(":recipeId/archive")
-  @UseGuards(OrgRolesGuard)
-  @OrgRoles("OWNER", "DIETITIAN")
   archive(@CurrentTenant() tenant: TenantContext, @Param("recipeId", ParseUUIDPipe) recipeId: string) {
     return this.recipes.archive(tenant, recipeId);
   }
 
   @Post(":recipeId/duplicate")
-  @UseGuards(OrgRolesGuard)
-  @OrgRoles("OWNER", "DIETITIAN")
   duplicate(@CurrentTenant() tenant: TenantContext, @Param("recipeId", ParseUUIDPipe) recipeId: string) {
     return this.recipes.duplicate(tenant, recipeId);
   }
 
   @Put(":recipeId/ingredients")
-  @UseGuards(OrgRolesGuard)
-  @OrgRoles("OWNER", "DIETITIAN")
   replaceIngredients(
     @CurrentTenant() tenant: TenantContext,
     @Param("recipeId", ParseUUIDPipe) recipeId: string,

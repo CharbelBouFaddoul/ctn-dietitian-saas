@@ -17,6 +17,7 @@ import { ClientAccessService } from "../clients/client-access.service";
 import { CurrentTenant } from "../organizations/decorators/current-tenant.decorator";
 import { TenantGuard } from "../organizations/guards/tenant.guard";
 import type { TenantContext } from "../organizations/tenant.types";
+import { requireDietitianAccountId } from "../organizations/tenant-scope";
 import { ConversationService } from "./conversation.service";
 import { MessagingRecipientService } from "./messaging-recipient.service";
 import { MarkConversationReadDto, MessagePaginationQueryDto, SendMessageDto } from "./dto/messaging.dto";
@@ -82,7 +83,7 @@ export class OrgMessagingController {
     const conversation = await this.conversations.getOrCreate(client);
     return this.conversations.listMessages(
       conversation.id,
-      client.organizationId,
+      requireDietitianAccountId(client),
       query.before,
       query.limit ?? 50,
     );
@@ -118,7 +119,7 @@ export class OrgMessagingController {
   ) {
     const client = await this.access.assertCanAccess(tenant, clientId, "read");
     const conversation = await this.conversations.getOrCreate(client);
-    return this.conversations.markRead(conversation.id, client.organizationId, tenant.userId);
+    return this.conversations.markRead(conversation.id, client, tenant.userId);
   }
 
   @Get("notifications")

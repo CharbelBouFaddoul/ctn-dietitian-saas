@@ -170,7 +170,7 @@ export class AssessmentService {
 
   private async requireAssessment(organizationId: string, clientId: string, assessmentId: string) {
     const assessment = await this.prisma.assessment.findFirst({
-      where: { id: assessmentId, clientId, organizationId },
+      where: { id: assessmentId, clientId, ...tenantWhere(organizationId) },
     });
     if (!assessment) {
       throw new NotFoundException("Assessment not found");

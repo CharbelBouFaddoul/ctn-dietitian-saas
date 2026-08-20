@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import { FEATURE_KEYS } from "@nutrition-saas/config";
 import { CLIENT_ACCESS_DENIED } from "../src/clients/client.messages";
-import { ORGANIZATION_ACCESS_DENIED } from "../src/organizations/tenant.types";
+import { ORGANIZATION_ACCESS_DENIED, ORGANIZATION_UNAVAILABLE } from "../src/organizations/tenant.types";
 import {
   activateStandardSubscription,
   connectClientPortal,
@@ -257,5 +257,107 @@ describe("release-blocking security isolation", () => {
         conditions: { clientStatus: "ACTIVE" },
       })
       .expect(403);
+  });
+
+  it("blocks dietitian account holders from portal APIs", async () => {
+    const owner = await registerVerifyLogin();
+    await createOrg(owner.cookie, "Dietitian Portal Block");
+
+    await request(ctx.app.getHttpServer())
+      .get("/api/v1/portal/me")
+      .set("Cookie", owner.cookie)
+      .expect(403)
+      .expect((res) => expect(res.body.message).toBe(CLIENT_ACCESS_DENIED));
+
+    await request(ctx.app.getHttpServer())
+      .get("/api/v1/portal/tracking/food-logs")
+      .set("Cookie", owner.cookie)
+      .expect(403);
+  });
+
+  it("does not grant access via planted ClientAssignment rows", async () => {
+    const owner = await registerVerifyLogin();
+    const outsider = await registerVerifyLogin();
+    const org = await createOrg(owner.cookie, "Assignment Plant");
+    const client = await createClient(owner.cookie, org.id);
+    expect(client.status).toBe(201);
+
+    const outsiderUser = await ctx.prisma.user.findFirstOrThrow({
+      where: { emailNormalized: outsider.address },
+    });
+    const fakeMember = await ctx.prisma.organizationMember.create({
+      data: {
+        organizationId: org.id,
+        userId: outsiderUser.id,
+        role: "DIETITIAN",
+        status: "ACTIVE",
+      },
+    });
+    await ctx.prisma.clientAssignment.create({
+      data: {
+        organizationId: org.id,
+        dietitianAccountId: org.id,
+        clientId: client.body.id,
+        organizationMemberId: fakeMember.id,
+        assignedById: outsiderUser.id,
+      },
+    });
+
+    await request(ctx.app.getHttpServer())
+      .get(`/api/v1/organizations/${org.id}/clients/${client.body.id}`)
+      .set("Cookie", outsider.cookie)
+      .expect(403);
+
+    await request(ctx.app.getHttpServer())
+      .get(`/api/v1/organizations/${org.id}`)
+      .set("Cookie", outsider.cookie)
+      .expect(403)
+      .expect((res) => expect(res.body.message).toBe(ORGANIZATION_ACCESS_DENIED));
+  });
+
+  it("rejects legacy organization id when it differs from DietitianAccount id", async () => {
+    const owner = await registerVerifyLogin();
+    const org = await createOrg(owner.cookie, "Legacy Bypass");
+    const ownerUser = await ctx.prisma.user.findFirstOrThrow({
+      where: { emailNormalized: owner.address },
+    });
+
+    // Simulate a split DIETITIAN-style account: account id != legacy organization id.
+    const legacyOrg = await ctx.prisma.organization.create({
+      data: {
+        name: "Legacy Only Org",
+        slug: `legacy-only-${seq}`,
+        status: "ACTIVE",
+        createdById: ownerUser.id,
+      },
+    });
+    await ctx.prisma.dietitianAccount.update({
+      where: { id: org.id },
+      data: { legacyOrganizationId: legacyOrg.id },
+    });
+
+    await request(ctx.app.getHttpServer())
+      .get(`/api/v1/organizations/${legacyOrg.id}`)
+      .set("Cookie", owner.cookie)
+      .expect(403)
+      .expect((res) => expect(res.body.message).toBe(ORGANIZATION_ACCESS_DENIED));
+
+    // Account id still works.
+    await request(ctx.app.getHttpServer())
+      .get(`/api/v1/organizations/${org.id}`)
+      .set("Cookie", owner.cookie)
+      .expect(200);
+  });
+
+  it("returns unavailable for suspended accounts on client list", async () => {
+    const owner = await registerVerifyLogin();
+    const org = await createOrg(owner.cookie, "Suspend List");
+    await ctx.lifecycle.setStatus(org.id, "SUSPENDED");
+
+    await request(ctx.app.getHttpServer())
+      .get(`/api/v1/organizations/${org.id}/clients`)
+      .set("Cookie", owner.cookie)
+      .expect(403)
+      .expect((res) => expect(res.body.message).toBe(ORGANIZATION_UNAVAILABLE));
   });
 });

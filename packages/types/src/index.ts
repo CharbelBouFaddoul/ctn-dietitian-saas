@@ -43,7 +43,9 @@ export interface TenantContextView {
   organizationId: string;
   organizationName: string;
   organizationStatus: OrganizationStatus;
+  /** Synthetic: DietitianAccount.id (API compatibility; not used for auth). */
   membershipId: string;
+  /** Synthetic: always OWNER (API compatibility; not used for auth). */
   role: OrganizationRole;
 }
 

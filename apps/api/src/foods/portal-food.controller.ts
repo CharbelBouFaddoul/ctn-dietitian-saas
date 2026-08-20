@@ -4,6 +4,7 @@ import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { SessionGuard } from "../auth/guards/session.guard";
 import type { AuthenticatedRequestUser } from "../auth/auth.types";
 import { ClientAccessService } from "../clients/client-access.service";
+import { requireDietitianAccountId } from "../organizations/tenant-scope";
 import { ListFoodsQueryDto } from "./dto/food.dto";
 import { FoodService } from "./food.service";
 
@@ -21,6 +22,6 @@ export class PortalFoodController {
   @ApiOperation({ summary: "Search foods for client food logging (organization effective values)" })
   async search(@CurrentUser() user: AuthenticatedRequestUser, @Query() query: ListFoodsQueryDto) {
     const client = await this.access.assertPortalAccess(user.id);
-    return this.foods.search(client.organizationId, query);
+    return this.foods.search(requireDietitianAccountId(client), query);
   }
 }

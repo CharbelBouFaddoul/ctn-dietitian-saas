@@ -10,6 +10,7 @@ import { ConversationService } from "./conversation.service";
 import { MessagingRecipientService } from "./messaging-recipient.service";
 import { NotificationService } from "../notifications/notification.service";
 import { MarkConversationReadDto, MessagePaginationQueryDto, SendMessageDto } from "./dto/messaging.dto";
+import { requireDietitianAccountId } from "../organizations/tenant-scope";
 
 @ApiTags("portal")
 @ApiCookieAuth()
@@ -44,7 +45,7 @@ export class PortalMessagingController {
     const conversation = await this.conversations.getOrCreate(client);
     return this.conversations.listMessages(
       conversation.id,
-      client.organizationId,
+      requireDietitianAccountId(client),
       query.before,
       query.limit ?? 50,
     );
@@ -56,7 +57,10 @@ export class PortalMessagingController {
   async sendMessage(@CurrentUser() user: AuthenticatedRequestUser, @Body() body: SendMessageDto) {
     const client = await this.access.assertPortalAccess(user.id);
     const conversation = await this.conversations.getOrCreate(client);
-    const notifyUserIds = await this.recipients.assignedMemberUserIds(client.organizationId, client.id);
+    const notifyUserIds = await this.recipients.assignedMemberUserIds(
+      requireDietitianAccountId(client),
+      client.id,
+    );
     return this.conversations.sendMessage({
       conversation,
       client,
@@ -71,7 +75,7 @@ export class PortalMessagingController {
   async markRead(@CurrentUser() user: AuthenticatedRequestUser, @Body() _body: MarkConversationReadDto) {
     const client = await this.access.assertPortalAccess(user.id);
     const conversation = await this.conversations.getOrCreate(client);
-    return this.conversations.markRead(conversation.id, client.organizationId, user.id);
+    return this.conversations.markRead(conversation.id, client, user.id);
   }
 }
 
@@ -88,13 +92,13 @@ export class PortalNotificationController {
   @Get()
   async list(@CurrentUser() user: AuthenticatedRequestUser) {
     const client = await this.access.assertPortalAccess(user.id);
-    return this.notifications.listForUser(user.id, client.organizationId);
+    return this.notifications.listForUser(user.id, requireDietitianAccountId(client));
   }
 
   @Get("unread-count")
   async unread(@CurrentUser() user: AuthenticatedRequestUser) {
     const client = await this.access.assertPortalAccess(user.id);
-    const count = await this.notifications.unreadCount(user.id, client.organizationId);
+    const count = await this.notifications.unreadCount(user.id, requireDietitianAccountId(client));
     return { count };
   }
 

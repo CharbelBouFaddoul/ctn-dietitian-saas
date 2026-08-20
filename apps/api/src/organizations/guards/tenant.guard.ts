@@ -9,6 +9,10 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { ORGANIZATION_ACCESS_DENIED, ORGANIZATION_UNAVAILABLE } from "../tenant.types";
 import type { TenantContext } from "../tenant.types";
 
+/**
+ * Phase 2: DietitianAccount ownership is the only practice authorization gate.
+ * Path `:organizationId` is DietitianAccount.id. No OrganizationMember / OrgRoles.
+ */
 @Injectable()
 export class TenantGuard implements CanActivate {
   constructor(private readonly prisma: PrismaService) {}
@@ -46,6 +50,7 @@ export class TenantGuard implements CanActivate {
       organizationId: account.id,
       organizationName: account.displayName,
       organizationStatus: account.status,
+      // Synthetic response fields only — not used for authorization.
       membershipId: account.id,
       role: "OWNER",
       membershipStatus: "ACTIVE",

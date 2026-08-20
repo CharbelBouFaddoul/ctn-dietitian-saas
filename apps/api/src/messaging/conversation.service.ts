@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type { Client, Conversation } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
+import { requireDietitianAccountId } from "../organizations/tenant-scope";
 import { TimelineService } from "../timeline/timeline.service";
 import { NotificationService } from "../notifications/notification.service";
 const PREVIEW_MAX = 120;
@@ -14,7 +15,7 @@ export class ConversationService {
   ) {}
 
   async getOrCreate(client: Client): Promise<Conversation> {
-    const dietitianAccountId = client.dietitianAccountId ?? client.organizationId;
+    const dietitianAccountId = requireDietitianAccountId(client);
     const existing = await this.prisma.conversation.findUnique({
       where: {
         dietitianAccountId_clientId: {
@@ -37,7 +38,7 @@ export class ConversationService {
     const conversation = await this.prisma.conversation.findFirst({
       where: {
         id: conversationId,
-        dietitianAccountId: client.dietitianAccountId ?? client.organizationId,
+        dietitianAccountId: requireDietitianAccountId(client),
         clientId: client.id,
       },
     });
@@ -85,7 +86,7 @@ export class ConversationService {
       throw new ForbiddenException("Conversation is not active");
     }
 
-    const dietitianAccountId = input.client.dietitianAccountId ?? input.client.organizationId;
+    const dietitianAccountId = requireDietitianAccountId(input.client);
     const message = await this.prisma.$transaction(async (tx) => {
       const created = await tx.message.create({
         data: {
@@ -154,11 +155,11 @@ export class ConversationService {
     return this.toMessageResponse(message);
   }
 
-  async listMessages(conversationId: string, organizationId: string, before?: string, limit = 50) {
+  async listMessages(conversationId: string, dietitianAccountId: string, before?: string, limit = 50) {
     const rows = await this.prisma.message.findMany({
       where: {
         conversationId,
-        dietitianAccountId: organizationId,
+        dietitianAccountId,
         deletedAt: null,
         ...(before ? { createdAt: { lt: new Date(before) } } : {}),
       },
@@ -168,14 +169,20 @@ export class ConversationService {
     return rows.reverse().map((row) => this.toMessageResponse(row));
   }
 
-  async markRead(conversationId: string, organizationId: string, readerUserId: string) {
+  async markRead(
+    conversationId: string,
+    client: { dietitianAccountId: string | null; organizationId: string },
+    readerUserId: string,
+  ) {
     const now = new Date();
+    const dietitianAccountId = requireDietitianAccountId(client);
     await this.prisma.conversationReadState.upsert({
       where: {
         conversationId_readerUserId: { conversationId, readerUserId },
       },
       create: {
-        organizationId,
+        dietitianAccountId,
+        organizationId: client.organizationId,
         conversationId,
         readerUserId,
         lastReadAt: now,
