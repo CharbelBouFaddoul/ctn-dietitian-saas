@@ -1,15 +1,83 @@
 :root {
   --color-bg: #f6f5f2;
   --color-surface: #ffffff;
+  --color-surface-muted: #faf9f7;
   --color-text: #1c1917;
   --color-muted: #78716c;
   --color-accent: #0f766e;
+  --color-accent-hover: #0d5f59;
   --color-accent-soft: #ccfbf1;
   --color-border: #e7e5e4;
   --color-danger: #b91c1c;
+  --color-danger-soft: #fee2e2;
+  --color-success: #047857;
+  --color-success-soft: #d1fae5;
+  --color-warning: #b45309;
+  --color-warning-soft: #fef3c7;
+  --color-info: #1d4ed8;
+  --color-info-soft: #dbeafe;
+  --color-overlay: rgb(28 25 23 / 45%);
+  --radius-sm: 8px;
   --radius: 12px;
+  --radius-lg: 20px;
   --shadow: 0 1px 2px rgb(28 25 23 / 6%);
+  --shadow-md: 0 8px 24px rgb(28 25 23 / 8%);
   --font-sans: "IBM Plex Sans", "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-md: 0.9375rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.5rem;
+  --text-2xl: 2rem;
+  --text-3xl: 2.75rem;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+  --sidebar-width: 248px;
+  --focus-ring: 0 0 0 3px rgb(15 118 110 / 28%);
+  --bp-sm: 640px;
+  --bp-md: 900px;
+  --bp-lg: 1100px;
+}
+
+[data-theme="admin"] {
+  --color-bg: #f1f5f9;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f8fafc;
+  --color-text: #0f172a;
+  --color-muted: #64748b;
+  --color-accent: #1e293b;
+  --color-accent-hover: #0f172a;
+  --color-accent-soft: #e2e8f0;
+  --color-border: #e2e8f0;
+  --focus-ring: 0 0 0 3px rgb(30 41 59 / 22%);
+}
+
+[data-theme="practice"] {
+  --color-bg: #f4f7f6;
+  --color-accent: #0f766e;
+  --color-accent-hover: #0d5f59;
+  --color-accent-soft: #ccfbf1;
+}
+
+[data-theme="client"] {
+  --color-bg: #faf8f5;
+  --color-accent: #0f766e;
+  --color-accent-soft: #ecfdf8;
+  --sidebar-width: 220px;
+}
+
+[data-theme="marketing"] {
+  --color-bg: #f7f4ee;
+  --color-accent: #0f766e;
 }
 
 * {
@@ -23,4 +91,22 @@ body {
   background: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+a {
+  color: inherit;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }

@@ -1,8 +1,11 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import Link from "next/link";
+import { Alert, Button, Field, Input } from "@nutrition-saas/ui";
 import { api } from "../../../lib/api";
-import { AuthShell, buttonStyle, fieldStyle, inputStyle } from "../auth-shell";
+import { errorMessage } from "../../../lib/humanize-error";
+import { AuthShell } from "../auth-shell";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -19,30 +22,45 @@ export default function ForgotPasswordPage() {
       });
       setMessage(result.message);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Request failed");
+      setError(errorMessage(err, "Request failed"));
     }
   }
 
   return (
-    <AuthShell title="Forgot password">
+    <AuthShell
+      title="Forgot password"
+      audience="dietitian"
+      description="We’ll send a reset link if an account exists for that email."
+    >
       <form onSubmit={(event) => void onSubmit(event)}>
-        <label style={fieldStyle}>
-          Email
-          <input
-            style={inputStyle}
+        <Field label="Email">
+          <Input
             type="email"
             autoComplete="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             required
           />
-        </label>
-        <button type="submit" style={buttonStyle}>
+        </Field>
+        <Button type="submit" block>
           Send reset link
-        </button>
+        </Button>
       </form>
-      {message ? <p>{message}</p> : null}
-      {error ? <p style={{ color: "var(--color-danger)" }}>{error}</p> : null}
+      {message ? (
+        <div style={{ marginTop: 12 }}>
+          <Alert tone="success">{message}</Alert>
+        </div>
+      ) : null}
+      {error ? (
+        <div style={{ marginTop: 12 }}>
+          <Alert tone="danger">{error}</Alert>
+        </div>
+      ) : null}
+      <p style={{ marginTop: 16, fontSize: 13 }}>
+        <Link href="/auth/login" className="ui-link">
+          Back to sign in
+        </Link>
+      </p>
     </AuthShell>
   );
 }

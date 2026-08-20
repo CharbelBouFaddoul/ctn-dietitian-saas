@@ -4,8 +4,6 @@ import { FormEvent, useEffect, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { api } from "../../../../../lib/api";
-import { buttonStyle, fieldStyle, inputStyle } from "../../practice-shell";
-
 type NutrientKey =
   | "energyKcal"
   | "proteinG"
@@ -169,7 +167,7 @@ export default function FoodDetailPage() {
         {food.category ? ` · ${food.category}` : ""}
       </p>
       <p>
-        Values marked <strong>CUSTOM</strong> are organization overrides. <strong>GLOBAL</strong> values come from the
+        Values marked <strong>Practice food</strong> are organization overrides. <strong>Catalog food</strong> values come from the
         imported dataset and cannot be edited in place.
       </p>
       {error ? <p style={{ color: "var(--color-danger)" }}>{error}</p> : null}
@@ -195,11 +193,11 @@ export default function FoodDetailPage() {
                 </td>
                 <td style={td}>{formatValue(food.presentedEffectiveNutrition[item.key])}</td>
                 <td style={td}>{formatValue(food.globalNutrition[item.key])}</td>
-                <td style={td}>{custom ? "CUSTOM" : "GLOBAL"}</td>
+                <td style={td}>{custom ? "Practice food" : "Catalog food"}</td>
                 {canOverride ? (
                   <td style={td}>
                     <input
-                      style={inputStyle}
+                      className="ui-input"
                       value={draft[item.key]}
                       placeholder="global"
                       onChange={(event) => setDraft((current) => ({ ...current, [item.key]: event.target.value }))}
@@ -214,11 +212,11 @@ export default function FoodDetailPage() {
 
       {canOverride ? (
         <form onSubmit={(event) => void saveOverride(event).catch((err) => setError(err instanceof Error ? err.message : "Save failed"))} style={{ marginTop: 16, display: "flex", gap: 8 }}>
-          <button type="submit" style={buttonStyle}>
+          <button type="submit" className="ui-btn ui-btn--primary">
             Save organization override
           </button>
           {food.override ? (
-            <button type="button" style={buttonStyle} onClick={() => void resetOverride().catch((err) => setError(err instanceof Error ? err.message : "Reset failed"))}>
+            <button type="button" className="ui-btn ui-btn--primary" onClick={() => void resetOverride().catch((err) => setError(err instanceof Error ? err.message : "Reset failed"))}>
               Remove override
             </button>
           ) : null}
@@ -233,13 +231,13 @@ export default function FoodDetailPage() {
         onSubmit={(event) => void calculate(event).catch((err) => setError(err instanceof Error ? err.message : "Calculate failed"))}
         style={{ display: "flex", gap: 12, alignItems: "end" }}
       >
-        <label style={fieldStyle}>
+        <label className="ui-field">
           Quantity
-          <input style={inputStyle} value={quantity} onChange={(event) => setQuantity(event.target.value)} />
+          <input className="ui-input" value={quantity} onChange={(event) => setQuantity(event.target.value)} />
         </label>
-        <label style={fieldStyle}>
+        <label className="ui-field">
           Unit
-          <select style={inputStyle} value={unit} onChange={(event) => setUnit(event.target.value)}>
+          <select className="ui-input" value={unit} onChange={(event) => setUnit(event.target.value)}>
             {(food.referenceUnit === "g" ? ["g", "kg", "oz", "lb"] : ["ml", "l", "fl_oz"]).map((item) => (
               <option key={item} value={item}>
                 {item}
@@ -247,7 +245,7 @@ export default function FoodDetailPage() {
             ))}
           </select>
         </label>
-        <button type="submit" style={{ ...buttonStyle, height: 38 }}>
+        <button type="submit" className="ui-btn ui-btn--primary" style={{height: 38}}>
           Calculate
         </button>
       </form>

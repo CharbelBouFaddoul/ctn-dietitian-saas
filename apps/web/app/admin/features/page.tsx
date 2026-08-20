@@ -2,8 +2,6 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { api } from "../../../lib/api";
-import { buttonStyle, cellStyle, inputStyle, tableStyle } from "../admin-shell";
-
 interface FeatureRow {
   id: string;
   key: string;
@@ -60,33 +58,33 @@ export default function AdminFeaturesPage() {
       </p>
       {error ? <p style={{ color: "var(--color-danger)" }}>{error}</p> : null}
       <form onSubmit={(event) => void onCreate(event)} style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-        <input style={inputStyle} value={key} onChange={(event) => setKey(event.target.value)} placeholder="KEY" required />
-        <input style={inputStyle} value={name} onChange={(event) => setName(event.target.value)} placeholder="Name" required />
-        <select style={inputStyle} value={valueType} onChange={(event) => setValueType(event.target.value as "BOOLEAN" | "LIMIT")}>
+        <input className="ui-input" value={key} onChange={(event) => setKey(event.target.value)} placeholder="KEY" required />
+        <input className="ui-input" value={name} onChange={(event) => setName(event.target.value)} placeholder="Name" required />
+        <select className="ui-input" value={valueType} onChange={(event) => setValueType(event.target.value as "BOOLEAN" | "LIMIT")}>
           <option value="BOOLEAN">BOOLEAN</option>
           <option value="LIMIT">LIMIT</option>
         </select>
-        <button type="submit" style={buttonStyle}>
+        <button type="submit" className="ui-btn ui-btn--primary">
           Create
         </button>
       </form>
-      <table style={tableStyle}>
+      <table className="ui-table">
         <thead>
           <tr>
-            <th style={cellStyle}>Key</th>
-            <th style={cellStyle}>Type</th>
-            <th style={cellStyle}>Status</th>
-            <th style={cellStyle}></th>
+            <th>Key</th>
+            <th>Type</th>
+            <th>Status</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => (
             <tr key={row.id}>
-              <td style={cellStyle}>{row.key}</td>
-              <td style={cellStyle}>{row.valueType}</td>
-              <td style={cellStyle}>{row.status}</td>
-              <td style={cellStyle}>
-                <button type="button" style={buttonStyle} onClick={() => void setStatus(row.id, row.status === "ACTIVE" ? "INACTIVE" : "ACTIVE")}>
+              <td>{row.key}</td>
+              <td>{row.valueType}</td>
+              <td>{row.status}</td>
+              <td>
+                <button type="button" className="ui-btn ui-btn--primary" onClick={() => void setStatus(row.id, row.status === "ACTIVE" ? "INACTIVE" : "ACTIVE")}>
                   {row.status === "ACTIVE" ? "Deactivate" : "Activate"}
                 </button>
               </td>

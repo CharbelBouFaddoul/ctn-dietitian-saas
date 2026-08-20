@@ -2,9 +2,10 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { api } from "../../../../../lib/api";
-import { buttonStyle, fieldStyle, inputStyle } from "../../practice-shell";
-
+import { ApiError, api } from "../../../../../lib/api";
+import { errorMessage } from "../../../../../lib/humanize-error";
+import { canManageClients } from "../../../../../lib/practice-access";
+import { usePractice } from "../../practice-shell";
 interface Member {
   id: string;
   email: string;
@@ -21,19 +22,23 @@ export default function NewClientPage() {
   const params = useParams<{ organizationId: string }>();
   const organizationId = params.organizationId;
   const router = useRouter();
+  const practice = usePractice();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [status, setStatus] = useState("ACTIVE");
-  const [assignedMemberId, setAssignedMemberId] = useState("");
+  const [assignedMemberId, setAssignedMemberId] = useState(practice.membershipId);
   const [tagIds, setTagIds] = useState<string[]>([]);
-  const [invitePortal, setInvitePortal] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!canManageClients(practice.role)) {
+      router.replace(`/orgs/${organizationId}/clients`);
+      return;
+    }
     void Promise.all([
       api<Member[]>(`/api/v1/organizations/${organizationId}/members`),
       api<Tag[]>(`/api/v1/organizations/${organizationId}/tags`),
@@ -41,7 +46,7 @@ export default function NewClientPage() {
       setMembers(memberRows.filter((row) => row.status === "ACTIVE"));
       setTags(tagRows);
     });
-  }, [organizationId]);
+  }, [organizationId, practice.role, router]);
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -57,12 +62,20 @@ export default function NewClientPage() {
           status,
           assignedMemberId: assignedMemberId || undefined,
           tagIds,
-          invitePortal,
         }),
       });
-      router.push(`/orgs/${organizationId}/clients/${created.id}`);
+      try {
+        await api(`/api/v1/organizations/${organizationId}/clients/${created.id}`);
+        router.push(`/orgs/${organizationId}/clients/${created.id}`);
+      } catch (accessErr) {
+        if (accessErr instanceof ApiError && accessErr.status === 403) {
+          router.push(`/orgs/${organizationId}/clients`);
+          return;
+        }
+        throw accessErr;
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Create failed");
+      setError(errorMessage(err, "Create failed"));
     }
   }
 
@@ -70,37 +83,38 @@ export default function NewClientPage() {
     <section style={{ maxWidth: 520 }}>
       <h1>New client</h1>
       <p style={{ color: "var(--color-muted)" }}>
-        Portal invitation is optional. Clients are not organization members.
+        Add a chart yourself when you already work with this person. New clients should create their own account, then
+        enter the practice join code from the Clients page.
       </p>
       <form onSubmit={(event) => void onSubmit(event)}>
-        <label style={fieldStyle}>
+        <label className="ui-field">
           First name
-          <input style={inputStyle} value={firstName} onChange={(event) => setFirstName(event.target.value)} required />
+          <input className="ui-input" value={firstName} onChange={(event) => setFirstName(event.target.value)} required />
         </label>
-        <label style={fieldStyle}>
+        <label className="ui-field">
           Last name
-          <input style={inputStyle} value={lastName} onChange={(event) => setLastName(event.target.value)} required />
+          <input className="ui-input" value={lastName} onChange={(event) => setLastName(event.target.value)} required />
         </label>
-        <label style={fieldStyle}>
+        <label className="ui-field">
           Email
-          <input style={inputStyle} type="email" value={email} onChange={(event) => setEmail(event.target.value)} />
+          <input className="ui-input" type="email" value={email} onChange={(event) => setEmail(event.target.value)} />
         </label>
-        <label style={fieldStyle}>
+        <label className="ui-field">
           Phone
-          <input style={inputStyle} value={phone} onChange={(event) => setPhone(event.target.value)} />
+          <input className="ui-input" value={phone} onChange={(event) => setPhone(event.target.value)} />
         </label>
-        <label style={fieldStyle}>
+        <label className="ui-field">
           Status
-          <select style={inputStyle} value={status} onChange={(event) => setStatus(event.target.value)}>
+          <select className="ui-input" value={status} onChange={(event) => setStatus(event.target.value)}>
             <option value="PENDING">Pending</option>
             <option value="ACTIVE">Active</option>
             <option value="INACTIVE">Inactive</option>
           </select>
         </label>
-        <label style={fieldStyle}>
+        <label className="ui-field">
           Assign to
           <select
-            style={inputStyle}
+            className="ui-input"
             value={assignedMemberId}
             onChange={(event) => setAssignedMemberId(event.target.value)}
           >
@@ -130,15 +144,7 @@ export default function NewClientPage() {
           ))}
           {tags.length === 0 ? <p>No tags yet.</p> : null}
         </fieldset>
-        <label style={{ display: "block", marginBottom: 16 }}>
-          <input
-            type="checkbox"
-            checked={invitePortal}
-            onChange={(event) => setInvitePortal(event.target.checked)}
-          />{" "}
-          Create portal account and send invitation
-        </label>
-        <button type="submit" style={buttonStyle}>
+        <button type="submit" className="ui-btn ui-btn--primary">
           Create client
         </button>
       </form>

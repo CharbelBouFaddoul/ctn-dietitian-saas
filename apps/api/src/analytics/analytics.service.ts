@@ -146,7 +146,7 @@ export class AnalyticsService {
     const visible = this.access.visibleWhere(tenant);
     const clients = await this.prisma.client.findMany({
       where: { ...visible, status: "ACTIVE" },
-      select: { id: true, firstName: true, lastName: true, displayName: true },
+      select: { id: true, firstName: true, lastName: true, displayName: true, email: true },
     });
     const clientIds = clients.map((c) => c.id);
     if (!clientIds.length) {
@@ -170,10 +170,25 @@ export class AnalyticsService {
     const cutoff = new Date();
     cutoff.setUTCDate(cutoff.getUTCDate() - INACTIVE_DAYS);
 
-    const recentlyActive: Array<{ clientId: string; clientName: string; lastActivityAt: string }> = [];
-    const noRecentActivity: Array<{ clientId: string; clientName: string; lastActivityAt: string | null; reason: string }> =
-      [];
-    const needsAttention: Array<{ clientId: string; clientName: string; reasons: string[] }> = [];
+    const recentlyActive: Array<{
+      clientId: string;
+      clientName: string;
+      clientEmail: string | null;
+      lastActivityAt: string;
+    }> = [];
+    const noRecentActivity: Array<{
+      clientId: string;
+      clientName: string;
+      clientEmail: string | null;
+      lastActivityAt: string | null;
+      reason: string;
+    }> = [];
+    const needsAttention: Array<{
+      clientId: string;
+      clientName: string;
+      clientEmail: string | null;
+      reasons: string[];
+    }> = [];
 
     for (const client of clients) {
       const name = client.displayName ?? `${client.firstName} ${client.lastName}`;
@@ -190,7 +205,12 @@ export class AnalyticsService {
         : null;
 
       if (lastActivity && lastActivity >= range.start) {
-        recentlyActive.push({ clientId: client.id, clientName: name, lastActivityAt: lastActivity.toISOString() });
+        recentlyActive.push({
+          clientId: client.id,
+          clientName: name,
+          clientEmail: client.email,
+          lastActivityAt: lastActivity.toISOString(),
+        });
       }
 
       const reasons: string[] = [];
@@ -206,6 +226,7 @@ export class AnalyticsService {
         noRecentActivity.push({
           clientId: client.id,
           clientName: name,
+          clientEmail: client.email,
           lastActivityAt: lastActivity?.toISOString() ?? null,
           reason: reasons[0] ?? "Needs attention",
         });
@@ -220,7 +241,7 @@ export class AnalyticsService {
         reasons.push("Overdue task");
       }
       if (reasons.length) {
-        needsAttention.push({ clientId: client.id, clientName: name, reasons });
+        needsAttention.push({ clientId: client.id, clientName: name, clientEmail: client.email, reasons });
       }
     }
 

@@ -3,8 +3,6 @@
 import { FormEvent, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { api } from "../../../../../lib/api";
-import { buttonStyle, fieldStyle, inputStyle } from "../../practice-shell";
-
 export default function NewRecipePage() {
   const params = useParams<{ organizationId: string }>();
   const router = useRouter();
@@ -28,19 +26,19 @@ export default function NewRecipePage() {
       <h1>New recipe</h1>
       {error ? <p style={{ color: "var(--color-danger)" }}>{error}</p> : null}
       <form onSubmit={(event) => void onSubmit(event).catch((err) => setError(err instanceof Error ? err.message : "Save failed"))}>
-        <label style={fieldStyle}>
+        <label className="ui-field">
           Name
-          <input style={inputStyle} value={name} onChange={(event) => setName(event.target.value)} required />
+          <input className="ui-input" value={name} onChange={(event) => setName(event.target.value)} required />
         </label>
-        <label style={fieldStyle}>
+        <label className="ui-field">
           Servings
-          <input style={inputStyle} value={servings} onChange={(event) => setServings(event.target.value)} />
+          <input className="ui-input" value={servings} onChange={(event) => setServings(event.target.value)} />
         </label>
-        <label style={fieldStyle}>
+        <label className="ui-field">
           Description
-          <textarea style={inputStyle} value={description} onChange={(event) => setDescription(event.target.value)} />
+          <textarea className="ui-input" value={description} onChange={(event) => setDescription(event.target.value)} />
         </label>
-        <button type="submit" style={buttonStyle}>
+        <button type="submit" className="ui-btn ui-btn--primary">
           Create
         </button>
       </form>

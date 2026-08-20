@@ -35,11 +35,25 @@ export class RegisterDto {
   @MaxLength(128)
   password!: string;
 
-  @ApiPropertyOptional({ type: [ConsentInputDto] })
+  @ApiPropertyOptional()
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(8)
   @ValidateNested({ each: true })
   @Type(() => ConsentInputDto)
   consents?: ConsentInputDto[];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  firstName?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  lastName?: string;
 }

@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import { CLIENT_ACCESS_DENIED } from "../src/clients/client.messages";
 import {
+  connectClientPortal,
   cookieValue,
   createAuthTestApp,
   extractEmailedToken,
@@ -75,24 +76,11 @@ describe("Phase 10 invoices, tasks, and analytics", () => {
       .send({ firstName: "Pat", lastName: "Client", email: email("client"), ...body });
   }
 
-  async function portalLogin(clientEmail: string) {
-    const inviteMail = ctx.emails.messages.find(
-      (message) => message.text.includes("CLIENT_INVITE") && message.to === clientEmail,
-    );
-    const token = extractEmailedToken(inviteMail?.text ?? "");
-    await request(ctx.app.getHttpServer()).post("/api/v1/auth/invitations/accept").send({ token, password: PASSWORD }).expect(200);
-    const login = await request(ctx.app.getHttpServer())
-      .post("/api/v1/auth/login")
-      .send({ email: clientEmail, password: PASSWORD })
-      .expect(200);
-    return `ns_session=${cookieValue(login.headers["set-cookie"])}`;
-  }
-
   it("runs invoice lifecycle with server totals and unique numbering", async () => {
     const owner = await registerVerifyLogin();
     const org = await createOrg(owner.cookie, "Billing Clinic");
-    const client = await createClient(owner.cookie, org.id, { invitePortal: true });
-    const portal = await portalLogin(client.body.email);
+    const client = await createClient(owner.cookie, org.id);
+    const portal = await connectClientPortal(ctx, owner.cookie, org.id, client.body);
 
     const draft = await request(ctx.app.getHttpServer())
       .post(`/api/v1/organizations/${org.id}/clients/${client.body.id}/invoices`)

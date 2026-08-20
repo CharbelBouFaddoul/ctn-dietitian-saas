@@ -3,8 +3,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "../../../lib/api";
-import { buttonStyle, cellStyle, inputStyle, tableStyle } from "../admin-shell";
-
 interface PlanRow {
   id: string;
   name: string;
@@ -51,31 +49,31 @@ export default function AdminPlansPage() {
       </p>
       {error ? <p style={{ color: "var(--color-danger)" }}>{error}</p> : null}
       <form onSubmit={(event) => void onCreate(event)} style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-        <input style={inputStyle} value={name} onChange={(event) => setName(event.target.value)} placeholder="Name" required />
-        <input style={inputStyle} value={slug} onChange={(event) => setSlug(event.target.value)} placeholder="slug" required />
-        <button type="submit" style={buttonStyle}>
+        <input className="ui-input" value={name} onChange={(event) => setName(event.target.value)} placeholder="Name" required />
+        <input className="ui-input" value={slug} onChange={(event) => setSlug(event.target.value)} placeholder="slug" required />
+        <button type="submit" className="ui-btn ui-btn--primary">
           Create
         </button>
       </form>
-      <table style={tableStyle}>
+      <table className="ui-table">
         <thead>
           <tr>
-            <th style={cellStyle}>Plan</th>
-            <th style={cellStyle}>Status</th>
-            <th style={cellStyle}>Subscriptions</th>
+            <th>Plan</th>
+            <th>Status</th>
+            <th>Subscriptions</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => (
             <tr key={row.id}>
-              <td style={cellStyle}>
+              <td>
                 <Link href={`/admin/plans/${row.id}`} style={{ color: "var(--color-accent)" }}>
                   {row.name}
                 </Link>{" "}
                 ({row.slug})
               </td>
-              <td style={cellStyle}>{row.status}</td>
-              <td style={cellStyle}>{row._count?.subscriptions ?? 0}</td>
+              <td>{row.status}</td>
+              <td>{row._count?.subscriptions ?? 0}</td>
             </tr>
           ))}
         </tbody>

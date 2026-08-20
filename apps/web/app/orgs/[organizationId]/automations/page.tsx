@@ -4,15 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { api } from "../../../../lib/api";
-import {
-  buttonStyle,
-  cellStyle,
-  fieldStyle,
-  inputStyle,
-  pageStyle,
-  tableStyle,
-} from "../practice-shell";
-
+import { humanizeLabel } from "@nutrition-saas/ui";
 interface AutomationRule {
   id: string;
   name: string;
@@ -135,7 +127,7 @@ export default function AutomationsPage() {
 
   if (error) {
     return (
-      <main style={pageStyle}>
+      <main>
         <p>{error}</p>
       </main>
     );
@@ -144,8 +136,8 @@ export default function AutomationsPage() {
   return (
     <div>
       <h1 style={{ marginTop: 0 }}>Automations</h1>
-      <p style={{ color: "var(--color-muted)" }}>
-        Deterministic practice rules. AI-generated — review before use does not apply; actions use templates only.
+      <p className="ui-muted">
+        When something happens in the practice, then create a task or send a reminder. You stay in control of every action.
       </p>
 
       {usage ? (
@@ -167,7 +159,7 @@ export default function AutomationsPage() {
       ) : null}
 
       <div style={{ marginBottom: 16, display: "flex", gap: 8 }}>
-        <button type="button" style={buttonStyle} onClick={() => setShowBuilder((v) => !v)}>
+        <button type="button" className="ui-btn ui-btn--primary" onClick={() => setShowBuilder((v) => !v)}>
           {showBuilder ? "Close builder" : "Create rule"}
         </button>
         <Link href={`/orgs/${organizationId}/automation-runs`} style={{ alignSelf: "center", color: "var(--color-accent)" }}>
@@ -186,13 +178,13 @@ export default function AutomationsPage() {
           }}
         >
           <h2 style={{ marginTop: 0, fontSize: 18 }}>Rule builder</h2>
-          <label style={fieldStyle}>
+          <label className="ui-field">
             Name
-            <input style={inputStyle} value={name} onChange={(e) => setName(e.target.value)} placeholder="Inactive client follow-up" />
+            <input className="ui-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Inactive client follow-up" />
           </label>
-          <label style={fieldStyle}>
+          <label className="ui-field">
             When
-            <select style={inputStyle} value={triggerType} onChange={(e) => setTriggerType(e.target.value)}>
+            <select className="ui-input" value={triggerType} onChange={(e) => setTriggerType(e.target.value)}>
               {TRIGGERS.map((t) => (
                 <option key={t.value} value={t.value}>
                   {t.label}
@@ -201,10 +193,10 @@ export default function AutomationsPage() {
             </select>
           </label>
           {selectedTrigger?.timingKey ? (
-            <label style={fieldStyle}>
-              Timing ({selectedTrigger.timingKey})
+            <label className="ui-field">
+              After how many days?
               <input
-                style={inputStyle}
+                className="ui-input"
                 type="number"
                 min={1}
                 value={timingValue}
@@ -212,9 +204,9 @@ export default function AutomationsPage() {
               />
             </label>
           ) : null}
-          <label style={fieldStyle}>
+          <label className="ui-field">
             Then
-            <select style={inputStyle} value={actionType} onChange={(e) => setActionType(e.target.value)}>
+            <select className="ui-input" value={actionType} onChange={(e) => setActionType(e.target.value)}>
               {ACTIONS.map((a) => (
                 <option key={a.value} value={a.value}>
                   {a.label}
@@ -222,30 +214,30 @@ export default function AutomationsPage() {
               ))}
             </select>
           </label>
-          <label style={fieldStyle}>
+          <label className="ui-field">
             Recipient
-            <select style={inputStyle} value={recipient} onChange={(e) => setRecipient(e.target.value)}>
+            <select className="ui-input" value={recipient} onChange={(e) => setRecipient(e.target.value)}>
               <option value="ASSIGNED_DIETITIAN">Assigned dietitian</option>
               <option value="RULE_CREATOR">Rule creator</option>
               <option value="CLIENT">Client</option>
             </select>
           </label>
           {actionType === "CREATE_TASK" ? (
-            <label style={fieldStyle}>
+            <label className="ui-field">
               Task title
-              <input style={inputStyle} value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} />
+              <input className="ui-input" value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} />
             </label>
           ) : null}
           {actionType !== "CREATE_TASK" ? (
             <>
-              <label style={fieldStyle}>
+              <label className="ui-field">
                 Title / subject
-                <input style={inputStyle} value={notificationTitle} onChange={(e) => setNotificationTitle(e.target.value)} />
+                <input className="ui-input" value={notificationTitle} onChange={(e) => setNotificationTitle(e.target.value)} />
               </label>
-              <label style={fieldStyle}>
+              <label className="ui-field">
                 Body
                 <textarea
-                  style={{ ...inputStyle, minHeight: 80 }}
+                  className="ui-input" style={{minHeight: 80}}
                   value={notificationBody}
                   onChange={(e) => setNotificationBody(e.target.value)}
                 />
@@ -257,49 +249,49 @@ export default function AutomationsPage() {
             {ACTIONS.find((a) => a.value === actionType)?.label.toLowerCase()} to {recipient.replace(/_/g, " ").toLowerCase()}.
           </p>
           <div style={{ display: "flex", gap: 8 }}>
-            <button type="button" style={buttonStyle} onClick={() => void createRule(false).catch((e) => setError(String(e)))}>
+            <button type="button" className="ui-btn ui-btn--primary" onClick={() => void createRule(false).catch((e) => setError(String(e)))}>
               Save as paused
             </button>
-            <button type="button" style={buttonStyle} onClick={() => void createRule(true).catch((e) => setError(String(e)))}>
+            <button type="button" className="ui-btn ui-btn--primary" onClick={() => void createRule(true).catch((e) => setError(String(e)))}>
               Activate
             </button>
           </div>
         </section>
       ) : null}
 
-      <table style={tableStyle}>
+      <table className="ui-table">
         <thead>
           <tr>
-            <th style={cellStyle}>Name</th>
-            <th style={cellStyle}>Status</th>
-            <th style={cellStyle}>Summary</th>
-            <th style={cellStyle}>Last run</th>
-            <th style={cellStyle}>Actions</th>
+            <th>Name</th>
+            <th>Status</th>
+            <th>Summary</th>
+            <th>Last run</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
           {rules.map((rule) => (
             <tr key={rule.id}>
-              <td style={cellStyle}>
+              <td>
                 <Link href={`/orgs/${organizationId}/automations/${rule.id}`} style={{ color: "var(--color-accent)" }}>
                   {rule.name}
                 </Link>
               </td>
-              <td style={cellStyle}>{rule.status}</td>
-              <td style={cellStyle}>{rule.summary}</td>
-              <td style={cellStyle}>{rule.lastRunAt ? new Date(rule.lastRunAt).toLocaleString() : "—"}</td>
-              <td style={cellStyle}>
+              <td>{humanizeLabel(rule.status)}</td>
+              <td>{rule.summary}</td>
+              <td>{rule.lastRunAt ? new Date(rule.lastRunAt).toLocaleString() : "—"}</td>
+              <td>
                 {rule.status !== "ACTIVE" ? (
-                  <button type="button" style={buttonStyle} onClick={() => void setStatus(rule.id, "activate")}>
+                  <button type="button" className="ui-btn ui-btn--primary" onClick={() => void setStatus(rule.id, "activate")}>
                     Activate
                   </button>
                 ) : (
-                  <button type="button" style={buttonStyle} onClick={() => void setStatus(rule.id, "pause")}>
+                  <button type="button" className="ui-btn ui-btn--primary" onClick={() => void setStatus(rule.id, "pause")}>
                     Pause
                   </button>
                 )}{" "}
                 {rule.status !== "ARCHIVED" ? (
-                  <button type="button" style={buttonStyle} onClick={() => void setStatus(rule.id, "archive")}>
+                  <button type="button" className="ui-btn ui-btn--primary" onClick={() => void setStatus(rule.id, "archive")}>
                     Archive
                   </button>
                 ) : null}

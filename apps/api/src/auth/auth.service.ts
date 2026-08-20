@@ -13,6 +13,8 @@ import { SessionService } from "./session.service";
 export interface RegisterInput {
   email: string;
   password: string;
+  firstName?: string;
+  lastName?: string;
   consents?: Array<{ type: "TERMS_OF_SERVICE" | "PRIVACY_POLICY"; policyVersion: string }>;
 }
 
@@ -39,6 +41,8 @@ export class AuthService {
           emailNormalized,
           passwordHash,
           status: "PENDING",
+          firstName: input.firstName?.trim() || null,
+          lastName: input.lastName?.trim() || null,
         },
       });
 

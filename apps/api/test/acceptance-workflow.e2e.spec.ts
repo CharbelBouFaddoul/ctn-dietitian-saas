@@ -3,6 +3,7 @@ import request from "supertest";
 import { FEATURE_KEYS } from "@nutrition-saas/config";
 import { PLATFORM_ASSESSMENT_TEMPLATE_ID } from "../src/assessments/platform-template.seed";
 import {
+  connectClientPortal,
   cookieValue,
   createAuthTestApp,
   extractEmailedToken,
@@ -117,20 +118,10 @@ describe("§87 end-to-end acceptance workflow", () => {
     const client = await request(ctx.app.getHttpServer())
       .post(`/api/v1/organizations/${org.body.id}/clients`)
       .set("Cookie", dietitian.cookie)
-      .send({ firstName: "Alex", lastName: "Client", email: nextEmail("client"), invitePortal: true })
+      .send({ firstName: "Alex", lastName: "Client", email: nextEmail("client") })
       .expect(201);
 
-    const inviteMail = ctx.emails.messages.find((row) => row.to === client.body.email);
-    const inviteToken = extractEmailedToken(inviteMail?.text ?? "");
-    await request(ctx.app.getHttpServer())
-      .post("/api/v1/auth/invitations/accept")
-      .send({ token: inviteToken, password: PASSWORD })
-      .expect(200);
-    const clientLogin = await request(ctx.app.getHttpServer())
-      .post("/api/v1/auth/login")
-      .send({ email: client.body.email, password: PASSWORD })
-      .expect(200);
-    const clientCookie = `ns_session=${cookieValue(clientLogin.headers["set-cookie"])}`;
+    const clientCookie = await connectClientPortal(ctx, dietitian.cookie, org.body.id, client.body);
 
     const assessment = await request(ctx.app.getHttpServer())
       .post(`/api/v1/organizations/${org.body.id}/clients/${client.body.id}/assessments`)

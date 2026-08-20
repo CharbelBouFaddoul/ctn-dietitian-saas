@@ -3,8 +3,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "../../../lib/api";
-import { buttonStyle, cellStyle, inputStyle, tableStyle } from "../admin-shell";
-
 interface OrgRow {
   id: string;
   name: string;
@@ -41,30 +39,30 @@ export default function AdminOrganizationsPage() {
     <section>
       <h1>Organizations</h1>
       <form onSubmit={onSearch} style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-        <input style={inputStyle} value={q} onChange={(event) => setQ(event.target.value)} placeholder="Search name or slug" />
-        <button type="submit" style={buttonStyle}>
+        <input className="ui-input" value={q} onChange={(event) => setQ(event.target.value)} placeholder="Search name or slug" />
+        <button type="submit" className="ui-btn ui-btn--primary">
           Search
         </button>
       </form>
       {error ? <p style={{ color: "var(--color-danger)" }}>{error}</p> : null}
-      <table style={tableStyle}>
+      <table className="ui-table">
         <thead>
           <tr>
-            <th style={cellStyle}>Name</th>
-            <th style={cellStyle}>Status</th>
-            <th style={cellStyle}>Plan</th>
+            <th>Name</th>
+            <th>Status</th>
+            <th>Plan</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => (
             <tr key={row.id}>
-              <td style={cellStyle}>
+              <td>
                 <Link href={`/admin/organizations/${row.id}`} style={{ color: "var(--color-accent)" }}>
                   {row.name}
                 </Link>
               </td>
-              <td style={cellStyle}>{row.status}</td>
-              <td style={cellStyle}>
+              <td>{row.status}</td>
+              <td>
                 {row.subscription ? `${row.subscription.plan.name} (${row.subscription.status})` : "None"}
               </td>
             </tr>

@@ -4,6 +4,7 @@ import { FEATURE_KEYS } from "@nutrition-saas/config";
 import { CLIENT_ACCESS_DENIED } from "../src/clients/client.messages";
 import { ORGANIZATION_ACCESS_DENIED } from "../src/organizations/tenant.types";
 import {
+  connectClientPortal,
   cookieValue,
   createAuthTestApp,
   extractEmailedToken,
@@ -129,24 +130,9 @@ describe("release-blocking security isolation", () => {
   it("blocks clients from accessing another client's data", async () => {
     const owner = await registerVerifyLogin();
     const org = await createOrg(owner.cookie, "Portal Clinic");
-    const clientA = await createClient(owner.cookie, org.id, { invitePortal: true });
-    const clientB = await createClient(owner.cookie, org.id, { invitePortal: true });
-
-    async function portalCookie(clientEmail: string) {
-      const invite = ctx.emails.messages.find((row) => row.to === clientEmail);
-      const token = extractEmailedToken(invite?.text ?? "");
-      await request(ctx.app.getHttpServer())
-        .post("/api/v1/auth/invitations/accept")
-        .send({ token, password: PASSWORD })
-        .expect(200);
-      const login = await request(ctx.app.getHttpServer())
-        .post("/api/v1/auth/login")
-        .send({ email: clientEmail, password: PASSWORD })
-        .expect(200);
-      return `ns_session=${cookieValue(login.headers["set-cookie"])}`;
-    }
-
-    const portalA = await portalCookie(clientA.body.email);
+    const clientA = await createClient(owner.cookie, org.id);
+    const clientB = await createClient(owner.cookie, org.id);
+    const portalA = await connectClientPortal(ctx, owner.cookie, org.id, clientA.body);
 
     await request(ctx.app.getHttpServer())
       .get(`/api/v1/organizations/${org.id}/clients/${clientB.body.id}/conversation/messages`)
@@ -245,15 +231,7 @@ describe("release-blocking security isolation", () => {
     const owner = await registerVerifyLogin();
     const org = await createOrg(owner.cookie, "Archive Clinic");
     const client = await createClient(owner.cookie, org.id);
-    await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${client.body.id}/account/invite`)
-      .set("Cookie", owner.cookie)
-      .expect(201);
-    const token = extractEmailedToken(ctx.emails.last().text);
-    await request(ctx.app.getHttpServer())
-      .post("/api/v1/auth/invitations/accept")
-      .send({ token, password: PASSWORD })
-      .expect(200);
+    await connectClientPortal(ctx, owner.cookie, org.id, client.body);
     await request(ctx.app.getHttpServer())
       .post(`/api/v1/organizations/${org.id}/clients/${client.body.id}/archive`)
       .set("Cookie", owner.cookie)

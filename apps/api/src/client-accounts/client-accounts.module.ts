@@ -1,17 +1,17 @@
 import { Module } from "@nestjs/common";
 import { AuthModule } from "../auth/auth.module";
-import { EmailModule } from "../email/email.module";
 import { ClientsModule } from "../clients/clients.module";
+import { EntitlementsModule } from "../entitlements/entitlements.module";
 import { OrganizationModule } from "../organizations/organization.module";
 import { TimelineModule } from "../timeline/timeline.module";
 import { ClientAccountController } from "./client-account.controller";
 import { ClientAccountService } from "./client-account.service";
-import { ClientInvitationController } from "./client-invitation.controller";
 import { PortalController } from "./portal.controller";
+import { PracticeJoinCodeController } from "./practice-join-code.controller";
 
 @Module({
-  imports: [AuthModule, EmailModule, OrganizationModule, ClientsModule, TimelineModule],
-  controllers: [ClientAccountController, PortalController, ClientInvitationController],
+  imports: [AuthModule, OrganizationModule, ClientsModule, EntitlementsModule, TimelineModule],
+  controllers: [ClientAccountController, PortalController, PracticeJoinCodeController],
   providers: [ClientAccountService],
   exports: [ClientAccountService],
 })

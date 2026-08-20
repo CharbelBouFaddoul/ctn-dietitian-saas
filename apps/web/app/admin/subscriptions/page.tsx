@@ -3,8 +3,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "../../../lib/api";
-import { cellStyle, tableStyle } from "../admin-shell";
-
 interface SubscriptionRow {
   id: string;
   status: string;
@@ -27,24 +25,24 @@ export default function AdminSubscriptionsPage() {
       <h1>Subscriptions</h1>
       <p style={{ color: "var(--color-muted)" }}>One subscription per organization. No payment UI in V1.</p>
       {error ? <p style={{ color: "var(--color-danger)" }}>{error}</p> : null}
-      <table style={tableStyle}>
+      <table className="ui-table">
         <thead>
           <tr>
-            <th style={cellStyle}>Organization</th>
-            <th style={cellStyle}>Plan</th>
-            <th style={cellStyle}>Status</th>
+            <th>Organization</th>
+            <th>Plan</th>
+            <th>Status</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => (
             <tr key={row.id}>
-              <td style={cellStyle}>
+              <td>
                 <Link href={`/admin/organizations/${row.organization.id}`} style={{ color: "var(--color-accent)" }}>
                   {row.organization.name}
                 </Link>
               </td>
-              <td style={cellStyle}>{row.plan.name}</td>
-              <td style={cellStyle}>{row.status}</td>
+              <td>{row.plan.name}</td>
+              <td>{row.status}</td>
             </tr>
           ))}
         </tbody>

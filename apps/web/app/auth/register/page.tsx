@@ -1,8 +1,11 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import Link from "next/link";
+import { Alert, Button, Field, Input, PasswordInput } from "@nutrition-saas/ui";
 import { api } from "../../../lib/api";
-import { AuthShell, buttonStyle, fieldStyle, inputStyle } from "../auth-shell";
+import { errorMessage } from "../../../lib/humanize-error";
+import { AuthShell } from "../auth-shell";
 
 export default function RegisterPage() {
   const [email, setEmail] = useState("");
@@ -27,45 +30,54 @@ export default function RegisterPage() {
       });
       setMessage(result.message);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Registration failed");
+      setError(errorMessage(err, "Registration failed"));
     }
   }
 
   return (
-    <AuthShell title="Register">
-      <p style={{ color: "var(--color-muted)", marginTop: 0 }}>
-        Creates an authentication identity only. Check the API console for the verification link.
-      </p>
+    <AuthShell
+      title="Run your nutrition practice with confidence."
+      audience="dietitian"
+      description="Create your dietitian account. We’ll send a verification email — then you can sign in and open your practice."
+    >
       <form onSubmit={(event) => void onSubmit(event)}>
-        <label style={fieldStyle}>
-          Email
-          <input
-            style={inputStyle}
+        <Field label="Email">
+          <Input
             type="email"
             autoComplete="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             required
           />
-        </label>
-        <label style={fieldStyle}>
-          Password
-          <input
-            style={inputStyle}
-            type="password"
+        </Field>
+        <Field label="Password" hint="At least 10 characters.">
+          <PasswordInput
             autoComplete="new-password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             minLength={10}
             required
           />
-        </label>
-        <button type="submit" style={buttonStyle}>
+        </Field>
+        <Button type="submit" block>
           Create account
-        </button>
+        </Button>
       </form>
-      {message ? <p>{message}</p> : null}
-      {error ? <p style={{ color: "var(--color-danger)" }}>{error}</p> : null}
+      {message ? (
+        <div style={{ marginTop: 12 }}>
+          <Alert tone="success">
+            {message}{" "}
+            <Link href="/auth/verify-email" className="ui-link">
+              Verify email
+            </Link>
+          </Alert>
+        </div>
+      ) : null}
+      {error ? (
+        <div style={{ marginTop: 12 }}>
+          <Alert tone="danger">{error}</Alert>
+        </div>
+      ) : null}
     </AuthShell>
   );
 }

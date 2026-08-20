@@ -5,9 +5,18 @@
 
 ## Local development
 
+Day-to-day UI work (Next.js Fast Refresh, no image rebuild on save):
+
 ```bash
 cp .env.example .env
-pnpm install
+pnpm dev:docker
+```
+
+That runs `docker compose -f docker-compose.dev.yml up`. Rebuild the development image only when `docker/dev.Dockerfile`, OS packages, or the lockfile/base image change (`docker compose -f docker-compose.dev.yml up --build`).
+
+Production-style local stack (compiled Next standalone, same as Coolify — not for UI iteration):
+
+```bash
 docker compose up --build
 ```
 

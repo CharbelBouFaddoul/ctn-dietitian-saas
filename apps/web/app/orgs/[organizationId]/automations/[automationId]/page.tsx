@@ -4,8 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { api } from "../../../../../lib/api";
-import { cellStyle, pageStyle, tableStyle } from "../../practice-shell";
-
+import { humanizeLabel } from "@nutrition-saas/ui";
 interface AutomationRule {
   id: string;
   name: string;
@@ -48,10 +47,10 @@ export default function AutomationDetailPage() {
   }, [organizationId, automationId]);
 
   if (error) {
-    return <main style={pageStyle}><p>{error}</p></main>;
+    return <main><p>{error}</p></main>;
   }
   if (!rule) {
-    return <main style={pageStyle}>Loading…</main>;
+    return <main>Loading…</main>;
   }
 
   return (
@@ -64,30 +63,31 @@ export default function AutomationDetailPage() {
       <h1 style={{ marginTop: 0 }}>{rule.name}</h1>
       <p style={{ color: "var(--color-muted)" }}>{rule.summary}</p>
       <p>
-        Status: <strong>{rule.status}</strong> · Trigger: {rule.triggerType} · Action: {rule.actionType}
+        Status: <strong>{humanizeLabel(rule.status)}</strong> · When: {humanizeLabel(rule.triggerType)} · Then:{" "}
+        {humanizeLabel(rule.actionType)}
       </p>
 
       <h2>Recent runs</h2>
-      <table style={tableStyle}>
+      <table className="ui-table">
         <thead>
           <tr>
-            <th style={cellStyle}>Status</th>
-            <th style={cellStyle}>Trigger key</th>
-            <th style={cellStyle}>Started</th>
-            <th style={cellStyle}>Completed</th>
-            <th style={cellStyle}>Retries</th>
-            <th style={cellStyle}>Failure</th>
+            <th>Status</th>
+            <th>When</th>
+            <th>Started</th>
+            <th>Completed</th>
+            <th>Retries</th>
+            <th>Failure</th>
           </tr>
         </thead>
         <tbody>
           {runs.map((run) => (
             <tr key={run.id}>
-              <td style={cellStyle}>{run.status}</td>
-              <td style={cellStyle}>{run.triggerKey}</td>
-              <td style={cellStyle}>{run.startedAt ? new Date(run.startedAt).toLocaleString() : "—"}</td>
-              <td style={cellStyle}>{run.completedAt ? new Date(run.completedAt).toLocaleString() : "—"}</td>
-              <td style={cellStyle}>{run.retryCount}</td>
-              <td style={cellStyle}>{run.errorMessage ?? run.errorCode ?? "—"}</td>
+              <td>{humanizeLabel(run.status)}</td>
+              <td>{humanizeLabel(run.triggerKey)}</td>
+              <td>{run.startedAt ? new Date(run.startedAt).toLocaleString() : "—"}</td>
+              <td>{run.completedAt ? new Date(run.completedAt).toLocaleString() : "—"}</td>
+              <td>{run.retryCount}</td>
+              <td>{run.errorMessage ?? run.errorCode ?? "—"}</td>
             </tr>
           ))}
         </tbody>

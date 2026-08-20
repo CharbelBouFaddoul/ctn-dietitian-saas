@@ -4,8 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { api } from "../../../../lib/api";
-import { cellStyle, pageStyle, tableStyle } from "../practice-shell";
-
+import { humanizeLabel } from "@nutrition-saas/ui";
 interface AutomationRun {
   id: string;
   automationRuleId: string;
@@ -35,7 +34,7 @@ export default function AutomationRunsPage() {
   }, [organizationId]);
 
   if (error) {
-    return <main style={pageStyle}><p>{error}</p></main>;
+    return <main><p>{error}</p></main>;
   }
 
   return (
@@ -46,20 +45,20 @@ export default function AutomationRunsPage() {
         </Link>
       </p>
       <h1 style={{ marginTop: 0 }}>Automation runs</h1>
-      <table style={tableStyle}>
+      <table className="ui-table">
         <thead>
           <tr>
-            <th style={cellStyle}>Rule</th>
-            <th style={cellStyle}>Status</th>
-            <th style={cellStyle}>Trigger</th>
-            <th style={cellStyle}>Started</th>
-            <th style={cellStyle}>Failure</th>
+            <th>Rule</th>
+            <th>Status</th>
+            <th>Trigger</th>
+            <th>Started</th>
+            <th>Failure</th>
           </tr>
         </thead>
         <tbody>
           {runs.map((run) => (
             <tr key={run.id}>
-              <td style={cellStyle}>
+              <td>
                 <Link
                   href={`/orgs/${organizationId}/automations/${run.automationRuleId}`}
                   style={{ color: "var(--color-accent)" }}
@@ -67,10 +66,10 @@ export default function AutomationRunsPage() {
                   {run.ruleName}
                 </Link>
               </td>
-              <td style={cellStyle}>{run.status}</td>
-              <td style={cellStyle}>{run.triggerKey}</td>
-              <td style={cellStyle}>{run.startedAt ? new Date(run.startedAt).toLocaleString() : "—"}</td>
-              <td style={cellStyle}>{run.errorMessage ?? run.errorCode ?? "—"}</td>
+              <td>{humanizeLabel(run.status)}</td>
+              <td>{humanizeLabel(run.triggerType)}</td>
+              <td>{run.startedAt ? new Date(run.startedAt).toLocaleString() : "—"}</td>
+              <td>{run.errorMessage ?? run.errorCode ?? "—"}</td>
             </tr>
           ))}
         </tbody>

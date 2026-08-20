@@ -120,7 +120,10 @@ export class SessionService {
     if (membership) {
       return true;
     }
-    return account.status === "ACTIVE" && account.client.status === "ACTIVE";
+    if (account.client.status !== "ACTIVE") {
+      return false;
+    }
+    return account.status === "ACTIVE" || account.status === "DEACTIVATED";
   }
 
   toAuthenticatedSession(session: Session): AuthenticatedSession {

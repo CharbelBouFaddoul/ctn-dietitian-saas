@@ -1,21 +1,43 @@
 "use client";
 
-import type { CSSProperties, ReactNode } from "react";
-import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { ApiError, api } from "../../../lib/api";
+import { useParams, usePathname, useRouter } from "next/navigation";
+import { AppShell, Button, LoadingState } from "@nutrition-saas/ui";
+import { ApiError, api, logout } from "../../../lib/api";
+import { loginPathFor, resolveSessionHome } from "../../../lib/session-home";
 
 interface OrgDetail {
   id: string;
   name: string;
   role: string;
   status: string;
+  context?: { membershipId: string; role: string };
+}
+
+interface PracticeContextValue {
+  organizationId: string;
+  name: string;
+  role: string;
+  membershipId: string;
+}
+
+const PracticeContext = createContext<PracticeContextValue | null>(null);
+
+export function usePractice(): PracticeContextValue {
+  const value = useContext(PracticeContext);
+  if (!value) {
+    throw new Error("usePractice must be used inside PracticeShell");
+  }
+  return value;
 }
 
 export function PracticeShell({ children }: { children: ReactNode }) {
   const params = useParams<{ organizationId: string }>();
   const organizationId = params.organizationId;
+  const pathname = usePathname();
+  const router = useRouter();
   const [org, setOrg] = useState<OrgDetail | null>(null);
   const [state, setState] = useState<"loading" | "ok" | "unauth" | "forbidden">("loading");
 
@@ -34,112 +56,67 @@ export function PracticeShell({ children }: { children: ReactNode }) {
       });
   }, [organizationId]);
 
-  if (state === "loading") {
-    return <main style={pageStyle}>Loading practice…</main>;
-  }
-  if (state === "unauth") {
-    return (
-      <main style={pageStyle}>
-        <p>Sign in required.</p>
-        <Link href="/auth" style={{ color: "var(--color-accent)" }}>
-          Sign in
-        </Link>
-      </main>
-    );
-  }
-  if (state === "forbidden") {
-    return (
-      <main style={pageStyle}>
-        <h1>Practice is not available</h1>
-        <Link href="/orgs" style={{ color: "var(--color-accent)" }}>
-          Organizations
-        </Link>
-      </main>
-    );
+  useEffect(() => {
+    if (state === "unauth") {
+      router.replace(loginPathFor("dietitian"));
+      return;
+    }
+    if (state === "forbidden") {
+      void resolveSessionHome().then((home) => {
+        router.replace(home.kind === "unauthenticated" ? loginPathFor("dietitian") : home.path);
+      });
+    }
+  }, [state, router]);
+
+  async function onLogout() {
+    await logout();
+    router.replace(loginPathFor("dietitian"));
   }
 
+  if (state !== "ok" || !org) {
+    return <LoadingState>Loading practice…</LoadingState>;
+  }
+
+  const membershipId = org.context?.membershipId ?? "";
   const nav = [
     { href: `/orgs/${organizationId}`, label: "Dashboard" },
     { href: `/orgs/${organizationId}/clients`, label: "Clients" },
-    { href: `/orgs/${organizationId}/foods`, label: "Foods" },
-    { href: `/orgs/${organizationId}/recipes`, label: "Recipes" },
+    { href: `/orgs/${organizationId}/calendar`, label: "Calendar" },
     { href: `/orgs/${organizationId}/meal-plans`, label: "Meal plans" },
+    { href: `/orgs/${organizationId}/recipes`, label: "Recipes" },
+    { href: `/orgs/${organizationId}/foods`, label: "Foods" },
     { href: `/orgs/${organizationId}/messages`, label: "Messages" },
+    { href: `/orgs/${organizationId}/documents`, label: "Documents" },
     { href: `/orgs/${organizationId}/invoices`, label: "Invoices" },
     { href: `/orgs/${organizationId}/tasks`, label: "Tasks" },
-    { href: `/orgs/${organizationId}/automations`, label: "Automations" },
     { href: `/orgs/${organizationId}/analytics`, label: "Analytics" },
+    { href: `/orgs/${organizationId}/ai`, label: "AI" },
+    { href: `/orgs/${organizationId}/automations`, label: "Automations" },
     { href: `/orgs/${organizationId}/settings`, label: "Settings" },
   ];
 
   return (
-    <div style={{ minHeight: "100vh", display: "grid", gridTemplateColumns: "220px 1fr" }}>
-      <aside
-        style={{
-          background: "var(--color-surface)",
-          borderRight: "1px solid var(--color-border)",
-          padding: "1.25rem",
-        }}
-      >
-        <p style={{ margin: 0, fontSize: 12, color: "var(--color-muted)", letterSpacing: "0.04em" }}>
-          PRACTICE
-        </p>
-        <p style={{ margin: "0.35rem 0 0.25rem", fontWeight: 600 }}>{org?.name}</p>
-        <p style={{ margin: "0 0 1rem", fontSize: 13, color: "var(--color-muted)" }}>{org?.role}</p>
-        <nav style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {nav.map((item) => (
-            <Link key={item.href} href={item.href} style={{ color: "var(--color-accent)" }}>
-              {item.label}
+    <PracticeContext.Provider value={{ organizationId, name: org.name, role: org.role, membershipId }}>
+      <AppShell
+        theme="practice"
+        brand={org.name}
+        meta={org.role === "OWNER" ? "Owner" : org.role === "DIETITIAN" ? "Dietitian" : "Staff"}
+        nav={nav}
+        pathname={pathname}
+        linkComponent={Link}
+        footer={
+          <div className="ui-stack">
+            <Link href="/orgs" className="ui-nav-link">
+              All organizations
             </Link>
-          ))}
-        </nav>
-        <p style={{ marginTop: 24, fontSize: 13 }}>
-          <Link href="/orgs" style={{ color: "var(--color-muted)" }}>
-            All organizations
-          </Link>
-        </p>
-      </aside>
-      <main style={{ padding: "1.5rem 2rem" }}>{children}</main>
-    </div>
+            <Button variant="ghost" size="sm" onClick={() => void onLogout()}>
+              Sign out
+            </Button>
+          </div>
+        }
+      >
+        {children}
+      </AppShell>
+    </PracticeContext.Provider>
   );
 }
-
-export const pageStyle: CSSProperties = { padding: "2rem" };
-
-export const inputStyle: CSSProperties = {
-  padding: "0.5rem 0.65rem",
-  border: "1px solid var(--color-border)",
-  borderRadius: 8,
-  fontSize: 14,
-  width: "100%",
-  boxSizing: "border-box",
-};
-
-export const buttonStyle: CSSProperties = {
-  padding: "0.5rem 0.85rem",
-  background: "var(--color-accent)",
-  color: "#fff",
-  border: 0,
-  borderRadius: 8,
-  cursor: "pointer",
-};
-
-export const fieldStyle: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: 6,
-  marginBottom: 12,
-};
-
-export const tableStyle: CSSProperties = {
-  width: "100%",
-  borderCollapse: "collapse",
-  background: "var(--color-surface)",
-};
-
-export const cellStyle: CSSProperties = {
-  borderBottom: "1px solid var(--color-border)",
-  padding: "0.6rem 0.75rem",
-  textAlign: "left",
-  fontSize: 14,
-};

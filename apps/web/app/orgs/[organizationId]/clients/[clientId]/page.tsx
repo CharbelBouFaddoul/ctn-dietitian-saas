@@ -1,146 +1,103 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  ConfirmDialog,
+  EmptyState,
+  Field,
+  Input,
+  PageHeader,
+  Select,
+  Table,
+  Tabs,
+  Td,
+  Textarea,
+  humanizeLabel,
+} from "@nutrition-saas/ui";
 import { AiPanel } from "../../../../../components/ai-panel";
-import { api } from "../../../../../lib/api";
-import { buttonStyle, cellStyle, fieldStyle, inputStyle, tableStyle } from "../../practice-shell";
+import { JoinCodePanel } from "../../../../../components/join-code-panel";
+import { api, apiUrl } from "../../../../../lib/api";
+import { connectionStatusLabel } from "../../../../../lib/connection-status";
+import { formatDate, formatMoney, nutritionLabel, statusTone } from "../../../../../lib/format";
+import { errorMessage } from "../../../../../lib/humanize-error";
+import { canManageClients } from "../../../../../lib/practice-access";
+import { shortId } from "../../../../../lib/client-identity";
+import { usePractice } from "../../practice-shell";
 
 type Tab =
   | "overview"
-  | "profile"
-  | "goals"
-  | "measurements"
   | "assessments"
-  | "appointments"
-  | "timeline"
-  | "tags"
+  | "meal-plan"
   | "tracking"
   | "messages"
   | "documents"
   | "invoices"
+  | "appointments"
   | "ai"
   | "portal";
 
-interface ClientDetail {
-  id: string;
-  firstName: string;
-  lastName: string;
-  displayName: string | null;
-  email: string | null;
-  phone: string | null;
-  status: string;
-  portalStatus: string | null;
-  assignments: Array<{ id: string; membershipId: string; email: string; active: boolean }>;
-  tags: Array<{ id: string; name: string }>;
-}
-
-interface Profile {
-  nutritionContext: string | null;
-  preferences: string | null;
-  dietaryPreferences: string | null;
-  allergies: string | null;
-  intolerances: string | null;
-  lifestyle: string | null;
-  notes: string | null;
-}
-
-interface Goal {
-  id: string;
-  title: string;
-  status: string;
-  targetValue: number | null;
-  targetUnit: string | null;
-}
-
-interface Measurement {
-  id: string;
-  type: string;
-  value: number;
-  unit: string;
-  measuredAt: string;
-}
-
-interface Assessment {
-  id: string;
-  status: string;
-  templateName: string;
-  templateVersion: number;
-}
-
-interface Appointment {
-  id: string;
-  title: string;
-  startAt: string;
-  endAt: string;
-  status: string;
-}
-
-interface TimelineEvent {
-  id: string;
-  type: string;
-  occurredAt: string;
-}
-
-interface TrackingSummary {
-  date: string;
-  food: { presented: { energyKcal: number | null; proteinG: number | null } };
-  water: { totalLiters: number };
-  exercise: { totalDurationMinutes: number };
-  sleep: { durationMinutes: number | null } | null;
-  habits: { completed: number; total: number };
-}
-
-interface Tag {
-  id: string;
-  name: string;
-}
-
-interface Template {
-  id: string;
-  name: string;
-  version: number;
-}
-
-interface Member {
-  id: string;
-  email: string;
-  status: string;
-}
-
 const tabs: Array<{ id: Tab; label: string }> = [
   { id: "overview", label: "Overview" },
-  { id: "profile", label: "Profile" },
-  { id: "goals", label: "Goals" },
-  { id: "measurements", label: "Measurements" },
   { id: "assessments", label: "Assessments" },
-  { id: "appointments", label: "Appointments" },
-  { id: "timeline", label: "Timeline" },
-  { id: "tags", label: "Tags" },
+  { id: "meal-plan", label: "Meal Plan" },
   { id: "tracking", label: "Tracking" },
   { id: "messages", label: "Messages" },
   { id: "documents", label: "Documents" },
   { id: "invoices", label: "Invoices" },
-  { id: "ai", label: "AI assist" },
+  { id: "appointments", label: "Appointments" },
+  { id: "ai", label: "AI" },
   { id: "portal", label: "Portal" },
 ];
 
-export default function ClientWorkspacePage() {
+function isTab(value: string | null): value is Tab {
+  return tabs.some((item) => item.id === value);
+}
+
+export default function ClientWorkspaceRoute() {
+  return (
+    <Suspense fallback={<p className="ui-muted">Loading client…</p>}>
+      <ClientWorkspacePage />
+    </Suspense>
+  );
+}
+
+function ClientWorkspacePage() {
   const params = useParams<{ organizationId: string; clientId: string }>();
   const { organizationId, clientId } = params;
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const practice = usePractice();
+  const allowManage = canManageClients(practice.role);
   const base = `/api/v1/organizations/${organizationId}/clients/${clientId}`;
-  const [tab, setTab] = useState<Tab>("overview");
-  const [client, setClient] = useState<ClientDetail | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [goals, setGoals] = useState<Goal[]>([]);
-  const [measurements, setMeasurements] = useState<Measurement[]>([]);
-  const [assessments, setAssessments] = useState<Assessment[]>([]);
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
-  const [tags, setTags] = useState<Tag[]>([]);
-  const [templates, setTemplates] = useState<Template[]>([]);
-  const [members, setMembers] = useState<Member[]>([]);
+  const tabFromQuery = searchParams.get("tab");
+  const [tab, setTab] = useState<Tab>(isTab(tabFromQuery) ? tabFromQuery : "overview");
+  const [client, setClient] = useState<{
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string | null;
+    phone: string | null;
+    status: string;
+    connectionStatus?: string | null;
+    assignments: Array<{ email: string; active: boolean }>;
+    tags: Array<{ id: string; name: string }>;
+  } | null>(null);
+  const [profile, setProfile] = useState<Record<string, string | null> | null>(null);
+  const [goals, setGoals] = useState<Array<{ id: string; title: string; status: string }>>([]);
+  const [measurements, setMeasurements] = useState<Array<{ id: string; type: string; value: number; unit: string; measuredAt: string }>>([]);
+  const [assessments, setAssessments] = useState<Array<{ id: string; status: string; templateName: string; templateVersion: number }>>([]);
+  const [appointments, setAppointments] = useState<Array<{ id: string; title: string; startAt: string; status: string }>>([]);
+  const [timeline, setTimeline] = useState<Array<{ id: string; type: string; occurredAt: string }>>([]);
+  const [tags, setTags] = useState<Array<{ id: string; name: string }>>([]);
+  const [templates, setTemplates] = useState<Array<{ id: string; name: string; version: number }>>([]);
+  const [members, setMembers] = useState<Array<{ id: string; email: string }>>([]);
+  const [plans, setPlans] = useState<Array<{ id: string; name: string; status: string; client: { id: string } }>>([]);
   const [error, setError] = useState<string | null>(null);
   const [goalTitle, setGoalTitle] = useState("");
   const [weight, setWeight] = useState("");
@@ -148,39 +105,52 @@ export default function ClientWorkspacePage() {
   const [startAt, setStartAt] = useState("");
   const [endAt, setEndAt] = useState("");
   const [templateId, setTemplateId] = useState("");
-  const [newTag, setNewTag] = useState("");
-  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [assignTo, setAssignTo] = useState("");
-  const [trackingSummary, setTrackingSummary] = useState<TrackingSummary | null>(null);
-  const [trackingDate, setTrackingDate] = useState("");
+  const [trackingSummary, setTrackingSummary] = useState<{
+    date: string;
+    food: { presented: { energyKcal: number | null; proteinG: number | null } };
+    water: { totalLiters: number };
+    exercise: { totalDurationMinutes: number };
+  } | null>(null);
   const [trackingFood, setTrackingFood] = useState<Array<{ id: string; foodName: string; quantity: number; unit: string; presented: { energyKcal: number | null } }>>([]);
-  const [chatMessages, setChatMessages] = useState<Array<{ id: string; senderUserId: string; body: string; createdAt: string }>>([]);
+  const [trackingDate, setTrackingDate] = useState("");
+  const [chatMessages, setChatMessages] = useState<Array<{ id: string; body: string; createdAt: string }>>([]);
   const [messageBody, setMessageBody] = useState("");
-  const [clientDocuments, setClientDocuments] = useState<Array<{ id: string; filename: string; visibility: string; sizeBytes: number; createdAt: string }>>([]);
+  const [clientDocuments, setClientDocuments] = useState<Array<{ id: string; filename: string; visibility: string }>>([]);
   const [clientInvoices, setClientInvoices] = useState<Array<{ id: string; invoiceNumber: string | null; status: string; dueDate: string | null; total: number; currency: string }>>([]);
+  const [portalAccount, setPortalAccount] = useState<{ connectionStatus: string; joinCode: { expiresAt: string; hint: string | null } | null } | null>(null);
+  const [plainJoinCode, setPlainJoinCode] = useState<string | null>(null);
+  const [portalBusy, setPortalBusy] = useState(false);
+  const [confirmArchive, setConfirmArchive] = useState(false);
+  const [confirmRevoke, setConfirmRevoke] = useState(false);
+  const [confirmDeactivate, setConfirmDeactivate] = useState(false);
 
-  async function loadClient() {
-    const detail = await api<ClientDetail>(base);
-    setClient(detail);
-    setSelectedTagIds(detail.tags.map((tag) => tag.id));
+  function selectTab(next: string) {
+    const value = isTab(next) ? next : "overview";
+    setTab(value);
+    router.replace(`/orgs/${organizationId}/clients/${clientId}?tab=${value}`, { scroll: false });
   }
 
   async function load() {
     setError(null);
     try {
-      await loadClient();
-      const [profileRow, goalRows, measurementRows, assessmentRows, appointmentRows, timelineRows, tagRows, templateRows, memberRows] =
+      const [detail, account, profileRow, goalRows, measurementRows, assessmentRows, appointmentRows, timelineRows, tagRows, templateRows, memberRows, planRows] =
         await Promise.all([
-          api<Profile>(`${base}/profile`),
-          api<Goal[]>(`${base}/goals`),
-          api<Measurement[]>(`${base}/measurements`),
-          api<Assessment[]>(`/api/v1/organizations/${organizationId}/clients/${clientId}/assessments`),
-          api<Appointment[]>(`${base}/appointments`),
-          api<TimelineEvent[]>(`${base}/timeline`),
-          api<Tag[]>(`/api/v1/organizations/${organizationId}/tags`),
-          api<Template[]>(`/api/v1/organizations/${organizationId}/assessment-templates`),
-          api<Member[]>(`/api/v1/organizations/${organizationId}/members`),
+          api<NonNullable<typeof client>>(base),
+          api<NonNullable<typeof portalAccount>>(`${base}/account`),
+          api<Record<string, string | null>>(`${base}/profile`),
+          api<typeof goals>(`${base}/goals`),
+          api<typeof measurements>(`${base}/measurements`),
+          api<typeof assessments>(`${base}/assessments`),
+          api<typeof appointments>(`${base}/appointments`),
+          api<typeof timeline>(`${base}/timeline`),
+          api<typeof tags>(`/api/v1/organizations/${organizationId}/tags`),
+          api<typeof templates>(`/api/v1/organizations/${organizationId}/assessment-templates`),
+          api<Array<{ id: string; email: string; status: string }>>(`/api/v1/organizations/${organizationId}/members`),
+          api<{ items: typeof plans }>(`/api/v1/organizations/${organizationId}/meal-plans`),
         ]);
+      setClient(detail);
+      setPortalAccount(account);
       setProfile(profileRow);
       setGoals(goalRows);
       setMeasurements(measurementRows);
@@ -190,11 +160,10 @@ export default function ClientWorkspacePage() {
       setTags(tagRows);
       setTemplates(templateRows);
       setMembers(memberRows.filter((row) => row.status === "ACTIVE"));
-      if (!templateId && templateRows[0]) {
-        setTemplateId(templateRows[0].id);
-      }
+      setPlans(planRows.items.filter((plan) => plan.client.id === clientId));
+      if (!templateId && templateRows[0]) setTemplateId(templateRows[0].id);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to load client");
+      setError(errorMessage(err, "Unable to load client"));
     }
   }
 
@@ -206,477 +175,289 @@ export default function ClientWorkspacePage() {
     if (tab !== "tracking") return;
     const query = trackingDate ? `?date=${trackingDate}` : "";
     void Promise.all([
-      api<TrackingSummary>(`${base}/tracking/summary${query}`),
-      api<Array<{ id: string; foodName: string; quantity: number; unit: string; presented: { energyKcal: number | null } }>>(
-        `${base}/tracking/food-logs${query}`,
-      ),
+      api<NonNullable<typeof trackingSummary>>(`${base}/tracking/summary${query}`),
+      api<typeof trackingFood>(`${base}/tracking/food-logs${query}`),
     ])
       .then(([summary, foods]) => {
         setTrackingSummary(summary);
         if (!trackingDate) setTrackingDate(summary.date);
         setTrackingFood(foods);
       })
-      .catch((err) => setError(err instanceof Error ? err.message : "Unable to load tracking"));
+      .catch((err) => setError(errorMessage(err, "Unable to load tracking")));
   }, [tab, trackingDate, base]);
 
   useEffect(() => {
     if (tab !== "messages") return;
-    void Promise.all([
-      api<Array<{ id: string; senderUserId: string; body: string; createdAt: string }>>(`${base}/conversation/messages`),
-    ])
-      .then(([messages]) => {
+    void api<typeof chatMessages>(`${base}/conversation/messages`)
+      .then((messages) => {
         setChatMessages(messages);
         return api(`${base}/conversation/read`, { method: "POST", body: JSON.stringify({}) });
       })
-      .catch((err) => setError(err instanceof Error ? err.message : "Unable to load messages"));
+      .catch((err) => setError(errorMessage(err, "Unable to load messages")));
   }, [tab, base]);
 
   useEffect(() => {
     if (tab !== "documents") return;
-    void reloadDocuments().catch((err) => setError(err instanceof Error ? err.message : "Unable to load documents"));
+    void api<typeof clientDocuments>(`${base}/documents`)
+      .then(setClientDocuments)
+      .catch((err) => setError(errorMessage(err, "Unable to load documents")));
   }, [tab, base]);
 
   useEffect(() => {
     if (tab !== "invoices") return;
-    void api<Array<{ id: string; invoiceNumber: string | null; status: string; dueDate: string | null; total: number; currency: string }>>(
-      `/api/v1/organizations/${organizationId}/clients/${clientId}/invoices`,
-    )
+    void api<typeof clientInvoices>(`${base}/invoices`)
       .then(setClientInvoices)
-      .catch((err) => setError(err instanceof Error ? err.message : "Unable to load invoices"));
-  }, [tab, organizationId, clientId]);
+      .catch((err) => setError(errorMessage(err, "Unable to load invoices")));
+  }, [tab, base]);
 
-  async function reloadDocuments() {
-    const rows = await api<Array<{ id: string; filename: string; visibility: string; sizeBytes: number; createdAt: string }>>(
-      `${base}/documents`,
-    );
-    setClientDocuments(rows);
-  }
-
-  async function saveProfile(event: FormEvent) {
-    event.preventDefault();
-    if (!profile) return;
-    await api(`${base}/profile`, { method: "PATCH", body: JSON.stringify(profile) });
-    await load();
-  }
-
-  async function addGoal(event: FormEvent) {
-    event.preventDefault();
-    await api(`${base}/goals`, { method: "POST", body: JSON.stringify({ title: goalTitle }) });
-    setGoalTitle("");
-    await load();
-  }
-
-  async function addMeasurement(event: FormEvent) {
-    event.preventDefault();
-    await api(`${base}/measurements`, {
-      method: "POST",
-      body: JSON.stringify({
-        type: "WEIGHT",
-        value: Number(weight),
-        unit: "kg",
-        measuredAt: new Date().toISOString(),
-      }),
-    });
-    setWeight("");
-    await load();
-  }
-
-  async function startAssessment(event: FormEvent) {
-    event.preventDefault();
-    await api(`${base}/assessments`, { method: "POST", body: JSON.stringify({ templateId }) });
-    await load();
-  }
-
-  async function addAppointment(event: FormEvent) {
-    event.preventDefault();
-    await api(`${base}/appointments`, {
-      method: "POST",
-      body: JSON.stringify({
-        title: appointmentTitle,
-        startAt: new Date(startAt).toISOString(),
-        endAt: new Date(endAt).toISOString(),
-      }),
-    });
-    await load();
-  }
+  const name = client ? `${client.firstName} ${client.lastName}` : "Client";
 
   return (
     <section>
-      <h1>{client ? `${client.firstName} ${client.lastName}` : "Client"}</h1>
-      <p>
-        Status <strong>{client?.status}</strong> · portal <strong>{client?.portalStatus ?? "none"}</strong>
-      </p>
-      <nav style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
-        {tabs.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            onClick={() => setTab(item.id)}
-            style={{
-              ...buttonStyle,
-              background: tab === item.id ? "var(--color-accent)" : "var(--color-surface)",
-              color: tab === item.id ? "#fff" : "inherit",
-              border: "1px solid var(--color-border)",
-            }}
-          >
-            {item.label}
-          </button>
-        ))}
-      </nav>
+      <PageHeader
+        eyebrow="Client workspace"
+        title={name}
+        description={`${client?.email ?? "No email"} · ${shortId(clientId)} · ${humanizeLabel(client?.status)} · ${connectionStatusLabel(client?.connectionStatus ?? portalAccount?.connectionStatus)}`}
+      />
+      <Tabs items={tabs} value={tab} onChange={selectTab} />
+      {error ? <Alert tone="danger">{error}</Alert> : null}
 
-      {tab === "overview" && client ? (
-        <div>
-          <p>
-            {client.email ?? "No email"} · {client.phone ?? "No phone"}
-          </p>
-          <p>Assigned: {client.assignments.find((row) => row.active)?.email ?? "None"}</p>
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              void api(`${base}/assignments`, {
-                method: "POST",
-                body: JSON.stringify({ organizationMemberId: assignTo }),
-              }).then(() => load());
-            }}
-          >
-            <label style={fieldStyle}>
-              Reassign
-              <select style={inputStyle} value={assignTo} onChange={(event) => setAssignTo(event.target.value)}>
-                <option value="">Select member</option>
-                {members.map((member) => (
-                  <option key={member.id} value={member.id}>
-                    {member.email}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button type="submit" style={buttonStyle} disabled={!assignTo}>
-              Assign
-            </button>
-          </form>
-          {client.status !== "ARCHIVED" ? (
-            <button
-              type="button"
-              style={{ ...buttonStyle, marginTop: 12 }}
-              onClick={() => void api(`${base}/archive`, { method: "POST" }).then(() => load())}
+      {tab === "overview" && client && profile ? (
+        <div className="ui-stack">
+          <Card title="Chart">
+            <p>Assigned: {client.assignments.find((row) => row.active)?.email ?? "None"}</p>
+            <p>Phone: {client.phone ?? "—"}</p>
+            {allowManage ? (
+              <form
+                className="ui-row"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void api(`${base}/assignments`, {
+                    method: "POST",
+                    body: JSON.stringify({ organizationMemberId: assignTo }),
+                  }).then(() => load());
+                }}
+              >
+                <Field label="Reassign">
+                  <Select value={assignTo} onChange={(event) => setAssignTo(event.target.value)}>
+                    <option value="">Select member</option>
+                    {members.map((member) => (
+                      <option key={member.id} value={member.id}>
+                        {member.email}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                <Button type="submit" disabled={!assignTo}>
+                  Assign
+                </Button>
+              </form>
+            ) : null}
+            {allowManage && client.status !== "ARCHIVED" ? (
+              <Button variant="danger" onClick={() => setConfirmArchive(true)}>
+                Archive client
+              </Button>
+            ) : null}
+          </Card>
+          <Card title="Profile">
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                void api(`${base}/profile`, { method: "PATCH", body: JSON.stringify(profile) }).then(() => load());
+              }}
             >
-              Archive client
-            </button>
-          ) : (
-            <button
-              type="button"
-              style={{ ...buttonStyle, marginTop: 12 }}
-              onClick={() => void api(`${base}/restore`, { method: "POST", body: JSON.stringify({ status: "ACTIVE" }) }).then(() => load())}
-            >
-              Restore client
-            </button>
-          )}
-        </div>
-      ) : null}
-
-      {tab === "profile" && profile ? (
-        <form onSubmit={(event) => void saveProfile(event)} style={{ maxWidth: 560 }}>
-          {(
-            [
-              ["allergies", "Allergies"],
-              ["intolerances", "Intolerances"],
-              ["dietaryPreferences", "Dietary preferences"],
-              ["preferences", "Preferences"],
-              ["lifestyle", "Lifestyle"],
-              ["nutritionContext", "Nutrition context"],
-              ["notes", "Notes"],
-            ] as const
-          ).map(([key, label]) => (
-            <label key={key} style={fieldStyle}>
-              {label}
-              <textarea
-                style={{ ...inputStyle, minHeight: 72 }}
-                value={profile[key] ?? ""}
-                onChange={(event) => setProfile({ ...profile, [key]: event.target.value })}
-              />
-            </label>
-          ))}
-          <button type="submit" style={buttonStyle}>
-            Save profile
-          </button>
-        </form>
-      ) : null}
-
-      {tab === "goals" ? (
-        <div>
-          <form onSubmit={(event) => void addGoal(event)} style={{ maxWidth: 360 }}>
-            <label style={fieldStyle}>
-              Goal
-              <input style={inputStyle} value={goalTitle} onChange={(event) => setGoalTitle(event.target.value)} required />
-            </label>
-            <button type="submit" style={buttonStyle}>
-              Add goal
-            </button>
-          </form>
-          <ul>
-            {goals.map((goal) => (
-              <li key={goal.id}>
-                {goal.title} ({goal.status})
-                {goal.status === "ACTIVE" ? (
-                  <button
-                    type="button"
-                    style={{ ...buttonStyle, marginLeft: 8 }}
-                    onClick={() => void api(`${base}/goals/${goal.id}/complete`, { method: "POST" }).then(() => load())}
-                  >
-                    Complete
-                  </button>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-
-      {tab === "measurements" ? (
-        <div>
-          <form onSubmit={(event) => void addMeasurement(event)} style={{ maxWidth: 280 }}>
-            <label style={fieldStyle}>
-              Weight (kg)
-              <input
-                style={inputStyle}
-                type="number"
-                step="0.1"
-                value={weight}
-                onChange={(event) => setWeight(event.target.value)}
-                required
-              />
-            </label>
-            <button type="submit" style={buttonStyle}>
-              Record
-            </button>
-          </form>
-          <table style={tableStyle}>
-            <thead>
-              <tr>
-                <th style={cellStyle}>Type</th>
-                <th style={cellStyle}>Value</th>
-                <th style={cellStyle}>When</th>
-              </tr>
-            </thead>
-            <tbody>
-              {measurements.map((row) => (
-                <tr key={row.id}>
-                  <td style={cellStyle}>{row.type}</td>
-                  <td style={cellStyle}>
-                    {row.value} {row.unit}
-                  </td>
-                  <td style={cellStyle}>{new Date(row.measuredAt).toLocaleString()}</td>
-                </tr>
+              {(["allergies", "intolerances", "dietaryPreferences", "notes"] as const).map((key) => (
+                <Field key={key} label={humanizeLabel(key)}>
+                  <Textarea
+                    value={profile[key] ?? ""}
+                    onChange={(event) => setProfile({ ...profile, [key]: event.target.value })}
+                  />
+                </Field>
               ))}
-            </tbody>
-          </table>
+              <Button type="submit">Save profile</Button>
+            </form>
+          </Card>
+          <Card title="Goals">
+            <form
+              className="ui-row"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void api(`${base}/goals`, { method: "POST", body: JSON.stringify({ title: goalTitle }) }).then(() => {
+                  setGoalTitle("");
+                  return load();
+                });
+              }}
+            >
+              <Field label="Goal">
+                <Input value={goalTitle} onChange={(event) => setGoalTitle(event.target.value)} required />
+              </Field>
+              <Button type="submit">Add</Button>
+            </form>
+            {goals.length === 0 ? <EmptyState title="No goals yet" /> : (
+              <ul>
+                {goals.map((goal) => (
+                  <li key={goal.id}>
+                    {goal.title} ({humanizeLabel(goal.status)})
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+          <Card title="Measurements">
+            <form
+              className="ui-row"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void api(`${base}/measurements`, {
+                  method: "POST",
+                  body: JSON.stringify({ type: "WEIGHT", value: Number(weight), unit: "kg", measuredAt: new Date().toISOString() }),
+                }).then(() => {
+                  setWeight("");
+                  return load();
+                });
+              }}
+            >
+              <Field label="Weight (kg)">
+                <Input type="number" step="0.1" value={weight} onChange={(event) => setWeight(event.target.value)} required />
+              </Field>
+              <Button type="submit">Record</Button>
+            </form>
+            {measurements.length === 0 ? <p className="ui-muted">No measurements yet.</p> : (
+              <ul>
+                {measurements.map((row) => (
+                  <li key={row.id}>
+                    {humanizeLabel(row.type)} {row.value} {row.unit} · {formatDate(row.measuredAt)}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+          <Card title="Timeline">
+            {timeline.length === 0 ? <p className="ui-muted">No activity yet.</p> : (
+              <ul>
+                {timeline.map((row) => (
+                  <li key={row.id}>
+                    {humanizeLabel(row.type)} · {formatDate(row.occurredAt)}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+          <Card title="Tags">
+            <p>{client.tags.map((tag) => tag.name).join(", ") || "No tags"}</p>
+            <p className="ui-muted">{tags.length} tags in this practice.</p>
+          </Card>
         </div>
       ) : null}
 
       {tab === "assessments" ? (
-        <div>
-          <form onSubmit={(event) => void startAssessment(event)} style={{ maxWidth: 360 }}>
-            <label style={fieldStyle}>
-              Template
-              <select style={inputStyle} value={templateId} onChange={(event) => setTemplateId(event.target.value)}>
+        <Card title="Assessments">
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              void api(`${base}/assessments`, { method: "POST", body: JSON.stringify({ templateId }) }).then(() => load());
+            }}
+          >
+            <Field label="Template">
+              <Select value={templateId} onChange={(event) => setTemplateId(event.target.value)}>
                 {templates.map((template) => (
                   <option key={template.id} value={template.id}>
                     {template.name} (v{template.version})
                   </option>
                 ))}
-              </select>
-            </label>
-            <button type="submit" style={buttonStyle} disabled={!templateId}>
+              </Select>
+            </Field>
+            <Button type="submit" disabled={!templateId}>
               Start assessment
-            </button>
+            </Button>
           </form>
-          <ul>
-            {assessments.map((row) => (
-              <li key={row.id}>
-                {row.templateName} v{row.templateVersion} · {row.status}
-                {row.status !== "COMPLETED" ? (
-                  <button
-                    type="button"
-                    style={{ ...buttonStyle, marginLeft: 8 }}
-                    onClick={() =>
-                      void api(`${base}/assessments/${row.id}/complete`, {
-                        method: "POST",
-                        body: JSON.stringify({ responses: {} }),
-                      }).then(() => load())
-                    }
-                  >
-                    Complete
-                  </button>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        </div>
+          {assessments.length === 0 ? <EmptyState title="No assessments yet" /> : (
+            <ul>
+              {assessments.map((row) => (
+                <li key={row.id}>
+                  {row.templateName} v{row.templateVersion} · {humanizeLabel(row.status)}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
       ) : null}
 
-      {tab === "appointments" ? (
-        <div>
-          <form onSubmit={(event) => void addAppointment(event)} style={{ maxWidth: 360 }}>
-            <label style={fieldStyle}>
-              Title
-              <input
-                style={inputStyle}
-                value={appointmentTitle}
-                onChange={(event) => setAppointmentTitle(event.target.value)}
-                required
-              />
-            </label>
-            <label style={fieldStyle}>
-              Start
-              <input
-                style={inputStyle}
-                type="datetime-local"
-                value={startAt}
-                onChange={(event) => setStartAt(event.target.value)}
-                required
-              />
-            </label>
-            <label style={fieldStyle}>
-              End
-              <input
-                style={inputStyle}
-                type="datetime-local"
-                value={endAt}
-                onChange={(event) => setEndAt(event.target.value)}
-                required
-              />
-            </label>
-            <button type="submit" style={buttonStyle}>
-              Schedule
-            </button>
-          </form>
-          <ul>
-            {appointments.map((row) => (
-              <li key={row.id}>
-                {row.title} · {row.status} · {new Date(row.startAt).toLocaleString()}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-
-      {tab === "timeline" ? (
-        <ul>
-          {timeline.map((row) => (
-            <li key={row.id}>
-              {row.type} · {new Date(row.occurredAt).toLocaleString()}
-            </li>
-          ))}
-        </ul>
-      ) : null}
-
-      {tab === "tags" ? (
-        <div>
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              void api(`/api/v1/organizations/${organizationId}/tags`, {
-                method: "POST",
-                body: JSON.stringify({ name: newTag }),
-              }).then(() => {
-                setNewTag("");
-                return load();
-              });
-            }}
-            style={{ maxWidth: 280 }}
-          >
-            <label style={fieldStyle}>
-              New tag
-              <input style={inputStyle} value={newTag} onChange={(event) => setNewTag(event.target.value)} required />
-            </label>
-            <button type="submit" style={buttonStyle}>
-              Create tag
-            </button>
-          </form>
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              void api(`${base.replace(`/clients/${clientId}`, "")}/clients/${clientId}/tags`, {
-                method: "PUT",
-                body: JSON.stringify({ tagIds: selectedTagIds }),
-              }).then(() => load());
-            }}
-          >
-            {tags.map((tag) => (
-              <label key={tag.id} style={{ display: "block", marginBottom: 6 }}>
-                <input
-                  type="checkbox"
-                  checked={selectedTagIds.includes(tag.id)}
-                  onChange={(event) =>
-                    setSelectedTagIds(
-                      event.target.checked
-                        ? [...selectedTagIds, tag.id]
-                        : selectedTagIds.filter((id) => id !== tag.id),
-                    )
-                  }
-                />{" "}
-                {tag.name}
-              </label>
-            ))}
-            <button type="submit" style={buttonStyle}>
-              Save client tags
-            </button>
-          </form>
-        </div>
+      {tab === "meal-plan" ? (
+        <Card title="Meal plans">
+          {plans.length === 0 ? (
+            <EmptyState
+              title="No meal plans for this client"
+              action={
+                <Link href={`/orgs/${organizationId}/meal-plans`} className="ui-btn ui-btn--primary">
+                  Open meal plans
+                </Link>
+              }
+            />
+          ) : (
+            <ul>
+              {plans.map((plan) => (
+                <li key={plan.id}>
+                  <Link href={`/orgs/${organizationId}/meal-plans/${plan.id}`} className="ui-link">
+                    {plan.name}
+                  </Link>{" "}
+                  · {humanizeLabel(plan.status)}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
       ) : null}
 
       {tab === "tracking" ? (
-        <div>
-          <p style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <input type="date" value={trackingDate} onChange={(event) => setTrackingDate(event.target.value)} />
-          </p>
+        <Card title="Tracking">
+          <Field label="Date">
+            <Input type="date" value={trackingDate} onChange={(event) => setTrackingDate(event.target.value)} />
+          </Field>
           {trackingSummary ? (
             <>
               <p>
-                Calories {trackingSummary.food.presented.energyKcal ?? "unknown"} · Protein{" "}
-                {trackingSummary.food.presented.proteinG ?? "unknown"}g · Water {trackingSummary.water.totalLiters.toFixed(1)}L ·
-                Exercise {trackingSummary.exercise.totalDurationMinutes} min · Sleep{" "}
-                {trackingSummary.sleep?.durationMinutes
-                  ? `${Math.floor(trackingSummary.sleep.durationMinutes / 60)}h ${trackingSummary.sleep.durationMinutes % 60}m`
-                  : "—"}{" "}
-                · Habits {trackingSummary.habits.completed}/{trackingSummary.habits.total}
+                {nutritionLabel(trackingSummary.food.presented.energyKcal, "kcal")} · protein{" "}
+                {nutritionLabel(trackingSummary.food.presented.proteinG, "g")} · water {trackingSummary.water.totalLiters.toFixed(1)} L
+                · exercise {trackingSummary.exercise.totalDurationMinutes} min
               </p>
-              <table style={tableStyle}>
+              <Table>
                 <thead>
                   <tr>
-                    <th style={cellStyle}>Food</th>
-                    <th style={cellStyle}>Quantity</th>
-                    <th style={cellStyle}>kcal</th>
+                    <th>Food</th>
+                    <th>Quantity</th>
+                    <th>kcal</th>
                   </tr>
                 </thead>
                 <tbody>
                   {trackingFood.map((row) => (
                     <tr key={row.id}>
-                      <td style={cellStyle}>{row.foodName}</td>
-                      <td style={cellStyle}>
-                        {row.quantity} {row.unit}
-                      </td>
-                      <td style={cellStyle}>{row.presented.energyKcal ?? "unknown"}</td>
+                      <Td label="Food">{row.foodName}</Td>
+                      <Td label="Quantity">
+                        {row.quantity} {humanizeLabel(row.unit)}
+                      </Td>
+                      <Td label="kcal">{row.presented.energyKcal ?? "—"}</Td>
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </Table>
             </>
           ) : (
-            <p>Loading tracking…</p>
+            <p className="ui-muted">Loading tracking…</p>
           )}
-        </div>
+        </Card>
       ) : null}
 
       {tab === "messages" ? (
-        <div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
+        <Card title="Messages">
+          <div className="ui-stack" style={{ marginBottom: 16 }}>
             {chatMessages.map((message) => (
-              <div key={message.id} style={{ padding: 10, background: "var(--color-surface)", borderRadius: 8 }}>
+              <div key={message.id} className="ui-card">
                 <div>{message.body}</div>
-                <div style={{ fontSize: 12, color: "var(--color-muted)" }}>{new Date(message.createdAt).toLocaleString()}</div>
+                <div className="ui-hint">{formatDate(message.createdAt)}</div>
               </div>
             ))}
+            {chatMessages.length === 0 ? <EmptyState title="No messages yet" /> : null}
           </div>
           <form
             onSubmit={(event) => {
@@ -684,26 +465,23 @@ export default function ClientWorkspacePage() {
               void api(`${base}/conversation/messages`, { method: "POST", body: JSON.stringify({ body: messageBody }) })
                 .then(() => {
                   setMessageBody("");
-                  return api<Array<{ id: string; senderUserId: string; body: string; createdAt: string }>>(
-                    `${base}/conversation/messages`,
-                  );
+                  return api<typeof chatMessages>(`${base}/conversation/messages`);
                 })
-                .then(setChatMessages)
-                .catch((err) => setError(err instanceof Error ? err.message : "Send failed"));
+                .then(setChatMessages);
             }}
           >
-            <textarea value={messageBody} onChange={(event) => setMessageBody(event.target.value)} rows={3} style={{ width: "100%" }} />
-            <button type="submit" style={buttonStyle}>
-              Send
-            </button>
+            <Field label="Message">
+              <Textarea value={messageBody} onChange={(event) => setMessageBody(event.target.value)} />
+            </Field>
+            <Button type="submit">Send</Button>
           </form>
-        </div>
+        </Card>
       ) : null}
 
       {tab === "documents" ? (
-        <div>
+        <Card title="Documents">
           <form
-            style={{ marginBottom: 16 }}
+            className="ui-row"
             onSubmit={(event) => {
               event.preventDefault();
               const form = event.currentTarget;
@@ -714,192 +492,188 @@ export default function ClientWorkspacePage() {
               const body = new FormData();
               body.append("file", file);
               body.append("visibility", visibilityInput.value);
-              void fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ""}${base}/documents`, {
-                method: "POST",
-                body,
-                credentials: "include",
-              })
-                .then((res) => {
-                  if (!res.ok) throw new Error("Upload failed");
-                  fileInput.value = "";
-                  return api<Array<{ id: string; filename: string; visibility: string; sizeBytes: number; createdAt: string }>>(
-                    `${base}/documents`,
-                  );
-                })
-                .then(() => reloadDocuments())
-                .catch((err) => setError(err instanceof Error ? err.message : "Upload failed"));
+              void fetch(apiUrl(`${base}/documents`), { method: "POST", body, credentials: "include" }).then((res) => {
+                if (!res.ok) throw new Error("Upload failed");
+                fileInput.value = "";
+                return api<typeof clientDocuments>(`${base}/documents`).then(setClientDocuments);
+              });
             }}
           >
             <input type="file" name="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.docx" />
-            <select name="visibility" defaultValue="INTERNAL" style={{ marginLeft: 8 }}>
+            <select name="visibility" defaultValue="INTERNAL" className="ui-select">
               <option value="INTERNAL">Internal</option>
               <option value="SHARED">Shared with client</option>
             </select>
-            <button type="submit" style={{ ...buttonStyle, marginLeft: 8 }}>
-              Upload
-            </button>
+            <Button type="submit">Upload</Button>
           </form>
-          <table style={tableStyle}>
-            <thead>
-              <tr>
-                <th style={cellStyle}>File</th>
-                <th style={cellStyle}>Visibility</th>
-                <th style={cellStyle}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
+          {clientDocuments.length === 0 ? <EmptyState title="No documents yet" /> : (
+            <ul>
               {clientDocuments.map((doc) => (
-                <tr key={doc.id}>
-                  <td style={cellStyle}>{doc.filename}</td>
-                  <td style={cellStyle}>{doc.visibility}</td>
-                  <td style={cellStyle}>
-                    <a href={`${process.env.NEXT_PUBLIC_API_URL ?? ""}${base}/documents/${doc.id}/download`}>Download</a>
-                    {doc.visibility === "INTERNAL" ? (
-                      <button
-                        type="button"
-                        style={{ ...buttonStyle, marginLeft: 8 }}
-                        onClick={() =>
-                          void api(`${base}/documents/${doc.id}/visibility`, {
-                            method: "PATCH",
-                            body: JSON.stringify({ visibility: "SHARED" }),
-                          }).then(() => reloadDocuments())
-                        }
-                      >
-                        Share
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        style={{ ...buttonStyle, marginLeft: 8 }}
-                        onClick={() =>
-                          void api(`${base}/documents/${doc.id}/visibility`, {
-                            method: "PATCH",
-                            body: JSON.stringify({ visibility: "INTERNAL" }),
-                          }).then(() => reloadDocuments())
-                        }
-                      >
-                        Unshare
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      style={{ ...buttonStyle, marginLeft: 8 }}
-                      onClick={() =>
-                        void api(`${base}/documents/${doc.id}/archive`, { method: "POST" }).then(() => reloadDocuments())
-                      }
-                    >
-                      Archive
-                    </button>
-                  </td>
-                </tr>
+                <li key={doc.id}>
+                  {doc.filename} · {humanizeLabel(doc.visibility)}
+                </li>
               ))}
-            </tbody>
-          </table>
-        </div>
+            </ul>
+          )}
+        </Card>
       ) : null}
 
       {tab === "invoices" ? (
-        <div>
-          <p style={{ color: "var(--color-muted)" }}>
-            Client invoices.{" "}
-            <Link href={`/orgs/${organizationId}/invoices`} style={{ color: "var(--color-accent)" }}>
-              Open org invoices
-            </Link>
-          </p>
-          <table style={tableStyle}>
-            <thead>
-              <tr>
-                <th style={cellStyle}>Invoice</th>
-                <th style={cellStyle}>Status</th>
-                <th style={cellStyle}>Due</th>
-                <th style={cellStyle}>Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {clientInvoices.map((row) => (
-                <tr key={row.id}>
-                  <td style={cellStyle}>
-                    <Link href={`/orgs/${organizationId}/invoices/${row.id}`} style={{ color: "var(--color-accent)" }}>
-                      {row.invoiceNumber ?? "Draft"}
-                    </Link>
-                  </td>
-                  <td style={cellStyle}>{row.status}</td>
-                  <td style={cellStyle}>{row.dueDate ?? "—"}</td>
-                  <td style={cellStyle}>
-                    {row.total.toFixed(2)} {row.currency}
-                  </td>
+        <Card title="Invoices">
+          {clientInvoices.length === 0 ? <EmptyState title="No invoices for this client" /> : (
+            <Table>
+              <thead>
+                <tr>
+                  <th>Invoice</th>
+                  <th>Status</th>
+                  <th>Due</th>
+                  <th>Total</th>
                 </tr>
+              </thead>
+              <tbody>
+                {clientInvoices.map((row) => (
+                  <tr key={row.id}>
+                    <Td label="Invoice">
+                      <Link href={`/orgs/${organizationId}/invoices/${row.id}`} className="ui-link">
+                        {row.invoiceNumber ?? "Draft"}
+                      </Link>
+                    </Td>
+                    <Td label="Status">
+                      <Badge tone={statusTone(row.status)}>{humanizeLabel(row.status)}</Badge>
+                    </Td>
+                    <Td label="Due">{row.dueDate ?? "—"}</Td>
+                    <Td label="Total">{formatMoney(row.total, row.currency)}</Td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          )}
+        </Card>
+      ) : null}
+
+      {tab === "appointments" ? (
+        <Card title="Appointments">
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              void api(`${base}/appointments`, {
+                method: "POST",
+                body: JSON.stringify({
+                  title: appointmentTitle,
+                  startAt: new Date(startAt).toISOString(),
+                  endAt: new Date(endAt).toISOString(),
+                }),
+              }).then(() => load());
+            }}
+          >
+            <Field label="Title">
+              <Input value={appointmentTitle} onChange={(event) => setAppointmentTitle(event.target.value)} required />
+            </Field>
+            <Field label="Start">
+              <Input type="datetime-local" value={startAt} onChange={(event) => setStartAt(event.target.value)} required />
+            </Field>
+            <Field label="End">
+              <Input type="datetime-local" value={endAt} onChange={(event) => setEndAt(event.target.value)} required />
+            </Field>
+            <Button type="submit">Schedule</Button>
+          </form>
+          {appointments.length === 0 ? <EmptyState title="No appointments yet" /> : (
+            <ul>
+              {appointments.map((row) => (
+                <li key={row.id}>
+                  {row.title} · {humanizeLabel(row.status)} · {formatDate(row.startAt)}
+                </li>
               ))}
-            </tbody>
-          </table>
-          {clientInvoices.length === 0 ? <p>No invoices for this client.</p> : null}
-        </div>
+            </ul>
+          )}
+        </Card>
       ) : null}
 
       {tab === "ai" ? (
-        <div style={{ display: "grid", gap: 16 }}>
-          <AiPanel
-            organizationId={organizationId}
-            clientId={clientId}
-            action="client-summary"
-            title="Client summary"
-            description="Concise overview from profile, goals, tracking, and meal-plan context."
-          />
-          <AiPanel
-            organizationId={organizationId}
-            clientId={clientId}
-            action="meal-plan-assistance"
-            title="Meal plan assistance"
-            description="Suggestions only — review and apply manually in the meal-plan editor."
-          />
-          <AiPanel
-            organizationId={organizationId}
-            clientId={clientId}
-            action="nutrition-assistance"
-            title="Nutrition assistance"
-            description="Explain foods using application database values. AI does not replace FoodService."
-            foodQuery
-          />
-          <AiPanel
-            organizationId={organizationId}
-            clientId={clientId}
-            action="consultation-summary"
-            title="Consultation summary"
-            description="Draft summary and follow-up questions for your next visit."
-          />
-          <AiPanel
-            organizationId={organizationId}
-            clientId={clientId}
-            action="message-draft"
-            title="Message draft"
-            description="Draft only — send manually from Messages when ready."
-          />
+        <div className="ui-stack">
+          <AiPanel organizationId={organizationId} clientId={clientId} action="client-summary" title="Client summary" description="Concise overview from profile, goals, tracking, and meal-plan context." />
+          <AiPanel organizationId={organizationId} clientId={clientId} action="meal-plan-assistance" title="Meal plan assistance" description="Suggestions only — review and apply manually in the meal-plan editor." />
+          <AiPanel organizationId={organizationId} clientId={clientId} action="nutrition-assistance" title="Nutrition assistance" description="Explain foods using values from your food database." foodQuery />
+          <AiPanel organizationId={organizationId} clientId={clientId} action="consultation-summary" title="Consultation summary" description="Draft summary and follow-up questions for your next visit." />
+          <AiPanel organizationId={organizationId} clientId={clientId} action="message-draft" title="Message draft" description="Draft only — send manually from Messages when ready." />
         </div>
       ) : null}
 
       {tab === "portal" ? (
-        <div>
-          <p>Portal status: {client?.portalStatus ?? "none"}</p>
-          <button
-            type="button"
-            style={buttonStyle}
-            onClick={() => void api(`${base}/account/invite`, { method: "POST" }).then(() => load())}
-          >
-            Invite / create portal account
-          </button>
-          {client?.portalStatus && client.portalStatus !== "DEACTIVATED" ? (
-            <button
-              type="button"
-              style={{ ...buttonStyle, marginLeft: 8 }}
-              onClick={() => void api(`${base}/account/deactivate`, { method: "POST" }).then(() => load())}
-            >
-              Deactivate portal
-            </button>
-          ) : null}
-        </div>
+        <JoinCodePanel
+          title="Reconnect portal"
+          description="Use this only for an existing chart. New clients create their own account and join with the practice code from the Clients page."
+          connectionStatus={client?.connectionStatus ?? portalAccount?.connectionStatus}
+          plainJoinCode={plainJoinCode}
+          hint={portalAccount?.joinCode?.hint ?? null}
+          expiresAt={portalAccount?.joinCode?.expiresAt ?? null}
+          allowManage={allowManage}
+          portalBusy={portalBusy}
+          onGenerate={() => {
+            setPortalBusy(true);
+            void api<{ code: string }>(`${base}/account/join-code`, { method: "POST" })
+              .then((result) => {
+                setPlainJoinCode(result.code);
+                return load();
+              })
+              .catch((err) => setError(errorMessage(err, "Could not generate join code")))
+              .finally(() => setPortalBusy(false));
+          }}
+          onCopy={() => plainJoinCode && void navigator.clipboard.writeText(plainJoinCode)}
+          onRevoke={() => setConfirmRevoke(true)}
+          onDeactivate={
+            allowManage && (client?.connectionStatus ?? portalAccount?.connectionStatus) === "connected"
+              ? () => setConfirmDeactivate(true)
+              : undefined
+          }
+        />
       ) : null}
 
-      {error ? <p style={{ color: "var(--color-danger)" }}>{error}</p> : null}
+      <ConfirmDialog
+        open={confirmArchive}
+        title="Archive this client?"
+        description="The chart stays in the practice but is no longer active."
+        confirmLabel="Archive"
+        danger
+        onConfirm={() => {
+          void api(`${base}/archive`, { method: "POST" }).then(() => {
+            setConfirmArchive(false);
+            return load();
+          });
+        }}
+        onCancel={() => setConfirmArchive(false)}
+      />
+      <ConfirmDialog
+        open={confirmRevoke}
+        title="Revoke this reconnect code?"
+        confirmLabel="Revoke"
+        danger
+        onConfirm={() => {
+          setPortalBusy(true);
+          void api(`${base}/account/join-code`, { method: "DELETE" })
+            .then(() => {
+              setPlainJoinCode(null);
+              setConfirmRevoke(false);
+              return load();
+            })
+            .finally(() => setPortalBusy(false));
+        }}
+        onCancel={() => setConfirmRevoke(false)}
+      />
+      <ConfirmDialog
+        open={confirmDeactivate}
+        title="Deactivate this portal connection?"
+        confirmLabel="Deactivate"
+        danger
+        onConfirm={() => {
+          void api(`${base}/account/deactivate`, { method: "POST" }).then(() => {
+            setPlainJoinCode(null);
+            setConfirmDeactivate(false);
+            return load();
+          });
+        }}
+        onCancel={() => setConfirmDeactivate(false)}
+      />
     </section>
   );
 }

@@ -4,8 +4,6 @@ import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { api } from "../../../../lib/api";
-import { buttonStyle, cellStyle, fieldStyle, inputStyle, tableStyle } from "../practice-shell";
-
 interface PlanRow {
   id: string;
   name: string;
@@ -64,13 +62,13 @@ export default function MealPlansPage() {
       <p style={{ color: "var(--color-muted)" }}>Draft, publish, and keep historical versions. Clients only see the current published snapshot.</p>
       {error ? <p style={{ color: "var(--color-danger)" }}>{error}</p> : null}
       <form onSubmit={(event) => void create(event).catch((err) => setError(err instanceof Error ? err.message : "Create failed"))} style={{ display: "flex", gap: 12, alignItems: "end" }}>
-        <label style={fieldStyle}>
+        <label className="ui-field">
           Name
-          <input style={inputStyle} value={name} onChange={(event) => setName(event.target.value)} required />
+          <input className="ui-input" value={name} onChange={(event) => setName(event.target.value)} required />
         </label>
-        <label style={fieldStyle}>
+        <label className="ui-field">
           Client
-          <select style={inputStyle} value={clientId} onChange={(event) => setClientId(event.target.value)}>
+          <select className="ui-input" value={clientId} onChange={(event) => setClientId(event.target.value)}>
             {clients.map((client) => (
               <option key={client.id} value={client.id}>
                 {client.firstName} {client.lastName}
@@ -78,30 +76,30 @@ export default function MealPlansPage() {
             ))}
           </select>
         </label>
-        <button type="submit" style={{ ...buttonStyle, height: 38 }}>
+        <button type="submit" className="ui-btn ui-btn--primary" style={{height: 38}}>
           Create draft
         </button>
       </form>
-      <table style={{ ...tableStyle, marginTop: 16 }}>
+      <table className="ui-table">
         <thead>
           <tr>
-            <th style={cellStyle}>Plan</th>
-            <th style={cellStyle}>Client</th>
-            <th style={cellStyle}>Status</th>
-            <th style={cellStyle}>Published</th>
+            <th>Plan</th>
+            <th>Client</th>
+            <th>Status</th>
+            <th>Published</th>
           </tr>
         </thead>
         <tbody>
           {data?.items.map((row) => (
             <tr key={row.id}>
-              <td style={cellStyle}>
+              <td>
                 <Link href={`/orgs/${organizationId}/meal-plans/${row.id}`} style={{ color: "var(--color-accent)" }}>
                   {row.name}
                 </Link>
               </td>
-              <td style={cellStyle}>{row.client.displayName ?? `${row.client.firstName} ${row.client.lastName}`}</td>
-              <td style={cellStyle}>{row.status}</td>
-              <td style={cellStyle}>{row.currentPublishedVersion ? `v${row.currentPublishedVersion}` : "—"}</td>
+              <td>{row.client.displayName ?? `${row.client.firstName} ${row.client.lastName}`}</td>
+              <td>{row.status}</td>
+              <td>{row.currentPublishedVersion ? `v${row.currentPublishedVersion}` : "—"}</td>
             </tr>
           ))}
         </tbody>

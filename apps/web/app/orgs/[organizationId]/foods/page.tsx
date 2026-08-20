@@ -4,8 +4,6 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { api } from "../../../../lib/api";
-import { buttonStyle, cellStyle, fieldStyle, inputStyle, tableStyle } from "../practice-shell";
-
 interface NutritionValues {
   energyKcal: number | null;
   proteinG: number | null;
@@ -100,13 +98,13 @@ export default function FoodsPage() {
       </p>
       {error ? <p style={{ color: "var(--color-danger)" }}>{error}</p> : null}
       <form onSubmit={onSearch} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr auto", gap: 12 }}>
-        <label style={fieldStyle}>
+        <label className="ui-field">
           Search
-          <input style={inputStyle} value={q} onChange={(event) => setQ(event.target.value)} />
+          <input className="ui-input" value={q} onChange={(event) => setQ(event.target.value)} />
         </label>
-        <label style={fieldStyle}>
+        <label className="ui-field">
           Category
-          <select style={inputStyle} value={category} onChange={(event) => { setCategory(event.target.value); setPage(1); }}>
+          <select className="ui-input" value={category} onChange={(event) => { setCategory(event.target.value); setPage(1); }}>
             <option value="">All</option>
             {categories.map((item) => (
               <option key={item} value={item}>
@@ -115,9 +113,9 @@ export default function FoodsPage() {
             ))}
           </select>
         </label>
-        <label style={fieldStyle}>
+        <label className="ui-field">
           Source
-          <select style={inputStyle} value={sourceId} onChange={(event) => { setSourceId(event.target.value); setPage(1); }}>
+          <select className="ui-input" value={sourceId} onChange={(event) => { setSourceId(event.target.value); setPage(1); }}>
             <option value="">All</option>
             {sources.map((item) => (
               <option key={item.id} value={item.id}>
@@ -126,42 +124,42 @@ export default function FoodsPage() {
             ))}
           </select>
         </label>
-        <button type="submit" style={{ ...buttonStyle, alignSelf: "end", height: 38 }}>
+        <button type="submit" className="ui-btn ui-btn--primary" style={{alignSelf: "end", height: 38}}>
           Search
         </button>
       </form>
-      <table style={{ ...tableStyle, marginTop: 16 }}>
+      <table className="ui-table">
         <thead>
           <tr>
-            <th style={cellStyle}>Name</th>
-            <th style={cellStyle}>Category</th>
-            <th style={cellStyle}>kcal</th>
-            <th style={cellStyle}>Protein</th>
-            <th style={cellStyle}>Source</th>
-            <th style={cellStyle}>Values</th>
+            <th>Name</th>
+            <th>Category</th>
+            <th>kcal</th>
+            <th>Protein</th>
+            <th>Source</th>
+            <th>Values</th>
           </tr>
         </thead>
         <tbody>
           {data?.items.map((row) => (
             <tr key={row.id}>
-              <td style={cellStyle}>
+              <td>
                 <Link href={`/orgs/${organizationId}/foods/${row.id}`} style={{ color: "var(--color-accent)" }}>
                   {row.name}
                 </Link>
               </td>
-              <td style={cellStyle}>{row.category ?? "—"}</td>
-              <td style={cellStyle}>
+              <td>{row.category ?? "—"}</td>
+              <td>
                 {formatNutrient(row.presentedNutrition.energyKcal)} / {row.referenceQuantity} {row.referenceUnit}
               </td>
-              <td style={cellStyle}>{formatNutrient(row.presentedNutrition.proteinG)}</td>
-              <td style={cellStyle}>{row.source.name}</td>
-              <td style={cellStyle}>{row.hasOverride ? "CUSTOM" : "GLOBAL"}</td>
+              <td>{formatNutrient(row.presentedNutrition.proteinG)}</td>
+              <td>{row.source.name}</td>
+              <td>{row.hasOverride ? "Practice food" : "Catalog food"}</td>
             </tr>
           ))}
         </tbody>
       </table>
       <p style={{ marginTop: 12, display: "flex", gap: 12, alignItems: "center" }}>
-        <button type="button" style={buttonStyle} disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>
+        <button type="button" className="ui-btn ui-btn--primary" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>
           Previous
         </button>
         <span>
@@ -169,7 +167,7 @@ export default function FoodsPage() {
         </span>
         <button
           type="button"
-          style={buttonStyle}
+          className="ui-btn ui-btn--primary"
           disabled={page >= totalPages}
           onClick={() => setPage((value) => value + 1)}
         >

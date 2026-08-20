@@ -1,10 +1,13 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { Alert, Card, EmptyState, PageHeader, StatCard, Table, Td, humanizeLabel } from "@nutrition-saas/ui";
 import { api } from "../../../lib/api";
-import { buttonStyle, cellStyle, fieldStyle, inputStyle, tableStyle } from "./practice-shell";
+import { clientIdentityLine } from "../../../lib/client-identity";
+import { errorMessage } from "../../../lib/humanize-error";
+import { formatDate, formatMoney } from "../../../lib/format";
 
 interface Dashboard {
   clientCount: number;
@@ -19,15 +22,14 @@ interface Dashboard {
   overdueInvoices: number;
   paidThisMonth: number;
   invoicedThisMonth: number;
-  needsAttention: Array<{ clientId: string; clientName: string; reasons: string[] }>;
-  recentlyActive: Array<{ clientId: string; clientName: string; lastActivityAt: string }>;
-  noRecentActivity: Array<{ clientId: string; clientName: string; reason: string }>;
+  needsAttention: Array<{ clientId: string; clientName: string; clientEmail?: string | null; reasons: string[] }>;
   upcomingAppointments: Array<{
     id: string;
     title: string;
     startAt: string;
     clientId: string;
     clientName: string;
+    clientEmail?: string | null;
   }>;
   recentActivity: Array<{
     id: string;
@@ -35,6 +37,7 @@ interface Dashboard {
     occurredAt: string;
     clientId: string;
     clientName: string;
+    clientEmail?: string | null;
   }>;
 }
 
@@ -42,151 +45,100 @@ export default function PracticeDashboardPage() {
   const params = useParams<{ organizationId: string }>();
   const organizationId = params.organizationId;
   const [data, setData] = useState<Dashboard | null>(null);
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  async function load() {
-    try {
-      setData(await api<Dashboard>(`/api/v1/organizations/${organizationId}/practice/dashboard`));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to load dashboard");
-    }
-  }
-
   useEffect(() => {
-    void load();
+    void api<Dashboard>(`/api/v1/organizations/${organizationId}/practice/dashboard`)
+      .then(setData)
+      .catch((err) => setError(errorMessage(err, "Unable to load dashboard")));
   }, [organizationId]);
-
-  async function onCreate(event: FormEvent) {
-    event.preventDefault();
-    setError(null);
-    try {
-      await api(`/api/v1/organizations/${organizationId}/clients`, {
-        method: "POST",
-        body: JSON.stringify({ firstName, lastName }),
-      });
-      setFirstName("");
-      setLastName("");
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Create failed");
-    }
-  }
 
   return (
     <section>
-      <h1>Practice dashboard</h1>
-      <p style={{ color: "var(--color-muted)" }}>
-        Operational overview from clients, invoices, tasks, appointments, and timeline data.
-      </p>
+      <PageHeader
+        title="Today in your practice"
+        description="What needs attention, who you’re seeing, and what’s still unpaid."
+        actions={
+          <Link href={`/orgs/${organizationId}/clients`} className="ui-btn ui-btn--primary">
+            Open clients
+          </Link>
+        }
+      />
+      {error ? <Alert tone="danger">{error}</Alert> : null}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 20 }}>
-        <Card label="Active clients" value={data?.activeClients} />
-        <Card label="New this month" value={data?.newClientsThisMonth} />
-        <Card label="Inactive" value={data?.inactiveClients} />
-        <Card label="Outstanding invoices" value={data?.outstandingInvoices} />
-        <Card label="Overdue invoices" value={data?.overdueInvoices} />
-        <Card label="Invoiced this month" value={data?.invoicedThisMonth} money />
-        <Card label="Paid this month" value={data?.paidThisMonth} money />
-        <Card label="My tasks" value={data?.myTasks} />
-        <Card label="My overdue tasks" value={data?.myOverdueTasks} />
+      <div className="ui-grid" style={{ marginBottom: 20 }}>
+        <StatCard label="Active clients" value={data?.activeClients ?? "—"} hint={`${data?.newClientsThisMonth ?? 0} new this month`} />
+        <StatCard label="My tasks" value={data?.myTasks ?? "—"} hint={`${data?.myOverdueTasks ?? 0} overdue`} />
+        <StatCard label="Outstanding invoices" value={data?.outstandingInvoices ?? "—"} hint={`${data?.overdueInvoices ?? 0} overdue`} />
+        <StatCard label="Paid this month" value={formatMoney(data?.paidThisMonth)} />
       </div>
 
-      <p>
-        <Link href={`/orgs/${organizationId}/clients`} style={{ color: "var(--color-accent)" }}>
-          Open client list
-        </Link>
-        {" · "}
-        <Link href={`/orgs/${organizationId}/invoices`} style={{ color: "var(--color-accent)" }}>
-          Invoices
-        </Link>
-        {" · "}
-        <Link href={`/orgs/${organizationId}/tasks`} style={{ color: "var(--color-accent)" }}>
-          Tasks
-        </Link>
-        {" · "}
-        <Link href={`/orgs/${organizationId}/analytics`} style={{ color: "var(--color-accent)" }}>
-          Analytics
-        </Link>
-      </p>
+      <div className="ui-stack">
+        <Card title="Needs attention">
+          {(data?.needsAttention ?? []).length === 0 ? (
+            <EmptyState title="Nothing flagged">No clients need attention right now.</EmptyState>
+          ) : (
+            <ul>
+              {(data?.needsAttention ?? []).map((row) => (
+                <li key={row.clientId}>
+                  <Link href={`/orgs/${organizationId}/clients/${row.clientId}`} className="ui-link">
+                    {clientIdentityLine({ id: row.clientId, displayName: row.clientName, email: row.clientEmail })}
+                  </Link>
+                  : {row.reasons.map(humanizeLabel).join(" · ")}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
 
-      <h2>Needs attention</h2>
-      <ul>
-        {(data?.needsAttention ?? []).map((row) => (
-          <li key={row.clientId}>
-            <Link href={`/orgs/${organizationId}/clients/${row.clientId}`} style={{ color: "var(--color-accent)" }}>
-              {row.clientName}
-            </Link>
-            : {row.reasons.join(" · ")}
-          </li>
-        ))}
-      </ul>
-      {(data?.needsAttention ?? []).length === 0 ? <p>No clients flagged.</p> : null}
+        <Card title="Upcoming appointments">
+          {(data?.upcomingAppointments ?? []).length === 0 ? (
+            <EmptyState title="No upcoming appointments">
+              Schedule from a client workspace. A full practice calendar needs a list endpoint.
+            </EmptyState>
+          ) : (
+            <Table>
+              <thead>
+                <tr>
+                  <th>When</th>
+                  <th>Client</th>
+                  <th>Title</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(data?.upcomingAppointments ?? []).map((row) => (
+                  <tr key={row.id}>
+                    <Td label="When">{formatDate(row.startAt)}</Td>
+                    <Td label="Client">
+                      <Link href={`/orgs/${organizationId}/clients/${row.clientId}`} className="ui-link">
+                        {clientIdentityLine({ id: row.clientId, displayName: row.clientName, email: row.clientEmail })}
+                      </Link>
+                    </Td>
+                    <Td label="Title">{row.title}</Td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          )}
+        </Card>
 
-      <h2>Quick client</h2>
-      <form onSubmit={(event) => void onCreate(event)} style={{ maxWidth: 360 }}>
-        <label style={fieldStyle}>
-          First name
-          <input style={inputStyle} value={firstName} onChange={(event) => setFirstName(event.target.value)} required />
-        </label>
-        <label style={fieldStyle}>
-          Last name
-          <input style={inputStyle} value={lastName} onChange={(event) => setLastName(event.target.value)} required />
-        </label>
-        <button type="submit" style={buttonStyle}>
-          Create client
-        </button>
-      </form>
-
-      <h2>Upcoming appointments</h2>
-      <table style={tableStyle}>
-        <thead>
-          <tr>
-            <th style={cellStyle}>When</th>
-            <th style={cellStyle}>Client</th>
-            <th style={cellStyle}>Title</th>
-          </tr>
-        </thead>
-        <tbody>
-          {(data?.upcomingAppointments ?? []).map((row) => (
-            <tr key={row.id}>
-              <td style={cellStyle}>{new Date(row.startAt).toLocaleString()}</td>
-              <td style={cellStyle}>
-                <Link href={`/orgs/${organizationId}/clients/${row.clientId}`} style={{ color: "var(--color-accent)" }}>
-                  {row.clientName}
-                </Link>
-              </td>
-              <td style={cellStyle}>{row.title}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {(data?.upcomingAppointments ?? []).length === 0 ? <p>No upcoming appointments.</p> : null}
-
-      <h2>Recent activity</h2>
-      <ul>
-        {(data?.recentActivity ?? []).map((row) => (
-          <li key={row.id}>
-            <Link href={`/orgs/${organizationId}/clients/${row.clientId}`} style={{ color: "var(--color-accent)" }}>
-              {row.clientName}
-            </Link>{" "}
-            · {row.type} · {new Date(row.occurredAt).toLocaleString()}
-          </li>
-        ))}
-      </ul>
-      {(data?.recentActivity ?? []).length === 0 ? <p>No timeline activity yet.</p> : null}
-      {error ? <p style={{ color: "var(--color-danger)" }}>{error}</p> : null}
+        <Card title="Recent activity">
+          {(data?.recentActivity ?? []).length === 0 ? (
+            <p className="ui-muted">No timeline activity yet.</p>
+          ) : (
+            <ul>
+              {(data?.recentActivity ?? []).map((row) => (
+                <li key={row.id}>
+                  <Link href={`/orgs/${organizationId}/clients/${row.clientId}`} className="ui-link">
+                    {clientIdentityLine({ id: row.clientId, displayName: row.clientName, email: row.clientEmail })}
+                  </Link>{" "}
+                  · {humanizeLabel(row.type)} · {formatDate(row.occurredAt)}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      </div>
     </section>
-  );
-}
-
-function Card({ label, value, money }: { label: string; value?: number; money?: boolean }) {
-  const display = value === undefined ? "—" : money ? value.toFixed(2) : String(value);
-  return (
-    <div style={{ border: "1px solid var(--color-border)", borderRadius: 8, padding: 12, background: "var(--color-surface)" }}>
-      <div style={{ fontSize: 12, color: "var(--color-muted)" }}>{label}</div>
-      <div style={{ fontSize: 22, fontWeight: 600 }}>{display}</div>
-    </div>
   );
 }

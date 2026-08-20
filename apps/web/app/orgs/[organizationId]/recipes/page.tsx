@@ -4,8 +4,6 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { api } from "../../../../lib/api";
-import { buttonStyle, cellStyle, fieldStyle, inputStyle, tableStyle } from "../practice-shell";
-
 interface RecipeRow {
   id: string;
   name: string;
@@ -69,41 +67,41 @@ export default function RecipesPage() {
         </Link>
       </p>
       <form onSubmit={onSearch} style={{ display: "flex", gap: 12, alignItems: "end" }}>
-        <label style={fieldStyle}>
+        <label className="ui-field">
           Search
-          <input style={inputStyle} value={q} onChange={(event) => setQ(event.target.value)} />
+          <input className="ui-input" value={q} onChange={(event) => setQ(event.target.value)} />
         </label>
-        <label style={fieldStyle}>
+        <label className="ui-field">
           Status
-          <select style={inputStyle} value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }}>
+          <select className="ui-input" value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }}>
             <option value="ACTIVE">Active</option>
             <option value="ARCHIVED">Archived</option>
           </select>
         </label>
-        <button type="submit" style={{ ...buttonStyle, height: 38 }}>
+        <button type="submit" className="ui-btn ui-btn--primary" style={{height: 38}}>
           Search
         </button>
       </form>
-      <table style={{ ...tableStyle, marginTop: 16 }}>
+      <table className="ui-table">
         <thead>
           <tr>
-            <th style={cellStyle}>Name</th>
-            <th style={cellStyle}>Servings</th>
-            <th style={cellStyle}>Ingredients</th>
-            <th style={cellStyle}>Status</th>
+            <th>Name</th>
+            <th>Servings</th>
+            <th>Ingredients</th>
+            <th>Status</th>
           </tr>
         </thead>
         <tbody>
           {data?.items.map((row) => (
             <tr key={row.id}>
-              <td style={cellStyle}>
+              <td>
                 <Link href={`/orgs/${organizationId}/recipes/${row.id}`} style={{ color: "var(--color-accent)" }}>
                   {row.name}
                 </Link>
               </td>
-              <td style={cellStyle}>{row.servings}</td>
-              <td style={cellStyle}>{row.ingredientCount}</td>
-              <td style={cellStyle}>{row.status}</td>
+              <td>{row.servings}</td>
+              <td>{row.ingredientCount}</td>
+              <td>{row.status}</td>
             </tr>
           ))}
         </tbody>

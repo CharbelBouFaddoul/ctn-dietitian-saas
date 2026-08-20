@@ -2,8 +2,12 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
-import { api } from "../../lib/api";
-import { AuthShell, buttonStyle, fieldStyle, inputStyle } from "../auth/auth-shell";
+import { useRouter } from "next/navigation";
+import { Alert, Button, Card, EmptyState, Field, Input, LoadingState, PageHeader } from "@nutrition-saas/ui";
+import { humanizeLabel } from "@nutrition-saas/ui";
+import { ApiError, api, logout } from "../../lib/api";
+import { errorMessage } from "../../lib/humanize-error";
+import { loginPathFor, resolveSessionHome } from "../../lib/session-home";
 
 interface Org {
   id: string;
@@ -19,20 +23,34 @@ const defaultSettings = {
   currency: "USD",
   weightUnit: "kg",
   heightUnit: "cm",
-  dateFormat: "YYYY_MM_DD",
+  dateFormat: "YYYY-MM-DD",
 };
 
 export default function OrganizationsPage() {
-  const [orgs, setOrgs] = useState<Org[]>([]);
+  const router = useRouter();
+  const [orgs, setOrgs] = useState<Org[] | null>(null);
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   async function load() {
     try {
-      const list = await api<Org[]>("/api/v1/organizations");
-      setOrgs(list);
+      const home = await resolveSessionHome();
+      if (home.kind === "unauthenticated") {
+        router.replace(loginPathFor("dietitian"));
+        return;
+      }
+      if (home.kind === "client") {
+        router.replace("/client");
+        return;
+      }
+      setOrgs(await api<Org[]>("/api/v1/organizations"));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to load organizations");
+      if (err instanceof ApiError && err.status === 401) {
+        router.replace(loginPathFor("dietitian"));
+        return;
+      }
+      setError(errorMessage(err, "Unable to load organizations"));
+      setOrgs([]);
     }
   }
 
@@ -44,48 +62,62 @@ export default function OrganizationsPage() {
     event.preventDefault();
     setError(null);
     try {
-      await api("/api/v1/organizations", {
+      const created = await api<Org>("/api/v1/organizations", {
         method: "POST",
         body: JSON.stringify({ name, settings: defaultSettings }),
       });
-      setName("");
-      await load();
+      router.replace(`/orgs/${created.id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Create failed");
+      setError(errorMessage(err, "Create failed"));
     }
   }
 
+  async function onLogout() {
+    await logout();
+    router.replace(loginPathFor("dietitian"));
+  }
+
+  if (orgs === null) {
+    return <LoadingState>Loading practices…</LoadingState>;
+  }
+
   return (
-    <AuthShell title="Organizations">
-      <p style={{ color: "var(--color-muted)", marginTop: 0 }}>
-        Phase 5 practice workspace. Sign in first. Clients are not organization members.
-      </p>
-      <ul>
-        {orgs.map((org) => (
-          <li key={org.id}>
-            <Link href={`/orgs/${org.id}`} style={{ color: "var(--color-accent)" }}>
-              {org.name}
-            </Link>{" "}
-            ({org.role}, {org.status})
-          </li>
-        ))}
-      </ul>
-      <form onSubmit={(event) => void onSubmit(event)}>
-        <label style={fieldStyle}>
-          New organization
-          <input
-            style={inputStyle}
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            minLength={2}
-            required
-          />
-        </label>
-        <button type="submit" style={buttonStyle}>
-          Create organization
-        </button>
-      </form>
-      {error ? <p style={{ color: "var(--color-danger)" }}>{error}</p> : null}
-    </AuthShell>
+    <main className="ui-mkt__section">
+      <PageHeader
+        eyebrow="Practice"
+        title="Your practices"
+        description="Open a clinic workspace or create a new one."
+        actions={
+          <Button variant="ghost" onClick={() => void onLogout()}>
+            Sign out
+          </Button>
+        }
+      />
+      {error ? <Alert tone="danger">{error}</Alert> : null}
+      <div className="ui-stack">
+        {orgs.length === 0 ? (
+          <EmptyState title="No practices yet">Create one to continue.</EmptyState>
+        ) : (
+          orgs.map((org) => (
+            <Card key={org.id}>
+              <Link href={`/orgs/${org.id}`} className="ui-link">
+                {org.name}
+              </Link>
+              <p className="ui-muted">
+                {humanizeLabel(org.role)} · {humanizeLabel(org.status)}
+              </p>
+            </Card>
+          ))
+        )}
+        <Card title="Create a practice">
+          <form onSubmit={(event) => void onSubmit(event)}>
+            <Field label="Practice name">
+              <Input value={name} onChange={(event) => setName(event.target.value)} minLength={2} required />
+            </Field>
+            <Button type="submit">Create</Button>
+          </form>
+        </Card>
+      </div>
+    </main>
   );
 }

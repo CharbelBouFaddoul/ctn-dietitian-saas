@@ -3,8 +3,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { api } from "../../../../lib/api";
-import { buttonStyle, fieldStyle, inputStyle } from "../practice-shell";
-
 interface Settings {
   timezone: string;
   locale: string;
@@ -67,8 +65,8 @@ export default function PracticeSettingsPage() {
   return (
     <section style={{ maxWidth: 560 }}>
       <h1>Practice settings</h1>
-      <p style={{ color: "var(--color-muted)" }}>
-        Invoice and reminder values are stored as settings only. Invoicing is not implemented in this phase.
+      <p className="ui-muted">
+        Practice details, reminders, and invoice defaults used across this clinic.
       </p>
       <form onSubmit={(event) => void onSave(event)}>
         {(
@@ -80,7 +78,6 @@ export default function PracticeSettingsPage() {
             ["heightUnit", "Height unit"],
             ["dateFormat", "Date format"],
             ["practiceName", "Practice name"],
-            ["logoStorageKey", "Logo storage key"],
             ["contactEmail", "Email"],
             ["contactPhone", "Phone"],
             ["addressLine1", "Address line 1"],
@@ -94,19 +91,19 @@ export default function PracticeSettingsPage() {
             ["invoiceFooter", "Invoice footer"],
           ] as const
         ).map(([key, label]) => (
-          <label key={key} style={fieldStyle}>
+          <label key={key} className="ui-field">
             {label}
             <input
-              style={inputStyle}
+              className="ui-input"
               value={settings[key] ?? ""}
               onChange={(event) => setSettings({ ...settings, [key]: event.target.value || null })}
             />
           </label>
         ))}
-        <label style={fieldStyle}>
+        <label className="ui-field">
           Default appointment minutes
           <input
-            style={inputStyle}
+            className="ui-input"
             type="number"
             value={settings.defaultAppointmentMinutes}
             onChange={(event) =>
@@ -114,19 +111,19 @@ export default function PracticeSettingsPage() {
             }
           />
         </label>
-        <label style={fieldStyle}>
+        <label className="ui-field">
           Reminder hours before
           <input
-            style={inputStyle}
+            className="ui-input"
             type="number"
             value={settings.reminderHoursBefore}
             onChange={(event) => setSettings({ ...settings, reminderHoursBefore: Number(event.target.value) })}
           />
         </label>
-        <label style={fieldStyle}>
+        <label className="ui-field">
           Invoice default due days
           <input
-            style={inputStyle}
+            className="ui-input"
             type="number"
             value={settings.invoiceDefaultDueDays}
             onChange={(event) => setSettings({ ...settings, invoiceDefaultDueDays: Number(event.target.value) })}
@@ -140,7 +137,7 @@ export default function PracticeSettingsPage() {
           />{" "}
           Email reminders enabled (preference only)
         </label>
-        <button type="submit" style={buttonStyle}>
+        <button type="submit" className="ui-btn ui-btn--primary">
           Save settings
         </button>
       </form>

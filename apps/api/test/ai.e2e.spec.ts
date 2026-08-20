@@ -3,6 +3,7 @@ import request from "supertest";
 import { FEATURE_KEYS } from "@nutrition-saas/config";
 import { CLIENT_ACCESS_DENIED } from "../src/clients/client.messages";
 import {
+  connectClientPortal,
   cookieValue,
   createAuthTestApp,
   extractEmailedToken,
@@ -76,19 +77,6 @@ describe("Phase 11 AI assistance", () => {
       .post(`/api/v1/organizations/${organizationId}/clients`)
       .set("Cookie", cookie)
       .send({ firstName: "Pat", lastName: "Client", email: email("client"), ...body });
-  }
-
-  async function portalLogin(clientEmail: string) {
-    const inviteMail = ctx.emails.messages.find(
-      (message) => message.text.includes("CLIENT_INVITE") && message.to === clientEmail,
-    );
-    const token = extractEmailedToken(inviteMail?.text ?? "");
-    await request(ctx.app.getHttpServer()).post("/api/v1/auth/invitations/accept").send({ token, password: PASSWORD }).expect(200);
-    const login = await request(ctx.app.getHttpServer())
-      .post("/api/v1/auth/login")
-      .send({ email: clientEmail, password: PASSWORD })
-      .expect(200);
-    return `ns_session=${cookieValue(login.headers["set-cookie"])}`;
   }
 
   it("rejects AI when disabled by plan and allows when enabled", async () => {
@@ -179,8 +167,8 @@ describe("Phase 11 AI assistance", () => {
   it("blocks client portal users from dietitian AI endpoints", async () => {
     const owner = await registerVerifyLogin();
     const org = await createOrg(owner.cookie, "Portal Org", "pro");
-    const client = await createClient(owner.cookie, org.id, { invitePortal: true });
-    const portal = await portalLogin(client.body.email);
+    const client = await createClient(owner.cookie, org.id);
+    const portal = await connectClientPortal(ctx, owner.cookie, org.id, client.body);
 
     await request(ctx.app.getHttpServer())
       .post(`/api/v1/organizations/${org.id}/clients/${client.body.id}/ai/client-summary`)

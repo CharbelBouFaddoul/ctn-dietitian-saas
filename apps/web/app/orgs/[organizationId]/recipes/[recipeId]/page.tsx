@@ -4,8 +4,6 @@ import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { api } from "../../../../../lib/api";
-import { buttonStyle, cellStyle, fieldStyle, inputStyle, tableStyle } from "../../practice-shell";
-
 interface Nutrition {
   energyKcal: number | null;
   proteinG: number | null;
@@ -129,46 +127,46 @@ export default function RecipeDetailPage() {
         {format(recipe.nutrition.presentedPerServing.energyKcal)} kcal
       </p>
       <form onSubmit={(event) => void save(event).catch((err) => setError(err instanceof Error ? err.message : "Save failed"))}>
-        <label style={fieldStyle}>
+        <label className="ui-field">
           Name
-          <input style={inputStyle} value={name} onChange={(event) => setName(event.target.value)} />
+          <input className="ui-input" value={name} onChange={(event) => setName(event.target.value)} />
         </label>
-        <label style={fieldStyle}>
+        <label className="ui-field">
           Servings
-          <input style={inputStyle} value={servings} onChange={(event) => setServings(event.target.value)} />
+          <input className="ui-input" value={servings} onChange={(event) => setServings(event.target.value)} />
         </label>
-        <label style={fieldStyle}>
+        <label className="ui-field">
           Description
-          <textarea style={inputStyle} value={description} onChange={(event) => setDescription(event.target.value)} />
+          <textarea className="ui-input" value={description} onChange={(event) => setDescription(event.target.value)} />
         </label>
-        <label style={fieldStyle}>
+        <label className="ui-field">
           Instructions
-          <textarea style={inputStyle} value={instructions} onChange={(event) => setInstructions(event.target.value)} />
+          <textarea className="ui-input" value={instructions} onChange={(event) => setInstructions(event.target.value)} />
         </label>
-        <button type="submit" style={buttonStyle}>
+        <button type="submit" className="ui-btn ui-btn--primary">
           Save recipe
         </button>
       </form>
       <h2>Ingredients</h2>
-      <table style={tableStyle}>
+      <table className="ui-table">
         <thead>
           <tr>
-            <th style={cellStyle}>Food</th>
-            <th style={cellStyle}>Quantity</th>
-            <th style={cellStyle}>kcal</th>
-            <th style={cellStyle}></th>
+            <th>Food</th>
+            <th>Quantity</th>
+            <th>kcal</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
           {recipe.nutrition.ingredients.map((row, index) => (
             <tr key={`${row.foodId}-${index}`}>
-              <td style={cellStyle}>{row.foodName}</td>
-              <td style={cellStyle}>
+              <td>{row.foodName}</td>
+              <td>
                 {row.quantity} {row.unit}
               </td>
-              <td style={cellStyle}>{format(row.presented.energyKcal)}</td>
-              <td style={cellStyle}>
-                <button type="button" style={buttonStyle} onClick={() => void removeIngredient(index)}>
+              <td>{format(row.presented.energyKcal)}</td>
+              <td>
+                <button type="button" className="ui-btn ui-btn--primary" onClick={() => void removeIngredient(index)}>
                   Remove
                 </button>
               </td>
@@ -177,23 +175,23 @@ export default function RecipeDetailPage() {
         </tbody>
       </table>
       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-        <input style={inputStyle} value={foodQuery} onChange={(event) => setFoodQuery(event.target.value)} placeholder="Search foods" />
-        <input style={{ ...inputStyle, width: 90 }} value={quantity} onChange={(event) => setQuantity(event.target.value)} />
-        <select style={inputStyle} value={unit} onChange={(event) => setUnit(event.target.value)}>
+        <input className="ui-input" value={foodQuery} onChange={(event) => setFoodQuery(event.target.value)} placeholder="Search foods" />
+        <input className="ui-input" style={{width: 90}} value={quantity} onChange={(event) => setQuantity(event.target.value)} />
+        <select className="ui-input" value={unit} onChange={(event) => setUnit(event.target.value)}>
           {["g", "kg", "oz", "lb", "ml", "l", "fl_oz"].map((item) => (
             <option key={item} value={item}>
               {item}
             </option>
           ))}
         </select>
-        <button type="button" style={buttonStyle} onClick={() => void searchFoods()}>
+        <button type="button" className="ui-btn ui-btn--primary" onClick={() => void searchFoods()}>
           Search
         </button>
       </div>
       {foodHits.map((hit) => (
         <p key={hit.id}>
           {hit.name}{" "}
-          <button type="button" style={buttonStyle} onClick={() => void addFood(hit.id)}>
+          <button type="button" className="ui-btn ui-btn--primary" onClick={() => void addFood(hit.id)}>
             Add
           </button>
         </p>
@@ -201,7 +199,7 @@ export default function RecipeDetailPage() {
       <p style={{ marginTop: 16, display: "flex", gap: 8 }}>
         <button
           type="button"
-          style={buttonStyle}
+          className="ui-btn ui-btn--primary"
           onClick={() =>
             void api<{ id: string }>(`/api/v1/organizations/${organizationId}/recipes/${recipeId}/duplicate`, { method: "POST" }).then(
               (copy) => {
@@ -215,7 +213,7 @@ export default function RecipeDetailPage() {
         {recipe.status === "ACTIVE" ? (
           <button
             type="button"
-            style={buttonStyle}
+            className="ui-btn ui-btn--primary"
             onClick={() =>
               void api(`/api/v1/organizations/${organizationId}/recipes/${recipeId}/archive`, { method: "POST" }).then(() => load())
             }

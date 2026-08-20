@@ -9,12 +9,15 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
-    "./tokens.css": "./src/tokens.css"
+    "./tokens.css": "./src/tokens.css",
+    "./ui.css": "./src/ui.css"
   },
+  "sideEffects": ["*.css"],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "eslint src --max-warnings=0"
+    "lint": "eslint src --max-warnings=0",
+    "test": "node --experimental-strip-types --test src/humanize.test.ts"
   },
   "peerDependencies": {
     "react": "^19.0.0",

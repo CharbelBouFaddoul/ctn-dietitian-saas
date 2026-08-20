@@ -3,8 +3,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "../../../lib/api";
-import { buttonStyle, cellStyle, inputStyle, tableStyle } from "../admin-shell";
-
 interface UserRow {
   id: string;
   email: string;
@@ -40,30 +38,30 @@ export default function AdminUsersPage() {
     <section>
       <h1>Users</h1>
       <form onSubmit={onSearch} style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-        <input style={inputStyle} value={q} onChange={(event) => setQ(event.target.value)} placeholder="Search email" />
-        <button type="submit" style={buttonStyle}>
+        <input className="ui-input" value={q} onChange={(event) => setQ(event.target.value)} placeholder="Search email" />
+        <button type="submit" className="ui-btn ui-btn--primary">
           Search
         </button>
       </form>
       {error ? <p style={{ color: "var(--color-danger)" }}>{error}</p> : null}
-      <table style={tableStyle}>
+      <table className="ui-table">
         <thead>
           <tr>
-            <th style={cellStyle}>Email</th>
-            <th style={cellStyle}>Status</th>
-            <th style={cellStyle}>Platform role</th>
+            <th>Email</th>
+            <th>Status</th>
+            <th>Platform role</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => (
             <tr key={row.id}>
-              <td style={cellStyle}>
+              <td>
                 <Link href={`/admin/users/${row.id}`} style={{ color: "var(--color-accent)" }}>
                   {row.email}
                 </Link>
               </td>
-              <td style={cellStyle}>{row.status}</td>
-              <td style={cellStyle}>{row.platformRole ?? "—"}</td>
+              <td>{row.status}</td>
+              <td>{row.platformRole ?? "—"}</td>
             </tr>
           ))}
         </tbody>

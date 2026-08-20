@@ -3,8 +3,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { api } from "../../../../lib/api";
-import { buttonStyle, cellStyle, inputStyle, tableStyle } from "../../admin-shell";
-
 interface Plan {
   id: string;
   name: string;
@@ -114,80 +112,80 @@ export default function AdminOrganizationDetailPage() {
       </p>
       {error ? <p style={{ color: "var(--color-danger)" }}>{error}</p> : null}
       <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-        <button type="button" style={buttonStyle} onClick={() => void setOrgStatus("ACTIVE")}>
+        <button type="button" className="ui-btn ui-btn--primary" onClick={() => void setOrgStatus("ACTIVE")}>
           Activate org
         </button>
-        <button type="button" style={buttonStyle} onClick={() => void setOrgStatus("SUSPENDED")}>
+        <button type="button" className="ui-btn ui-btn--primary" onClick={() => void setOrgStatus("SUSPENDED")}>
           Suspend org
         </button>
-        <button type="button" style={buttonStyle} onClick={() => void setOrgStatus("ARCHIVED")}>
+        <button type="button" className="ui-btn ui-btn--primary" onClick={() => void setOrgStatus("ARCHIVED")}>
           Archive org
         </button>
       </div>
       <form onSubmit={(event) => void assignPlan(event)} style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-        <select style={inputStyle} value={planId} onChange={(event) => setPlanId(event.target.value)}>
+        <select className="ui-input" value={planId} onChange={(event) => setPlanId(event.target.value)}>
           {plans.map((plan) => (
             <option key={plan.id} value={plan.id}>
               {plan.name}
             </option>
           ))}
         </select>
-        <button type="submit" style={buttonStyle}>
+        <button type="submit" className="ui-btn ui-btn--primary">
           Assign plan
         </button>
       </form>
       <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
-        <button type="button" style={buttonStyle} onClick={() => void setSubStatus("ACTIVE")}>
+        <button type="button" className="ui-btn ui-btn--primary" onClick={() => void setSubStatus("ACTIVE")}>
           Reactivate subscription
         </button>
-        <button type="button" style={buttonStyle} onClick={() => void setSubStatus("SUSPENDED")}>
+        <button type="button" className="ui-btn ui-btn--primary" onClick={() => void setSubStatus("SUSPENDED")}>
           Suspend subscription
         </button>
-        <button type="button" style={buttonStyle} onClick={() => void setSubStatus("CANCELLED")}>
+        <button type="button" className="ui-btn ui-btn--primary" onClick={() => void setSubStatus("CANCELLED")}>
           Cancel subscription
         </button>
       </div>
       <h2>Effective entitlements</h2>
       <label style={{ display: "block", marginBottom: 12 }}>
         Override reason
-        <input style={{ ...inputStyle, marginLeft: 8 }} value={reason} onChange={(event) => setReason(event.target.value)} />
+        <input className="ui-input" style={{marginLeft: 8}} value={reason} onChange={(event) => setReason(event.target.value)} />
       </label>
-      <table style={tableStyle}>
+      <table className="ui-table">
         <thead>
           <tr>
-            <th style={cellStyle}>Feature</th>
-            <th style={cellStyle}>Plan</th>
-            <th style={cellStyle}>Override</th>
-            <th style={cellStyle}>Effective</th>
-            <th style={cellStyle}>Source</th>
-            <th style={cellStyle}>Actions</th>
+            <th>Feature</th>
+            <th>Plan</th>
+            <th>Override</th>
+            <th>Effective</th>
+            <th>Source</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
           {org.entitlements.map((row) => (
             <tr key={row.key}>
-              <td style={cellStyle}>{row.key}</td>
-              <td style={cellStyle}>
+              <td>{row.key}</td>
+              <td>
                 {formatValue(row.planEnabled, row.planLimit)}
               </td>
-              <td style={cellStyle}>
+              <td>
                 {row.overrideEnabled === null && row.overrideLimit === null
                   ? "—"
                   : formatValue(row.overrideEnabled, row.overrideLimit)}
               </td>
-              <td style={cellStyle}>{formatValue(row.enabled, row.limit)}</td>
-              <td style={cellStyle}>{row.source}</td>
-              <td style={cellStyle}>
-                <button type="button" style={buttonStyle} onClick={() => void saveOverride(row.key, true, row.valueType === "LIMIT" ? row.limit ?? 0 : null)}>
+              <td>{formatValue(row.enabled, row.limit)}</td>
+              <td>{row.source}</td>
+              <td>
+                <button type="button" className="ui-btn ui-btn--primary" onClick={() => void saveOverride(row.key, true, row.valueType === "LIMIT" ? row.limit ?? 0 : null)}>
                   Enable
                 </button>{" "}
-                <button type="button" style={buttonStyle} onClick={() => void saveOverride(row.key, false, row.limit)}>
+                <button type="button" className="ui-btn ui-btn--primary" onClick={() => void saveOverride(row.key, false, row.limit)}>
                   Disable
                 </button>{" "}
                 {row.valueType === "LIMIT" ? (
                   <button
                     type="button"
-                    style={buttonStyle}
+                    className="ui-btn ui-btn--primary"
                     onClick={() => {
                       const next = window.prompt("Limit", String(row.limit ?? 0));
                       if (next === null) {
@@ -199,7 +197,7 @@ export default function AdminOrganizationDetailPage() {
                     Limit
                   </button>
                 ) : null}{" "}
-                <button type="button" style={buttonStyle} onClick={() => void removeOverride(row.key)}>
+                <button type="button" className="ui-btn ui-btn--primary" onClick={() => void removeOverride(row.key)}>
                   Remove override
                 </button>
               </td>

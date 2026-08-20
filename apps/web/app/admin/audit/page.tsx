@@ -2,8 +2,6 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { api } from "../../../lib/api";
-import { buttonStyle, cellStyle, inputStyle, tableStyle } from "../admin-shell";
-
 interface AuditRow {
   id: string;
   action: string;
@@ -43,30 +41,30 @@ export default function AdminAuditPage() {
     <section>
       <h1>Audit</h1>
       <form onSubmit={onSearch} style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-        <input style={inputStyle} value={q} onChange={(event) => setQ(event.target.value)} placeholder="Search action" />
-        <button type="submit" style={buttonStyle}>
+        <input className="ui-input" value={q} onChange={(event) => setQ(event.target.value)} placeholder="Search action" />
+        <button type="submit" className="ui-btn ui-btn--primary">
           Search
         </button>
       </form>
       {error ? <p style={{ color: "var(--color-danger)" }}>{error}</p> : null}
-      <table style={tableStyle}>
+      <table className="ui-table">
         <thead>
           <tr>
-            <th style={cellStyle}>Time</th>
-            <th style={cellStyle}>Action</th>
-            <th style={cellStyle}>Actor</th>
-            <th style={cellStyle}>Organization</th>
-            <th style={cellStyle}>Result</th>
+            <th>Time</th>
+            <th>Action</th>
+            <th>Actor</th>
+            <th>Organization</th>
+            <th>Result</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => (
             <tr key={row.id}>
-              <td style={cellStyle}>{row.createdAt}</td>
-              <td style={cellStyle}>{row.action}</td>
-              <td style={cellStyle}>{row.actor?.email ?? "—"}</td>
-              <td style={cellStyle}>{row.organization?.name ?? "—"}</td>
-              <td style={cellStyle}>{row.result}</td>
+              <td>{row.createdAt}</td>
+              <td>{row.action}</td>
+              <td>{row.actor?.email ?? "—"}</td>
+              <td>{row.organization?.name ?? "—"}</td>
+              <td>{row.result}</td>
             </tr>
           ))}
         </tbody>

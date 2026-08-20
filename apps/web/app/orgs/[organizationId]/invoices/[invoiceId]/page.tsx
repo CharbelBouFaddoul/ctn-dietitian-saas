@@ -4,8 +4,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { api } from "../../../../../lib/api";
-import { buttonStyle, cellStyle, tableStyle } from "../../practice-shell";
-
 interface InvoiceDetail {
   id: string;
   invoiceNumber: string | null;
@@ -79,46 +77,46 @@ export default function InvoiceDetailPage() {
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
         {invoice.status === "DRAFT" ? (
-          <button type="button" style={buttonStyle} onClick={() => void action("issue").catch((err) => setError(String(err)))}>
+          <button type="button" className="ui-btn ui-btn--primary" onClick={() => void action("issue").catch((err) => setError(String(err)))}>
             Issue
           </button>
         ) : null}
         {["ISSUED", "SENT", "OVERDUE"].includes(invoice.status) ? (
           <>
-            <button type="button" style={buttonStyle} onClick={() => void action("send").catch((err) => setError(String(err)))}>
+            <button type="button" className="ui-btn ui-btn--primary" onClick={() => void action("send").catch((err) => setError(String(err)))}>
               Mark sent
             </button>
-            <button type="button" style={buttonStyle} onClick={() => void action("pay").catch((err) => setError(String(err)))}>
+            <button type="button" className="ui-btn ui-btn--primary" onClick={() => void action("pay").catch((err) => setError(String(err)))}>
               Mark paid
             </button>
-            <button type="button" style={buttonStyle} onClick={() => void action("cancel").catch((err) => setError(String(err)))}>
+            <button type="button" className="ui-btn ui-btn--primary" onClick={() => void action("cancel").catch((err) => setError(String(err)))}>
               Cancel
             </button>
           </>
         ) : null}
-        <button type="button" style={buttonStyle} onClick={() => window.print()}>
+        <button type="button" className="ui-btn ui-btn--primary" onClick={() => window.print()}>
           Print
         </button>
       </div>
 
-      <table style={tableStyle}>
+      <table className="ui-table">
         <thead>
           <tr>
-            <th style={cellStyle}>Description</th>
-            <th style={cellStyle}>Qty</th>
-            <th style={cellStyle}>Unit</th>
-            <th style={cellStyle}>Line total</th>
+            <th>Description</th>
+            <th>Qty</th>
+            <th>Unit</th>
+            <th>Line total</th>
           </tr>
         </thead>
         <tbody>
           {invoice.items.map((item) => (
             <tr key={item.description + item.lineTotal}>
-              <td style={cellStyle}>{item.description}</td>
-              <td style={cellStyle}>{item.quantity}</td>
-              <td style={cellStyle}>
+              <td>{item.description}</td>
+              <td>{item.quantity}</td>
+              <td>
                 {item.unitPrice.toFixed(2)} {invoice.currency}
               </td>
-              <td style={cellStyle}>
+              <td>
                 {item.lineTotal.toFixed(2)} {invoice.currency}
               </td>
             </tr>

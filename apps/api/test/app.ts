@@ -1,6 +1,7 @@
 import { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { ConfigModule } from "@nestjs/config";
+import request from "supertest";
 import { AuthModule } from "../src/auth/auth.module";
 import { InvitationService } from "../src/auth/invitation.service";
 import { PasswordService } from "../src/auth/password.service";
@@ -128,6 +129,7 @@ export async function createAuthTestApp(): Promise<AuthTestContext> {
 }
 
 export async function resetAuthDatabase(prisma: PrismaService): Promise<void> {
+  await assertTestDatabase(prisma);
   await prisma.automationRun.deleteMany();
   await prisma.automationRule.deleteMany();
   await prisma.automationUsage.deleteMany();
@@ -188,6 +190,16 @@ export async function resetAuthDatabase(prisma: PrismaService): Promise<void> {
   await seedPlatformAssessmentTemplate(prisma);
 }
 
+async function assertTestDatabase(prisma: PrismaService): Promise<void> {
+  const rows = await prisma.$queryRaw<Array<{ current_database: string }>>`SELECT current_database()`;
+  const name = rows[0]?.current_database ?? "";
+  if (name !== "nutrition_test") {
+    throw new Error(
+      `Refusing to wipe database "${name}". API tests must use nutrition_test, not the Docker development database.`,
+    );
+  }
+}
+
 export function extractEmailedToken(text: string): string {
   const match = /Token: (\S+)/.exec(text);
   if (!match?.[1]) {
@@ -217,4 +229,67 @@ export function cookieValue(
     throw new Error(`Empty ${name} cookie`);
   }
   return value;
+}
+
+export const TEST_PASSWORD = "ValidPass12";
+
+export async function generateJoinCode(
+  ctx: AuthTestContext,
+  ownerCookie: string,
+  organizationId: string,
+  clientId: string,
+): Promise<{ code: string; expiresAt: string; hint: string; status: string }> {
+  const generated = await request(ctx.app.getHttpServer())
+    .post(`/api/v1/organizations/${organizationId}/clients/${clientId}/account/join-code`)
+    .set("Cookie", ownerCookie)
+    .expect(201);
+  return generated.body as { code: string; expiresAt: string; hint: string; status: string };
+}
+
+export async function generatePracticeJoinCode(
+  ctx: AuthTestContext,
+  ownerCookie: string,
+  organizationId: string,
+): Promise<{ code: string; expiresAt: string; hint: string; status: string }> {
+  const generated = await request(ctx.app.getHttpServer())
+    .post(`/api/v1/organizations/${organizationId}/join-code`)
+    .set("Cookie", ownerCookie)
+    .expect(201);
+  return generated.body as { code: string; expiresAt: string; hint: string; status: string };
+}
+
+export async function registerVerifyLoginUser(
+  ctx: AuthTestContext,
+  address: string,
+  password = TEST_PASSWORD,
+  names?: { firstName: string; lastName: string },
+): Promise<{ address: string; cookie: string }> {
+  await request(ctx.app.getHttpServer())
+    .post("/api/v1/auth/register")
+    .send({ email: address, password, ...names })
+    .expect(200);
+  const token = extractEmailedToken(ctx.emails.last().text);
+  await request(ctx.app.getHttpServer()).post("/api/v1/auth/verify-email").send({ token }).expect(200);
+  const login = await request(ctx.app.getHttpServer())
+    .post("/api/v1/auth/login")
+    .send({ email: address, password })
+    .expect(200);
+  return { address, cookie: `ns_session=${cookieValue(login.headers["set-cookie"])}` };
+}
+
+export async function connectClientPortal(
+  ctx: AuthTestContext,
+  ownerCookie: string,
+  organizationId: string,
+  client: { id: string; email: string },
+  password = TEST_PASSWORD,
+): Promise<string> {
+  const { code } = await generateJoinCode(ctx, ownerCookie, organizationId, client.id);
+  const session = await registerVerifyLoginUser(ctx, client.email, password);
+  await request(ctx.app.getHttpServer())
+    .post("/api/v1/portal/join")
+    .set("Cookie", session.cookie)
+    .send({ code })
+    .expect(201);
+  return session.cookie;
 }

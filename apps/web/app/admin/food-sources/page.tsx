@@ -2,8 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { api } from "../../../lib/api";
-import { cellStyle, tableStyle } from "../admin-shell";
-
 interface ImportReport {
   processed?: number;
   imported?: number;
@@ -42,29 +40,29 @@ export default function AdminFoodSourcesPage() {
         Read-only dataset visibility. Global foods are changed by the import command, not by dietitian APIs.
       </p>
       {error ? <p style={{ color: "var(--color-danger)" }}>{error}</p> : null}
-      <table style={tableStyle}>
+      <table className="ui-table">
         <thead>
           <tr>
-            <th style={cellStyle}>Name</th>
-            <th style={cellStyle}>Version</th>
-            <th style={cellStyle}>Status</th>
-            <th style={cellStyle}>Foods</th>
-            <th style={cellStyle}>Imported</th>
-            <th style={cellStyle}>Last import</th>
+            <th>Name</th>
+            <th>Version</th>
+            <th>Status</th>
+            <th>Foods</th>
+            <th>Imported</th>
+            <th>Last import</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => (
             <tr key={row.id}>
-              <td style={cellStyle}>
+              <td>
                 <div>{row.name}</div>
                 <div style={{ fontSize: 12, color: "var(--color-muted)" }}>{row.provider}</div>
               </td>
-              <td style={cellStyle}>{row.datasetVersion}</td>
-              <td style={cellStyle}>{row.status}</td>
-              <td style={cellStyle}>{row.foodCount}</td>
-              <td style={cellStyle}>{new Date(row.importedAt).toLocaleString()}</td>
-              <td style={cellStyle}>
+              <td>{row.datasetVersion}</td>
+              <td>{row.status}</td>
+              <td>{row.foodCount}</td>
+              <td>{new Date(row.importedAt).toLocaleString()}</td>
+              <td>
                 {row.lastImportReport
                   ? `${row.lastImportReport.processed ?? 0} processed · ${row.lastImportReport.imported ?? 0} imported · ${row.lastImportReport.updated ?? 0} updated · ${row.lastImportReport.rejected ?? 0} rejected`
                   : "—"}

@@ -1,0 +1,201 @@
+# Local development stack with source bind mounts and watch mode.
+# Production remains docker-compose.yml (compiled Next standalone, no bind mounts).
+#
+#   pnpm dev:docker
+#   docker compose -f docker-compose.dev.yml up
+#
+# Use --build only when this file, docker/dev.Dockerfile, or lockfile/base image change.
+# Do not run `down -v` unless you intend to delete the development database volume.
+
+x-dev-environment: &dev-environment
+  NODE_ENV: development
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  API_PORT: "3001"
+  DATABASE_URL: postgresql://${POSTGRES_USER:-nutrition}:${POSTGRES_PASSWORD:-nutrition}@postgres:5432/${POSTGRES_DB:-nutrition}?schema=public
+  REDIS_URL: redis://redis:6379
+  FILE_STORAGE_PATH: /data/storage
+  CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+  SWAGGER_ENABLED: ${SWAGGER_ENABLED:-true}
+  APP_URL: ${APP_URL:-http://localhost:3000}
+  AUTH_TOKEN_SECRET: ${AUTH_TOKEN_SECRET:-change-me-to-a-long-random-secret-value}
+  SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-604800}
+  EMAIL_VERIFICATION_TTL_SECONDS: ${EMAIL_VERIFICATION_TTL_SECONDS:-86400}
+  PASSWORD_RESET_TTL_SECONDS: ${PASSWORD_RESET_TTL_SECONDS:-3600}
+  INVITATION_TTL_SECONDS: ${INVITATION_TTL_SECONDS:-604800}
+  PASSWORD_MIN_LENGTH: ${PASSWORD_MIN_LENGTH:-10}
+  AUTH_THROTTLE_TTL_MS: ${AUTH_THROTTLE_TTL_MS:-60000}
+  AUTH_THROTTLE_LIMIT: ${AUTH_THROTTLE_LIMIT:-10}
+  MAX_DOCUMENT_BYTES: ${MAX_DOCUMENT_BYTES:-20971520}
+  EMAIL_PROVIDER: ${EMAIL_PROVIDER:-console}
+  AI_ENABLED: ${AI_ENABLED:-true}
+  AI_PROVIDER: ${AI_PROVIDER:-mock}
+  AI_MODEL: ${AI_MODEL:-gpt-4o-mini}
+  AI_TIMEOUT_MS: ${AI_TIMEOUT_MS:-30000}
+  AI_MAX_INPUT_TOKENS: ${AI_MAX_INPUT_TOKENS:-8000}
+  AI_MAX_OUTPUT_TOKENS: ${AI_MAX_OUTPUT_TOKENS:-2000}
+  MESSAGING_THROTTLE_TTL_MS: ${MESSAGING_THROTTLE_TTL_MS:-60000}
+  MESSAGING_THROTTLE_LIMIT: ${MESSAGING_THROTTLE_LIMIT:-30}
+  UPLOAD_THROTTLE_TTL_MS: ${UPLOAD_THROTTLE_TTL_MS:-60000}
+  UPLOAD_THROTTLE_LIMIT: ${UPLOAD_THROTTLE_LIMIT:-20}
+  AI_THROTTLE_TTL_MS: ${AI_THROTTLE_TTL_MS:-60000}
+  AI_THROTTLE_LIMIT: ${AI_THROTTLE_LIMIT:-20}
+  ERROR_TRACKING_ENABLED: ${ERROR_TRACKING_ENABLED:-false}
+  CHOKIDAR_USEPOLLING: "true"
+  CHOKIDAR_INTERVAL: "1000"
+  WATCHPACK_POLLING: "true"
+  TSC_WATCHFILE: "DynamicPriorityPolling"
+  TSC_WATCHDIRECTORY: "DynamicPriorityPolling"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-nutrition}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nutrition}
+      POSTGRES_DB: ${POSTGRES_DB:-nutrition}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nutrition} -d ${POSTGRES_DB:-nutrition}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/dev.Dockerfile
+    init: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      <<: *dev-environment
+      BUILD_PACKAGES: "true"
+      RUN_MIGRATIONS: "true"
+    command: ["sh", "/app/docker/dev-api.sh"]
+    ports:
+      - "${API_PORT:-3001}:3001"
+    volumes:
+      - .:/app
+      - pnpm_store:/pnpm/store
+      - dev_node_modules:/app/node_modules
+      - dev_web_node_modules:/app/apps/web/node_modules
+      - dev_api_node_modules:/app/apps/api/node_modules
+      - dev_ui_node_modules:/app/packages/ui/node_modules
+      - dev_config_node_modules:/app/packages/config/node_modules
+      - dev_types_node_modules:/app/packages/types/node_modules
+      - dev_utilities_node_modules:/app/packages/utilities/node_modules
+      - dev_validation_node_modules:/app/packages/validation/node_modules
+      - dev_nutrition_node_modules:/app/packages/nutrition/node_modules
+      - storage_data:/data/storage
+      - dev_api_dist:/app/apps/api/dist
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 90s
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/dev.Dockerfile
+    init: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    environment:
+      <<: *dev-environment
+      SWAGGER_ENABLED: "false"
+      BUILD_PACKAGES: "false"
+      RUN_MIGRATIONS: "false"
+    command: ["sh", "/app/docker/dev-worker.sh"]
+    volumes:
+      - .:/app
+      - pnpm_store:/pnpm/store
+      - dev_node_modules:/app/node_modules
+      - dev_web_node_modules:/app/apps/web/node_modules
+      - dev_api_node_modules:/app/apps/api/node_modules
+      - dev_ui_node_modules:/app/packages/ui/node_modules
+      - dev_config_node_modules:/app/packages/config/node_modules
+      - dev_types_node_modules:/app/packages/types/node_modules
+      - dev_utilities_node_modules:/app/packages/utilities/node_modules
+      - dev_validation_node_modules:/app/packages/validation/node_modules
+      - dev_nutrition_node_modules:/app/packages/nutrition/node_modules
+      - storage_data:/data/storage
+      - dev_worker_dist:/app/apps/api/dist
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/dev.Dockerfile
+    init: true
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      PORT: "3000"
+      HOSTNAME: 0.0.0.0
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
+      CHOKIDAR_INTERVAL: "1000"
+      TSC_WATCHFILE: "DynamicPriorityPolling"
+      TSC_WATCHDIRECTORY: "DynamicPriorityPolling"
+      NEXT_TELEMETRY_DISABLED: "1"
+      BUILD_PACKAGES: "false"
+      RUN_MIGRATIONS: "false"
+    command: ["sh", "/app/docker/dev-web.sh"]
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    volumes:
+      - .:/app
+      - pnpm_store:/pnpm/store
+      - dev_node_modules:/app/node_modules
+      - dev_web_node_modules:/app/apps/web/node_modules
+      - dev_api_node_modules:/app/apps/api/node_modules
+      - dev_ui_node_modules:/app/packages/ui/node_modules
+      - dev_config_node_modules:/app/packages/config/node_modules
+      - dev_types_node_modules:/app/packages/types/node_modules
+      - dev_utilities_node_modules:/app/packages/utilities/node_modules
+      - dev_validation_node_modules:/app/packages/validation/node_modules
+      - dev_nutrition_node_modules:/app/packages/nutrition/node_modules
+      - storage_data:/data/storage
+      - dev_web_next:/app/apps/web/.next
+
+volumes:
+  postgres_data:
+  storage_data:
+  pnpm_store:
+  dev_node_modules:
+  dev_web_node_modules:
+  dev_api_node_modules:
+  dev_ui_node_modules:
+  dev_config_node_modules:
+  dev_types_node_modules:
+  dev_utilities_node_modules:
+  dev_validation_node_modules:
+  dev_nutrition_node_modules:
+  dev_api_dist:
+  dev_worker_dist:
+  dev_web_next:

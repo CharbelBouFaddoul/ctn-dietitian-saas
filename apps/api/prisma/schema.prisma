@@ -42,6 +42,8 @@ model User {
   updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz
   suspendedAt     DateTime?     @map("suspended_at") @db.Timestamptz
   archivedAt      DateTime?     @map("archived_at") @db.Timestamptz
+  firstName       String?       @map("first_name")
+  lastName        String?       @map("last_name")
 
   sessions                Session[]
   emailVerificationTokens EmailVerificationToken[]

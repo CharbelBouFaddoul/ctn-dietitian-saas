@@ -3,8 +3,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { api } from "../../../../lib/api";
-import { buttonStyle, cellStyle, inputStyle, tableStyle } from "../../admin-shell";
-
 interface Feature {
   id: string;
   key: string;
@@ -90,32 +88,32 @@ export default function AdminPlanDetailPage() {
         {plan.slug} · {plan.status} · {plan._count?.subscriptions ?? 0} subscriptions
       </p>
       <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-        <button type="button" style={buttonStyle} onClick={() => void setStatus("ACTIVE")}>
+        <button type="button" className="ui-btn ui-btn--primary" onClick={() => void setStatus("ACTIVE")}>
           Activate
         </button>
-        <button type="button" style={buttonStyle} onClick={() => void setStatus("INACTIVE")}>
+        <button type="button" className="ui-btn ui-btn--primary" onClick={() => void setStatus("INACTIVE")}>
           Deactivate
         </button>
-        <button type="button" style={buttonStyle} onClick={() => void setStatus("ARCHIVED")}>
+        <button type="button" className="ui-btn ui-btn--primary" onClick={() => void setStatus("ARCHIVED")}>
           Archive
         </button>
       </div>
       <form onSubmit={(event) => void saveFeatures(event)}>
-        <table style={tableStyle}>
+        <table className="ui-table">
           <thead>
             <tr>
-              <th style={cellStyle}>Feature</th>
-              <th style={cellStyle}>Enabled</th>
-              <th style={cellStyle}>Limit</th>
+              <th>Feature</th>
+              <th>Enabled</th>
+              <th>Limit</th>
             </tr>
           </thead>
           <tbody>
             {features.map((feature) => (
               <tr key={feature.id}>
-                <td style={cellStyle}>
+                <td>
                   {feature.key} ({feature.valueType})
                 </td>
-                <td style={cellStyle}>
+                <td>
                   <input
                     type="checkbox"
                     checked={rows[feature.id]?.enabled ?? false}
@@ -127,10 +125,10 @@ export default function AdminPlanDetailPage() {
                     }
                   />
                 </td>
-                <td style={cellStyle}>
+                <td>
                   {feature.valueType === "LIMIT" ? (
                     <input
-                      style={inputStyle}
+                      className="ui-input"
                       type="number"
                       min={0}
                       value={rows[feature.id]?.limitValue ?? ""}
@@ -149,7 +147,7 @@ export default function AdminPlanDetailPage() {
             ))}
           </tbody>
         </table>
-        <button type="submit" style={{ ...buttonStyle, marginTop: 12 }}>
+        <button type="submit" className="ui-btn ui-btn--primary" style={{marginTop: 12}}>
           Save plan features
         </button>
       </form>

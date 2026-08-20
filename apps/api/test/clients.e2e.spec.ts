@@ -5,9 +5,11 @@ import { CLIENT_ACCESS_DENIED, CLIENT_EMAIL_IN_USE, CLIENT_LIMIT_REACHED } from 
 import { ORGANIZATION_ACCESS_DENIED } from "../src/organizations/tenant.types";
 import { PLATFORM_ASSESSMENT_TEMPLATE_ID } from "../src/assessments/platform-template.seed";
 import {
+  connectClientPortal,
   cookieValue,
   createAuthTestApp,
   extractEmailedToken,
+  generateJoinCode,
   resetAuthDatabase,
   type AuthTestContext,
 } from "./app";
@@ -274,10 +276,10 @@ describe("Phase 5 practice clients", () => {
     const clientEmail = email("portal");
     const created = await createClient(owner.cookie, org.id, {
       email: clientEmail,
-      invitePortal: true,
     });
     expect(created.status).toBe(201);
-    expect(created.body.portalStatus).toBe("PENDING");
+    expect(created.body.portalStatus).toBeNull();
+    expect(created.body.connectionStatus).toBe("not_connected");
 
     const members = await ctx.prisma.organizationMember.findMany({
       where: { organizationId: org.id },
@@ -286,26 +288,10 @@ describe("Phase 5 practice clients", () => {
     expect(members.every((row) => row.user.email !== clientEmail)).toBe(true);
     expect(members.every((row) => String(row.role) !== "CLIENT")).toBe(true);
 
-    const inviteMail = ctx.emails.messages.find((message) => message.text.includes("CLIENT_INVITE"));
-    expect(inviteMail).toBeTruthy();
-    const rawToken = extractEmailedToken(inviteMail!.text);
-
-    const preview = await request(ctx.app.getHttpServer())
-      .post("/api/v1/auth/invitations/preview")
-      .send({ token: rawToken })
-      .expect(200);
-    expect(preview.body.email).toBe(clientEmail.toLowerCase());
-
-    await request(ctx.app.getHttpServer())
-      .post("/api/v1/auth/invitations/accept")
-      .send({ token: rawToken, password: PASSWORD })
-      .expect(200);
-
-    const login = await request(ctx.app.getHttpServer())
-      .post("/api/v1/auth/login")
-      .send({ email: clientEmail, password: PASSWORD })
-      .expect(200);
-    const portalCookie = `ns_session=${cookieValue(login.headers["set-cookie"])}`;
+    const portalCookie = await connectClientPortal(ctx, owner.cookie, org.id, {
+      id: created.body.id,
+      email: clientEmail,
+    });
 
     const me = await request(ctx.app.getHttpServer()).get("/api/v1/portal/me").set("Cookie", portalCookie).expect(200);
     expect(me.body.client.id).toBe(created.body.id);
@@ -329,6 +315,8 @@ describe("Phase 5 practice clients", () => {
 
     const accounts = await ctx.prisma.clientAccount.findMany({ where: { clientId: created.body.id } });
     expect(accounts).toHaveLength(1);
+    const clientCount = await ctx.prisma.client.count({ where: { organizationId: org.id, email: clientEmail } });
+    expect(clientCount).toBe(1);
   });
 
   it("archives clients without deleting history and disables portal authentication", async () => {
@@ -336,15 +324,7 @@ describe("Phase 5 practice clients", () => {
     const org = await createOrg(owner.cookie, "Archive Practice");
     const clientEmail = email("archive");
     const created = await createClient(owner.cookie, org.id, { email: clientEmail });
-    await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${created.body.id}/account/invite`)
-      .set("Cookie", owner.cookie)
-      .expect(201);
-    const rawToken = extractEmailedToken(ctx.emails.last().text);
-    await request(ctx.app.getHttpServer())
-      .post("/api/v1/auth/invitations/accept")
-      .send({ token: rawToken, password: PASSWORD })
-      .expect(200);
+    await connectClientPortal(ctx, owner.cookie, org.id, { id: created.body.id, email: clientEmail });
 
     await request(ctx.app.getHttpServer())
       .post(`/api/v1/organizations/${org.id}/clients/${created.body.id}/goals`)
@@ -383,24 +363,29 @@ describe("Phase 5 practice clients", () => {
     expect(restored).toHaveLength(1);
     expect(restored[0]?.id).toBe(created.body.id);
 
-    await request(ctx.app.getHttpServer())
+    const loginAfterRestore = await request(ctx.app.getHttpServer())
       .post("/api/v1/auth/login")
       .send({ email: clientEmail, password: PASSWORD })
-      .expect(401);
-
-    await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${created.body.id}/account/invite`)
-      .set("Cookie", owner.cookie)
-      .expect(201);
-    const reopen = extractEmailedToken(ctx.emails.last().text);
-    await request(ctx.app.getHttpServer())
-      .post("/api/v1/auth/invitations/accept")
-      .send({ token: reopen, password: PASSWORD })
       .expect(200);
+    const restoredCookie = `ns_session=${cookieValue(loginAfterRestore.headers["set-cookie"])}`;
+    await request(ctx.app.getHttpServer()).get("/api/v1/portal/me").set("Cookie", restoredCookie).expect(403);
+    const onboarding = await request(ctx.app.getHttpServer())
+      .get("/api/v1/portal/onboarding")
+      .set("Cookie", restoredCookie)
+      .expect(200);
+    expect(onboarding.body.status).toBe("needs_join");
+
+    const { code } = await generateJoinCode(ctx, owner.cookie, org.id, created.body.id);
+    await request(ctx.app.getHttpServer())
+      .post("/api/v1/portal/join")
+      .set("Cookie", restoredCookie)
+      .send({ code })
+      .expect(201);
 
     const accounts = await ctx.prisma.clientAccount.findMany({ where: { clientId: created.body.id } });
     expect(accounts).toHaveLength(1);
     expect(accounts[0]?.userId).toBe(userBefore.id);
+    expect(accounts[0]?.status).toBe("ACTIVE");
   });
 
   it("protects profile, goals, measurements, tags, and deactivates portal accounts", async () => {
@@ -476,23 +461,17 @@ describe("Phase 5 practice clients", () => {
       .set("Cookie", owner.cookie)
       .expect(201);
 
-    await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${client.body.id}/account/invite`)
-      .set("Cookie", owner.cookie)
-      .expect(201);
-    const rawToken = extractEmailedToken(ctx.emails.last().text);
-    await request(ctx.app.getHttpServer())
-      .post("/api/v1/auth/invitations/accept")
-      .send({ token: rawToken, password: PASSWORD })
-      .expect(200);
+    await connectClientPortal(ctx, owner.cookie, org.id, { id: client.body.id, email: client.body.email });
     await request(ctx.app.getHttpServer())
       .post(`/api/v1/organizations/${org.id}/clients/${client.body.id}/account/deactivate`)
       .set("Cookie", owner.cookie)
       .expect(201);
-    await request(ctx.app.getHttpServer())
+    const deactivatedLogin = await request(ctx.app.getHttpServer())
       .post("/api/v1/auth/login")
       .send({ email: client.body.email, password: PASSWORD })
-      .expect(401);
+      .expect(200);
+    const deactivatedCookie = `ns_session=${cookieValue(deactivatedLogin.headers["set-cookie"])}`;
+    await request(ctx.app.getHttpServer()).get("/api/v1/portal/me").set("Cookie", deactivatedCookie).expect(403);
   });
 
   it("preserves assessment template version and authorizes appointments and timeline", async () => {

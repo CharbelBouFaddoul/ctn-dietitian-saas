@@ -1,13 +1,16 @@
 "use client";
 
 import { FormEvent, Suspense, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { Alert, Button, Field, PasswordInput } from "@nutrition-saas/ui";
 import { api } from "../../../lib/api";
-import { AuthShell, buttonStyle, fieldStyle, inputStyle } from "../auth-shell";
+import { errorMessage } from "../../../lib/humanize-error";
+import { AuthShell } from "../auth-shell";
 
 function ResetPasswordForm() {
   const searchParams = useSearchParams();
-  const [token, setToken] = useState(searchParams.get("token") ?? "");
+  const tokenFromLink = searchParams.get("token") ?? "";
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -18,50 +21,63 @@ function ResetPasswordForm() {
     try {
       const result = await api<{ message: string }>("/api/v1/auth/reset-password", {
         method: "POST",
-        body: JSON.stringify({ token, password }),
+        body: JSON.stringify({ token: tokenFromLink, password }),
       });
       setMessage(result.message);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Reset failed");
+      setError(errorMessage(err, "Reset failed"));
     }
+  }
+
+  if (!tokenFromLink) {
+    return (
+      <Alert tone="warning">
+        This reset link is missing. Open the link from your email, or{" "}
+        <Link href="/auth/forgot-password" className="ui-link">
+          request a new one
+        </Link>
+        .
+      </Alert>
+    );
   }
 
   return (
     <form onSubmit={(event) => void onSubmit(event)}>
-      <label style={fieldStyle}>
-        Token
-        <input
-          style={inputStyle}
-          value={token}
-          onChange={(event) => setToken(event.target.value)}
-          required
-        />
-      </label>
-      <label style={fieldStyle}>
-        New password
-        <input
-          style={inputStyle}
-          type="password"
+      <Field label="New password" hint="At least 10 characters.">
+        <PasswordInput
           autoComplete="new-password"
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           minLength={10}
           required
         />
-      </label>
-      <button type="submit" style={buttonStyle}>
+      </Field>
+      <Button type="submit" block>
         Reset password
-      </button>
-      {message ? <p>{message}</p> : null}
-      {error ? <p style={{ color: "var(--color-danger)" }}>{error}</p> : null}
+      </Button>
+      {message ? (
+        <div style={{ marginTop: 12 }}>
+          <Alert tone="success">
+            {message}{" "}
+            <Link href="/auth/login" className="ui-link">
+              Sign in
+            </Link>
+          </Alert>
+        </div>
+      ) : null}
+      {error ? (
+        <div style={{ marginTop: 12 }}>
+          <Alert tone="danger">{error}</Alert>
+        </div>
+      ) : null}
     </form>
   );
 }
 
 export default function ResetPasswordPage() {
   return (
-    <AuthShell title="Reset password">
-      <Suspense fallback={<p>Loading…</p>}>
+    <AuthShell title="Reset password" audience="dietitian">
+      <Suspense fallback={<p className="ui-muted">Loading…</p>}>
         <ResetPasswordForm />
       </Suspense>
     </AuthShell>

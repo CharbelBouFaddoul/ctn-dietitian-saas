@@ -32,19 +32,44 @@ export class InvitationService {
 
   async create(input: CreateInvitationInput): Promise<{ rawToken: string; invitation: InvitationToken }> {
     const { rawToken, tokenHash } = this.tokens.issue();
-    const ttl = input.ttlSeconds ?? this.config.get("INVITATION_TTL_SECONDS", { infer: true }) ?? 60 * 60 * 24 * 7;
-    const invitation = await this.prisma.invitationToken.create({
-      data: {
-        tokenHash,
-        purpose: input.purpose,
-        emailNormalized: input.emailNormalized,
-        createdById: input.createdById,
-        clientId: input.clientId,
-        organizationId: input.organizationId,
-        expiresAt: new Date(Date.now() + ttl * 1000),
-      },
-    });
+    const invitation = await this.insert(input, tokenHash);
     return { rawToken, invitation };
+  }
+
+  async createHashed(input: CreateInvitationInput, tokenHash: string): Promise<InvitationToken> {
+    return this.insert(input, tokenHash);
+  }
+
+  async inspect(rawToken: string): Promise<InvitationToken | null> {
+    return this.prisma.invitationToken.findUnique({
+      where: { tokenHash: this.tokens.hashToken(rawToken) },
+    });
+  }
+
+  async deleteUnusedClientInvites(clientId: string): Promise<void> {
+    await this.prisma.invitationToken.deleteMany({
+      where: { clientId, purpose: "CLIENT_INVITE", usedAt: null },
+    });
+  }
+
+  async findOpenClientInvite(clientId: string): Promise<InvitationToken | null> {
+    return this.prisma.invitationToken.findFirst({
+      where: { clientId, purpose: "CLIENT_INVITE", usedAt: null },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  async deleteUnusedPracticeInvites(organizationId: string): Promise<void> {
+    await this.prisma.invitationToken.deleteMany({
+      where: { organizationId, purpose: "CLIENT_INVITE", clientId: null, usedAt: null },
+    });
+  }
+
+  async findOpenPracticeInvite(organizationId: string): Promise<InvitationToken | null> {
+    return this.prisma.invitationToken.findFirst({
+      where: { organizationId, purpose: "CLIENT_INVITE", clientId: null, usedAt: null },
+      orderBy: { createdAt: "desc" },
+    });
   }
 
   async validate(rawToken: string): Promise<InvitationToken> {
@@ -66,6 +91,21 @@ export class InvitationService {
       data: {
         usedAt: new Date(),
         usedById: usedById ?? null,
+      },
+    });
+  }
+
+  private async insert(input: CreateInvitationInput, tokenHash: string): Promise<InvitationToken> {
+    const ttl = input.ttlSeconds ?? this.config.get("INVITATION_TTL_SECONDS", { infer: true }) ?? 60 * 60 * 24 * 7;
+    return this.prisma.invitationToken.create({
+      data: {
+        tokenHash,
+        purpose: input.purpose,
+        emailNormalized: input.emailNormalized,
+        createdById: input.createdById,
+        clientId: input.clientId,
+        organizationId: input.organizationId,
+        expiresAt: new Date(Date.now() + ttl * 1000),
       },
     });
   }

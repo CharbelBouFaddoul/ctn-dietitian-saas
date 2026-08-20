@@ -3,8 +3,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { api } from "../../../../lib/api";
-import { buttonStyle, cellStyle, fieldStyle, inputStyle, tableStyle } from "../practice-shell";
-
 interface TaskRow {
   id: string;
   title: string;
@@ -92,27 +90,23 @@ export default function TasksPage() {
           <button
             key={item}
             type="button"
-            style={{
-              ...buttonStyle,
-              background: view === item ? "var(--color-accent)" : "var(--color-surface)",
-              color: view === item ? "#fff" : "inherit",
-              border: "1px solid var(--color-border)",
-            }}
+            className="ui-tab"
+            data-active={view === item}
             onClick={() => setView(item)}
           >
-            {item.replace("_", " ")}
+            {item.replaceAll("_", " ")}
           </button>
         ))}
       </div>
 
       <form onSubmit={(event) => void create(event).catch((err) => setError(String(err)))} style={{ display: "grid", gap: 12, maxWidth: 640 }}>
-        <label style={fieldStyle}>
+        <label className="ui-field">
           Title
-          <input style={inputStyle} value={title} onChange={(event) => setTitle(event.target.value)} required />
+          <input className="ui-input" value={title} onChange={(event) => setTitle(event.target.value)} required />
         </label>
-        <label style={fieldStyle}>
+        <label className="ui-field">
           Client (optional)
-          <select style={inputStyle} value={clientId} onChange={(event) => setClientId(event.target.value)}>
+          <select className="ui-input" value={clientId} onChange={(event) => setClientId(event.target.value)}>
             <option value="">None</option>
             {clients.map((client) => (
               <option key={client.id} value={client.id}>
@@ -121,9 +115,9 @@ export default function TasksPage() {
             ))}
           </select>
         </label>
-        <label style={fieldStyle}>
+        <label className="ui-field">
           Assignee
-          <select style={inputStyle} value={assignedMemberId} onChange={(event) => setAssignedMemberId(event.target.value)}>
+          <select className="ui-input" value={assignedMemberId} onChange={(event) => setAssignedMemberId(event.target.value)}>
             <option value="">Unassigned</option>
             {members.map((member) => (
               <option key={member.id} value={member.id}>
@@ -132,37 +126,37 @@ export default function TasksPage() {
             ))}
           </select>
         </label>
-        <label style={fieldStyle}>
+        <label className="ui-field">
           Due
-          <input style={inputStyle} type="datetime-local" value={dueAt} onChange={(event) => setDueAt(event.target.value)} />
+          <input className="ui-input" type="datetime-local" value={dueAt} onChange={(event) => setDueAt(event.target.value)} />
         </label>
-        <button type="submit" style={{ ...buttonStyle, width: 160 }}>
+        <button type="submit" className="ui-btn ui-btn--primary" style={{width: 160}}>
           Create task
         </button>
       </form>
 
-      <table style={{ ...tableStyle, marginTop: 20 }}>
+      <table className="ui-table">
         <thead>
           <tr>
-            <th style={cellStyle}>Task</th>
-            <th style={cellStyle}>Client</th>
-            <th style={cellStyle}>Assignee</th>
-            <th style={cellStyle}>Due</th>
-            <th style={cellStyle}>Status</th>
-            <th style={cellStyle}></th>
+            <th>Task</th>
+            <th>Client</th>
+            <th>Assignee</th>
+            <th>Due</th>
+            <th>Status</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
           {data?.items.map((row) => (
             <tr key={row.id}>
-              <td style={cellStyle}>{row.title}</td>
-              <td style={cellStyle}>{row.clientName ?? "—"}</td>
-              <td style={cellStyle}>{row.assigneeEmail ?? "—"}</td>
-              <td style={cellStyle}>{row.dueAt ? new Date(row.dueAt).toLocaleString() : "—"}</td>
-              <td style={cellStyle}>{row.status}</td>
-              <td style={cellStyle}>
+              <td>{row.title}</td>
+              <td>{row.clientName ?? "—"}</td>
+              <td>{row.assigneeEmail ?? "—"}</td>
+              <td>{row.dueAt ? new Date(row.dueAt).toLocaleString() : "—"}</td>
+              <td>{row.status}</td>
+              <td>
                 {row.status !== "COMPLETED" && row.status !== "CANCELLED" ? (
-                  <button type="button" style={buttonStyle} onClick={() => void complete(row.id)}>
+                  <button type="button" className="ui-btn ui-btn--primary" onClick={() => void complete(row.id)}>
                     Complete
                   </button>
                 ) : null}

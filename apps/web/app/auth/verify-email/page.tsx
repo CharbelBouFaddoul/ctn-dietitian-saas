@@ -1,30 +1,36 @@
 "use client";
 
-import { FormEvent, Suspense, useState } from "react";
+import { FormEvent, Suspense, useEffect, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { Alert, Button, Field, Input } from "@nutrition-saas/ui";
 import { api } from "../../../lib/api";
-import { AuthShell, buttonStyle, fieldStyle, inputStyle } from "../auth-shell";
+import { errorMessage } from "../../../lib/humanize-error";
+import { AuthShell } from "../auth-shell";
 
 function VerifyEmailForm() {
   const searchParams = useSearchParams();
-  const [token, setToken] = useState(searchParams.get("token") ?? "");
+  const tokenFromLink = searchParams.get("token") ?? "";
+  const audience = searchParams.get("audience") === "client" ? "client" : "dietitian";
+  const signInHref = audience === "client" ? "/auth/client/login" : "/auth/login";
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [autoTried, setAutoTried] = useState(false);
 
-  async function onSubmit(event: FormEvent) {
-    event.preventDefault();
-    setError(null);
-    try {
-      const result = await api<{ message: string }>("/api/v1/auth/verify-email", {
-        method: "POST",
-        body: JSON.stringify({ token }),
-      });
-      setMessage(result.message);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Verification failed");
-    }
+  async function verify(value: string) {
+    const result = await api<{ message: string }>("/api/v1/auth/verify-email", {
+      method: "POST",
+      body: JSON.stringify({ token: value }),
+    });
+    setMessage(result.message);
   }
+
+  useEffect(() => {
+    if (!tokenFromLink || autoTried) return;
+    setAutoTried(true);
+    void verify(tokenFromLink).catch((err) => setError(errorMessage(err, "Verification failed")));
+  }, [tokenFromLink, autoTried]);
 
   async function onResend(event: FormEvent) {
     event.preventDefault();
@@ -36,53 +42,61 @@ function VerifyEmailForm() {
       });
       setMessage(result.message);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Request failed");
+      setError(errorMessage(err, "Request failed"));
     }
   }
 
   return (
-    <>
-      <form onSubmit={(event) => void onSubmit(event)}>
-        <label style={fieldStyle}>
-          Verification token
-          <input
-            style={inputStyle}
-            value={token}
-            onChange={(event) => setToken(event.target.value)}
-            required
-          />
-        </label>
-        <button type="submit" style={buttonStyle}>
-          Verify email
-        </button>
-      </form>
+    <AuthShell
+      title="Verify email"
+      audience={audience}
+      description="Open the link from your email, or resend a new one."
+    >
+      {tokenFromLink && !message && !error ? <p>Verifying your email…</p> : null}
+      {tokenFromLink && error ? (
+        <Button
+          onClick={() => {
+            setError(null);
+            void verify(tokenFromLink).catch((err) => setError(errorMessage(err, "Verification failed")));
+          }}
+        >
+          Try again
+        </Button>
+      ) : null}
+      {!tokenFromLink ? (
+        <Alert tone="warning">Open the verification link from your email to finish setting up your account.</Alert>
+      ) : null}
       <form onSubmit={(event) => void onResend(event)} style={{ marginTop: 24 }}>
-        <label style={fieldStyle}>
-          Resend to email
-          <input
-            style={inputStyle}
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            required
-          />
-        </label>
-        <button type="submit" style={buttonStyle}>
+        <Field label="Resend to email">
+          <Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+        </Field>
+        <Button type="submit" variant="secondary" block>
           Resend verification
-        </button>
+        </Button>
       </form>
-      {message ? <p>{message}</p> : null}
-      {error ? <p style={{ color: "var(--color-danger)" }}>{error}</p> : null}
-    </>
+      {message ? (
+        <div style={{ marginTop: 12 }}>
+          <Alert tone="success">
+            {message}{" "}
+            <Link href={signInHref} className="ui-link">
+              Sign in
+            </Link>
+          </Alert>
+        </div>
+      ) : null}
+      {error ? (
+        <div style={{ marginTop: 12 }}>
+          <Alert tone="danger">{error}</Alert>
+        </div>
+      ) : null}
+    </AuthShell>
   );
 }
 
 export default function VerifyEmailPage() {
   return (
-    <AuthShell title="Verify email">
-      <Suspense fallback={<p>Loading…</p>}>
-        <VerifyEmailForm />
-      </Suspense>
-    </AuthShell>
+    <Suspense fallback={<p className="ui-muted">Loading…</p>}>
+      <VerifyEmailForm />
+    </Suspense>
   );
 }

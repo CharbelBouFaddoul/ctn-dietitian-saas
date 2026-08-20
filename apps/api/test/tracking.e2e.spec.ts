@@ -3,6 +3,7 @@ import request from "supertest";
 import { FEATURE_KEYS } from "@nutrition-saas/config";
 import { CLIENT_ACCESS_DENIED } from "../src/clients/client.messages";
 import {
+  connectClientPortal,
   cookieValue,
   createAuthTestApp,
   extractEmailedToken,
@@ -109,30 +110,15 @@ describe("Phase 8 client tracking", () => {
     });
   }
 
-  async function portalLogin(clientEmail: string, inviteSent = true) {
-    if (inviteSent) {
-      const inviteMail = ctx.emails.messages.find(
-        (message) => message.text.includes("CLIENT_INVITE") && message.to === clientEmail,
-      );
-      const token = extractEmailedToken(inviteMail?.text ?? "");
-      await request(ctx.app.getHttpServer()).post("/api/v1/auth/invitations/accept").send({ token, password: PASSWORD }).expect(200);
-    }
-    const login = await request(ctx.app.getHttpServer())
-      .post("/api/v1/auth/login")
-      .send({ email: clientEmail, password: PASSWORD })
-      .expect(200);
-    return `ns_session=${cookieValue(login.headers["set-cookie"])}`;
-  }
-
   it("isolates tracking between organizations and preserves food log nutrition snapshots", async () => {
     const ownerA = await registerVerifyLogin();
     const ownerB = await registerVerifyLogin();
     const orgA = await createOrg(ownerA.cookie, "Clinic A");
     const orgB = await createOrg(ownerB.cookie, "Clinic B");
-    const clientA = await createClient(ownerA.cookie, orgA.id, { invitePortal: true });
-    const clientB = await createClient(ownerB.cookie, orgB.id, { invitePortal: true });
+    const clientA = await createClient(ownerA.cookie, orgA.id);
+    const clientB = await createClient(ownerB.cookie, orgB.id);
     const food = await seedFood();
-    const portalA = await portalLogin(clientA.body.email);
+    const portalA = await connectClientPortal(ctx, ownerA.cookie, orgA.id, clientA.body);
 
     const created = await request(ctx.app.getHttpServer())
       .post("/api/v1/portal/tracking/food-logs")
@@ -187,8 +173,8 @@ describe("Phase 8 client tracking", () => {
       .set("Cookie", owner.cookie)
       .send({ email: staff.address, role: "STAFF" })
       .expect(201);
-    const assigned = await createClient(owner.cookie, org.id, { invitePortal: true });
-    const unassigned = await createClient(owner.cookie, org.id, { invitePortal: true });
+    const assigned = await createClient(owner.cookie, org.id);
+    const unassigned = await createClient(owner.cookie, org.id);
     const dietitianCtx = await request(ctx.app.getHttpServer())
       .get(`/api/v1/organizations/${org.id}`)
       .set("Cookie", dietitian.cookie)
@@ -200,7 +186,7 @@ describe("Phase 8 client tracking", () => {
       .expect(201);
 
     const food = await seedFood();
-    const portal = await portalLogin(assigned.body.email);
+    const portal = await connectClientPortal(ctx, owner.cookie, org.id, assigned.body);
     await request(ctx.app.getHttpServer())
       .post("/api/v1/portal/tracking/food-logs")
       .set("Cookie", portal)
@@ -224,7 +210,7 @@ describe("Phase 8 client tracking", () => {
       .set("Cookie", staff.cookie)
       .expect(403);
 
-    const otherPortal = await portalLogin(unassigned.body.email);
+    const otherPortal = await connectClientPortal(ctx, owner.cookie, org.id, unassigned.body);
     const otherSummary = await request(ctx.app.getHttpServer())
       .get("/api/v1/portal/tracking/summary")
       .set("Cookie", otherPortal)
@@ -235,8 +221,8 @@ describe("Phase 8 client tracking", () => {
   it("calculates water, exercise, sleep, habits, and timeline events", async () => {
     const owner = await registerVerifyLogin();
     const org = await createOrg(owner.cookie, "Clinic", "Asia/Beirut");
-    const client = await createClient(owner.cookie, org.id, { invitePortal: true });
-    const portal = await portalLogin(client.body.email);
+    const client = await createClient(owner.cookie, org.id);
+    const portal = await connectClientPortal(ctx, owner.cookie, org.id, client.body);
     const date = "2026-08-18";
 
     await request(ctx.app.getHttpServer())
@@ -305,9 +291,9 @@ describe("Phase 8 client tracking", () => {
   it("rejects invalid exercise duration and archives logs", async () => {
     const owner = await registerVerifyLogin();
     const org = await createOrg(owner.cookie, "Clinic");
-    const client = await createClient(owner.cookie, org.id, { invitePortal: true });
+    const client = await createClient(owner.cookie, org.id);
     const food = await seedFood();
-    const portal = await portalLogin(client.body.email);
+    const portal = await connectClientPortal(ctx, owner.cookie, org.id, client.body);
 
     await request(ctx.app.getHttpServer())
       .post("/api/v1/portal/tracking/exercise-logs")

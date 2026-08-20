@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { join } from "node:path";
 import { AutomationWorkerModule } from "./automation/automation-worker.module";
+import { AppThrottlerModule } from "./common/app-throttler.module";
 import { WorkerBootstrapService } from "./common/worker-bootstrap.service";
 import { WorkerRuntimeService } from "./common/worker-runtime.service";
 import { loadEnv } from "./config/env";
@@ -17,6 +18,7 @@ import { StorageModule } from "./storage/storage.module";
       envFilePath: [join(process.cwd(), ".env"), join(process.cwd(), "../../.env")],
       validate: loadEnv,
     }),
+    AppThrottlerModule,
     PrismaModule,
     RedisModule,
     StorageModule,

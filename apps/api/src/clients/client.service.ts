@@ -17,9 +17,8 @@ import {
   CLIENT_ACCESS_DENIED,
   CLIENT_LIMIT_REACHED,
 } from "./client.messages";
+import { deriveConnectionStatus } from "./portal-connection";
 import type { CreateClientDto, ListClientsQueryDto, UpdateClientDto } from "./dto/client.dto";
-import { ModuleRef } from "@nestjs/core";
-import { ClientAccountService } from "../client-accounts/client-account.service";
 
 @Injectable()
 export class ClientService {
@@ -29,7 +28,6 @@ export class ClientService {
     private readonly entitlements: EntitlementService,
     private readonly timeline: TimelineService,
     private readonly security: SecurityEventLogger,
-    private readonly moduleRef: ModuleRef,
   ) {}
 
   async list(tenant: TenantContext, query: ListClientsQueryDto) {
@@ -69,6 +67,11 @@ export class ClientService {
           },
           tags: { include: { tag: true } },
           account: true,
+          invitations: {
+            where: { purpose: "CLIENT_INVITE", usedAt: null },
+            orderBy: { createdAt: "desc" },
+            take: 1,
+          },
         },
         orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
         skip: (page - 1) * pageSize,
@@ -96,6 +99,11 @@ export class ClientService {
           orderBy: { assignedAt: "desc" },
         },
         tags: { include: { tag: true } },
+        invitations: {
+          where: { purpose: "CLIENT_INVITE", usedAt: null },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+        },
       },
     });
     if (!client) {
@@ -191,11 +199,6 @@ export class ClientService {
       targetId: client.id,
       metadata: { status: client.status },
     });
-
-    if (input.invitePortal) {
-      const accounts = this.moduleRef.get(ClientAccountService, { strict: false });
-      await accounts.invite(tenant, client.id);
-    }
 
     return this.get(tenant, client.id);
   }
@@ -348,8 +351,10 @@ export class ClientService {
     }>;
     tags: Array<{ tag: { id: string; name: string; color: string | null } }>;
     account: { status: string } | null;
+    invitations: Array<{ expiresAt: Date }>;
   }) {
     const assignment = client.assignments[0];
+    const connectionStatus = deriveConnectionStatus(client.account, client.invitations[0]);
     return {
       id: client.id,
       firstName: client.firstName,
@@ -363,6 +368,7 @@ export class ClientService {
         : null,
       tags: client.tags.map((row) => row.tag),
       portalStatus: client.account?.status ?? null,
+      connectionStatus,
     };
   }
 
@@ -376,7 +382,9 @@ export class ClientService {
       organizationMember: { id: string; user: { email: string } };
     }>;
     tags: Array<{ tag: { id: string; name: string; color: string | null } }>;
+    invitations: Array<{ expiresAt: Date }>;
   }) {
+    const connectionStatus = deriveConnectionStatus(client.account, client.invitations[0]);
     return {
       id: client.id,
       organizationId: client.organizationId,
@@ -393,6 +401,7 @@ export class ClientService {
       profile: client.profile,
       portalStatus: client.account?.status ?? null,
       portalActivatedAt: client.account?.activatedAt?.toISOString() ?? null,
+      connectionStatus,
       assignments: client.assignments.map((row) => ({
         id: row.id,
         membershipId: row.organizationMember.id,

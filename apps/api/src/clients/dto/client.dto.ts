@@ -2,7 +2,6 @@ import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
 import {
   IsArray,
-  IsBoolean,
   IsDateString,
   IsEmail,
   IsEnum,
@@ -71,11 +70,6 @@ export class CreateClientDto {
   @IsArray()
   @IsUUID("4", { each: true })
   tagIds?: string[];
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsBoolean()
-  invitePortal?: boolean;
 }
 
 export class UpdateClientDto {

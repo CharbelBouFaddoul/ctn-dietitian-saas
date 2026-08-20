@@ -3,8 +3,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { api } from "../../../../lib/api";
-import { buttonStyle, cellStyle, tableStyle } from "../../admin-shell";
-
 interface UserDetail {
   id: string;
   email: string;
@@ -59,31 +57,31 @@ export default function AdminUserDetailPage() {
         Organization roles are not editable here. Membership stays organization-scoped.
       </p>
       <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-        <button type="button" style={buttonStyle} onClick={() => void setStatus("ACTIVE")}>
+        <button type="button" className="ui-btn ui-btn--primary" onClick={() => void setStatus("ACTIVE")}>
           Activate
         </button>
-        <button type="button" style={buttonStyle} onClick={() => void setStatus("SUSPENDED")}>
+        <button type="button" className="ui-btn ui-btn--primary" onClick={() => void setStatus("SUSPENDED")}>
           Suspend
         </button>
-        <button type="button" style={buttonStyle} onClick={() => void setStatus("ARCHIVED")}>
+        <button type="button" className="ui-btn ui-btn--primary" onClick={() => void setStatus("ARCHIVED")}>
           Archive
         </button>
       </div>
       <h2>Organizations</h2>
-      <table style={tableStyle}>
+      <table className="ui-table">
         <thead>
           <tr>
-            <th style={cellStyle}>Organization</th>
-            <th style={cellStyle}>Role</th>
-            <th style={cellStyle}>Membership</th>
+            <th>Organization</th>
+            <th>Role</th>
+            <th>Membership</th>
           </tr>
         </thead>
         <tbody>
           {user.memberships.map((membership) => (
             <tr key={membership.id}>
-              <td style={cellStyle}>{membership.organizationName}</td>
-              <td style={cellStyle}>{membership.role}</td>
-              <td style={cellStyle}>{membership.status}</td>
+              <td>{membership.organizationName}</td>
+              <td>{membership.role}</td>
+              <td>{membership.status}</td>
             </tr>
           ))}
         </tbody>

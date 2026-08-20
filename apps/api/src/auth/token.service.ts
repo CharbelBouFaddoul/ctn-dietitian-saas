@@ -11,6 +11,17 @@ export class TokenService {
     return randomBytes(32).toString("base64url");
   }
 
+  generateJoinCode(): { display: string; normalized: string } {
+    const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    const bytes = randomBytes(8);
+    const chars = [...bytes].map((byte) => alphabet[byte % 32]).join("");
+    return { display: `${chars.slice(0, 4)}-${chars.slice(4)}`, normalized: chars };
+  }
+
+  normalizeJoinCode(value: string): string {
+    return value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  }
+
   hashToken(rawToken: string): string {
     return createHmac("sha256", this.config.get("AUTH_TOKEN_SECRET", { infer: true }))
       .update(rawToken)

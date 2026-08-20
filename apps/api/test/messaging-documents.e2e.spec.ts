@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import { CLIENT_ACCESS_DENIED } from "../src/clients/client.messages";
 import {
+  connectClientPortal,
   cookieValue,
   createAuthTestApp,
   extractEmailedToken,
@@ -78,27 +79,14 @@ describe("Phase 9 messaging and documents", () => {
       .send({ firstName: "Pat", lastName: "Client", email: email("client"), ...body });
   }
 
-  async function portalLogin(clientEmail: string) {
-    const inviteMail = ctx.emails.messages.find(
-      (message) => message.text.includes("CLIENT_INVITE") && message.to === clientEmail,
-    );
-    const token = extractEmailedToken(inviteMail?.text ?? "");
-    await request(ctx.app.getHttpServer()).post("/api/v1/auth/invitations/accept").send({ token, password: PASSWORD }).expect(200);
-    const login = await request(ctx.app.getHttpServer())
-      .post("/api/v1/auth/login")
-      .send({ email: clientEmail, password: PASSWORD })
-      .expect(200);
-    return `ns_session=${cookieValue(login.headers["set-cookie"])}`;
-  }
-
   it("isolates messaging and documents between organizations", async () => {
     const ownerA = await registerVerifyLogin();
     const ownerB = await registerVerifyLogin();
     const orgA = await createOrg(ownerA.cookie, "Clinic A");
     const orgB = await createOrg(ownerB.cookie, "Clinic B");
-    const clientA = await createClient(ownerA.cookie, orgA.id, { invitePortal: true });
-    const clientB = await createClient(ownerB.cookie, orgB.id, { invitePortal: true });
-    const portalA = await portalLogin(clientA.body.email);
+    const clientA = await createClient(ownerA.cookie, orgA.id);
+    const clientB = await createClient(ownerB.cookie, orgB.id);
+    const portalA = await connectClientPortal(ctx, ownerA.cookie, orgA.id, clientA.body);
 
     await request(ctx.app.getHttpServer())
       .post("/api/v1/portal/conversation/messages")
@@ -138,10 +126,10 @@ describe("Phase 9 messaging and documents", () => {
       .set("Cookie", owner.cookie)
       .send({ email: dietitian.address, role: "DIETITIAN" })
       .expect(201);
-    const assigned = await createClient(owner.cookie, org.id, { invitePortal: true });
-    const unassigned = await createClient(owner.cookie, org.id, { invitePortal: true });
-    const portalAssigned = await portalLogin(assigned.body.email);
-    const portalOther = await portalLogin(unassigned.body.email);
+    const assigned = await createClient(owner.cookie, org.id);
+    const unassigned = await createClient(owner.cookie, org.id);
+    const portalAssigned = await connectClientPortal(ctx, owner.cookie, org.id, assigned.body);
+    const portalOther = await connectClientPortal(ctx, owner.cookie, org.id, unassigned.body);
 
     const shared = await request(ctx.app.getHttpServer())
       .post(`/api/v1/organizations/${org.id}/clients/${assigned.body.id}/documents`)
@@ -182,8 +170,8 @@ describe("Phase 9 messaging and documents", () => {
   it("rejects unsupported uploads and blocks archived document access", async () => {
     const owner = await registerVerifyLogin();
     const org = await createOrg(owner.cookie, "Clinic");
-    const client = await createClient(owner.cookie, org.id, { invitePortal: true });
-    const portal = await portalLogin(client.body.email);
+    const client = await createClient(owner.cookie, org.id);
+    const portal = await connectClientPortal(ctx, owner.cookie, org.id, client.body);
 
     await request(ctx.app.getHttpServer())
       .post(`/api/v1/organizations/${org.id}/clients/${client.body.id}/documents`)

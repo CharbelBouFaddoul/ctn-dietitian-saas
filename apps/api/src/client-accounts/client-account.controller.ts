@@ -1,4 +1,4 @@
-import { Controller, Get, Param, ParseUUIDPipe, Post, UseGuards } from "@nestjs/common";
+import { Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, UseGuards } from "@nestjs/common";
 import { ApiCookieAuth, ApiTags } from "@nestjs/swagger";
 import { SessionGuard } from "../auth/guards/session.guard";
 import { CurrentTenant } from "../organizations/decorators/current-tenant.decorator";
@@ -21,9 +21,34 @@ export class ClientAccountController {
   }
 
   @Post("invite")
+  @HttpCode(HttpStatus.CREATED)
   @ClientActionRequired("invite")
-  invite(@CurrentTenant() tenant: TenantContext, @Param("clientId", ParseUUIDPipe) clientId: string) {
-    return this.accounts.invite(tenant, clientId);
+  generateFromInvite(
+    @CurrentTenant() tenant: TenantContext,
+    @Param("clientId", ParseUUIDPipe) clientId: string,
+  ) {
+    return this.accounts.generateJoinCode(tenant, clientId);
+  }
+
+  @Post("join-code")
+  @HttpCode(HttpStatus.CREATED)
+  @ClientActionRequired("invite")
+  generate(@CurrentTenant() tenant: TenantContext, @Param("clientId", ParseUUIDPipe) clientId: string) {
+    return this.accounts.generateJoinCode(tenant, clientId);
+  }
+
+  @Post("join-code/regenerate")
+  @HttpCode(HttpStatus.CREATED)
+  @ClientActionRequired("invite")
+  regenerate(@CurrentTenant() tenant: TenantContext, @Param("clientId", ParseUUIDPipe) clientId: string) {
+    return this.accounts.generateJoinCode(tenant, clientId);
+  }
+
+  @Delete("join-code")
+  @HttpCode(HttpStatus.OK)
+  @ClientActionRequired("invite")
+  revoke(@CurrentTenant() tenant: TenantContext, @Param("clientId", ParseUUIDPipe) clientId: string) {
+    return this.accounts.revokeJoinCode(tenant, clientId);
   }
 
   @Post("deactivate")

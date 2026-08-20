@@ -4,6 +4,7 @@ import { FEATURE_KEYS } from "@nutrition-saas/config";
 import { CLIENT_ACCESS_DENIED } from "../src/clients/client.messages";
 import { ORGANIZATION_ACCESS_DENIED } from "../src/organizations/tenant.types";
 import {
+  connectClientPortal,
   cookieValue,
   createAuthTestApp,
   extractEmailedToken,
@@ -336,8 +337,8 @@ describe("Phase 7 recipes and meal plans", () => {
     const otherOwner = await registerVerifyLogin();
     const org = await createOrg(owner.cookie, "Clinic");
     const otherOrg = await createOrg(otherOwner.cookie, "Other");
-    const client = await createClient(owner.cookie, org.id, { invitePortal: true });
-    const otherClient = await createClient(otherOwner.cookie, otherOrg.id, { invitePortal: true });
+    const client = await createClient(owner.cookie, org.id);
+    const otherClient = await createClient(otherOwner.cookie, otherOrg.id);
     const food = await seedFood();
 
     const plan = await request(ctx.app.getHttpServer())
@@ -362,14 +363,7 @@ describe("Phase 7 recipes and meal plans", () => {
       .send({ email: client.body.email, password: PASSWORD });
     expect(portalBefore.status).not.toBe(200);
 
-    const inviteMail = ctx.emails.messages.find((message) => message.text.includes("CLIENT_INVITE"));
-    const token = extractEmailedToken(inviteMail?.text ?? "");
-    await request(ctx.app.getHttpServer()).post("/api/v1/auth/invitations/accept").send({ token, password: PASSWORD }).expect(200);
-    const login = await request(ctx.app.getHttpServer())
-      .post("/api/v1/auth/login")
-      .send({ email: client.body.email, password: PASSWORD })
-      .expect(200);
-    const portalCookie = `ns_session=${cookieValue(login.headers["set-cookie"])}`;
+    const portalCookie = await connectClientPortal(ctx, owner.cookie, org.id, client.body);
 
     const draftView = await request(ctx.app.getHttpServer()).get("/api/v1/portal/meal-plan").set("Cookie", portalCookie).expect(200);
     expect(draftView.body.plan).toBeNull();
@@ -403,16 +397,7 @@ describe("Phase 7 recipes and meal plans", () => {
       .expect(200);
     expect(otherPlans.body.items).toHaveLength(0);
 
-    const otherInvite = ctx.emails.messages.filter((message) => message.text.includes("CLIENT_INVITE")).at(-1);
-    await request(ctx.app.getHttpServer())
-      .post("/api/v1/auth/invitations/accept")
-      .send({ token: extractEmailedToken(otherInvite?.text ?? ""), password: PASSWORD })
-      .expect(200);
-    const otherLogin = await request(ctx.app.getHttpServer())
-      .post("/api/v1/auth/login")
-      .send({ email: otherClient.body.email, password: PASSWORD })
-      .expect(200);
-    const otherCookie = `ns_session=${cookieValue(otherLogin.headers["set-cookie"])}`;
+    const otherCookie = await connectClientPortal(ctx, otherOwner.cookie, otherOrg.id, otherClient.body);
     const otherPortal = await request(ctx.app.getHttpServer()).get("/api/v1/portal/meal-plan").set("Cookie", otherCookie).expect(200);
     expect(otherPortal.body.plan).toBeNull();
   });

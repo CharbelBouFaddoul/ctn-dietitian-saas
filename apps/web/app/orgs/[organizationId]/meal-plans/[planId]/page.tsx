@@ -4,8 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { api } from "../../../../../lib/api";
-import { buttonStyle, cellStyle, inputStyle, tableStyle } from "../../practice-shell";
-
 interface Nutrition {
   energyKcal: number | null;
   proteinG: number | null;
@@ -163,18 +161,18 @@ export default function MealPlanEditorPage() {
       </p>
       <p style={{ display: "flex", gap: 8 }}>
         {canEdit ? (
-          <button type="button" style={buttonStyle} onClick={() => void publish().catch((err) => setError(err instanceof Error ? err.message : "Publish failed"))}>
+          <button type="button" className="ui-btn ui-btn--primary" onClick={() => void publish().catch((err) => setError(err instanceof Error ? err.message : "Publish failed"))}>
             Publish
           </button>
         ) : (
-          <button type="button" style={buttonStyle} onClick={() => void newDraft().catch((err) => setError(err instanceof Error ? err.message : "Draft failed"))}>
+          <button type="button" className="ui-btn ui-btn--primary" onClick={() => void newDraft().catch((err) => setError(err instanceof Error ? err.message : "Draft failed"))}>
             New draft from this version
           </button>
         )}
         {canEdit ? (
           <button
             type="button"
-            style={buttonStyle}
+            className="ui-btn ui-btn--primary"
             onClick={() =>
               void api(`/api/v1/organizations/${organizationId}/meal-plans/${planId}/versions/${version.id}/days`, {
                 method: "POST",
@@ -188,7 +186,7 @@ export default function MealPlanEditorPage() {
       </p>
       <div style={{ display: "flex", gap: 8, margin: "12px 0" }}>
         {version.snapshot.days.map((item, index) => (
-          <button key={item.id} type="button" style={buttonStyle} onClick={() => setDayIndex(index)}>
+          <button key={item.id} type="button" className="ui-btn ui-btn--primary" onClick={() => setDayIndex(index)}>
             {item.title ?? `Day ${item.dayNumber}`} ({kcal(item.presented.energyKcal)})
           </button>
         ))}
@@ -204,20 +202,20 @@ export default function MealPlanEditorPage() {
               <h3>
                 {meal.name} · {kcal(meal.presented.energyKcal)}
               </h3>
-              <table style={tableStyle}>
+              <table className="ui-table">
                 <tbody>
                   {meal.items.map((item) => (
                     <tr key={item.id}>
-                      <td style={cellStyle}>{item.food?.name ?? item.recipe?.name}</td>
-                      <td style={cellStyle}>
+                      <td>{item.food?.name ?? item.recipe?.name}</td>
+                      <td>
                         {item.quantity} {item.unit}
                       </td>
-                      <td style={cellStyle}>{kcal(item.presented.energyKcal)}</td>
-                      <td style={cellStyle}>
+                      <td>{kcal(item.presented.energyKcal)}</td>
+                      <td>
                         {canEdit ? (
                           <button
                             type="button"
-                            style={buttonStyle}
+                            className="ui-btn ui-btn--primary"
                             onClick={() =>
                               void api(
                                 `/api/v1/organizations/${organizationId}/meal-plans/${planId}/versions/${version.id}/items/${item.id}`,
@@ -235,9 +233,9 @@ export default function MealPlanEditorPage() {
               </table>
               {canEdit ? (
                 <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-                  <input style={inputStyle} value={foodQuery} onChange={(event) => setFoodQuery(event.target.value)} placeholder="Search food" />
-                  <input style={{ ...inputStyle, width: 80 }} value={quantity} onChange={(event) => setQuantity(event.target.value)} />
-                  <select style={inputStyle} value={unit} onChange={(event) => setUnit(event.target.value)}>
+                  <input className="ui-input" value={foodQuery} onChange={(event) => setFoodQuery(event.target.value)} placeholder="Search food" />
+                  <input className="ui-input" style={{width: 80}} value={quantity} onChange={(event) => setQuantity(event.target.value)} />
+                  <select className="ui-input" value={unit} onChange={(event) => setUnit(event.target.value)}>
                     {["g", "kg", "oz", "lb", "ml", "l", "fl_oz"].map((item) => (
                       <option key={item} value={item}>
                         {item}
@@ -246,7 +244,7 @@ export default function MealPlanEditorPage() {
                   </select>
                   <button
                     type="button"
-                    style={buttonStyle}
+                    className="ui-btn ui-btn--primary"
                     onClick={() =>
                       void api<{ items: Array<{ id: string; name: string }> }>(
                         `/api/v1/organizations/${organizationId}/foods?q=${encodeURIComponent(foodQuery)}&pageSize=5`,
@@ -256,20 +254,20 @@ export default function MealPlanEditorPage() {
                     Find food
                   </button>
                   {foodHits.map((hit) => (
-                    <button key={hit.id} type="button" style={buttonStyle} onClick={() => void addFood(meal.id, hit.id)}>
+                    <button key={hit.id} type="button" className="ui-btn ui-btn--primary" onClick={() => void addFood(meal.id, hit.id)}>
                       Add {hit.name}
                     </button>
                   ))}
-                  <input style={inputStyle} value={recipeQuery} onChange={(event) => setRecipeQuery(event.target.value)} placeholder="Search recipe" />
+                  <input className="ui-input" value={recipeQuery} onChange={(event) => setRecipeQuery(event.target.value)} placeholder="Search recipe" />
                   <input
-                    style={{ ...inputStyle, width: 80 }}
+                    className="ui-input" style={{width: 80}}
                     value={recipeServings}
                     onChange={(event) => setRecipeServings(event.target.value)}
                     title="Recipe servings"
                   />
                   <button
                     type="button"
-                    style={buttonStyle}
+                    className="ui-btn ui-btn--primary"
                     onClick={() =>
                       void api<{ items: Array<{ id: string; name: string }> }>(
                         `/api/v1/organizations/${organizationId}/recipes?q=${encodeURIComponent(recipeQuery)}&pageSize=5`,
@@ -279,7 +277,7 @@ export default function MealPlanEditorPage() {
                     Find recipe
                   </button>
                   {recipeHits.map((hit) => (
-                    <button key={hit.id} type="button" style={buttonStyle} onClick={() => void addRecipe(meal.id, hit.id)}>
+                    <button key={hit.id} type="button" className="ui-btn ui-btn--primary" onClick={() => void addRecipe(meal.id, hit.id)}>
                       Add {hit.name} (servings)
                     </button>
                   ))}

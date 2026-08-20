@@ -4,6 +4,7 @@ import { FEATURE_KEYS } from "@nutrition-saas/config";
 import { AutomationExecutorService } from "../src/automation/automation-executor.service";
 import { AutomationSweepService } from "../src/automation/automation-sweep.service";
 import {
+  connectClientPortal,
   cookieValue,
   createAuthTestApp,
   extractEmailedToken,
@@ -300,22 +301,7 @@ describe("Phase 12 automation", () => {
     const org = await createOrg(owner.cookie, "Portal Org", "pro");
     const client = await createClient(owner.cookie, org.id);
     const clientEmail = (await ctx.prisma.client.findUniqueOrThrow({ where: { id: client.id } })).email!;
-
-    await request(ctx.app.getHttpServer())
-      .post(`/api/v1/organizations/${org.id}/clients/${client.id}/account/invite`)
-      .set("Cookie", owner.cookie)
-      .expect(201);
-
-    const portalCookie = await (async () => {
-      const inviteMail = ctx.emails.messages.find((m) => m.to === clientEmail);
-      const token = extractEmailedToken(inviteMail?.text ?? "");
-      await request(ctx.app.getHttpServer()).post("/api/v1/auth/invitations/accept").send({ token, password: PASSWORD }).expect(200);
-      const login = await request(ctx.app.getHttpServer())
-        .post("/api/v1/auth/login")
-        .send({ email: clientEmail, password: PASSWORD })
-        .expect(200);
-      return `ns_session=${cookieValue(login.headers["set-cookie"])}`;
-    })();
+    const portalCookie = await connectClientPortal(ctx, owner.cookie, org.id, { id: client.id, email: clientEmail });
 
     await request(ctx.app.getHttpServer()).get(`/api/v1/organizations/${org.id}/automations`).expect(401);
     await request(ctx.app.getHttpServer())

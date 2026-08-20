@@ -84,6 +84,7 @@ export class PracticeDashboardService {
         startAt: row.startAt.toISOString(),
         clientId: row.client.id,
         clientName: row.client.displayName ?? `${row.client.firstName} ${row.client.lastName}`,
+        clientEmail: row.client.email,
       })),
       recentActivity: recentTimeline.map((row) => ({
         id: row.id,
@@ -91,6 +92,7 @@ export class PracticeDashboardService {
         occurredAt: row.occurredAt.toISOString(),
         clientId: row.client.id,
         clientName: row.client.displayName ?? `${row.client.firstName} ${row.client.lastName}`,
+        clientEmail: row.client.email,
       })),
     };
   }

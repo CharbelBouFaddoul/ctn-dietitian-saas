@@ -1,8 +1,11 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
+import { Alert, Button, Card, Field, Input, Textarea } from "@nutrition-saas/ui";
 import { api } from "../lib/api";
-import { buttonStyle, fieldStyle, inputStyle } from "../app/orgs/[organizationId]/practice-shell";
+import { errorMessage } from "../lib/humanize-error";
+import { humanizeLabel } from "@nutrition-saas/ui";
 
 interface Usage {
   enabled: boolean;
@@ -27,6 +30,96 @@ interface AiPanelProps {
   foodQuery?: boolean;
 }
 
+function asList(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function renderResult(result: Record<string, unknown>): ReactNode {
+  const sections: ReactNode[] = [];
+  if (typeof result.overview === "string") sections.push(<p key="overview">{result.overview}</p>);
+  if (typeof result.explanation === "string") sections.push(<p key="explanation">{result.explanation}</p>);
+  if (typeof result.summary === "string") sections.push(<p key="summary">{result.summary}</p>);
+  if (typeof result.subject === "string") sections.push(<p key="subject"><strong>{result.subject}</strong></p>);
+  if (typeof result.body === "string") sections.push(<p key="body" style={{ whiteSpace: "pre-wrap" }}>{result.body}</p>);
+
+  const namedLists: Array<[string, string]> = [
+    ["observations", "Observations"],
+    ["adherence", "Adherence"],
+    ["areas_to_review", "Areas to review"],
+    ["suggested_questions", "Suggested questions"],
+    ["notes", "Notes"],
+    ["talking_points", "Talking points"],
+    ["key_points", "Key points"],
+    ["follow_up_questions", "Follow-up questions"],
+    ["action_items", "Action items"],
+  ];
+  for (const [key, title] of namedLists) {
+    const items = asList(result[key]);
+    if (items.length) {
+      sections.push(
+        <div key={key}>
+          <h4>{title}</h4>
+          <ul>
+            {items.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </div>,
+      );
+    }
+  }
+
+  if (Array.isArray(result.suggestions)) {
+    sections.push(
+      <div key="suggestions">
+        <h4>Suggestions</h4>
+        <ul>
+          {result.suggestions.map((item, index) => {
+            const row = item as { title?: string; meal?: string; notes?: string };
+            return (
+              <li key={index}>
+                <strong>{row.title ?? "Suggestion"}</strong>
+                {row.meal ? ` · ${row.meal}` : ""}
+                {row.notes ? ` — ${row.notes}` : ""}
+              </li>
+            );
+          })}
+        </ul>
+      </div>,
+    );
+  }
+
+  if (Array.isArray(result.substitutions)) {
+    sections.push(
+      <div key="subs">
+        <h4>Substitutions</h4>
+        <ul>
+          {result.substitutions.map((item, index) => {
+            const row = item as { from?: string; to?: string; reason?: string };
+            return (
+              <li key={index}>
+                {row.from} → {row.to}
+                {row.reason ? ` (${row.reason})` : ""}
+              </li>
+            );
+          })}
+        </ul>
+      </div>,
+    );
+  }
+
+  if (!sections.length) {
+    const leftover = Object.entries(result).filter(([, value]) => typeof value === "string" || typeof value === "number");
+    if (!leftover.length) return <p className="ui-muted">No readable draft was returned.</p>;
+    return leftover.map(([key, value]) => (
+      <p key={key}>
+        <strong>{humanizeLabel(key)}:</strong> {String(value)}
+      </p>
+    ));
+  }
+  return sections;
+}
+
 export function AiPanel({
   organizationId,
   clientId,
@@ -42,7 +135,7 @@ export function AiPanel({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
-  const [meta, setMeta] = useState<{ provider?: string; model?: string; generatedAt?: string } | null>(null);
+  const [meta, setMeta] = useState<{ provider?: string; model?: string } | null>(null);
 
   useEffect(() => {
     void api<Usage>(`/api/v1/organizations/${organizationId}/ai/usage`)
@@ -59,14 +152,13 @@ export function AiPanel({
         provider: string;
         model: string;
         generatedAt: string;
-        disclaimer: string;
         usage: Usage;
       }>(`/api/v1/organizations/${organizationId}/clients/${clientId}/ai/${action}`, {
         method: "POST",
         body: JSON.stringify({ prompt, ...(foodQuery ? { foodQuery: food } : {}) }),
       });
       setResult(response.result);
-      setMeta({ provider: response.provider, model: response.model, generatedAt: response.generatedAt });
+      setMeta({ provider: response.provider, model: response.model });
       setUsage({
         enabled: true,
         limit: response.usage.limit,
@@ -75,63 +167,60 @@ export function AiPanel({
         periodKey: response.usage.periodKey,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "AI request failed");
+      setError(errorMessage(err, "Unable to generate a draft"));
     } finally {
       setLoading(false);
     }
   }
 
+  const copyText = result
+    ? Object.values(result)
+        .flatMap((value) => (Array.isArray(value) ? value.map((item) => (typeof item === "string" ? item : JSON.stringify(item))) : [String(value)]))
+        .join("\n")
+    : "";
+
   return (
-    <section style={{ border: "1px solid var(--color-border)", borderRadius: 8, padding: 16 }}>
-      <h3>{title}</h3>
-      <p style={{ color: "var(--color-muted)", fontSize: 14 }}>{description}</p>
-      <p style={{ fontSize: 13, color: "var(--color-muted)" }}>
-        AI-generated — review before use. Not a diagnosis or autonomous treatment decision.
-      </p>
+    <Card title={title}>
+      <p className="ui-muted">{description}</p>
+      <p className="ui-hint">AI-generated — review before use. Not a diagnosis.</p>
       {usage ? (
-        <p style={{ fontSize: 13 }}>
-          Usage: {usage.used}
-          {usage.limit !== null ? ` / ${usage.limit}` : ""}
-          {usage.remaining !== null ? ` (${usage.remaining} remaining this ${usage.periodKey})` : ""}
-          {!usage.enabled ? " · AI disabled for this organization" : ""}
+        <p className="ui-hint">
+          {usage.used}
+          {usage.limit !== null ? ` / ${usage.limit}` : ""} used
+          {usage.remaining !== null ? ` · ${usage.remaining} remaining this ${humanizeLabel(usage.periodKey)}` : ""}
+          {!usage.enabled ? " · AI is not enabled for this practice" : ""}
         </p>
       ) : null}
       {foodQuery ? (
-        <label style={fieldStyle}>
-          Food search
-          <input style={inputStyle} value={food} onChange={(event) => setFood(event.target.value)} placeholder="e.g. salmon" />
-        </label>
+        <Field label="Food search">
+          <Input value={food} onChange={(event) => setFood(event.target.value)} placeholder="e.g. salmon" />
+        </Field>
       ) : null}
-      <label style={fieldStyle}>
-        {promptLabel}
-        <textarea style={{ ...inputStyle, minHeight: 80 }} value={prompt} onChange={(event) => setPrompt(event.target.value)} />
-      </label>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <button type="button" style={buttonStyle} disabled={loading || usage?.enabled === false} onClick={() => void generate()}>
+      <Field label={promptLabel}>
+        <Textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} />
+      </Field>
+      <div className="ui-row">
+        <Button disabled={loading || usage?.enabled === false} onClick={() => void generate()}>
           {loading ? "Generating…" : "Generate"}
-        </button>
+        </Button>
         {result ? (
           <>
-            <button type="button" style={buttonStyle} onClick={() => void navigator.clipboard.writeText(JSON.stringify(result, null, 2))}>
+            <Button variant="secondary" onClick={() => void navigator.clipboard.writeText(copyText)}>
               Copy
-            </button>
-            <button type="button" style={buttonStyle} onClick={() => setResult(null)}>
+            </Button>
+            <Button variant="ghost" onClick={() => setResult(null)}>
               Dismiss
-            </button>
+            </Button>
           </>
         ) : null}
       </div>
-      {error ? <p style={{ color: "var(--color-danger)" }}>{error}</p> : null}
-      {result ? (
-        <pre style={{ marginTop: 12, background: "var(--color-surface)", padding: 12, borderRadius: 8, overflow: "auto", fontSize: 13 }}>
-          {JSON.stringify(result, null, 2)}
-        </pre>
+      {error ? (
+        <div style={{ marginTop: 12 }}>
+          <Alert tone="danger">{error}</Alert>
+        </div>
       ) : null}
-      {meta ? (
-        <p style={{ fontSize: 12, color: "var(--color-muted)", marginTop: 8 }}>
-          {meta.provider} · {meta.model} · {meta.generatedAt ? new Date(meta.generatedAt).toLocaleString() : ""}
-        </p>
-      ) : null}
-    </section>
+      {result ? <div style={{ marginTop: 16 }}>{renderResult(result)}</div> : null}
+      {meta?.model ? <p className="ui-hint">{meta.model}</p> : null}
+    </Card>
   );
 }
