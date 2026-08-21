@@ -5554,6 +5554,75 @@
   padding-bottom: 0.15rem;
 }
 
+.ui-client-appt-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0;
+}
+
+.ui-client-appt {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.95rem 0;
+  border-top: 1px solid rgb(15 23 42 / 7%);
+}
+
+.ui-client-appt:first-child {
+  border-top: 0;
+  padding-top: 0.2rem;
+}
+
+.ui-client-appt:last-child {
+  padding-bottom: 0.2rem;
+}
+
+.ui-client-appt__main {
+  min-width: 0;
+}
+
+.ui-client-appt__title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.ui-client-appt__title-row strong {
+  font-size: 0.95rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.ui-client-appt__when {
+  margin: 0.25rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--color-muted);
+}
+
+.ui-client-appt__request {
+  margin: 0.4rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--practice-deep-teal, #0f766e);
+  font-weight: 600;
+}
+
+.ui-client-appt__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.ui-client-appt__actions .ui-btn--ghost {
+  font-weight: 650;
+  color: var(--color-text);
+  background: #fff;
+  border: 1px solid rgb(15 23 42 / 12%);
+  border-radius: 10px;
+  padding: 0.35rem 0.7rem;
+}
+
 .ui-line-chart {
   display: grid;
   gap: 0.35rem;
@@ -8840,6 +8909,67 @@
   display: grid;
   gap: 0.2rem;
   min-width: 0;
+}
+
+.ui-portal-appt-detail {
+  display: grid;
+  gap: 0.95rem;
+}
+
+.ui-portal-appt-detail__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.65rem;
+  font-size: 0.875rem;
+  color: var(--color-muted);
+}
+
+.ui-portal-appt-detail__when {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.ui-portal-appt-detail__label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.ui-portal-appt-detail__when p {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--color-text);
+}
+
+.ui-portal-appt-detail__request {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 650;
+  color: var(--practice-deep-teal, #0f766e);
+}
+
+.ui-portal-appt-detail__notes {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.ui-portal-appt-detail__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  padding-top: 0.25rem;
+}
+
+.ui-portal-appt-detail__actions .ui-btn--ghost {
+  font-weight: 650;
+  color: var(--color-text);
+  background: #fff;
+  border: 1px solid rgb(15 23 42 / 12%);
+  border-radius: 10px;
+  padding: 0.35rem 0.7rem;
 }
 
 @media (max-width: 800px) {

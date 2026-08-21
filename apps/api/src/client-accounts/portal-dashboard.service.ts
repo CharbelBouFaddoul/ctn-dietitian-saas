@@ -34,7 +34,7 @@ export class PortalDashboardService {
           where: {
             clientId: client.id,
             ...tenantWhere(dietitianAccountId),
-            status: { in: ["SCHEDULED", "RESCHEDULE_PENDING"] },
+            status: { in: ["SCHEDULED", "RESCHEDULE_PENDING", "CANCELLATION_PENDING"] },
             startAt: { gte: new Date() },
           },
           orderBy: { startAt: "asc" },

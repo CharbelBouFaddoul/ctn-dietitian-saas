@@ -21,7 +21,11 @@ import { CLIENT_ACCESS_DENIED } from "../clients/client.messages";
 import { NotificationService } from "../notifications/notification.service";
 import type { AppointmentCategoryValue } from "./dto/appointment.dto";
 
-const BLOCKING_STATUSES: AppointmentStatus[] = ["SCHEDULED", "RESCHEDULE_PENDING"];
+const BLOCKING_STATUSES: AppointmentStatus[] = [
+  "SCHEDULED",
+  "RESCHEDULE_PENDING",
+  "CANCELLATION_PENDING",
+];
 
 type AppointmentRow = Appointment & {
   client?: {
@@ -174,6 +178,9 @@ export class AppointmentService {
     if (existing.status === "RESCHEDULE_PENDING") {
       throw new BadRequestException("Resolve or reject the pending reschedule before editing");
     }
+    if (existing.status === "CANCELLATION_PENDING") {
+      throw new BadRequestException("Resolve the pending cancellation request before editing");
+    }
     if (existing.status === "CANCELLED") {
       throw new BadRequestException("Cancelled appointments cannot be edited");
     }
@@ -263,7 +270,11 @@ export class AppointmentService {
 
   async cancelForPractice(tenant: DietitianTenantContext, appointmentId: string) {
     const existing = await this.requirePracticeAppointment(tenant, appointmentId, "manageRecords");
-    if (existing.status !== "SCHEDULED" && existing.status !== "RESCHEDULE_PENDING") {
+    if (
+      existing.status !== "SCHEDULED" &&
+      existing.status !== "RESCHEDULE_PENDING" &&
+      existing.status !== "CANCELLATION_PENDING"
+    ) {
       throw new BadRequestException("Only upcoming appointments can be cancelled");
     }
     const appointment = await this.prisma.appointment.update({
@@ -290,6 +301,76 @@ export class AppointmentService {
       title: appointment.title,
       type: "APPOINTMENT_CANCELLED",
       body: `Appointment cancelled: ${appointment.title}`,
+      excludeUserId: tenant.userId,
+    });
+    return this.toResponse(appointment);
+  }
+
+  async acceptCancellationForPractice(tenant: DietitianTenantContext, appointmentId: string) {
+    const existing = await this.requirePracticeAppointment(tenant, appointmentId, "manageRecords");
+    if (existing.status !== "CANCELLATION_PENDING") {
+      throw new BadRequestException("No pending cancellation request");
+    }
+    const appointment = await this.prisma.appointment.update({
+      where: { id: appointmentId },
+      data: {
+        status: "CANCELLED",
+        proposedStartAt: null,
+        proposedEndAt: null,
+        proposedByUserId: null,
+      },
+    });
+    await this.timeline.record({
+      dietitianAccountId: tenant.dietitianAccountId,
+      clientId: appointment.clientId,
+      type: "APPOINTMENT_CANCELLED",
+      actorUserId: tenant.userId,
+      targetType: "appointment",
+      targetId: appointment.id,
+      metadata: { action: "accept_cancellation" },
+    });
+    await this.notifyAppointmentParties({
+      dietitianAccountId: tenant.dietitianAccountId,
+      clientId: appointment.clientId,
+      appointmentId: appointment.id,
+      title: appointment.title,
+      type: "APPOINTMENT_CANCELLATION_ACCEPTED",
+      body: `Cancellation approved: ${appointment.title}`,
+      excludeUserId: tenant.userId,
+    });
+    return this.toResponse(appointment);
+  }
+
+  async rejectCancellationForPractice(tenant: DietitianTenantContext, appointmentId: string) {
+    const existing = await this.requirePracticeAppointment(tenant, appointmentId, "manageRecords");
+    if (existing.status !== "CANCELLATION_PENDING") {
+      throw new BadRequestException("No pending cancellation request");
+    }
+    const appointment = await this.prisma.appointment.update({
+      where: { id: appointmentId },
+      data: {
+        status: "SCHEDULED",
+        proposedStartAt: null,
+        proposedEndAt: null,
+        proposedByUserId: null,
+      },
+    });
+    await this.timeline.record({
+      dietitianAccountId: tenant.dietitianAccountId,
+      clientId: appointment.clientId,
+      type: "APPOINTMENT_UPDATED",
+      actorUserId: tenant.userId,
+      targetType: "appointment",
+      targetId: appointment.id,
+      metadata: { action: "reject_cancellation" },
+    });
+    await this.notifyAppointmentParties({
+      dietitianAccountId: tenant.dietitianAccountId,
+      clientId: appointment.clientId,
+      appointmentId: appointment.id,
+      title: appointment.title,
+      type: "APPOINTMENT_CANCELLATION_REJECTED",
+      body: `Cancellation declined: ${appointment.title}`,
       excludeUserId: tenant.userId,
     });
     return this.toResponse(appointment);
@@ -349,32 +430,33 @@ export class AppointmentService {
   async cancelForPortal(userId: string, appointmentId: string, activeClientId?: string | null) {
     const existing = await this.requirePortalAppointment(userId, appointmentId, activeClientId);
     if (existing.status !== "SCHEDULED" && existing.status !== "RESCHEDULE_PENDING") {
-      throw new BadRequestException("Only upcoming appointments can be cancelled");
+      throw new BadRequestException("Only upcoming appointments can request cancellation");
     }
     const appointment = await this.prisma.appointment.update({
       where: { id: existing.id },
       data: {
-        status: "CANCELLED",
+        status: "CANCELLATION_PENDING",
         proposedStartAt: null,
         proposedEndAt: null,
-        proposedByUserId: null,
+        proposedByUserId: userId,
       },
     });
     await this.timeline.record({
       dietitianAccountId: existing.dietitianAccountId,
       clientId: existing.clientId,
-      type: "APPOINTMENT_CANCELLED",
+      type: "APPOINTMENT_UPDATED",
       actorUserId: userId,
       targetType: "appointment",
       targetId: appointment.id,
+      metadata: { action: "request_cancellation" },
     });
     await this.notifyAppointmentParties({
       dietitianAccountId: existing.dietitianAccountId,
       clientId: existing.clientId,
       appointmentId: appointment.id,
       title: appointment.title,
-      type: "APPOINTMENT_CANCELLED",
-      body: `Appointment cancelled: ${appointment.title}`,
+      type: "APPOINTMENT_CANCELLATION_REQUESTED",
+      body: `Cancellation requested: ${appointment.title}`,
       excludeUserId: userId,
     });
     return this.toResponse(appointment);
@@ -436,9 +518,10 @@ export class AppointmentService {
     if (existing.status === "CANCELLED" || existing.status === "COMPLETED" || existing.status === "NO_SHOW") {
       throw new BadRequestException("Cannot reschedule a closed appointment");
     }
-    if (existing.status === "RESCHEDULE_PENDING") {
-      throw new BadRequestException("A reschedule proposal is already pending");
+    if (existing.status === "CANCELLATION_PENDING") {
+      throw new BadRequestException("Resolve the cancellation request before rescheduling");
     }
+    // Allow replacing an existing pending proposal (counter-offer / request another time).
     const { startAt, endAt } = this.parseRange(input.startAtRaw, input.endAtRaw);
     await this.assertNoOverlap(input.dietitianAccountId, startAt, endAt, existing.id);
 
@@ -458,7 +541,12 @@ export class AppointmentService {
       actorUserId: input.actorUserId,
       targetType: "appointment",
       targetId: appointment.id,
-      metadata: { action: "propose_reschedule", proposedStartAt: startAt, proposedEndAt: endAt },
+      metadata: {
+        action:
+          existing.status === "RESCHEDULE_PENDING" ? "counter_propose_reschedule" : "propose_reschedule",
+        proposedStartAt: startAt,
+        proposedEndAt: endAt,
+      },
     });
     await this.notifyAppointmentParties({
       dietitianAccountId: input.dietitianAccountId,
@@ -466,7 +554,10 @@ export class AppointmentService {
       appointmentId: appointment.id,
       title: appointment.title,
       type: "APPOINTMENT_RESCHEDULE_PROPOSED",
-      body: `New time proposed for: ${appointment.title}`,
+      body:
+        existing.status === "RESCHEDULE_PENDING"
+          ? `Another time proposed for: ${appointment.title}`
+          : `New time proposed for: ${appointment.title}`,
       excludeUserId: input.actorUserId,
     });
     return this.toResponse(appointment);

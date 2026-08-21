@@ -62,6 +62,22 @@ export class AppointmentController {
     return this.appointments.cancelForPractice(tenant, appointmentId);
   }
 
+  @Post("appointments/:appointmentId/accept-cancellation")
+  acceptCancellation(
+    @CurrentTenant() tenant: DietitianTenantContext,
+    @Param("appointmentId", ParseUUIDPipe) appointmentId: string,
+  ) {
+    return this.appointments.acceptCancellationForPractice(tenant, appointmentId);
+  }
+
+  @Post("appointments/:appointmentId/reject-cancellation")
+  rejectCancellation(
+    @CurrentTenant() tenant: DietitianTenantContext,
+    @Param("appointmentId", ParseUUIDPipe) appointmentId: string,
+  ) {
+    return this.appointments.rejectCancellationForPractice(tenant, appointmentId);
+  }
+
   @Post("appointments/:appointmentId/propose-reschedule")
   proposeReschedule(
     @CurrentTenant() tenant: DietitianTenantContext,

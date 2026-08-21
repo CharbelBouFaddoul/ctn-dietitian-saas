@@ -181,8 +181,21 @@ describe("phase6 calendar + appointments", () => {
       .post(`/api/v1/portal/appointments/${withPortal.body.id}/cancel`)
       .set("Cookie", portalCookie)
       .expect(201);
+    const pending = await request(ctx.app.getHttpServer())
+      .get(`/api/v1/dietitian/${org.id}/appointments/${withPortal.body.id}`)
+      .set("Cookie", owner.cookie)
+      .expect(200);
+    expect(pending.body.status).toBe("CANCELLATION_PENDING");
+    const requestNotifs = await ctx.prisma.notification.count({
+      where: { targetId: withPortal.body.id, type: "APPOINTMENT_CANCELLATION_REQUESTED" },
+    });
+    expect(requestNotifs).toBeGreaterThanOrEqual(1);
+    await request(ctx.app.getHttpServer())
+      .post(`/api/v1/dietitian/${org.id}/appointments/${withPortal.body.id}/accept-cancellation`)
+      .set("Cookie", owner.cookie)
+      .expect(201);
     const cancelledNotifs = await ctx.prisma.notification.count({
-      where: { targetId: withPortal.body.id, type: "APPOINTMENT_CANCELLED" },
+      where: { targetId: withPortal.body.id, type: "APPOINTMENT_CANCELLATION_ACCEPTED" },
     });
     expect(cancelledNotifs).toBeGreaterThanOrEqual(1);
 

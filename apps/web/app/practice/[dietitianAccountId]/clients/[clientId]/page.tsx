@@ -11,6 +11,7 @@ import {
   Button,
   Checkbox,
   ConfirmDialog,
+  Dialog,
   EmptyState,
   Field,
   Input,
@@ -35,6 +36,11 @@ import { ClientTimelinePanel } from "../../../../../components/client-timeline-p
 import { ClientTrackingPanel } from "../../../../../components/client-tracking-panel";
 import { ClinicTagsManager } from "../../../../../components/clinic-tags-manager";
 import { api, apiUrl } from "../../../../../lib/api";
+import {
+  combineLocalDateTime,
+  toDateInputValue,
+  toTimeInputValue,
+} from "../../../../../lib/calendar-range";
 import { downloadAuthenticatedFile } from "../../../../../lib/documents";
 import { formatDate, formatMoney } from "../../../../../lib/format";
 import { errorMessage } from "../../../../../lib/humanize-error";
@@ -99,7 +105,7 @@ const chartSections: ChartSection[] = [
   },
   {
     id: "care",
-    label: "Care & communication",
+    label: "Appointments & documents",
     tabs: [
       { id: "appointments", label: "Appointments" },
       { id: "documents", label: "Documents" },
@@ -467,7 +473,23 @@ function ClientWorkspacePage() {
     Array<{ id: string; invoiceNumber: string | null; status: string; dueDate: string | null; total: number; currency: string }>
   >([]);
 
-  const [appointments, setAppointments] = useState<Array<{ id: string; title: string; startAt: string; status: string }>>([]);
+  const [appointments, setAppointments] = useState<
+    Array<{
+      id: string;
+      title: string;
+      startAt: string;
+      endAt?: string;
+      status: string;
+      proposedStartAt?: string | null;
+      proposedEndAt?: string | null;
+      proposedByUserId?: string | null;
+    }>
+  >([]);
+  const [appointmentBusyId, setAppointmentBusyId] = useState<string | null>(null);
+  const [counterProposeId, setCounterProposeId] = useState<string | null>(null);
+  const [counterDate, setCounterDate] = useState(toDateInputValue(new Date()));
+  const [counterStart, setCounterStart] = useState("10:00");
+  const [counterEnd, setCounterEnd] = useState("11:00");
   const [appointmentTitle, setAppointmentTitle] = useState("Consultation");
   const [startAt, setStartAt] = useState("");
   const [endAt, setEndAt] = useState("");
@@ -1517,16 +1539,140 @@ function ClientWorkspacePage() {
             {appointments.length === 0 ? (
               <EmptyState title="No appointments yet" />
             ) : (
-              <ul className="ui-client-chart__list">
-                {appointments.map((row) => (
-                  <li key={row.id}>
-                    <div>
-                      <div style={{ fontWeight: 500 }}>{row.title}</div>
-                      <div className="ui-hint">{formatDate(row.startAt)}</div>
-                    </div>
-                    <StatusBadge status={row.status} label={humanizeLabel(row.status)} />
-                  </li>
-                ))}
+              <ul className="ui-client-appt-list">
+                {appointments.map((row) => {
+                  const busy = appointmentBusyId === row.id;
+                  const pendingReschedule =
+                    row.status === "RESCHEDULE_PENDING" && row.proposedStartAt && row.proposedEndAt;
+                  const pendingCancel = row.status === "CANCELLATION_PENDING";
+                  return (
+                    <li key={row.id} className="ui-client-appt">
+                      <div className="ui-client-appt__main">
+                        <div className="ui-client-appt__title-row">
+                          <strong>{row.title}</strong>
+                          <StatusBadge status={row.status} label={humanizeLabel(row.status)} />
+                        </div>
+                        <p className="ui-client-appt__when">{formatDate(row.startAt)}</p>
+                        {pendingReschedule ? (
+                          <p className="ui-client-appt__request">
+                            Requested: {formatDate(row.proposedStartAt)}
+                            {row.proposedEndAt ? ` – ${formatDate(row.proposedEndAt)}` : ""}
+                          </p>
+                        ) : null}
+                        {pendingCancel ? (
+                          <p className="ui-client-appt__request">Patient requested cancellation</p>
+                        ) : null}
+                      </div>
+                      {pendingReschedule || pendingCancel ? (
+                        <div className="ui-client-appt__actions">
+                          {pendingReschedule ? (
+                            <>
+                              <Button
+                                type="button"
+                                size="sm"
+                                disabled={busy}
+                                onClick={() => {
+                                  setAppointmentBusyId(row.id);
+                                  void api(
+                                    `/api/v1/dietitian/${dietitianAccountId}/appointments/${row.id}/accept-reschedule`,
+                                    { method: "POST", body: JSON.stringify({}) },
+                                  )
+                                    .then(() => Promise.all([loadAppointments(), loadPortfolio()]))
+                                    .catch((err) =>
+                                      setError(errorMessage(err, "Unable to accept reschedule")),
+                                    )
+                                    .finally(() => setAppointmentBusyId(null));
+                                }}
+                              >
+                                Approve
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="secondary"
+                                disabled={busy}
+                                onClick={() => {
+                                  const start = new Date(row.proposedStartAt ?? row.startAt);
+                                  const end = new Date(row.proposedEndAt ?? row.endAt ?? row.startAt);
+                                  setCounterProposeId(row.id);
+                                  setCounterDate(toDateInputValue(start));
+                                  setCounterStart(toTimeInputValue(start));
+                                  setCounterEnd(toTimeInputValue(end));
+                                }}
+                              >
+                                Suggest another time
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                disabled={busy}
+                                onClick={() => {
+                                  setAppointmentBusyId(row.id);
+                                  void api(
+                                    `/api/v1/dietitian/${dietitianAccountId}/appointments/${row.id}/reject-reschedule`,
+                                    { method: "POST", body: JSON.stringify({}) },
+                                  )
+                                    .then(() => loadAppointments())
+                                    .catch((err) =>
+                                      setError(errorMessage(err, "Unable to decline reschedule")),
+                                    )
+                                    .finally(() => setAppointmentBusyId(null));
+                                }}
+                              >
+                                Decline
+                              </Button>
+                            </>
+                          ) : null}
+                          {pendingCancel ? (
+                            <>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="danger"
+                                disabled={busy}
+                                onClick={() => {
+                                  setAppointmentBusyId(row.id);
+                                  void api(
+                                    `/api/v1/dietitian/${dietitianAccountId}/appointments/${row.id}/accept-cancellation`,
+                                    { method: "POST", body: JSON.stringify({}) },
+                                  )
+                                    .then(() => Promise.all([loadAppointments(), loadPortfolio()]))
+                                    .catch((err) =>
+                                      setError(errorMessage(err, "Unable to approve cancellation")),
+                                    )
+                                    .finally(() => setAppointmentBusyId(null));
+                                }}
+                              >
+                                Approve cancel
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="secondary"
+                                disabled={busy}
+                                onClick={() => {
+                                  setAppointmentBusyId(row.id);
+                                  void api(
+                                    `/api/v1/dietitian/${dietitianAccountId}/appointments/${row.id}/reject-cancellation`,
+                                    { method: "POST", body: JSON.stringify({}) },
+                                  )
+                                    .then(() => loadAppointments())
+                                    .catch((err) =>
+                                      setError(errorMessage(err, "Unable to decline cancellation")),
+                                    )
+                                    .finally(() => setAppointmentBusyId(null));
+                                }}
+                              >
+                                Keep
+                              </Button>
+                            </>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </Section>
@@ -1632,6 +1778,73 @@ function ClientWorkspacePage() {
           }
         />
       ) : null}
+
+      <Dialog
+        open={!!counterProposeId}
+        title="Suggest another time"
+        onClose={() => setCounterProposeId(null)}
+      >
+        <form
+          className="ui-stack"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!counterProposeId) return;
+            setAppointmentBusyId(counterProposeId);
+            void api(
+              `/api/v1/dietitian/${dietitianAccountId}/appointments/${counterProposeId}/propose-reschedule`,
+              {
+                method: "POST",
+                body: JSON.stringify({
+                  startAt: combineLocalDateTime(counterDate, counterStart),
+                  endAt: combineLocalDateTime(counterDate, counterEnd),
+                }),
+              },
+            )
+              .then(() => {
+                setCounterProposeId(null);
+                return Promise.all([loadAppointments(), loadPortfolio()]);
+              })
+              .catch((err) => setError(errorMessage(err, "Unable to suggest another time")))
+              .finally(() => setAppointmentBusyId(null));
+          }}
+        >
+          <p className="ui-muted" style={{ margin: 0 }}>
+            Send a different time to the patient. They will need to accept it.
+          </p>
+          <Field label="Date">
+            <Input
+              type="date"
+              value={counterDate}
+              onChange={(event) => setCounterDate(event.target.value)}
+              required
+            />
+          </Field>
+          <Field label="Start">
+            <Input
+              type="time"
+              value={counterStart}
+              onChange={(event) => setCounterStart(event.target.value)}
+              required
+            />
+          </Field>
+          <Field label="End">
+            <Input
+              type="time"
+              value={counterEnd}
+              onChange={(event) => setCounterEnd(event.target.value)}
+              required
+            />
+          </Field>
+          <div className="ui-row" style={{ justifyContent: "flex-end", gap: 8 }}>
+            <Button type="button" variant="secondary" onClick={() => setCounterProposeId(null)}>
+              Back
+            </Button>
+            <Button type="submit" disabled={appointmentBusyId === counterProposeId}>
+              {appointmentBusyId === counterProposeId ? "Sending…" : "Send request"}
+            </Button>
+          </div>
+        </form>
+      </Dialog>
 
       <ConfirmDialog
         open={confirmArchive}

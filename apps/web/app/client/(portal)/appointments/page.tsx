@@ -84,11 +84,15 @@ export default function PortalAppointmentsPage() {
   }, [load]);
 
   const upcoming = (rows ?? []).filter(
-    (r) => (r.status === "SCHEDULED" || r.status === "RESCHEDULE_PENDING") && new Date(r.endAt) >= new Date(),
+    (r) =>
+      (r.status === "SCHEDULED" ||
+        r.status === "RESCHEDULE_PENDING" ||
+        r.status === "CANCELLATION_PENDING") &&
+      new Date(r.endAt) >= new Date(),
   );
   const past = (rows ?? []).filter((r) => !upcoming.includes(r));
 
-  async function cancelAppt() {
+  async function requestCancel() {
     if (!selected) return;
     setPending(true);
     setActionError(null);
@@ -100,7 +104,7 @@ export default function PortalAppointmentsPage() {
       setSelected(null);
       await load();
     } catch (err) {
-      setActionError(errorMessage(err, "Unable to cancel"));
+      setActionError(errorMessage(err, "Unable to request cancellation"));
     } finally {
       setPending(false);
     }
@@ -171,6 +175,44 @@ export default function PortalAppointmentsPage() {
     me?.user.id &&
     selected.proposedByUserId !== me.user.id;
 
+  function appointmentStatusLabel(row: AppointmentRow): string {
+    if (row.status === "CANCELLATION_PENDING") return "Cancellation requested";
+    if (row.status === "RESCHEDULE_PENDING") {
+      const fromDietitian =
+        row.proposedByUserId != null && me?.user.id != null && row.proposedByUserId !== me.user.id;
+      return fromDietitian ? "Dietitian suggested a new time" : "Waiting on dietitian";
+    }
+    return row.status.replaceAll("_", " ");
+  }
+
+  function appointmentCardMeta(row: AppointmentRow): string {
+    const category = CATEGORY_LABELS[row.category] ?? row.category;
+    const when = new Date(row.startAt).toLocaleString(undefined, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+    if (
+      row.status === "RESCHEDULE_PENDING" &&
+      row.proposedStartAt &&
+      row.proposedByUserId != null &&
+      me?.user.id != null &&
+      row.proposedByUserId !== me.user.id
+    ) {
+      const proposed = new Date(row.proposedStartAt).toLocaleString(undefined, {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      });
+      return `${category} · Suggested: ${proposed}`;
+    }
+    return `${category} · ${when}`;
+  }
+
   return (
     <section>
       <PageHeader title="Appointments" description="Upcoming visits with your dietitian." />
@@ -189,18 +231,9 @@ export default function PortalAppointmentsPage() {
                   <button type="button" className="ui-portal-appts__card" onClick={() => setSelected(row)}>
                     <div>
                       <strong>{row.title}</strong>
-                      <span className="ui-muted">
-                        {CATEGORY_LABELS[row.category] ?? row.category} ·{" "}
-                        {new Date(row.startAt).toLocaleString(undefined, {
-                          weekday: "short",
-                          month: "short",
-                          day: "numeric",
-                          hour: "numeric",
-                          minute: "2-digit",
-                        })}
-                      </span>
+                      <span className="ui-muted">{appointmentCardMeta(row)}</span>
                     </div>
-                    <StatusBadge status={row.status} />
+                    <StatusBadge status={row.status} label={appointmentStatusLabel(row)} />
                   </button>
                 </li>
               ))}
@@ -231,65 +264,117 @@ export default function PortalAppointmentsPage() {
       <Dialog open={!!selected} title={selected?.title ?? "Appointment"} onClose={() => setSelected(null)}>
         {actionError ? <Alert tone="danger">{actionError}</Alert> : null}
         {selected ? (
-          <div className="ui-stack">
-            <p style={{ margin: 0 }}>
-              <StatusBadge status={selected.status} /> · {CATEGORY_LABELS[selected.category] ?? selected.category}
-            </p>
-            <p style={{ margin: 0 }}>
-              {new Date(selected.startAt).toLocaleString()} – {formatMessageTime(selected.endAt)}
-            </p>
-            {selected.notes ? <p className="ui-muted">{selected.notes}</p> : null}
+          <div className="ui-portal-appt-detail">
+            <div className="ui-portal-appt-detail__meta">
+              <StatusBadge status={selected.status} label={appointmentStatusLabel(selected)} />
+              <span>{CATEGORY_LABELS[selected.category] ?? selected.category}</span>
+            </div>
+
+            <div className="ui-portal-appt-detail__when">
+              <span className="ui-portal-appt-detail__label">Scheduled</span>
+              <p>
+                {new Date(selected.startAt).toLocaleString()} – {formatMessageTime(selected.endAt)}
+              </p>
+            </div>
+
+            {selected.notes ? <p className="ui-muted ui-portal-appt-detail__notes">{selected.notes}</p> : null}
+
+            {selected.status === "CANCELLATION_PENDING" ? (
+              <p className="ui-portal-appt-detail__request">
+                Cancellation requested — waiting for your dietitian.
+              </p>
+            ) : null}
 
             {selected.status === "RESCHEDULE_PENDING" && selected.proposedStartAt && selected.proposedEndAt ? (
-              <div className="ui-cal-proposal">
-                <strong>Proposed new time</strong>
-                <p>
+              <div className="ui-portal-appt-detail__when">
+                <span className="ui-portal-appt-detail__label">
+                  {dietitianProposed ? "Dietitian suggested" : "You requested"}
+                </span>
+                <p className="ui-portal-appt-detail__request">
                   {new Date(selected.proposedStartAt).toLocaleString()} –{" "}
                   {formatMessageTime(selected.proposedEndAt)}
                 </p>
-                {dietitianProposed ? (
-                  <div className="ui-row" style={{ gap: 8 }}>
-                    <Button type="button" disabled={pending} onClick={() => void accept()}>
-                      Accept
-                    </Button>
-                    <Button type="button" variant="secondary" disabled={pending} onClick={() => void reject()}>
-                      Reject
-                    </Button>
-                  </div>
-                ) : (
-                  <p className="ui-muted">Waiting for your dietitian to respond.</p>
-                )}
+                {!dietitianProposed ? (
+                  <p className="ui-muted" style={{ margin: "0.35rem 0 0" }}>
+                    Waiting for your dietitian to respond.
+                  </p>
+                ) : null}
               </div>
             ) : null}
 
-            {selected.status === "SCHEDULED" || selected.status === "RESCHEDULE_PENDING" ? (
-              <div className="ui-row" style={{ justifyContent: "flex-end", gap: 8, flexWrap: "wrap" }}>
-                {selected.status === "SCHEDULED" ? (
+            <div className="ui-portal-appt-detail__actions">
+              {dietitianProposed ? (
+                <>
+                  <Button type="button" size="sm" disabled={pending} onClick={() => void accept()}>
+                    Accept
+                  </Button>
                   <Button
                     type="button"
+                    size="sm"
                     variant="secondary"
+                    disabled={pending}
                     onClick={() => {
-                      const s = new Date(selected.startAt);
+                      const s = new Date(selected.proposedStartAt ?? selected.startAt);
                       setProposeDate(toDateInputValue(s));
                       setProposeStart(toTimeInputValue(s));
-                      setProposeEnd(toTimeInputValue(new Date(selected.endAt)));
+                      setProposeEnd(
+                        toTimeInputValue(new Date(selected.proposedEndAt ?? selected.endAt)),
+                      );
                       setProposeOpen(true);
                     }}
                   >
-                    Request reschedule
+                    Suggest another time
                   </Button>
-                ) : null}
-                <Button type="button" variant="danger" disabled={pending} onClick={() => void cancelAppt()}>
-                  Cancel appointment
+                  <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={() => void reject()}>
+                    Decline
+                  </Button>
+                </>
+              ) : null}
+
+              {selected.status === "SCHEDULED" ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    const s = new Date(selected.startAt);
+                    setProposeDate(toDateInputValue(s));
+                    setProposeStart(toTimeInputValue(s));
+                    setProposeEnd(toTimeInputValue(new Date(selected.endAt)));
+                    setProposeOpen(true);
+                  }}
+                >
+                  Request reschedule
                 </Button>
-              </div>
-            ) : null}
+              ) : null}
+
+              {selected.status === "SCHEDULED" || selected.status === "RESCHEDULE_PENDING" ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  disabled={pending}
+                  onClick={() => void requestCancel()}
+                >
+                  Request cancellation
+                </Button>
+              ) : null}
+            </div>
           </div>
         ) : null}
       </Dialog>
 
-      <Dialog open={proposeOpen} title="Request new time" onClose={() => setProposeOpen(false)}>
+      <Dialog
+        open={proposeOpen}
+        title={dietitianProposed ? "Suggest another time" : "Request new time"}
+        onClose={() => setProposeOpen(false)}
+      >
         <form className="ui-stack" onSubmit={(e) => void propose(e)}>
+          <p className="ui-muted" style={{ margin: 0 }}>
+            {dietitianProposed
+              ? "Send a different time to your dietitian. They will need to accept it."
+              : "Ask your dietitian to move this appointment."}
+          </p>
           <Field label="Date">
             <Input type="date" value={proposeDate} onChange={(e) => setProposeDate(e.target.value)} required />
           </Field>

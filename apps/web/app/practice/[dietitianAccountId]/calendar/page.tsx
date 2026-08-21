@@ -78,6 +78,7 @@ function roundToHour(d: Date): Date {
 
 function appointmentStatusLabel(status: string): string {
   if (status === "RESCHEDULE_PENDING") return "Reschedule pending";
+  if (status === "CANCELLATION_PENDING") return "Cancellation pending";
   if (status === "NO_SHOW") return "No-show";
   return statusLabel(status);
 }
@@ -270,6 +271,42 @@ export default function CalendarPage() {
     }
   }
 
+  async function onAcceptCancellation() {
+    if (!selected) return;
+    setSaving(true);
+    setFormError(null);
+    try {
+      await api(
+        `/api/v1/dietitian/${dietitianAccountId}/appointments/${selected.id}/accept-cancellation`,
+        { method: "POST", body: JSON.stringify({}) },
+      );
+      closeDialog();
+      await load();
+    } catch (err) {
+      setFormError(errorMessage(err, "Unable to approve cancellation"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function onRejectCancellation() {
+    if (!selected) return;
+    setSaving(true);
+    setFormError(null);
+    try {
+      await api(
+        `/api/v1/dietitian/${dietitianAccountId}/appointments/${selected.id}/reject-cancellation`,
+        { method: "POST", body: JSON.stringify({}) },
+      );
+      closeDialog();
+      await load();
+    } catch (err) {
+      setFormError(errorMessage(err, "Unable to decline cancellation"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function onPropose() {
     if (!selected) return;
     setSaving(true);
@@ -437,6 +474,20 @@ export default function CalendarPage() {
             )}
           </div>
         ) : null}
+        {selected?.status === "CANCELLATION_PENDING" ? (
+          <div className="ui-cal-proposal">
+            <strong>Cancellation requested</strong>
+            <p className="ui-muted">The patient asked to cancel this appointment.</p>
+            <div className="ui-cal-dialog__actions">
+              <Button type="button" variant="danger" disabled={saving} onClick={() => void onAcceptCancellation()}>
+                Approve cancel
+              </Button>
+              <Button type="button" variant="secondary" disabled={saving} onClick={() => void onRejectCancellation()}>
+                Keep appointment
+              </Button>
+            </div>
+          </div>
+        ) : null}
         <form className="ui-cal-form" onSubmit={(e) => void onSave(e)}>
           {selected ? (
             <div className="ui-cal-form__meta">
@@ -460,7 +511,10 @@ export default function CalendarPage() {
                 onChange={(e) => setForm((f) => ({ ...f, clientId: e.target.value }))}
                 required
                 disabled={
-                  clients.length === 0 || (mode === "edit" && selected?.status === "RESCHEDULE_PENDING")
+                  clients.length === 0 ||
+                  (mode === "edit" &&
+                    (selected?.status === "RESCHEDULE_PENDING" ||
+                      selected?.status === "CANCELLATION_PENDING"))
                 }
               >
                 <option value="" disabled>
@@ -571,7 +625,8 @@ export default function CalendarPage() {
               <Button type="button" variant="secondary" onClick={closeDialog}>
                 Close
               </Button>
-              {selected?.status !== "RESCHEDULE_PENDING" ? (
+              {selected?.status !== "RESCHEDULE_PENDING" &&
+              selected?.status !== "CANCELLATION_PENDING" ? (
                 <Button type="submit" disabled={saving || !form.clientId}>
                   {saving ? "Saving…" : mode === "create" ? "Create appointment" : "Save changes"}
                 </Button>
