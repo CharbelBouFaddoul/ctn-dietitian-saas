@@ -35,11 +35,20 @@ export type RealtimeMessageRead = {
   lastReadAt: string;
 };
 
+export type RealtimeMessageDeleted = {
+  messageId: string;
+  conversationId: string;
+  clientId: string;
+  scope: "me" | "everyone";
+  userId?: string;
+};
+
 type Handlers = {
   onMessageCreated?: (event: RealtimeMessage) => void;
   onConversationUpdated?: (event: RealtimeConversationUpdated) => void;
   onUnreadUpdated?: (event: RealtimeUnreadUpdated) => void;
   onMessageRead?: (event: RealtimeMessageRead) => void;
+  onMessageDeleted?: (event: RealtimeMessageDeleted) => void;
   onReconnect?: () => void;
 };
 
@@ -90,6 +99,9 @@ export function useMessagingRealtime(enabled: boolean, handlers: Handlers) {
     });
     socket.on("message.read", (event: RealtimeMessageRead) => {
       handlersRef.current.onMessageRead?.(event);
+    });
+    socket.on("message.deleted", (event: RealtimeMessageDeleted) => {
+      handlersRef.current.onMessageDeleted?.(event);
     });
 
     return () => {

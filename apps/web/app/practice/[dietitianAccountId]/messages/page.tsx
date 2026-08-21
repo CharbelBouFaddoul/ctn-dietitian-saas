@@ -166,6 +166,21 @@ export default function PracticeMessagesPage() {
   const { connected, subscribe } = useMessagingRealtime(true, {
     onMessageCreated: onRealtimeMessage,
     onMessageDeleted: onRealtimeDeleted,
+    onMessageRead: (event) => {
+      if (event.clientId !== selectedClientId) return;
+      if (!me?.user.id || event.readerUserId === me.user.id) return;
+      const readAt = new Date(event.lastReadAt).getTime();
+      const myId = me.user.id;
+      window.setTimeout(() => {
+        setMessages((prev) =>
+          (prev ?? []).map((row) => {
+            if (row.senderUserId !== myId || row.deleted || !row.canDeleteForEveryone) return row;
+            if (new Date(row.createdAt).getTime() > readAt) return row;
+            return { ...row, canDeleteForEveryone: false };
+          }),
+        );
+      }, 60_000);
+    },
     onConversationUpdated: () => {
       void refreshInbox().catch(() => undefined);
     },

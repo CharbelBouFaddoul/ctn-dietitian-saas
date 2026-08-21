@@ -5,7 +5,11 @@ import { Alert, Avatar, LoadingState } from "@nutrition-saas/ui";
 import { api } from "../../../../lib/api";
 import { dayKey, formatChatDayLabel, formatMessageTime } from "../../../../lib/chat-format";
 import { errorMessage } from "../../../../lib/humanize-error";
-import { useMessagingRealtime, type RealtimeMessage } from "../../../../lib/realtime";
+import {
+  useMessagingRealtime,
+  type RealtimeMessage,
+  type RealtimeMessageDeleted,
+} from "../../../../lib/realtime";
 
 interface Conversation {
   id: string;
@@ -20,6 +24,8 @@ interface Message {
   senderUserId: string;
   body: string;
   createdAt: string;
+  deleted?: boolean;
+  canDeleteForEveryone?: boolean;
 }
 
 interface Me {
@@ -40,6 +46,16 @@ function SendIcon() {
   );
 }
 
+function MoreIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <circle cx="5" cy="12" r="2" />
+      <circle cx="12" cy="12" r="2" />
+      <circle cx="19" cy="12" r="2" />
+    </svg>
+  );
+}
+
 export default function ClientMessagesPage() {
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -48,6 +64,8 @@ export default function ClientMessagesPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [menuMessageId, setMenuMessageId] = useState<string | null>(null);
   const bubblesRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
   const clientIdRef = useRef<string | null>(null);
@@ -77,6 +95,8 @@ export default function ClientMessagesPage() {
           senderUserId: event.senderUserId,
           body: event.body,
           createdAt: event.createdAt,
+          deleted: false,
+          canDeleteForEveryone: event.senderUserId === me?.user.id,
         }),
       );
       setConversation((prev) =>
@@ -92,8 +112,42 @@ export default function ClientMessagesPage() {
     [me?.user.id],
   );
 
+  const onRealtimeDeleted = useCallback(
+    (event: RealtimeMessageDeleted) => {
+      if (clientIdRef.current && event.clientId !== clientIdRef.current) return;
+      if (event.scope === "me") {
+        setMessages((prev) => prev.filter((row) => row.id !== event.messageId));
+      } else {
+        setMessages((prev) =>
+          prev.map((row) =>
+            row.id === event.messageId
+              ? { ...row, body: "", deleted: true, canDeleteForEveryone: false }
+              : row,
+          ),
+        );
+      }
+    },
+    [],
+  );
+
   const { connected, subscribe, unsubscribe } = useMessagingRealtime(true, {
     onMessageCreated: onRealtimeMessage,
+    onMessageDeleted: onRealtimeDeleted,
+    onMessageRead: (event) => {
+      if (clientIdRef.current && event.clientId !== clientIdRef.current) return;
+      if (!me?.user.id || event.readerUserId === me.user.id) return;
+      const readAt = new Date(event.lastReadAt).getTime();
+      const myId = me.user.id;
+      window.setTimeout(() => {
+        setMessages((prev) =>
+          prev.map((row) => {
+            if (row.senderUserId !== myId || row.deleted || !row.canDeleteForEveryone) return row;
+            if (new Date(row.createdAt).getTime() > readAt) return row;
+            return { ...row, canDeleteForEveryone: false };
+          }),
+        );
+      }, 60_000);
+    },
     onUnreadUpdated: (event) => {
       if (clientIdRef.current && event.clientId !== clientIdRef.current) return;
       setConversation((prev) => (prev ? { ...prev, unreadCount: event.unreadCount } : prev));
@@ -145,6 +199,17 @@ export default function ClientMessagesPage() {
     el.scrollTop = el.scrollHeight;
   }, [messages]);
 
+  useEffect(() => {
+    if (!menuMessageId) return;
+    function onPointerDown(event: MouseEvent) {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest(".ui-wa-msg-menu")) return;
+      setMenuMessageId(null);
+    }
+    window.addEventListener("mousedown", onPointerDown);
+    return () => window.removeEventListener("mousedown", onPointerDown);
+  }, [menuMessageId]);
+
   async function send(event?: FormEvent) {
     event?.preventDefault();
     if (!body.trim()) return;
@@ -162,6 +227,34 @@ export default function ClientMessagesPage() {
       setError(errorMessage(err, "Unable to send message"));
     } finally {
       setSending(false);
+    }
+  }
+
+  async function onDelete(messageId: string, scope: "me" | "everyone") {
+    if (deleting) return;
+    setDeleting(true);
+    setError(null);
+    setMenuMessageId(null);
+    try {
+      await api(`/api/v1/portal/conversation/messages/${messageId}/delete`, {
+        method: "POST",
+        body: JSON.stringify({ scope }),
+      });
+      if (scope === "me") {
+        setMessages((prev) => prev.filter((row) => row.id !== messageId));
+      } else {
+        setMessages((prev) =>
+          prev.map((row) =>
+            row.id === messageId
+              ? { ...row, body: "", deleted: true, canDeleteForEveryone: false }
+              : row,
+          ),
+        );
+      }
+    } catch (err) {
+      setError(errorMessage(err, "Unable to delete message"));
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -213,6 +306,7 @@ export default function ClientMessagesPage() {
                   const key = dayKey(message.createdAt);
                   const showDay = key !== lastDay;
                   lastDay = key;
+                  const menuOpen = menuMessageId === message.id;
                   return (
                     <div key={message.id} className="ui-wa-msg-block">
                       {showDay ? (
@@ -221,10 +315,55 @@ export default function ClientMessagesPage() {
                         </div>
                       ) : null}
                       <div className={`ui-wa-msg-row${mine ? " is-mine" : " is-theirs"}`}>
-                        <div className={`ui-wa-bubble${mine ? " is-mine" : " is-theirs"}`}>
-                          <p>{message.body}</p>
+                        <div
+                          className={`ui-wa-bubble${mine ? " is-mine" : " is-theirs"}${
+                            message.deleted ? " is-deleted" : ""
+                          }`}
+                        >
+                          {message.deleted ? (
+                            <p className="ui-wa-bubble__deleted">This message was deleted</p>
+                          ) : (
+                            <p>{message.body}</p>
+                          )}
                           <time dateTime={message.createdAt}>{formatMessageTime(message.createdAt)}</time>
                         </div>
+                        {!message.deleted ? (
+                          <div className={`ui-wa-msg-menu${menuOpen ? " is-open" : ""}`}>
+                            <button
+                              type="button"
+                              className="ui-wa-msg-menu__trigger"
+                              aria-label="Message actions"
+                              aria-expanded={menuOpen}
+                              onClick={() =>
+                                setMenuMessageId((current) => (current === message.id ? null : message.id))
+                              }
+                            >
+                              <MoreIcon />
+                            </button>
+                            {menuOpen ? (
+                              <div className="ui-wa-msg-menu__panel" role="menu">
+                                <button
+                                  type="button"
+                                  role="menuitem"
+                                  disabled={deleting}
+                                  onClick={() => void onDelete(message.id, "me")}
+                                >
+                                  Delete for me
+                                </button>
+                                {mine && message.canDeleteForEveryone ? (
+                                  <button
+                                    type="button"
+                                    role="menuitem"
+                                    disabled={deleting}
+                                    onClick={() => void onDelete(message.id, "everyone")}
+                                  >
+                                    Delete for everyone
+                                  </button>
+                                ) : null}
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : null}
                       </div>
                     </div>
                   );
