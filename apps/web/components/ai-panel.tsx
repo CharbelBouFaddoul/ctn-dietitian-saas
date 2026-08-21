@@ -300,7 +300,7 @@ export function AiPanel({
         <Badge tone="warning">AI-generated — review before use</Badge>
         {usage !== null ? (
           <Badge tone={aiDisabled ? "danger" : "neutral"}>
-            {aiDisabled ? "AI not enabled for this practice" : usageLine}
+            {aiDisabled ? "AI not enabled for this clinic" : usageLine}
           </Badge>
         ) : null}
       </div>
@@ -321,15 +321,15 @@ export function AiPanel({
       </Field>
 
       <div className="ui-row">
-        <Button disabled={loading || aiDisabled} onClick={() => void generate()}>
+        <Button size="sm" variant="secondary" disabled={loading || aiDisabled} onClick={() => void generate()}>
           {loading ? "Generating…" : "Generate"}
         </Button>
         {result ? (
           <>
-            <Button variant="secondary" onClick={() => void navigator.clipboard.writeText(copyText)}>
+            <Button size="sm" variant="secondary" onClick={() => void navigator.clipboard.writeText(copyText)}>
               Copy all
             </Button>
-            <Button variant="ghost" onClick={() => setResult(null)}>
+            <Button size="sm" variant="ghost" onClick={() => setResult(null)}>
               Clear
             </Button>
           </>

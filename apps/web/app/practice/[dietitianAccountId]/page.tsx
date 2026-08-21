@@ -164,7 +164,10 @@ export default function PracticeDashboardPage() {
         : data?.clientLimit != null
           ? `${data.activeClients} / ${data.clientLimit}`
           : String(data?.activeClients ?? 0),
-      hint: `${data?.newClientsThisMonth ?? 0} new this month`,
+      hint:
+        data?.clientLimit != null
+          ? `Active / plan limit · ${data?.newClientsThisMonth ?? 0} new this month`
+          : `${data?.newClientsThisMonth ?? 0} new this month`,
       icon: PracticeAccents.clients,
     },
     {

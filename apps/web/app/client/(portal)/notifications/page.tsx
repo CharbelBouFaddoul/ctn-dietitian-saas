@@ -72,7 +72,7 @@ export default function ClientNotificationsPage() {
       <PageHeader
         eyebrow="Portal"
         title="Notifications"
-        description="Updates for your active practice connection."
+        description="Updates for your active clinic connection."
         actions={
           <div className="ui-notif-page__actions">
             <Link href="/client" className="ui-btn ui-btn--ghost ui-btn--sm">

@@ -67,7 +67,7 @@ const DEFAULT_SETTINGS: MarketingSiteSettings = {
   dietitianSignInLabel: "Sign in as Dietitian",
   patientSignInLabel: "Sign in as Patient",
   footerDescription:
-    "A nutrition practice platform for dietitians and the clients they care for — meal plans, tracking, messaging, and practice tools in one place.",
+    "A nutrition clinic platform for dietitians and the clients they care for — meal plans, tracking, messaging, and practice tools in one place.",
   footerGroups: [
     {
       title: "Product",
@@ -82,7 +82,7 @@ const DEFAULT_SETTINGS: MarketingSiteSettings = {
       title: "For Dietitians",
       links: [
         { href: "/auth/dietitian/login", label: "Dietitian sign in" },
-        { href: "/auth/dietitian/register", label: "Create practice account" },
+        { href: "/auth/dietitian/register", label: "Create clinic account" },
       ],
     },
     {

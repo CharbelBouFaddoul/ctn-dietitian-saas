@@ -1,16 +1,14 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
   Alert,
   Badge,
   Button,
-  Card,
   ConfirmDialog,
   EmptyState,
-  FilterBar,
   PageHeader,
   SearchInput,
   Select,
@@ -23,6 +21,7 @@ import { api } from "../../../../lib/api";
 import { errorMessage } from "../../../../lib/humanize-error";
 import { portalStatusLabel } from "../../../../lib/practice-labels";
 import { canManageClients } from "../../../../lib/practice-access";
+import { ClinicTagsManager } from "../../../../components/clinic-tags-manager";
 import { usePractice } from "../practice-shell";
 
 interface ClientRow {
@@ -77,6 +76,8 @@ export default function ClientsPage() {
   const [inviteBusy, setInviteBusy] = useState(false);
   const [confirmRevoke, setConfirmRevoke] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [joinOpen, setJoinOpen] = useState(false);
+  const [tagsOpen, setTagsOpen] = useState(false);
 
   const query = useMemo(() => {
     const params = new URLSearchParams();
@@ -118,14 +119,9 @@ export default function ClientsPage() {
     void load();
   }, [dietitianAccountId, query, allowCreate]);
 
-  function onFilter(event: FormEvent) {
-    event.preventDefault();
-    setPage(1);
-    void load();
-  }
-
   const pageCount = Math.max(1, Math.ceil((data?.total ?? 0) / 20));
   const hasFilters = Boolean(q || status || tagId);
+  const joinActive = joinCode?.status === "active" || Boolean(plainJoinCode) || Boolean(joinCode?.hint);
 
   async function generatePracticeCode() {
     setInviteBusy(true);
@@ -139,6 +135,7 @@ export default function ClientsPage() {
       }
       setJoinCode(issued);
       setPlainJoinCode(issued.code);
+      setJoinOpen(true);
     } catch (err) {
       setError(errorMessage(err, "Could not generate join code"));
     } finally {
@@ -171,90 +168,177 @@ export default function ClientsPage() {
     setTimeout(() => setCopied(false), 2000);
   }
 
+  function clearFilters() {
+    setQ("");
+    setStatus("");
+    setTagId("");
+    setPage(1);
+  }
+
   return (
-    <section>
+    <section className="ui-clients">
       <PageHeader
         title="Clients"
-        description="People appear here after they create an account and enter your practice join code."
+        description="People appear here after they create an account and enter your clinic join code."
         actions={
-          allowCreate ? (
-            <Link href={`/practice/${dietitianAccountId}/clients/new`} className="ui-btn ui-btn--secondary">
-              Add chart manually
-            </Link>
-          ) : null
+          <div className="ui-clients__header-actions">
+            {allowCreate ? (
+              <div className="ui-clients__join">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  aria-expanded={joinOpen}
+                  onClick={() => {
+                    setTagsOpen(false);
+                    setJoinOpen((open) => !open);
+                  }}
+                >
+                  {joinActive ? "Join code" : "Clinic join code"}
+                  {joinActive && joinCode?.hint ? (
+                    <span className="ui-clients__join-chip">··{joinCode.hint}</span>
+                  ) : null}
+                </Button>
+                {joinOpen ? (
+                  <div className="ui-clients__join-panel" role="dialog" aria-label="Clinic join code">
+                    <button
+                      type="button"
+                      className="ui-clients__join-close"
+                      aria-label="Close"
+                      onClick={() => setJoinOpen(false)}
+                    >
+                      ×
+                    </button>
+                    <p className="ui-clients__join-copy">
+                      Share this code so patients can connect after they sign in.
+                    </p>
+                    {plainJoinCode ? (
+                      <code className="ui-clients__join-code">{plainJoinCode}</code>
+                    ) : joinCode?.hint ? (
+                      <p className="ui-muted" style={{ margin: 0 }}>
+                        Active code ending in <strong>{joinCode.hint}</strong>
+                      </p>
+                    ) : (
+                      <p className="ui-muted" style={{ margin: 0 }}>
+                        No join code active yet.
+                      </p>
+                    )}
+                    {joinCode?.expiresAt ? (
+                      <p className="ui-clients__join-meta">
+                        {joinCode.status === "expired" ? "Expired" : "Expires"}{" "}
+                        {new Date(joinCode.expiresAt).toLocaleString()}
+                      </p>
+                    ) : null}
+                    <div className="ui-clients__join-actions">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        disabled={inviteBusy}
+                        onClick={() => void generatePracticeCode()}
+                      >
+                        {joinActive ? "Regenerate" : "Generate"}
+                      </Button>
+                      {plainJoinCode ? (
+                        <Button type="button" size="sm" variant="secondary" onClick={() => void handleCopy()}>
+                          {copied ? "Copied" : "Copy"}
+                        </Button>
+                      ) : null}
+                      {joinActive ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          disabled={inviteBusy}
+                          onClick={() => setConfirmRevoke(true)}
+                        >
+                          Revoke
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+            {allowCreate ? (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                aria-expanded={tagsOpen}
+                onClick={() => {
+                  setJoinOpen(false);
+                  setTagsOpen((open) => !open);
+                }}
+              >
+                Manage tags
+              </Button>
+            ) : null}
+            {allowCreate ? (
+              <Link href={`/practice/${dietitianAccountId}/clients/new`} className="ui-btn ui-btn--secondary ui-btn--sm">
+                Create manual client
+              </Link>
+            ) : null}
+          </div>
         }
       />
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
 
-      {allowCreate ? (
-        <Card title="Practice join code">
-          <p className="ui-muted">
-            Share this code with clients who already have an account. They enter it after signing in and appear on this
-            list automatically.
-          </p>
-
-          {plainJoinCode ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "12px 0" }}>
-              <code
-                style={{
-                  fontFamily: "monospace",
-                  fontSize: "1.5rem",
-                  letterSpacing: "0.15em",
-                  fontWeight: 700,
-                  background: "var(--color-surface-raised, #f5f5f5)",
-                  padding: "8px 20px",
-                  borderRadius: 8,
-                  border: "1px solid var(--color-border)",
-                }}
-              >
-                {plainJoinCode}
-              </code>
+      {tagsOpen && allowCreate ? (
+        <div className="ui-clients__tags-panel">
+          <div className="ui-clients__tags-panel-head">
+            <div>
+              <h2 className="ui-clients__tags-panel-title">Clinic tags</h2>
+              <p className="ui-muted" style={{ margin: 0, fontSize: "0.85rem" }}>
+                Create labels you can assign to clients. Edit or remove anytime.
+              </p>
             </div>
-          ) : joinCode?.hint ? (
-            <p className="ui-muted" style={{ margin: "12px 0" }}>
-              Active code ending in <strong>{joinCode.hint}</strong>
-            </p>
-          ) : (
-            <p className="ui-muted" style={{ margin: "12px 0" }}>
-              No join code active.
-            </p>
-          )}
-
-          {joinCode?.expiresAt ? (
-            <p className="ui-hint">
-              {joinCode.status === "expired" ? "Expired" : "Expires"}{" "}
-              {new Date(joinCode.expiresAt).toLocaleString()}
-            </p>
-          ) : null}
-
-          <div className="ui-row" style={{ marginTop: 12 }}>
-            <Button disabled={inviteBusy} onClick={() => void generatePracticeCode()}>
-              {joinCode?.status === "active" || joinCode?.status === "expired" ? "Regenerate code" : "Generate join code"}
-            </Button>
-            {plainJoinCode ? (
-              <Button variant="secondary" onClick={() => void handleCopy()}>
-                {copied ? "Copied!" : "Copy code"}
-              </Button>
-            ) : null}
-            {joinCode?.status === "active" || joinCode?.status === "expired" ? (
-              <Button variant="danger" disabled={inviteBusy} onClick={() => setConfirmRevoke(true)}>
-                Revoke
-              </Button>
-            ) : null}
+            <button
+              type="button"
+              className="ui-clients__join-close"
+              aria-label="Close"
+              onClick={() => setTagsOpen(false)}
+            >
+              ×
+            </button>
           </div>
-        </Card>
+          <ClinicTagsManager
+            dietitianAccountId={dietitianAccountId}
+            tags={tags}
+            onChange={(next) => {
+              setTags(next);
+              if (tagId && !next.some((tag) => tag.id === tagId)) {
+                setTagId("");
+                setPage(1);
+              }
+              void load();
+            }}
+          />
+        </div>
       ) : null}
 
-      <form onSubmit={onFilter} style={{ margin: "20px 0" }}>
-        <FilterBar>
+      <div className="ui-clients__toolbar">
+        <div className="ui-clients__search">
           <SearchInput
             value={q}
-            onChange={(value) => { setQ(value); setPage(1); }}
-            placeholder="Search by name or email…"
+            onChange={(value) => {
+              setQ(value);
+              setPage(1);
+            }}
+            placeholder="Search name or email…"
             aria-label="Search clients"
           />
-          <Select value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }}>
+        </div>
+        <div className="ui-clients__filters">
+          <Select
+            value={status}
+            aria-label="Status"
+            onChange={(event) => {
+              setStatus(event.target.value);
+              setPage(1);
+            }}
+          >
             <option value="">All statuses</option>
             <option value="PENDING">Pending</option>
             <option value="ACTIVE">Active</option>
@@ -262,7 +346,14 @@ export default function ClientsPage() {
             <option value="ARCHIVED">Archived</option>
           </Select>
           {tags.length > 0 ? (
-            <Select value={tagId} onChange={(event) => { setTagId(event.target.value); setPage(1); }}>
+            <Select
+              value={tagId}
+              aria-label="Tag"
+              onChange={(event) => {
+                setTagId(event.target.value);
+                setPage(1);
+              }}
+            >
               <option value="">All tags</option>
               {tags.map((tag) => (
                 <option key={tag.id} value={tag.id}>
@@ -271,24 +362,38 @@ export default function ClientsPage() {
               ))}
             </Select>
           ) : null}
-          <Button type="submit" variant="secondary" size="sm">
-            Apply
-          </Button>
-        </FilterBar>
-      </form>
+          {hasFilters ? (
+            <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>
+              Clear
+            </Button>
+          ) : null}
+        </div>
+        <p className="ui-clients__count">
+          {data ? `${data.total} client${data.total === 1 ? "" : "s"}` : "—"}
+        </p>
+      </div>
 
       {(data?.items ?? []).length === 0 ? (
         <EmptyState
           title={hasFilters ? "No clients match these filters" : "No clients yet"}
           action={
             allowCreate && !hasFilters ? (
-              <Button onClick={() => void generatePracticeCode()}>Generate a join code</Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  setJoinOpen(true);
+                  void generatePracticeCode();
+                }}
+              >
+                Generate a join code
+              </Button>
             ) : undefined
           }
         >
           {hasFilters
             ? "Try adjusting your search or clearing the filters."
-            : "Share your practice join code with clients. Manual charts are a secondary option."}
+            : "Share your clinic join code with clients. Manual charts are a secondary option."}
         </EmptyState>
       ) : (
         <Table>
@@ -299,22 +404,23 @@ export default function ClientsPage() {
               <th>Status</th>
               <th>Tags</th>
               <th>Portal</th>
+              <th style={{ width: "1%" }} />
             </tr>
           </thead>
           <tbody>
             {(data?.items ?? []).map((row) => (
               <tr key={row.id}>
                 <Td label="Name">
-                  <Link href={`/practice/${dietitianAccountId}/clients/${row.id}`} className="ui-link" style={{ fontWeight: 500 }}>
+                  <Link
+                    href={`/practice/${dietitianAccountId}/clients/${row.id}`}
+                    className="ui-link"
+                    style={{ fontWeight: 500 }}
+                  >
                     {row.displayName ?? `${row.firstName} ${row.lastName}`}
                   </Link>
                 </Td>
                 <Td label="Email">
-                  {row.email ? (
-                    <span className="ui-muted">{row.email}</span>
-                  ) : (
-                    <span className="ui-muted">—</span>
-                  )}
+                  {row.email ? <span className="ui-muted">{row.email}</span> : <span className="ui-muted">—</span>}
                 </Td>
                 <Td label="Status">
                   <StatusBadge status={row.status} label={humanizeLabel(row.status)} />
@@ -341,6 +447,14 @@ export default function ClientsPage() {
                     {portalStatusLabel(row.connectionStatus)}
                   </Link>
                 </Td>
+                <Td label="Actions">
+                  <Link
+                    href={`/practice/${dietitianAccountId}/clients/${row.id}`}
+                    className="ui-btn ui-btn--ghost ui-btn--sm"
+                  >
+                    View
+                  </Link>
+                </Td>
               </tr>
             ))}
           </tbody>
@@ -348,19 +462,16 @@ export default function ClientsPage() {
       )}
 
       {(data?.total ?? 0) > 0 ? (
-        <div
-          className="ui-row"
-          style={{ marginTop: 16, justifyContent: "space-between", alignItems: "center" }}
-        >
+        <div className="ui-clients__pager">
           <span className="ui-muted" style={{ fontSize: "0.875rem" }}>
-            Page {data?.page ?? 1} of {pageCount} &middot; {data?.total ?? 0} client{(data?.total ?? 0) !== 1 ? "s" : ""}
+            Page {data?.page ?? 1} of {pageCount}
           </span>
           <div className="ui-row">
             <Button variant="secondary" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
-              ← Previous
+              Previous
             </Button>
             <Button variant="secondary" size="sm" disabled={page >= pageCount} onClick={() => setPage(page + 1)}>
-              Next →
+              Next
             </Button>
           </div>
         </div>
@@ -371,7 +482,6 @@ export default function ClientsPage() {
         title="Revoke this join code?"
         description="People who still have the old code will not be able to join until you generate a new one."
         confirmLabel="Revoke code"
-        danger
         pending={inviteBusy}
         onConfirm={() => void revokePracticeCode()}
         onCancel={() => setConfirmRevoke(false)}

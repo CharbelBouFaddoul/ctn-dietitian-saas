@@ -150,7 +150,7 @@ export default function FoodDetailPage() {
         method: "PUT",
         body: JSON.stringify(body),
       });
-      setNotice("Practice override saved. The global food record was not changed.");
+      setNotice("Clinic override saved. The global food record was not changed.");
       await load();
     } catch (err) {
       setError(errorMessage(err, "Could not save override"));
@@ -238,9 +238,9 @@ export default function FoodDetailPage() {
         title="Macros"
         description={
           isCustom
-            ? "Practice-private custom food. Nutrients live on the food row (no FoodOverride merge)."
+            ? "Clinic-private custom food. Nutrients live on the food row (no FoodOverride merge)."
             : canOverride
-              ? "Practice overrides replace catalog macros for this food in recipes and meal plans in your practice."
+              ? "Clinic overrides replace catalog macros for this food in recipes and meal plans in your clinic."
               : "Effective values are sourced from the catalog. Staff cannot create overrides."
         }
       >
@@ -324,7 +324,7 @@ export default function FoodDetailPage() {
                       <Td label="Global catalog">{fmtVal(food.globalNutrition[item.key])}</Td>
                       <Td label="Origin">
                         {isOverridden ? (
-                          <Badge tone="accent">Practice</Badge>
+                          <Badge tone="accent">Clinic</Badge>
                         ) : (
                           <Badge tone="neutral">Catalog</Badge>
                         )}
@@ -361,7 +361,7 @@ export default function FoodDetailPage() {
             {canOverride ? (
               <div className="ui-row" style={{ marginTop: 12 }}>
                 <Button type="submit" disabled={saveBusy}>
-                  {saveBusy ? "Saving…" : "Save practice override"}
+                  {saveBusy ? "Saving…" : "Save clinic override"}
                 </Button>
                 {food.override ? (
                   <Button type="button" variant="danger" onClick={() => void resetOverride()}>

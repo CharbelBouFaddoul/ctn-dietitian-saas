@@ -79,7 +79,7 @@ export default function AnalyticsPage() {
     <section>
       <PageHeader
         title="Analytics"
-        description={`Snapshot for ${humanizeLabel(period)}. Figures reflect your practice timezone — not invented trends.`}
+        description={`Snapshot for ${humanizeLabel(period)}. Figures reflect your clinic timezone — not invented trends.`}
         actions={
           <div className="ui-row">
             <Field label="Period">

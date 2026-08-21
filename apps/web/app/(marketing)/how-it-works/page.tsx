@@ -2,18 +2,18 @@ import Link from "next/link";
 
 const STEPS = [
   {
-    title: "Create your practice",
-    body: "Register as a dietitian, verify your email, and open your practice workspace.",
-    visual: { title: "Practice account", detail: "Email verified · workspace ready" },
+    title: "Create your clinic",
+    body: "Register as a dietitian, verify your email, and open your clinic workspace.",
+    visual: { title: "Clinic account", detail: "Email verified · workspace ready" },
   },
   {
     title: "Add your clients",
-    body: "Build charts manually when needed, or wait for patients to join through your practice code.",
+    body: "Build charts manually when needed, or wait for patients to join through your clinic code.",
     visual: { title: "Client roster", detail: "Search · tags · status" },
   },
   {
     title: "Create a client join code",
-    body: "Generate a short practice code from your clients area and share it with the people you work with.",
+    body: "Generate a short clinic code from your clients area and share it with the people you work with.",
     visual: { title: "Join code", detail: "Short · secure · shareable" },
   },
   {
@@ -22,14 +22,14 @@ const STEPS = [
     visual: { title: "Patient account", detail: "Self-serve registration" },
   },
   {
-    title: "Client enters the practice code",
-    body: "After sign-in, they enter the code once. That connects their account to your practice roster.",
-    visual: { title: "Connect", detail: "Code → correct practice" },
+    title: "Client enters the clinic code",
+    body: "After sign-in, they enter the code once. That connects their account to your clinic roster.",
+    visual: { title: "Connect", detail: "Code → correct clinic" },
   },
   {
     title: "Dietitian and client are connected",
     body: "They appear on your client list. You can manage their chart, plans, messages, and documents.",
-    visual: { title: "Linked chart", detail: "Portal + practice in sync" },
+    visual: { title: "Linked chart", detail: "Portal + clinic in sync" },
   },
   {
     title: "Manage the nutrition journey together",
@@ -46,7 +46,7 @@ export default function HowItWorksPage() {
           <p className="ui-eyebrow">How it works</p>
           <h1>How dietitians and patients connect.</h1>
           <p>
-            Follow the path from opening your practice to ongoing shared care — connected by a short practice join code,
+            Follow the path from opening your clinic to ongoing shared care — connected by a short clinic join code,
             not complicated invitation links.
           </p>
         </div>
@@ -76,9 +76,9 @@ export default function HowItWorksPage() {
           </div>
 
           <div className="ui-mkt__code-visual" role="note">
-            <span>Practice join code</span>
+            <span>Clinic join code</span>
             <strong>NUTR-4821</strong>
-            <span>Example format — your live code is generated in the practice app.</span>
+            <span>Example format — your live code is generated in the clinic app.</span>
           </div>
         </div>
       </section>
@@ -93,7 +93,7 @@ export default function HowItWorksPage() {
             <article className="ui-mkt__experience ui-mkt__experience--dietitian">
               <h3>Dietitian</h3>
               <ul>
-                <li>Create and manage the practice</li>
+                <li>Create and manage the clinic</li>
                 <li>Add and organize clients</li>
                 <li>Build and publish meal plans</li>
                 <li>Review tracking and progress</li>
@@ -101,14 +101,14 @@ export default function HowItWorksPage() {
                 <li>Run appointments, tasks, invoices, and analytics</li>
               </ul>
               <Link href="/auth/dietitian/login" className="ui-link">
-                Create practice account →
+                Create clinic account →
               </Link>
             </article>
             <article className="ui-mkt__experience ui-mkt__experience--patient">
               <h3>Patient</h3>
               <ul>
                 <li>Create a personal account</li>
-                <li>Enter the practice join code</li>
+                <li>Enter the clinic join code</li>
                 <li>Connect to the correct dietitian</li>
                 <li>Access the published meal plan</li>
                 <li>Track food, water, exercise, sleep, and habits</li>

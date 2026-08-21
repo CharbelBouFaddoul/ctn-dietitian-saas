@@ -302,7 +302,7 @@ export class ClientPortfolioService {
       quickLinks: [
         { tab: "evolution", label: "Evolution" },
         { tab: "personal", label: "Personal information" },
-        { tab: "assessments", label: "Assessments" },
+        { tab: "assessments", label: "Patient evaluation" },
         { tab: "meal-plan", label: "Meal plans" },
         { tab: "tracking", label: "Tracking" },
         { tab: "appointments", label: "Appointments" },

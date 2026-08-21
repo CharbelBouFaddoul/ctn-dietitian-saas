@@ -305,7 +305,7 @@ export default function RecipeDetailPage() {
         description={
           <>
             <Badge tone={recipe.origin === "starter" ? "info" : "neutral"}>
-              {recipe.origin === "starter" ? "Starter" : "Practice"}
+              {recipe.origin === "starter" ? "Starter" : "Clinic"}
             </Badge>
             {" · "}
             Reusable meal · {recipe.servings} serving{recipe.servings !== 1 ? "s" : ""}

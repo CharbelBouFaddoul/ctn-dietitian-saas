@@ -100,7 +100,7 @@ export default function ClientJoinPage() {
       setStep("done");
       setTimeout(() => router.replace("/client"), 900);
     } catch (err) {
-      setError(errorMessage(err, "Unable to join this practice."));
+      setError(errorMessage(err, "Unable to join this clinic."));
     } finally {
       setPending(false);
     }
@@ -133,12 +133,12 @@ export default function ClientJoinPage() {
         </div>
         <h1>Join a dietitian</h1>
         <p className="ui-muted">
-          Enter the practice code they shared. You’ll confirm the practice before connecting.
+          Enter the clinic code they shared. You’ll confirm the clinic before connecting.
         </p>
 
         {step === "enter" ? (
           <form onSubmit={(event) => void onResolve(event)}>
-            <Field label="Practice code">
+            <Field label="Clinic code">
               <Input
                 className="ui-code"
                 value={code}
@@ -159,7 +159,7 @@ export default function ClientJoinPage() {
             <Alert tone="neutral">
               <strong>Dietitian:</strong> {preview.dietitianDisplayName ?? "—"}
               <br />
-              <strong>Practice:</strong> {preview.practiceName ?? "—"}
+              <strong>Clinic:</strong> {preview.practiceName ?? "—"}
             </Alert>
             <Button block disabled={pending} onClick={() => void onConfirm()}>
               {pending ? "Joining…" : "Join"}
@@ -182,7 +182,7 @@ export default function ClientJoinPage() {
         {step === "already" && preview ? (
           <div className="ui-stack" style={{ gap: 12 }}>
             <Alert tone="success">
-              You’re already connected to {preview.practiceName ?? "this practice"}
+              You’re already connected to {preview.practiceName ?? "this clinic"}
               {preview.dietitianDisplayName ? ` (${preview.dietitianDisplayName})` : ""}. Use the
               connection switcher in the portal to select it.
             </Alert>
@@ -199,7 +199,7 @@ export default function ClientJoinPage() {
                 setError(null);
               }}
             >
-              Join another practice
+              Join another clinic
             </Button>
           </div>
         ) : null}

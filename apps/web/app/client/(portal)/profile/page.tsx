@@ -60,7 +60,7 @@ export default function ClientProfilePage() {
       <PageHeader
         eyebrow="Account"
         title="Profile"
-        description="Your personal details for the active practice connection. Contact your dietitian to update clinical information."
+        description="Your personal details for the active clinic connection. Contact your dietitian to update clinical information."
       />
       {error ? <Alert tone="danger">{error}</Alert> : null}
       {loading ? <LoadingState>Loading profile…</LoadingState> : null}
@@ -79,7 +79,7 @@ export default function ClientProfilePage() {
             </div>
           </Section>
 
-          <Section title="Dietary preferences & restrictions" description="Recorded by your dietitian for this practice.">
+          <Section title="Dietary preferences & restrictions" description="Recorded by your dietitian for this clinic.">
             {row("Allergies", data.profile?.allergies)}
             {row("Intolerances", data.profile?.intolerances)}
             {row("Dietary preferences", data.profile?.dietaryPreferences)}
@@ -102,9 +102,9 @@ export default function ClientProfilePage() {
             )}
           </Section>
 
-          <Section title="Your practice" description="The dietitian practice for this connection.">
+          <Section title="Your clinic" description="The dietitian clinic for this connection.">
             <div className="ui-client-focus-row">
-              <span>Practice</span>
+              <span>Clinic</span>
               <strong>{data.practiceName?.trim() || "Connected to your dietitian"}</strong>
             </div>
           </Section>

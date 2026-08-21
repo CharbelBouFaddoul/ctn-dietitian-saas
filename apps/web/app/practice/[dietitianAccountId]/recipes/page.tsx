@@ -100,7 +100,7 @@ export default function RecipesPage() {
       <PageHeader
         eyebrow="Nutrition"
         title="Meal library"
-        description="Reusable meals from the platform Starter catalog and your practice library. Nutrition is calculated from foods automatically."
+        description="Reusable meals from the platform Starter catalog and your clinic library. Nutrition is calculated from foods automatically."
         actions={
           <Link href={`/practice/${dietitianAccountId}/recipes/new`} className="ui-btn ui-btn--primary">
             New reusable meal
@@ -187,7 +187,7 @@ export default function RecipesPage() {
                   </Td>
                   <Td label="Origin">
                     <Badge tone={row.origin === "starter" ? "info" : "neutral"}>
-                      {row.origin === "starter" ? "Starter" : "Practice"}
+                      {row.origin === "starter" ? "Starter" : "Clinic"}
                     </Badge>
                   </Td>
                   <Td label="Servings">{row.servings}</Td>

@@ -61,7 +61,7 @@ export default function AdminFeaturesPage() {
       <PageHeader
         eyebrow="Catalog"
         title="Features"
-        description="Global catalog status is separate from practice entitlement. Disabling a feature globally still denies access through entitlements."
+        description="Global catalog status is separate from clinic entitlement. Disabling a feature globally still denies access through entitlements."
         actions={
           <Link href="/admin/features/new" className="ui-btn ui-btn--primary ui-btn--sm">
             Add feature

@@ -38,12 +38,12 @@ export default function PracticeDocumentsPage() {
     <section>
       <PageHeader
         title="Documents"
-        description="Documents are stored on each client chart. Open a client to upload or share files. A practice-wide inbox is not available yet."
+        description="Documents are stored on each client chart. Open a client to upload or share files. A clinic-wide inbox is not available yet."
       />
       {error ? <Alert tone="danger">{error}</Alert> : null}
       {clients.length === 0 && !error ? (
         <EmptyState title="No client charts yet">
-          Invite clients using your practice join code, then share documents from their workspace.
+          Invite clients using your clinic join code, then share documents from their workspace.
         </EmptyState>
       ) : (
         <>

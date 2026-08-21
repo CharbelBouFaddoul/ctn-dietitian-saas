@@ -114,7 +114,7 @@ export default function TasksPage() {
     <section>
       <PageHeader
         title="Tasks"
-        description="Internal practice tasks — not visible to clients."
+        description="Internal clinic tasks — not visible to clients."
       />
       {error ? <Alert tone="danger">{error}</Alert> : null}
 

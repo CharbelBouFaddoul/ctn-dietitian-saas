@@ -36,6 +36,44 @@ export class ClientTagService {
     }
   }
 
+  async updateTag(
+    tenant: DietitianTenantContext,
+    tagId: string,
+    input: { name?: string; color?: string | null },
+  ) {
+    const existing = await this.prisma.tag.findFirst({
+      where: { id: tagId, ...tenantWhere(tenant.dietitianAccountId) },
+    });
+    if (!existing) {
+      throw new NotFoundException("Tag not found");
+    }
+    try {
+      return await this.prisma.tag.update({
+        where: { id: tagId },
+        data: {
+          ...(input.name !== undefined ? { name: input.name.trim() } : {}),
+          ...(input.color !== undefined ? { color: input.color } : {}),
+        },
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        throw new ConflictException("Tag name already exists");
+      }
+      throw error;
+    }
+  }
+
+  async deleteTag(tenant: DietitianTenantContext, tagId: string) {
+    const existing = await this.prisma.tag.findFirst({
+      where: { id: tagId, ...tenantWhere(tenant.dietitianAccountId) },
+    });
+    if (!existing) {
+      throw new NotFoundException("Tag not found");
+    }
+    await this.prisma.tag.delete({ where: { id: tagId } });
+    return { ok: true };
+  }
+
   async setClientTags(tenant: DietitianTenantContext, clientId: string, tagIds: string[]) {
     await this.access.assertCanAccess(tenant, clientId, "update");
     const tags = await this.prisma.tag.findMany({

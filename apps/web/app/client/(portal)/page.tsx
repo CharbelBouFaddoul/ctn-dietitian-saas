@@ -147,7 +147,7 @@ export default function ClientHomePage() {
 
       <Section
         title="Upcoming appointment"
-        description="Your next scheduled visit with this practice."
+        description="Your next scheduled visit with this clinic."
         actions={
           <Link href="/client" className="ui-link">
             Home
@@ -163,7 +163,7 @@ export default function ClientHomePage() {
             <p className="ui-muted">{formatDate(data.upcomingAppointment.startAt)}</p>
           </div>
         ) : (
-          <EmptyState title="No upcoming appointment">Nothing scheduled with this practice yet.</EmptyState>
+          <EmptyState title="No upcoming appointment">Nothing scheduled with this clinic yet.</EmptyState>
         )}
       </Section>
 

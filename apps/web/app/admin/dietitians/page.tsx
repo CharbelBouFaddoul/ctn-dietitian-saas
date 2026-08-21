@@ -76,7 +76,7 @@ export default function AdminDietitiansPage() {
           <Table>
             <thead>
               <tr>
-                <th>Practice</th>
+                <th>Clinic</th>
                 <th>Status</th>
                 <th>Plan</th>
                 <th>Subscription</th>
@@ -85,7 +85,7 @@ export default function AdminDietitiansPage() {
             <tbody>
               {rows.map((row) => (
                 <tr key={row.id}>
-                  <Td label="Practice">
+                  <Td label="Clinic">
                     <Link href={`/admin/dietitians/${row.id}`} className="ui-link">
                       {row.name}
                     </Link>

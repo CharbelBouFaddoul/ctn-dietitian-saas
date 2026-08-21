@@ -9,6 +9,12 @@ import { MessagingRecipientService } from "./messaging-recipient.service";
 
 const PREVIEW_MAX = 120;
 
+function previewText(value: string, max = PREVIEW_MAX): string {
+  const chars = Array.from(value);
+  if (chars.length <= max) return value;
+  return chars.slice(0, max).join("");
+}
+
 @Injectable()
 export class ConversationService {
   constructor(
@@ -58,13 +64,24 @@ export class ConversationService {
       where: { dietitianAccountId, clientId: { in: clientIds }, status: "ACTIVE" },
       orderBy: [{ lastMessageAt: "desc" }, { updatedAt: "desc" }],
       include: {
-        client: { select: { id: true, firstName: true, lastName: true, displayName: true } },
+        client: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            displayName: true,
+            email: true,
+            phone: true,
+          },
+        },
       },
     });
     return rows.map((row) => ({
       id: row.id,
       clientId: row.clientId,
       clientName: row.client.displayName ?? `${row.client.firstName} ${row.client.lastName}`,
+      clientEmail: row.client.email,
+      clientPhone: row.client.phone,
       status: row.status,
       lastMessageAt: row.lastMessageAt?.toISOString() ?? null,
       lastMessagePreview: row.lastMessagePreview,
@@ -106,7 +123,7 @@ export class ConversationService {
         data: {
           lastMessageAt: created.createdAt,
           lastMessageId: created.id,
-          lastMessagePreview: trimmed.slice(0, PREVIEW_MAX),
+          lastMessagePreview: previewText(trimmed),
         },
       });
       await tx.conversationReadState.upsert({
@@ -145,7 +162,7 @@ export class ConversationService {
           clientId: input.client.id,
           type: "NEW_MESSAGE",
           title,
-          body: trimmed.slice(0, PREVIEW_MAX),
+          body: previewText(trimmed),
           targetType: "conversation",
           targetId: input.conversation.id,
         }),

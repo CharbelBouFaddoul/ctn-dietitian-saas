@@ -61,7 +61,7 @@ export default function DietitianRegisterPage() {
 
   if (enabled === null) {
     return (
-      <AuthShell title="Create your practice account" audience="dietitian" description="Checking registration availability…">
+      <AuthShell title="Create your clinic account" audience="dietitian" description="Checking registration availability…">
         <LoadingState>Loading…</LoadingState>
       </AuthShell>
     );
@@ -72,7 +72,7 @@ export default function DietitianRegisterPage() {
       <AuthShell
         title="Registration is closed"
         audience="dietitian"
-        description="Self-serve practice registration is currently disabled. Sign in if you already have an account, or contact the platform administrator."
+        description="Self-serve clinic registration is currently disabled. Sign in if you already have an account, or contact the platform administrator."
       >
         <Link href="/auth/dietitian/login" className="ui-btn ui-btn--primary ui-btn--block">
           Sign in as Dietitian
@@ -88,9 +88,9 @@ export default function DietitianRegisterPage() {
 
   return (
     <AuthShell
-      title="Create your practice account"
+      title="Create your clinic account"
       audience="dietitian"
-      description="Start your nutrition SaaS workspace for client care, meal plans, tracking, messaging, and practice operations. We’ll send a verification email — then you can sign in and open your practice."
+      description="Start your nutrition SaaS workspace for client care, meal plans, tracking, messaging, and clinic operations. We’ll send a verification email — then you can sign in and open your clinic."
     >
       <form onSubmit={(event) => void onSubmit(event)}>
         <Field label="Email">
@@ -112,7 +112,7 @@ export default function DietitianRegisterPage() {
           />
         </Field>
         <Button type="submit" block>
-          Create practice account
+          Create clinic account
         </Button>
       </form>
       {message ? (

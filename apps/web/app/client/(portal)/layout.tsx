@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { AppShell, Button, LoadingState, type NavSection } from "@nutrition-saas/ui";
 import { ApiError, api, logout } from "../../../lib/api";
+import { useMessagingRealtime } from "../../../lib/realtime";
 import { loginPathFor, resolveSessionHome } from "../../../lib/session-home";
 import { NotificationBell } from "../../../lib/use-notifications";
 import { PatientNavIcons } from "./patient-nav-icons";
@@ -29,6 +30,29 @@ export default function ClientPortalLayout({ children }: { children: ReactNode }
   const [me, setMe] = useState<PortalMe | null>(null);
   const [connections, setConnections] = useState<PortalConnection[]>([]);
   const [switching, setSwitching] = useState(false);
+  const [unreadMessages, setUnreadMessages] = useState(0);
+
+  const refreshUnreadMessages = useCallback(async () => {
+    const conversation = await api<{ unreadCount: number }>("/api/v1/portal/conversation");
+    setUnreadMessages(conversation.unreadCount || 0);
+  }, []);
+
+  useMessagingRealtime(state === "ok", {
+    onUnreadUpdated: () => {
+      void refreshUnreadMessages().catch(() => undefined);
+    },
+    onMessageCreated: () => {
+      void refreshUnreadMessages().catch(() => undefined);
+    },
+    onReconnect: () => {
+      void refreshUnreadMessages().catch(() => undefined);
+    },
+  });
+
+  useEffect(() => {
+    if (state !== "ok") return;
+    void refreshUnreadMessages().catch(() => undefined);
+  }, [state, refreshUnreadMessages, pathname, me?.client.id]);
 
   const load = useCallback(async () => {
     const [profile, links] = await Promise.all([
@@ -114,7 +138,7 @@ export default function ClientPortalLayout({ children }: { children: ReactNode }
     {
       label: "Communication",
       items: [
-        { href: "/client/messages", label: "Messages", icon: PatientNavIcons.messages },
+        { href: "/client/messages", label: "Messages", icon: PatientNavIcons.messages, badge: unreadMessages },
         { href: "/client/appointments", label: "Appointments", icon: PatientNavIcons.appointments },
         { href: "/client/notifications", label: "Notifications", icon: PatientNavIcons.notifications },
       ],
@@ -130,7 +154,7 @@ export default function ClientPortalLayout({ children }: { children: ReactNode }
       label: "Account",
       items: [
         { href: "/client/profile", label: "Profile", icon: PatientNavIcons.profile },
-        { href: "/client/join", label: "Join another practice", icon: PatientNavIcons.profile },
+        { href: "/client/join", label: "Join another clinic", icon: PatientNavIcons.profile },
       ],
     },
   ];
@@ -154,7 +178,7 @@ export default function ClientPortalLayout({ children }: { children: ReactNode }
           />
           {connections.length > 1 ? (
             <label className="ui-field" style={{ margin: 0 }}>
-              <span style={{ fontSize: 12 }}>Active practice</span>
+              <span style={{ fontSize: 12 }}>Active clinic</span>
               <select
                 className="ui-input"
                 value={me?.client.id ?? ""}

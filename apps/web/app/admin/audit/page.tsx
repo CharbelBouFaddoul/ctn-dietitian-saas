@@ -82,7 +82,7 @@ export default function AdminAuditPage() {
                 <th>When</th>
                 <th>Action</th>
                 <th>Actor</th>
-                <th>Practice</th>
+                <th>Clinic</th>
                 <th>Result</th>
                 <th></th>
               </tr>
@@ -100,7 +100,7 @@ export default function AdminAuditPage() {
                     ) : null}
                   </Td>
                   <Td label="Actor">{row.actor?.email ?? "System"}</Td>
-                  <Td label="Practice">{row.dietitianAccount?.name ?? "—"}</Td>
+                  <Td label="Clinic">{row.dietitianAccount?.name ?? "—"}</Td>
                   <Td label="Result">
                     <StatusBadge status={row.result} label={statusLabel(row.result)} />
                   </Td>

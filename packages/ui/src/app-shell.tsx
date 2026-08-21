@@ -13,6 +13,8 @@ export interface NavItem {
   exact?: boolean;
   /** Optional section key when using flat `nav` (legacy). */
   section?: string;
+  /** Unread / notification count shown on the right of the item. */
+  badge?: number;
 }
 
 export interface NavSection {
@@ -61,7 +63,7 @@ export function AppShell({
   meta?: string;
   /** Flat nav (Admin/Patient). Still supported. */
   nav?: NavItem[];
-  /** Grouped nav (Practice). Takes precedence when provided. */
+  /** Grouped nav (Clinic). Takes precedence when provided. */
   navSections?: NavSection[];
   pathname?: string;
   footer?: ReactNode;
@@ -121,7 +123,7 @@ export function AppShell({
           <div className="ui-app__sidebar-head">
             <div className="ui-app__identity">
               <p className="ui-eyebrow">
-                {theme === "admin" ? "Platform" : theme === "practice" ? "Practice" : "My care"}
+                {theme === "admin" ? "Platform" : theme === "practice" ? "Clinic" : "My care"}
               </p>
               <p className="ui-app__brand">{brand}</p>
               {meta ? <p className="ui-app__meta">{meta}</p> : null}
@@ -149,10 +151,21 @@ export function AppShell({
                       className={cn("ui-nav-link", isCollapsed && "ui-nav-link--collapsed")}
                       data-active={active}
                       onClick={() => setOpen(false)}
-                      title={isCollapsed ? item.label : undefined}
+                      title={
+                        isCollapsed
+                          ? item.badge && item.badge > 0
+                            ? `${item.label} (${item.badge} unread)`
+                            : item.label
+                          : undefined
+                      }
                     >
                       {item.icon ? <span className="ui-nav-link__icon">{item.icon}</span> : null}
                       <span className="ui-nav-link__label">{item.label}</span>
+                      {item.badge != null && item.badge > 0 ? (
+                        <span className="ui-nav-link__badge" aria-label={`${item.badge} unread`}>
+                          {item.badge > 99 ? "99+" : item.badge}
+                        </span>
+                      ) : null}
                     </Link>
                   );
                 })}

@@ -131,7 +131,7 @@ function AddUserForm() {
       <PageHeader
         eyebrow="Platform"
         title="Add user"
-        description="Provision a dietitian practice account or a patient chart under an existing practice."
+        description="Provision a dietitian clinic account or a patient chart under an existing clinic."
         actions={
           <Link href="/admin/users" className="ui-btn ui-btn--secondary ui-btn--sm">
             Back to users
@@ -160,7 +160,7 @@ function AddUserForm() {
               <Field label="Email">
                 <Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
               </Field>
-              <Field label="Practice name">
+              <Field label="Clinic name">
                 <Input value={displayName} onChange={(event) => setDisplayName(event.target.value)} required />
               </Field>
               <Field label="First name">
@@ -215,7 +215,7 @@ function AddUserForm() {
               className="ui-stack"
               style={{ maxWidth: 480 }}
             >
-              <Field label="Dietitian practice">
+              <Field label="Dietitian clinic">
                 <DietitianSearchSelect
                   value={patientDietitianId}
                   onChange={setPatientDietitianId}

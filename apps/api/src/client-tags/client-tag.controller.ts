@@ -1,6 +1,17 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Put, UseGuards } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Put,
+  UseGuards,
+} from "@nestjs/common";
 import { ApiCookieAuth, ApiProperty, ApiPropertyOptional, ApiTags } from "@nestjs/swagger";
-import { IsArray, IsOptional, IsString, IsUUID, MaxLength, MinLength } from "class-validator";
+import { IsArray, IsOptional, IsString, IsUUID, MaxLength, MinLength, ValidateIf } from "class-validator";
 import { SessionGuard } from "../auth/guards/session.guard";
 import { CurrentTenant } from "../dietitian/decorators/current-tenant.decorator";
 import { DietitianGuard } from "../dietitian/guards/dietitian.guard";
@@ -21,6 +32,22 @@ class CreateTagDto {
   @IsString()
   @MaxLength(16)
   color?: string;
+}
+
+class UpdateTagDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(40)
+  name?: string;
+
+  @ApiPropertyOptional({ nullable: true })
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsString()
+  @MaxLength(16)
+  color?: string | null;
 }
 
 class SetClientTagsDto {
@@ -45,6 +72,23 @@ export class ClientTagController {
   @Post("tags")
   create(@CurrentTenant() tenant: DietitianTenantContext, @Body() body: CreateTagDto) {
     return this.tags.createTag(tenant, body.name, body.color);
+  }
+
+  @Patch("tags/:tagId")
+  update(
+    @CurrentTenant() tenant: DietitianTenantContext,
+    @Param("tagId", ParseUUIDPipe) tagId: string,
+    @Body() body: UpdateTagDto,
+  ) {
+    return this.tags.updateTag(tenant, tagId, body);
+  }
+
+  @Delete("tags/:tagId")
+  remove(
+    @CurrentTenant() tenant: DietitianTenantContext,
+    @Param("tagId", ParseUUIDPipe) tagId: string,
+  ) {
+    return this.tags.deleteTag(tenant, tagId);
   }
 
   @Put("clients/:clientId/tags")

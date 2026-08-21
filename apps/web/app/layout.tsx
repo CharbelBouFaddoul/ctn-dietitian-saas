@@ -12,7 +12,7 @@ const plex = IBM_Plex_Sans({
 
 export const metadata: Metadata = {
   title: "Nutrition",
-  description: "Practice management for dietitians and a simple portal for their clients.",
+  description: "Clinic management for dietitians and a simple portal for their clients.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

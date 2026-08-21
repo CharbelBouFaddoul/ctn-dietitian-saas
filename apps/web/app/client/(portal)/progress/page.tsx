@@ -65,7 +65,6 @@ export default function ClientProgressPage() {
     }
     window.addEventListener("portal-connection-changed", onSwitch);
     return () => window.removeEventListener("portal-connection-changed", onSwitch);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function selectRange(preset: RangePreset) {
@@ -204,7 +203,7 @@ export default function ClientProgressPage() {
         <LineChart
           points={weightPoints}
           unit={weightUnit}
-          emptyTitle="No weight measurements yet for this practice connection."
+          emptyTitle="No weight measurements yet for this clinic connection."
         />
         {evolution?.comparison.weight ? (
           <p className="ui-muted" style={{ marginTop: 8 }}>

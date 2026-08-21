@@ -29,7 +29,7 @@ describe("V1 acceptance — authentication & roles", () => {
       .get("/api/v1/auth/me")
       .set("Cookie", adminCookie)
       .expect(200);
-    expect(adminMe.body.user.platformRole).toBe("SUPER_ADMIN");
+    expect(adminMe.body.user.platformRole).toBe("ADMIN");
 
     const aliceCookie = await loginAs(ctx, DEMO_EMAILS.alice);
     const aliceMe = await request(ctx.app.getHttpServer())

@@ -559,7 +559,7 @@ export default function ClientTrackingPage() {
           >
             {habits.length === 0 ? (
               <p className="ui-muted" style={{ margin: 0 }}>
-                Your dietitian can assign daily habits for this practice.
+                Your dietitian can assign daily habits for this clinic.
               </p>
             ) : (
               <ul className="ui-client-habit-list">
@@ -585,7 +585,7 @@ export default function ClientTrackingPage() {
             )}
           </Section>
 
-          <Section title="Weight" description="Saved to your measurement history for this practice.">
+          <Section title="Weight" description="Saved to your measurement history for this clinic.">
             <form onSubmit={(event) => void logWeight(event)} className="ui-inline-form">
               <Field label="Weight (kg)">
                 <Input

@@ -18,11 +18,11 @@ export interface MarketingFeature {
  * Not a CMS and not an entitlement system — update here when product capabilities change.
  */
 export const MARKETING_FEATURES: MarketingFeature[] = [
-  // Dietitian — Practice & clients
+  // Dietitian — Clinic & clients
   {
     id: "d-clients",
     audience: "dietitian",
-    category: "Practice & clients",
+    category: "Clinic & clients",
     title: "Client roster & charts",
     summary: "Search, filter, and open full client charts with profile, goals, measurements, and timeline.",
     highlight: true,
@@ -30,24 +30,24 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
   {
     id: "d-assessments",
     audience: "dietitian",
-    category: "Practice & clients",
+    category: "Clinic & clients",
     title: "Assessments",
     summary: "Run structured nutrition assessments from templates inside each client chart.",
   },
   {
     id: "d-join-codes",
     audience: "dietitian",
-    category: "Practice & clients",
-    title: "Practice join codes",
-    summary: "Share a short practice code so patients create their own account and connect to your roster.",
+    category: "Clinic & clients",
+    title: "Clinic join codes",
+    summary: "Share a short clinic code so patients create their own account and connect to your roster.",
     highlight: true,
   },
   {
     id: "d-tags-assign",
     audience: "dietitian",
-    category: "Practice & clients",
+    category: "Clinic & clients",
     title: "Tags & assignments",
-    summary: "Organize clients with tags and assign them across your practice team.",
+    summary: "Organize clients with tags and assign them across your clinic team.",
   },
 
   // Meal planning
@@ -106,7 +106,7 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     audience: "dietitian",
     category: "Appointments",
     title: "Practice calendar",
-    summary: "View appointments and due tasks together on a practice calendar.",
+    summary: "View appointments and due tasks together on a clinic calendar.",
   },
 
   // Messaging
@@ -115,7 +115,7 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     audience: "dietitian",
     category: "Messaging",
     title: "Secure messaging",
-    summary: "Message clients from your practice inbox with a thread per client.",
+    summary: "Message clients from your clinic inbox with a thread per client.",
     highlight: true,
   },
 
@@ -190,7 +190,7 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     id: "d-settings",
     audience: "dietitian",
     category: "Settings",
-    title: "Practice settings",
+    title: "Clinic settings",
     summary: "Configure timezone, units, practice contact details, appointment defaults, and invoice defaults.",
   },
 
@@ -276,7 +276,7 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     audience: "patient",
     category: "Invoices",
     title: "View invoices",
-    summary: "See invoices issued by your practice (view-only; online payment is not built in).",
+    summary: "See invoices issued by your clinic (view-only; online payment is not built in).",
   },
 
   // Profile
@@ -285,7 +285,7 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     audience: "patient",
     category: "Profile",
     title: "Profile",
-    summary: "View your account name and the practice you are connected to.",
+    summary: "View your account name and the clinic you are connected to.",
   },
 
   // Join-code onboarding
@@ -293,7 +293,7 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     id: "p-join",
     audience: "patient",
     category: "Join-code onboarding",
-    title: "Join with a practice code",
+    title: "Join with a clinic code",
     summary: "Create your own account, then enter the short code from your dietitian to connect.",
     highlight: true,
   },
@@ -305,7 +305,7 @@ export interface MarketingFeatureCategory {
 }
 
 const DIETITIAN_CATEGORY_ORDER = [
-  "Practice & clients",
+  "Clinic & clients",
   "Meal planning",
   "Recipes & foods",
   "Tracking",

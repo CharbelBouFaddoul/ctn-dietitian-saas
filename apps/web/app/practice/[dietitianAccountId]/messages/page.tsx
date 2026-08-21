@@ -1,18 +1,24 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
-import { Alert, Avatar, EmptyState, LoadingState, PageHeader } from "@nutrition-saas/ui";
+import { Alert, Avatar, EmptyState, LoadingState, SearchInput } from "@nutrition-saas/ui";
 import { api } from "../../../../lib/api";
 import { dayKey, formatChatDayLabel, formatMessageTime } from "../../../../lib/chat-format";
 import { errorMessage } from "../../../../lib/humanize-error";
-import { useMessagingRealtime, type RealtimeMessage } from "../../../../lib/realtime";
+import {
+  useMessagingRealtime,
+  type RealtimeMessage,
+  type RealtimeMessageDeleted,
+} from "../../../../lib/realtime";
 
 interface InboxRow {
   id: string;
   clientId: string;
   clientName: string;
+  clientEmail?: string | null;
+  clientPhone?: string | null;
   lastMessagePreview: string | null;
   lastMessageAt: string | null;
   unreadCount: number;
@@ -24,6 +30,8 @@ interface ChatMessage {
   senderUserId: string;
   body: string;
   createdAt: string;
+  deleted?: boolean;
+  canDeleteForEveryone?: boolean;
 }
 
 interface Me {
@@ -44,10 +52,33 @@ function mergeMessage(prev: ChatMessage[], next: ChatMessage): ChatMessage[] {
   return [...prev, next];
 }
 
+function matchesInboxSearch(row: InboxRow, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  const phoneDigits = (row.clientPhone ?? "").replace(/\D/g, "");
+  const queryDigits = q.replace(/\D/g, "");
+  return (
+    row.clientName.toLowerCase().includes(q) ||
+    (row.clientEmail ?? "").toLowerCase().includes(q) ||
+    (row.clientPhone ?? "").toLowerCase().includes(q) ||
+    (queryDigits.length > 0 && phoneDigits.includes(queryDigits))
+  );
+}
+
 function SendIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
       <path d="M3.4 20.6 21 12 3.4 3.4l-.05 6.75L15 12 3.35 13.85z" />
+    </svg>
+  );
+}
+
+function MoreIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <circle cx="5" cy="12" r="2" />
+      <circle cx="12" cy="12" r="2" />
+      <circle cx="19" cy="12" r="2" />
     </svg>
   );
 }
@@ -59,12 +90,15 @@ export default function PracticeMessagesPage() {
   const preferredClientId = searchParams.get("clientId");
   const [me, setMe] = useState<Me | null>(null);
   const [rows, setRows] = useState<InboxRow[] | null>(null);
+  const [inboxQuery, setInboxQuery] = useState("");
   const [selectedClientId, setSelectedClientId] = useState<string | null>(preferredClientId);
   const [messages, setMessages] = useState<ChatMessage[] | null>(null);
   const [messageBody, setMessageBody] = useState("");
+  const [menuMessageId, setMenuMessageId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [threadError, setThreadError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const bubblesRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
 
@@ -98,6 +132,8 @@ export default function PracticeMessagesPage() {
           senderUserId: event.senderUserId,
           body: event.body,
           createdAt: event.createdAt,
+          deleted: false,
+          canDeleteForEveryone: true,
         }),
       );
       void refreshInbox().catch(() => undefined);
@@ -105,8 +141,31 @@ export default function PracticeMessagesPage() {
     [selectedClientId, refreshInbox],
   );
 
+  const onRealtimeDeleted = useCallback(
+    (event: RealtimeMessageDeleted) => {
+      if (event.clientId !== selectedClientId) {
+        void refreshInbox().catch(() => undefined);
+        return;
+      }
+      if (event.scope === "me") {
+        setMessages((prev) => (prev ?? []).filter((row) => row.id !== event.messageId));
+      } else {
+        setMessages((prev) =>
+          (prev ?? []).map((row) =>
+            row.id === event.messageId
+              ? { ...row, body: "", deleted: true, canDeleteForEveryone: false }
+              : row,
+          ),
+        );
+      }
+      void refreshInbox().catch(() => undefined);
+    },
+    [selectedClientId, refreshInbox],
+  );
+
   const { connected, subscribe } = useMessagingRealtime(true, {
     onMessageCreated: onRealtimeMessage,
+    onMessageDeleted: onRealtimeDeleted,
     onConversationUpdated: () => {
       void refreshInbox().catch(() => undefined);
     },
@@ -155,6 +214,7 @@ export default function PracticeMessagesPage() {
     }
     setMessages(null);
     setThreadError(null);
+    setMenuMessageId(null);
     void loadThread(selectedClientId).catch((err) =>
       setThreadError(errorMessage(err, "Unable to load conversation")),
     );
@@ -166,6 +226,22 @@ export default function PracticeMessagesPage() {
     if (!el || !stickToBottom.current) return;
     el.scrollTop = el.scrollHeight;
   }, [messages]);
+
+  useEffect(() => {
+    if (!menuMessageId) return;
+    function onPointerDown(event: MouseEvent) {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest?.(".ui-wa-msg-menu")) return;
+      setMenuMessageId(null);
+    }
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, [menuMessageId]);
+
+  const filteredRows = useMemo(
+    () => (rows ?? []).filter((row) => matchesInboxSearch(row, inboxQuery)),
+    [rows, inboxQuery],
+  );
 
   async function onSend(event?: FormEvent) {
     event?.preventDefault();
@@ -189,6 +265,36 @@ export default function PracticeMessagesPage() {
     }
   }
 
+  async function onDelete(messageId: string, scope: "me" | "everyone") {
+    if (!selectedClientId || deleting) return;
+    setDeleting(true);
+    setThreadError(null);
+    setMenuMessageId(null);
+    try {
+      const base = `/api/v1/dietitian/${dietitianAccountId}/clients/${selectedClientId}`;
+      await api(`${base}/conversation/messages/${messageId}/delete`, {
+        method: "POST",
+        body: JSON.stringify({ scope }),
+      });
+      if (scope === "me") {
+        setMessages((prev) => (prev ?? []).filter((row) => row.id !== messageId));
+      } else {
+        setMessages((prev) =>
+          (prev ?? []).map((row) =>
+            row.id === messageId
+              ? { ...row, body: "", deleted: true, canDeleteForEveryone: false }
+              : row,
+          ),
+        );
+      }
+      await refreshInbox();
+    } catch (err) {
+      setThreadError(errorMessage(err, "Unable to delete message"));
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   function onComposerKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
@@ -201,11 +307,7 @@ export default function PracticeMessagesPage() {
   let lastDay: string | null = null;
 
   return (
-    <section className="ui-chat-page">
-      <PageHeader
-        title="Messages"
-        description={connected ? "Live updates on" : "Reconnecting…"}
-      />
+    <section className="ui-chat-page ui-chat-page--flush">
       {error ? <Alert tone="danger">{error}</Alert> : null}
       {rows === null && !error ? (
         <LoadingState />
@@ -214,7 +316,7 @@ export default function PracticeMessagesPage() {
           Messages appear here once a client sends a message or you start a conversation from their profile.
         </EmptyState>
       ) : (
-        <div className="ui-wa-shell">
+        <div className="ui-wa-shell ui-wa-shell--fill">
           <aside className="ui-wa-inbox" aria-label="Conversations">
             <div className="ui-wa-inbox__head">
               <h2>Chats</h2>
@@ -222,32 +324,44 @@ export default function PracticeMessagesPage() {
                 {connected ? "Live" : "Offline"}
               </span>
             </div>
+            <div className="ui-wa-inbox__search">
+              <SearchInput
+                value={inboxQuery}
+                onChange={setInboxQuery}
+                placeholder="Search name, email, or phone…"
+                aria-label="Search conversations"
+              />
+            </div>
             <div className="ui-wa-inbox__list">
-              {(rows ?? []).map((row) => {
-                const name = row.clientName || "Client";
-                const active = row.clientId === selectedClientId;
-                const hasUnread = row.unreadCount > 0;
-                return (
-                  <button
-                    key={row.id}
-                    type="button"
-                    className={`ui-wa-inbox__item${active ? " is-active" : ""}${hasUnread ? " is-unread" : ""}`}
-                    onClick={() => setSelectedClientId(row.clientId)}
-                  >
-                    <Avatar name={name} />
-                    <span className="ui-wa-inbox__meta">
-                      <span className="ui-wa-inbox__top">
-                        <span className="ui-wa-inbox__name">{name}</span>
-                        <span className="ui-wa-inbox__time">{relativeTime(row.lastMessageAt)}</span>
+              {filteredRows.length === 0 ? (
+                <p className="ui-wa-inbox__empty">No chats match your search.</p>
+              ) : (
+                filteredRows.map((row) => {
+                  const name = row.clientName || "Client";
+                  const active = row.clientId === selectedClientId;
+                  const hasUnread = row.unreadCount > 0;
+                  return (
+                    <button
+                      key={row.id}
+                      type="button"
+                      className={`ui-wa-inbox__item${active ? " is-active" : ""}${hasUnread ? " is-unread" : ""}`}
+                      onClick={() => setSelectedClientId(row.clientId)}
+                    >
+                      <Avatar name={name} />
+                      <span className="ui-wa-inbox__meta">
+                        <span className="ui-wa-inbox__top">
+                          <span className="ui-wa-inbox__name">{name}</span>
+                          <span className="ui-wa-inbox__time">{relativeTime(row.lastMessageAt)}</span>
+                        </span>
+                        <span className="ui-wa-inbox__bottom">
+                          <span className="ui-wa-inbox__preview">{row.lastMessagePreview || "No messages yet"}</span>
+                          {hasUnread ? <span className="ui-wa-unread">{row.unreadCount}</span> : null}
+                        </span>
                       </span>
-                      <span className="ui-wa-inbox__bottom">
-                        <span className="ui-wa-inbox__preview">{row.lastMessagePreview || "No messages yet"}</span>
-                        {hasUnread ? <span className="ui-wa-unread">{row.unreadCount}</span> : null}
-                      </span>
-                    </span>
-                  </button>
-                );
-              })}
+                    </button>
+                  );
+                })
+              )}
             </div>
           </aside>
 
@@ -259,7 +373,7 @@ export default function PracticeMessagesPage() {
                   <div className="ui-wa-thread__identity">
                     <h2>{selected.clientName || "Client"}</h2>
                     <Link
-                      href={`/practice/${dietitianAccountId}/clients/${selected.clientId}?tab=messages`}
+                      href={`/practice/${dietitianAccountId}/clients/${selected.clientId}?tab=overview`}
                       className="ui-wa-thread__link"
                     >
                       Open client profile
@@ -295,6 +409,7 @@ export default function PracticeMessagesPage() {
                         const key = dayKey(message.createdAt);
                         const showDay = key !== lastDay;
                         lastDay = key;
+                        const menuOpen = menuMessageId === message.id;
                         return (
                           <div key={message.id} className="ui-wa-msg-block">
                             {showDay ? (
@@ -302,9 +417,56 @@ export default function PracticeMessagesPage() {
                                 <span>{formatChatDayLabel(message.createdAt)}</span>
                               </div>
                             ) : null}
-                            <div className={`ui-wa-bubble${mine ? " is-mine" : " is-theirs"}`}>
-                              <p>{message.body}</p>
-                              <time dateTime={message.createdAt}>{formatMessageTime(message.createdAt)}</time>
+                            <div className={`ui-wa-msg-row${mine ? " is-mine" : " is-theirs"}`}>
+                              <div
+                                className={`ui-wa-bubble${mine ? " is-mine" : " is-theirs"}${
+                                  message.deleted ? " is-deleted" : ""
+                                }`}
+                              >
+                                {message.deleted ? (
+                                  <p className="ui-wa-bubble__deleted">This message was deleted</p>
+                                ) : (
+                                  <p>{message.body}</p>
+                                )}
+                                <time dateTime={message.createdAt}>{formatMessageTime(message.createdAt)}</time>
+                              </div>
+                              {!message.deleted ? (
+                                <div className={`ui-wa-msg-menu${menuOpen ? " is-open" : ""}`}>
+                                  <button
+                                    type="button"
+                                    className="ui-wa-msg-menu__trigger"
+                                    aria-label="Message actions"
+                                    aria-expanded={menuOpen}
+                                    onClick={() =>
+                                      setMenuMessageId((current) => (current === message.id ? null : message.id))
+                                    }
+                                  >
+                                    <MoreIcon />
+                                  </button>
+                                  {menuOpen ? (
+                                    <div className="ui-wa-msg-menu__panel" role="menu">
+                                      <button
+                                        type="button"
+                                        role="menuitem"
+                                        disabled={deleting}
+                                        onClick={() => void onDelete(message.id, "me")}
+                                      >
+                                        Delete for me
+                                      </button>
+                                      {mine && message.canDeleteForEveryone ? (
+                                        <button
+                                          type="button"
+                                          role="menuitem"
+                                          disabled={deleting}
+                                          onClick={() => void onDelete(message.id, "everyone")}
+                                        >
+                                          Delete for everyone
+                                        </button>
+                                      ) : null}
+                                    </div>
+                                  ) : null}
+                                </div>
+                              ) : null}
                             </div>
                           </div>
                         );

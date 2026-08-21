@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import { Alert, Avatar, LoadingState, PageHeader } from "@nutrition-saas/ui";
+import { Alert, Avatar, LoadingState } from "@nutrition-saas/ui";
 import { api } from "../../../../lib/api";
 import { dayKey, formatChatDayLabel, formatMessageTime } from "../../../../lib/chat-format";
 import { errorMessage } from "../../../../lib/humanize-error";
@@ -175,16 +175,12 @@ export default function ClientMessagesPage() {
   let lastDay: string | null = null;
 
   return (
-    <section className="ui-chat-page">
-      <PageHeader
-        title="Messages"
-        description={connected ? "Chat with your dietitian — live" : "Reconnecting…"}
-      />
+    <section className="ui-chat-page ui-chat-page--flush">
       {error ? <Alert tone="danger">{error}</Alert> : null}
-      {loading ? <LoadingState>Loading conversation…</LoadingState> : null}
-
-      {!loading ? (
-        <div className="ui-wa-shell ui-wa-shell--portal">
+      {loading ? (
+        <LoadingState>Loading conversation…</LoadingState>
+      ) : (
+        <div className="ui-wa-shell ui-wa-shell--fill ui-wa-shell--portal">
           <div className="ui-wa-thread">
             <header className="ui-wa-thread__head">
               <Avatar name="Dietitian" />
@@ -224,9 +220,11 @@ export default function ClientMessagesPage() {
                           <span>{formatChatDayLabel(message.createdAt)}</span>
                         </div>
                       ) : null}
-                      <div className={`ui-wa-bubble${mine ? " is-mine" : " is-theirs"}`}>
-                        <p>{message.body}</p>
-                        <time dateTime={message.createdAt}>{formatMessageTime(message.createdAt)}</time>
+                      <div className={`ui-wa-msg-row${mine ? " is-mine" : " is-theirs"}`}>
+                        <div className={`ui-wa-bubble${mine ? " is-mine" : " is-theirs"}`}>
+                          <p>{message.body}</p>
+                          <time dateTime={message.createdAt}>{formatMessageTime(message.createdAt)}</time>
+                        </div>
                       </div>
                     </div>
                   );
@@ -254,7 +252,7 @@ export default function ClientMessagesPage() {
             </form>
           </div>
         </div>
-      ) : null}
+      )}
     </section>
   );
 }

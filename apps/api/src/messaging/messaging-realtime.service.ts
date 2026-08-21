@@ -60,7 +60,7 @@ export class MessagingRealtimeService {
       conversationId: event.conversationId,
       clientId: event.clientId,
       lastMessageAt: event.createdAt,
-      lastMessagePreview: event.body.slice(0, 120),
+      lastMessagePreview: Array.from(event.body).slice(0, 120).join(""),
     } satisfies ConversationUpdatedEvent);
   }
 

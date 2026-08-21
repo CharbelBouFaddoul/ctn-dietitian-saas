@@ -77,7 +77,7 @@ export default function PracticeAiPage() {
       <div style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
         {usage !== null ? (
           <Badge tone={usage.enabled ? "success" : "danger"}>
-            {usage.enabled ? "AI enabled" : "AI not enabled for this practice"}
+            {usage.enabled ? "AI enabled" : "AI not enabled for this clinic"}
           </Badge>
         ) : (
           <Badge tone="neutral">Checking…</Badge>
@@ -103,7 +103,7 @@ export default function PracticeAiPage() {
 
       {!aiEnabled ? (
         <Alert tone="warning">
-          AI is not currently enabled for this practice. Contact support to enable the feature.
+          AI is not currently enabled for this clinic. Contact support to enable the feature.
         </Alert>
       ) : (
         <Section tone="muted">

@@ -64,7 +64,7 @@ export function InvoiceDocument({
     <article className={["ui-facture", "ui-facture--paper", className].filter(Boolean).join(" ")} id="print-invoice">
       <header className="ui-facture__header">
         <div>
-          <h1 className="ui-facture__brand">{practice.practiceName || "Practice"}</h1>
+          <h1 className="ui-facture__brand">{practice.practiceName || "Clinic"}</h1>
           {address ? <p className="ui-facture__meta">{address}</p> : null}
           {contact ? <p className="ui-facture__meta">{contact}</p> : null}
         </div>

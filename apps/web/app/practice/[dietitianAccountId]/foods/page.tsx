@@ -112,7 +112,7 @@ export default function FoodsPage() {
     <section>
       <PageHeader
         title="Food database"
-        description="Search the global catalog and your practice custom foods. Catalog overrides never change the shared dataset."
+        description="Search the global catalog and your clinic custom foods. Catalog overrides never change the shared dataset."
         actions={
           <Link href={`/practice/${dietitianAccountId}/foods/new`} className="ui-btn ui-btn--primary ui-btn--sm">
             New custom food

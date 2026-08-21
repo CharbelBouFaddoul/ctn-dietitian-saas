@@ -1,11 +1,12 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { Alert, AppShell, Button, LoadingState, type NavSection } from "@nutrition-saas/ui";
 import { ApiError, api, logout } from "../../../lib/api";
+import { useMessagingRealtime } from "../../../lib/realtime";
 import { loginPathFor, resolveSessionHome } from "../../../lib/session-home";
 import { NotificationBell } from "../../../lib/use-notifications";
 import { PracticeNavIcons } from "./practice-nav-icons";
@@ -64,6 +65,34 @@ export function PracticeShell({ children }: { children: ReactNode }) {
   const [practice, setPractice] = useState<PracticeDetail | null>(null);
   const [access, setAccess] = useState<SubscriptionAccess | null>(null);
   const [state, setState] = useState<"loading" | "ok" | "locked" | "unauth" | "forbidden">("loading");
+  const [unreadMessages, setUnreadMessages] = useState(0);
+
+  const refreshUnreadMessages = useCallback(async () => {
+    const rows = await api<{ unreadCount: number }[]>(
+      `/api/v1/dietitian/${dietitianAccountId}/conversations`,
+    );
+    setUnreadMessages(rows.reduce((sum, row) => sum + (row.unreadCount || 0), 0));
+  }, [dietitianAccountId]);
+
+  useMessagingRealtime(state === "ok", {
+    onUnreadUpdated: () => {
+      void refreshUnreadMessages().catch(() => undefined);
+    },
+    onMessageCreated: () => {
+      void refreshUnreadMessages().catch(() => undefined);
+    },
+    onConversationUpdated: () => {
+      void refreshUnreadMessages().catch(() => undefined);
+    },
+    onReconnect: () => {
+      void refreshUnreadMessages().catch(() => undefined);
+    },
+  });
+
+  useEffect(() => {
+    if (state !== "ok") return;
+    void refreshUnreadMessages().catch(() => undefined);
+  }, [state, refreshUnreadMessages, pathname]);
 
   useEffect(() => {
     let cancelled = false;
@@ -77,7 +106,7 @@ export function PracticeShell({ children }: { children: ReactNode }) {
         if (accessData.accessState === "LOCKED") {
           setPractice({
             id: dietitianAccountId,
-            name: accessData.planName ? `${accessData.planName} practice` : "Practice",
+            name: accessData.planName ? `${accessData.planName} clinic` : "Clinic",
             status: "ACTIVE",
           });
           setState("locked");
@@ -102,7 +131,7 @@ export function PracticeShell({ children }: { children: ReactNode }) {
           setState("locked");
           setPractice({
             id: dietitianAccountId,
-            name: "Practice",
+            name: "Clinic",
             status: "ACTIVE",
           });
           return;
@@ -133,14 +162,14 @@ export function PracticeShell({ children }: { children: ReactNode }) {
   }
 
   if (state === "loading" || !practice) {
-    return <LoadingState>Loading practice…</LoadingState>;
+    return <LoadingState>Loading clinic…</LoadingState>;
   }
 
   if (state === "locked") {
     return (
       <main style={{ padding: 32, maxWidth: 560, margin: "0 auto" }}>
         <Alert tone="danger">
-          This practice is locked because the subscription has expired
+          This clinic is locked because the subscription has expired
           {access?.planName ? ` (${access.planName})` : ""}. Contact a platform administrator to renew
           access. Your data is preserved.
         </Alert>
@@ -168,9 +197,8 @@ export function PracticeShell({ children }: { children: ReactNode }) {
       label: "Patients",
       items: [
         { href: `${base}/clients`, label: "Clients", icon: PracticeNavIcons.clients },
-        { href: `${base}/calendar`, label: "Calendar", icon: PracticeNavIcons.calendar },
-        { href: `${base}/messages`, label: "Messages", icon: PracticeNavIcons.messages },
-        { href: `${base}/notifications`, label: "Notifications", icon: PracticeNavIcons.notifications },
+        { href: `${base}/documents`, label: "Documents", icon: PracticeNavIcons.documents },
+        { href: `${base}/messages`, label: "Messages", icon: PracticeNavIcons.messages, badge: unreadMessages },
       ],
     },
     {
@@ -179,14 +207,14 @@ export function PracticeShell({ children }: { children: ReactNode }) {
         { href: `${base}/meal-plans`, label: "Meal Plans", icon: PracticeNavIcons.mealPlans },
         { href: `${base}/recipes`, label: "Meal library", icon: PracticeNavIcons.recipes },
         { href: `${base}/foods`, label: "Foods", icon: PracticeNavIcons.foods },
-        { href: `${base}/habits`, label: "Habits", icon: PracticeNavIcons.tasks },
+        { href: `${base}/habits`, label: "Habit library", icon: PracticeNavIcons.tasks },
       ],
     },
     {
-      label: "Practice",
+      label: "Clinic",
       items: [
+        { href: `${base}/calendar`, label: "Calendar", icon: PracticeNavIcons.calendar },
         { href: `${base}/tasks`, label: "Tasks", icon: PracticeNavIcons.tasks },
-        { href: `${base}/documents`, label: "Documents", icon: PracticeNavIcons.documents },
         { href: `${base}/invoices`, label: "Invoices", icon: PracticeNavIcons.invoices },
       ],
     },
@@ -211,11 +239,11 @@ export function PracticeShell({ children }: { children: ReactNode }) {
         {access.daysRemainingInPhase != null
           ? ` — ${access.daysRemainingInPhase} day${access.daysRemainingInPhase === 1 ? "" : "s"} left in grace`
           : ""}
-        . Contact an administrator to renew. Practice remains fully usable during grace.
+        . Contact an administrator to renew. Clinic remains fully usable during grace.
       </Alert>
     ) : access?.accessState === "READ_ONLY" ? (
       <Alert tone="warning">
-        Practice is read-only
+        Clinic is read-only
         {access.daysRemainingInPhase != null
           ? ` — ${access.daysRemainingInPhase} day${access.daysRemainingInPhase === 1 ? "" : "s"} remaining`
           : ""}

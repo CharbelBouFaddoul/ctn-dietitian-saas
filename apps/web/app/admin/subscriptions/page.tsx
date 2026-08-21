@@ -38,7 +38,7 @@ export default function AdminSubscriptionsPage() {
       <PageHeader
         eyebrow="Commerce"
         title="Subscriptions"
-        description="One subscription per practice. Payment UI is out of scope for V1."
+        description="One subscription per clinic. Payment UI is out of scope for V1."
       />
       {error ? <Alert tone="danger">{error}</Alert> : null}
 
@@ -51,7 +51,7 @@ export default function AdminSubscriptionsPage() {
           <Table>
             <thead>
               <tr>
-                <th>Practice</th>
+                <th>Clinic</th>
                 <th>Plan</th>
                 <th>Status</th>
               </tr>
@@ -59,7 +59,7 @@ export default function AdminSubscriptionsPage() {
             <tbody>
               {rows.map((row) => (
                 <tr key={row.id}>
-                  <Td label="Practice">
+                  <Td label="Clinic">
                     <Link href={`/admin/dietitians/${row.dietitianAccount.id}`} className="ui-link">
                       {row.dietitianAccount.name}
                     </Link>

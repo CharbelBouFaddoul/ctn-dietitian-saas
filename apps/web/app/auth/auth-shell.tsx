@@ -23,7 +23,7 @@ export function AuthShell({
       title={title}
       description={description}
       audience={layoutAudience}
-      eyebrow={audience === "client" ? "Patient portal" : audience === "admin" ? "Platform" : "Practice"}
+      eyebrow={audience === "client" ? "Patient portal" : audience === "admin" ? "Platform" : "Clinic"}
       backHref="/"
       backLabel="Back to website"
       footer={<AuthFooter audience={audience} />}
@@ -78,7 +78,7 @@ function AuthFooter({ audience }: { audience: AuthAudience }) {
       </Link>
       {" · "}
       <Link href="/auth/dietitian/register" className="ui-link">
-        Create practice account
+        Create clinic account
       </Link>
       {" · "}
       <Link href="/auth/forgot-password" className="ui-link">

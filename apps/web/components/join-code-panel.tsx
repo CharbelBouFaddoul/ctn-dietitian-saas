@@ -87,22 +87,22 @@ export function JoinCodePanel({
 
       <div className="ui-client-chart__toolbar" style={{ marginTop: 12 }}>
         {allowManage && !connected ? (
-          <Button disabled={portalBusy} onClick={onGenerate}>
+          <Button size="sm" variant="secondary" disabled={portalBusy} onClick={onGenerate}>
             {waiting ? "Regenerate join code" : "Generate join code"}
           </Button>
         ) : null}
         {allowManage && plainJoinCode ? (
-          <Button variant="secondary" onClick={() => void handleCopy()}>
+          <Button size="sm" variant="secondary" onClick={() => void handleCopy()}>
             {copied ? "Copied!" : "Copy code"}
           </Button>
         ) : null}
         {allowManage && waiting && !connected ? (
-          <Button variant="danger" disabled={portalBusy} onClick={onRevoke}>
+          <Button size="sm" variant="ghost" disabled={portalBusy} onClick={onRevoke}>
             Revoke
           </Button>
         ) : null}
         {onDeactivate ? (
-          <Button variant="danger" onClick={onDeactivate}>
+          <Button size="sm" variant="ghost" onClick={onDeactivate}>
             Deactivate portal
           </Button>
         ) : null}

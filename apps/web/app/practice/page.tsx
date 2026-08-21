@@ -44,14 +44,14 @@ export default function PracticeIndexPage() {
           router.replace(`/practice/${first.id}`);
           return;
         }
-        setError("No practice account is available. Contact an administrator.");
+        setError("No clinic account is available. Contact an administrator.");
       } catch (err) {
         if (cancelled) return;
         if (err instanceof ApiError && err.status === 401) {
           router.replace(loginPathFor("dietitian"));
           return;
         }
-        setError(errorMessage(err, "Unable to load practice"));
+        setError(errorMessage(err, "Unable to load clinic"));
       }
     })();
     return () => {
@@ -67,5 +67,5 @@ export default function PracticeIndexPage() {
     );
   }
 
-  return <LoadingState>Opening your practice…</LoadingState>;
+  return <LoadingState>Opening your clinic…</LoadingState>;
 }

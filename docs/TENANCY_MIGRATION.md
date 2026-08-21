@@ -76,6 +76,13 @@ No Organization layer. No OrganizationMember. No STAFF tenancy. No `organization
 - Portal `GET /api/v1/portal/me` includes lightweight personal + dietary/lifestyle + practice name.
 - **Product Phase 6 (calendar + appointments):** extends `Appointment` with `category`, `RESCHEDULE_PENDING`, and proposal fields; practice calendar month/week/day; portal appointments under `activeClientId`; REST + notifications only (no appointment WebSockets); no Organization.
 
+## Product Phase 7 assessments (practice-scoped)
+
+- Templates require `dietitianAccountId` (platform-shared template seed is a no-op).
+- Start freezes `schemaSnapshot`; GET/validate always prefer snapshot over live template.
+- Portal fill/submit under `activeClientId` only; dietitian starts assessments (portal cannot create).
+- Timeline events: `ASSESSMENT_STARTED`, `ASSESSMENT_COMPLETED`.
+
 ## Product Phase 8–11 notes (food / recipes / meal plans / tracking)
 
 - Canonical tenant remains `dietitianAccountId`. No Organization / STAFF reintroduction.

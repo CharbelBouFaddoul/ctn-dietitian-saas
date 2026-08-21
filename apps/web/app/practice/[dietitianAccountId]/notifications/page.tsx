@@ -72,7 +72,7 @@ export default function PracticeNotificationsPage() {
   return (
     <section className="ui-notif-page">
       <PageHeader
-        eyebrow="Practice"
+        eyebrow="Clinic"
         title="Notifications"
         description="Stay on top of messages, tasks, appointments, and practice alerts."
         actions={

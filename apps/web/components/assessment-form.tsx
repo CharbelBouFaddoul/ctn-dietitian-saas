@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Button, Checkbox, Field, Input, Select, Textarea } from "@nutrition-saas/ui";
+import { Button, Checkbox, ConfirmDialog, Field, Input, Select, Textarea } from "@nutrition-saas/ui";
 
 export type AssessmentQuestionView = {
   id: string;
@@ -25,71 +25,180 @@ type Props = {
   responses: Record<string, unknown>;
   onChange: (next: Record<string, unknown>) => void;
   readOnly?: boolean;
-  onSave?: () => void;
-  onComplete?: () => void;
+  /** Preview mode: interactive look-and-feel, no save/submit actions. */
+  preview?: boolean;
+  onSave?: () => void | Promise<void>;
+  onComplete?: () => void | Promise<void>;
   saving?: boolean;
   showInactive?: boolean;
+  completedAt?: string | null;
+  submittedBanner?: boolean;
 };
+
+export function questionTypeLabel(type: string): string {
+  switch (type.toUpperCase()) {
+    case "TEXT":
+      return "Short answer";
+    case "TEXTAREA":
+      return "Long answer";
+    case "NUMBER":
+      return "Number";
+    case "BOOLEAN":
+      return "Yes / No";
+    case "SINGLE_CHOICE":
+      return "Single choice";
+    case "MULTI_CHOICE":
+      return "Multiple choice";
+    default:
+      return type;
+  }
+}
 
 export function AssessmentForm({
   schema,
   responses,
   onChange,
   readOnly = false,
+  preview = false,
   onSave,
   onComplete,
   saving = false,
   showInactive = false,
+  completedAt = null,
+  submittedBanner = false,
 }: Props) {
-  const questions = useMemo(
+  const [confirmSubmit, setConfirmSubmit] = useState(false);
+  const [savedHint, setSavedHint] = useState(false);
+
+  const sections = useMemo(
     () =>
-      schema.sections.flatMap((s) =>
-        s.questions
-          .filter((q) => showInactive || q.active !== false)
-          .map((q) => ({ ...q, sectionTitle: s.title })),
-      ),
+      schema.sections
+        .map((section) => ({
+          ...section,
+          questions: section.questions.filter((q) => showInactive || q.active !== false),
+        }))
+        .filter((section) => section.questions.length > 0),
     [schema, showInactive],
   );
 
-  const requiredMissing = questions.some(
-    (q) => q.required && q.active !== false && isEmpty(responses[q.id]),
-  );
+  const questions = useMemo(() => sections.flatMap((s) => s.questions), [sections]);
+
+  const requiredQuestions = questions.filter((q) => q.required && q.active !== false);
+  const requiredAnswered = requiredQuestions.filter((q) => !isEmpty(responses[q.id])).length;
+  const answeredCount = questions.filter((q) => !isEmpty(responses[q.id])).length;
+  const progressPct =
+    requiredQuestions.length > 0
+      ? Math.round((requiredAnswered / requiredQuestions.length) * 100)
+      : questions.length > 0
+        ? Math.round((answeredCount / questions.length) * 100)
+        : 0;
+
+  const requiredMissing = requiredQuestions.some((q) => isEmpty(responses[q.id]));
+  const interactive = !readOnly && !preview;
 
   function setValue(id: string, value: unknown) {
     onChange({ ...responses, [id]: value });
   }
 
+  async function handleSave() {
+    if (!onSave) return;
+    await onSave();
+    setSavedHint(true);
+    window.setTimeout(() => setSavedHint(false), 2500);
+  }
+
   return (
     <div className="ui-assessment-form">
-      {questions.length === 0 ? <p className="ui-muted">No active questions.</p> : null}
-      {questions.map((q) => (
-        <div key={q.id} className="ui-assessment-q">
-          <div className="ui-assessment-q__label">
-            {q.label}
-            {q.required ? " *" : ""}
-          </div>
-          {q.active === false ? <div className="ui-assessment-q__meta">Inactive</div> : null}
-          {readOnly ? (
-            <div>{formatAnswer(responses[q.id], q)}</div>
-          ) : (
-            <QuestionControl question={q} value={responses[q.id]} onChange={(v) => setValue(q.id, v)} />
-          )}
-        </div>
-      ))}
-      {!readOnly ? (
-        <div className="ui-client-chart__toolbar">
-          {onSave ? (
-            <Button type="button" variant="secondary" disabled={saving} onClick={onSave}>
-              Save draft
-            </Button>
-          ) : null}
-          {onComplete ? (
-            <Button type="button" disabled={saving || requiredMissing} onClick={onComplete}>
-              Submit
-            </Button>
+      {preview ? (
+        <p className="ui-assessment-form__preview-banner">Patient view preview — answers are not saved</p>
+      ) : null}
+
+      {submittedBanner && readOnly ? (
+        <div className="ui-assessment-form__done">
+          <strong>Evaluation submitted</strong>
+          {completedAt ? (
+            <span className="ui-muted">
+              {" "}
+              ·{" "}
+              {new Date(completedAt).toLocaleString(undefined, {
+                dateStyle: "medium",
+                timeStyle: "short",
+              })}
+            </span>
           ) : null}
         </div>
       ) : null}
+
+      {interactive && questions.length > 0 ? (
+        <div className="ui-assessment-form__progress" aria-live="polite">
+          <div className="ui-assessment-form__progress-meta">
+            <span>
+              Progress {requiredQuestions.length > 0 ? `${requiredAnswered} of ${requiredQuestions.length} required` : `${answeredCount} of ${questions.length}`}
+            </span>
+            <span>{progressPct}%</span>
+          </div>
+          <div className="ui-assessment-form__progress-track" aria-hidden="true">
+            <div className="ui-assessment-form__progress-fill" style={{ width: `${progressPct}%` }} />
+          </div>
+        </div>
+      ) : null}
+
+      {questions.length === 0 ? <p className="ui-muted">No questions yet.</p> : null}
+
+      {sections.map((section) => (
+        <section key={section.id} className="ui-assessment-form__section">
+          {section.title ? <h3 className="ui-assessment-form__section-title">{section.title}</h3> : null}
+          {section.questions.map((q, index) => (
+            <div key={q.id} className="ui-assessment-q">
+              <div className="ui-assessment-q__label">
+                <span className="ui-assessment-q__index">{index + 1}.</span> {q.label}
+                {q.required ? <span className="ui-assessment-q__required">Required</span> : null}
+              </div>
+              {q.active === false ? <div className="ui-assessment-q__meta">Inactive</div> : null}
+              {readOnly ? (
+                <div className="ui-assessment-q__answer">{formatAnswer(responses[q.id], q)}</div>
+              ) : (
+                <QuestionControl question={q} value={responses[q.id]} onChange={(v) => setValue(q.id, v)} />
+              )}
+            </div>
+          ))}
+        </section>
+      ))}
+
+      {interactive ? (
+        <div className="ui-assessment-form__actions">
+          {onSave ? (
+            <Button type="button" size="sm" variant="secondary" disabled={saving} onClick={() => void handleSave()}>
+              {saving ? "Saving…" : "Save & continue"}
+            </Button>
+          ) : null}
+          {onComplete ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              disabled={saving || requiredMissing}
+              onClick={() => setConfirmSubmit(true)}
+            >
+              Submit assessment
+            </Button>
+          ) : null}
+          {savedHint ? <span className="ui-assessment-form__saved">Progress saved</span> : null}
+        </div>
+      ) : null}
+
+      <ConfirmDialog
+        open={confirmSubmit}
+        title="Submit this evaluation?"
+        description="You will not be able to change your answers after submitting."
+        confirmLabel="Submit assessment"
+        pending={saving}
+        onConfirm={() => {
+          setConfirmSubmit(false);
+          void onComplete?.();
+        }}
+        onCancel={() => setConfirmSubmit(false)}
+      />
     </div>
   );
 }
@@ -124,11 +233,24 @@ function QuestionControl({
   }
   if (type === "BOOLEAN") {
     return (
-      <Checkbox
-        checked={Boolean(value)}
-        onChange={(e) => onChange(e.target.checked)}
-        label="Yes"
-      />
+      <div className="ui-assessment-q__bool">
+        <Button
+          type="button"
+          size="sm"
+          variant={value === true ? "primary" : "secondary"}
+          onClick={() => onChange(true)}
+        >
+          Yes
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant={value === false ? "primary" : "secondary"}
+          onClick={() => onChange(false)}
+        >
+          No
+        </Button>
+      </div>
     );
   }
   if (type === "SINGLE_CHOICE") {
@@ -176,7 +298,7 @@ function isEmpty(value: unknown): boolean {
   return false;
 }
 
-function formatAnswer(value: unknown, q: AssessmentQuestionView): string {
+export function formatAnswer(value: unknown, q: AssessmentQuestionView): string {
   if (value == null || value === "") return "—";
   if (q.type === "BOOLEAN") return value ? "Yes" : "No";
   if (q.type === "SINGLE_CHOICE") {
@@ -189,18 +311,6 @@ function formatAnswer(value: unknown, q: AssessmentQuestionView): string {
       .join(", ");
   }
   return String(value);
-}
-
-export function NewQuestionDraft() {
-  const [id] = useState(() => `q-${crypto.randomUUID().slice(0, 8)}`);
-  return {
-    id,
-    type: "TEXT" as const,
-    label: "",
-    required: false,
-    active: true,
-    options: [] as Array<{ id: string; label: string }>,
-  };
 }
 
 export function AssessmentQuestionFields({
@@ -225,13 +335,17 @@ export function AssessmentQuestionFields({
   const needsOptions = draft.type === "SINGLE_CHOICE" || draft.type === "MULTI_CHOICE";
   return (
     <div className="ui-client-chart__form-grid">
-      <Field label="Label">
-        <Input value={draft.label} onChange={(e) => onChange({ ...draft, label: e.target.value })} />
+      <Field label="Question">
+        <Input
+          value={draft.label}
+          onChange={(e) => onChange({ ...draft, label: e.target.value })}
+          placeholder="What is your main nutrition goal?"
+        />
       </Field>
-      <Field label="Type">
+      <Field label="Answer type">
         <Select value={draft.type} onChange={(e) => onChange({ ...draft, type: e.target.value })}>
-          <option value="TEXT">Text</option>
-          <option value="TEXTAREA">Long text</option>
+          <option value="TEXT">Short answer</option>
+          <option value="TEXTAREA">Long answer</option>
           <option value="NUMBER">Number</option>
           <option value="BOOLEAN">Yes / No</option>
           <option value="SINGLE_CHOICE">Single choice</option>
@@ -246,7 +360,7 @@ export function AssessmentQuestionFields({
         />
       </Field>
       {needsOptions ? (
-        <Field label="Options (comma-separated)">
+        <Field label="Choices (comma-separated)">
           <Input
             value={(draft.options ?? []).map((o) => o.label).join(", ")}
             onChange={(e) => {
@@ -262,6 +376,7 @@ export function AssessmentQuestionFields({
                 })),
               });
             }}
+            placeholder="Dairy, Nuts, Gluten"
           />
         </Field>
       ) : null}

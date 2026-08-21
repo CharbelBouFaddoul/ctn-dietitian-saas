@@ -363,7 +363,7 @@ export default function NewInvoicePage() {
           <div className="ui-facture-stage">
             <InvoiceDocument
               practice={{
-                practiceName: practice?.practiceName ?? "Your practice",
+                practiceName: practice?.practiceName ?? "Your clinic",
                 contactEmail: practice?.contactEmail,
                 contactPhone: practice?.contactPhone,
                 addressLine1: practice?.addressLine1,

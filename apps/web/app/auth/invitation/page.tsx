@@ -40,7 +40,7 @@ export default function InvitationPage() {
   if (hasToken || token) {
     return (
       <AuthShell
-        title="Activate your practice"
+        title="Activate your clinic"
         audience="dietitian"
         description="Set a password to activate the dietitian account provisioned by an administrator."
       >

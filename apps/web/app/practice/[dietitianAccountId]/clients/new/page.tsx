@@ -1,9 +1,11 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
   Alert,
+  Breadcrumbs,
   Button,
   Card,
   Field,
@@ -26,6 +28,7 @@ export default function NewClientPage() {
   const dietitianAccountId = params.dietitianAccountId;
   const router = useRouter();
   const practice = usePractice();
+  const clientsHref = `/practice/${dietitianAccountId}/clients`;
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -38,13 +41,13 @@ export default function NewClientPage() {
 
   useEffect(() => {
     if (!canManageClients(practice.role)) {
-      router.replace(`/practice/${dietitianAccountId}/clients`);
+      router.replace(clientsHref);
       return;
     }
     void api<Tag[]>(`/api/v1/dietitian/${dietitianAccountId}/tags`).then((tagRows) => {
       setTags(tagRows);
     });
-  }, [dietitianAccountId, practice.role, router]);
+  }, [dietitianAccountId, practice.role, router, clientsHref]);
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -67,7 +70,7 @@ export default function NewClientPage() {
         router.push(`/practice/${dietitianAccountId}/clients/${created.id}`);
       } catch (accessErr) {
         if (accessErr instanceof ApiError && accessErr.status === 403) {
-          router.push(`/practice/${dietitianAccountId}/clients`);
+          router.push(clientsHref);
           return;
         }
         throw accessErr;
@@ -81,10 +84,15 @@ export default function NewClientPage() {
 
   return (
     <section>
+      <Breadcrumbs items={[{ label: "Clients", href: clientsHref }, { label: "New client" }]} />
       <PageHeader
-        eyebrow="Clients"
         title="Add a client chart"
-        description="Use this for existing clients you already work with. New clients should create their own account and join using the practice code from the Clients page."
+        description="Use this for existing clients you already work with. New clients should create their own account and join using the clinic code from the Clients page."
+        actions={
+          <Link href={clientsHref} className="ui-btn ui-btn--secondary ui-btn--sm">
+            Back to clients
+          </Link>
+        }
       />
 
       {error ? (
@@ -126,9 +134,10 @@ export default function NewClientPage() {
 
           <Field label="Phone" hint="Optional">
             <Input
+              type="tel"
               value={phone}
               onChange={(event) => setPhone(event.target.value)}
-              placeholder="+1 555 000 0000"
+              placeholder="+961 71 123 456"
             />
           </Field>
 
@@ -189,10 +198,13 @@ export default function NewClientPage() {
             </Field>
           ) : null}
 
-          <div style={{ marginTop: 8 }}>
-            <Button type="submit" disabled={busy}>
+          <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 8 }}>
+            <Button type="submit" size="sm" variant="secondary" disabled={busy}>
               {busy ? "Creating…" : "Create client"}
             </Button>
+            <Link href={clientsHref} className="ui-btn ui-btn--ghost ui-btn--sm">
+              Cancel
+            </Link>
           </div>
         </form>
       </Card>

@@ -98,21 +98,21 @@ export default function PracticeSettingsPage() {
   return (
     <section>
       <PageHeader
-        title="Practice settings"
-        description="Practice details, preferences, reminders, and invoice defaults used across this clinic."
+        title="Clinic settings"
+        description="Clinic details, preferences, reminders, and invoice defaults used across this clinic."
       />
 
       <form onSubmit={(e) => void onSave(e)}>
 
-        {/* ── Practice information ─────────────────────────────────── */}
-        <Section title="Practice information" description="Name, contact details, and address shown on invoices and communications.">
+        {/* ── Clinic information ─────────────────────────────────── */}
+        <Section title="Clinic information" description="Name, contact details, and address shown on invoices and communications.">
           <div style={{ display: "grid", gap: 16 }}>
-            <Field label="Practice name">
+            <Field label="Clinic name">
               <Input value={str("practiceName")} onChange={(e) => set("practiceName", e.target.value || null)} placeholder="e.g. Green Leaf Nutrition" />
             </Field>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
               <Field label="Contact email">
-                <Input type="email" value={str("contactEmail")} onChange={(e) => set("contactEmail", e.target.value || null)} placeholder="hello@practice.com" />
+                <Input type="email" value={str("contactEmail")} onChange={(e) => set("contactEmail", e.target.value || null)} placeholder="hello@clinic.com" />
               </Field>
               <Field label="Contact phone">
                 <Input type="tel" value={str("contactPhone")} onChange={(e) => set("contactPhone", e.target.value || null)} placeholder="+1 555 000 0000" />
@@ -142,7 +142,7 @@ export default function PracticeSettingsPage() {
         </Section>
 
         {/* ── Preferences ──────────────────────────────────────────── */}
-        <Section title="Preferences" description="Units, locale, and scheduling defaults applied across the practice.">
+        <Section title="Preferences" description="Units, locale, and scheduling defaults applied across the clinic.">
           <div style={{ display: "grid", gap: 16 }}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
               <Field label="Timezone">
@@ -205,10 +205,10 @@ export default function PracticeSettingsPage() {
             </Field>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
               <Field label="Email from name">
-                <Input value={str("emailFromName")} onChange={(e) => set("emailFromName", e.target.value || null)} placeholder="Your Practice Name" />
+                <Input value={str("emailFromName")} onChange={(e) => set("emailFromName", e.target.value || null)} placeholder="Your Clinic Name" />
               </Field>
               <Field label="Reply-to email">
-                <Input type="email" value={str("emailReplyTo")} onChange={(e) => set("emailReplyTo", e.target.value || null)} placeholder="noreply@practice.com" />
+                <Input type="email" value={str("emailReplyTo")} onChange={(e) => set("emailReplyTo", e.target.value || null)} placeholder="noreply@clinic.com" />
               </Field>
             </div>
           </div>

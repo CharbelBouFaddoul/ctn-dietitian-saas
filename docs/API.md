@@ -179,12 +179,17 @@ Session + `TenantGuard`. Client-scoped routes also run `ClientAccessGuard` / `Cl
 | GET/POST | `/clients/:clientId/measurements` | Read / manageRecords | Typed rows; stored in kg/cm/%; optional `type`, `from`, `to` filters on GET |
 | GET | `/clients/:clientId/evolution` | Read | Measurement series, BMI series, baseline/current comparison, date range |
 | GET | `/clients/:clientId/timeline` | Read | Organization-scoped **and** client-access scoped |
-| GET/POST | `/tags` | Member; create not STAFF | Organization tags |
-| PUT | `/clients/:clientId/tags` | update | Replace client tags (org-scoped tag IDs only) |
-| GET/POST/PATCH | `/assessment-templates` | Member; write not STAFF | Templates; schema edits bump `version`. Question helpers: `POST …/questions`, `…/questions/reorder`, `…/questions/:id/deactivate` |
-| GET | `/assessment-templates/:templateId` | Member | Template with parsed schema contract |
-| GET/POST | `/clients/:clientId/assessments` | Read / manageRecords | Start stores `templateVersion` + `schemaSnapshot` |
-| GET/PATCH/POST complete | `/clients/:clientId/assessments/:assessmentId` | Read / manageRecords | GET returns snapshot schema; completed rows are not rewritten when templates change |
+| GET/POST | `/tags` | DietitianGuard | Clinic tag library (create) |
+| PATCH/DELETE | `/tags/:tagId` | DietitianGuard | Rename/update color or delete a clinic tag (cascade removes assignments) |
+| PUT | `/clients/:clientId/tags` | update | Replace client tags (clinic-scoped tag IDs only) |
+| GET/POST/PATCH | `/assessment-templates` | Owner (DietitianGuard) | Practice-scoped evaluation forms; schema edits bump `version`. Question helpers: `POST …/questions`, `…/questions/reorder`, `…/questions/:id/deactivate` |
+| GET | `/assessment-templates/:templateId` | Owner | Template with parsed schema contract |
+| GET/POST | `/clients/:clientId/assessments` | Read / manageRecords | Start creates `IN_PROGRESS` assessment and freezes `templateVersion` + `schemaSnapshot` |
+| GET/PATCH/POST complete | `/clients/:clientId/assessments/:assessmentId` | Read / manageRecords | GET renders from snapshot; PATCH saves draft answers; complete submits. `COMPLETED`/`ARCHIVED` cannot be rewritten |
+
+**Assessment statuses (`AssessmentStatus`):** `DRAFT` | `IN_PROGRESS` | `COMPLETED` | `ARCHIVED`. Runtime start uses `IN_PROGRESS`; portal/UI “Submitted” maps to `COMPLETED`.
+
+**Answer validation:** PATCH (save) validates types/options for present values; missing required is allowed. POST complete requires all required active questions and rejects invalid NUMBER / BOOLEAN / choice values against the **snapshot** (not the live template).
 | GET | `/appointments?from=&to=` | Member | Calendar range (UTC). Omitting range defaults to upcoming-friendly window. Includes client summary; excludes `CANCELLED` |
 | GET | `/appointments/:appointmentId` | Member | Appointment detail (incl. category + pending proposal fields) |
 | PATCH | `/appointments/:appointmentId` | manageRecords | Edit title/category/notes/times/client while `SCHEDULED`; blocked while `RESCHEDULE_PENDING` |
@@ -343,18 +348,27 @@ Statuses: `SCHEDULED`, `RESCHEDULE_PENDING`, `CANCELLED`, `COMPLETED`, `NO_SHOW`
 
 ### Assessments & evolution — portal
 
-Scoped to `Session.activeClientId` + `ClientAccount`.
+Scoped to `Session.activeClientId` + `ClientAccount`. Portal **cannot** start assessments — the dietitian starts them for the client.
 
 | Method | Path | Description |
 |---|---|---|
-| GET | `/api/v1/portal/assessments` | List assessments for the active client |
+| GET | `/api/v1/portal/assessments` | List assessments for the active client only |
 | GET | `/api/v1/portal/assessments/:assessmentId` | Detail (schema from `schemaSnapshot`) |
-| PATCH | `/api/v1/portal/assessments/:assessmentId` | Save draft responses |
-| POST | `/api/v1/portal/assessments/:assessmentId/complete` | Submit |
+| PATCH | `/api/v1/portal/assessments/:assessmentId` | Save draft responses (validated types/options) |
+| POST | `/api/v1/portal/assessments/:assessmentId/complete` | Submit → `COMPLETED` (required fields enforced) |
 | GET | `/api/v1/portal/evolution` | Measurement evolution for the active client (`?from=&to=`) |
 | POST | `/api/v1/portal/measurements` | Log weight/height/etc. for the active client |
 
-Assessment templates use a JSON schema contract (`sections[].questions[]` with types `TEXT`, `TEXTAREA`, `NUMBER`, `BOOLEAN`, `SINGLE_CHOICE`, `MULTI_CHOICE`). Deactivating a question soft-flags `active: false`. Started assessments freeze `schemaSnapshot` so historical responses stay readable after template edits.
+**Model**
+
+```text
+Template (AssessmentTemplate) = reusable evaluation form for a practice
+Assessment = client-specific instance (answers + status + timestamps)
+schemaSnapshot = frozen question definition used by that assessment
+responses = client answers (JSON object keyed by question id)
+```
+
+Assessment templates use a schema contract (`sections[].questions[]` with types `TEXT`, `TEXTAREA`, `NUMBER`, `BOOLEAN`, `SINGLE_CHOICE`, `MULTI_CHOICE`). Deactivating a question soft-flags `active: false`. Started assessments freeze `schemaSnapshot` so historical responses stay readable after template edits. Templates are **practice-scoped** (`dietitianAccountId` required); platform-shared template seeding is disabled.
 
 ### Messaging — practice (`/api/v1/dietitian/:dietitianAccountId`)
 

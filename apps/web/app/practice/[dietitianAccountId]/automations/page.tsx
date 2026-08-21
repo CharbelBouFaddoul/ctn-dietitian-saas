@@ -181,7 +181,7 @@ export default function AutomationsPage() {
     <section>
       <PageHeader
         title="Automations"
-        description="When something happens in the practice, trigger a task or reminder. You stay in control of every action."
+        description="When something happens in the clinic, trigger a task or reminder. You stay in control of every action."
         actions={
           <div className="ui-row">
             <Link href={`/practice/${dietitianAccountId}/automation-runs`} className="ui-btn ui-btn--secondary">
@@ -369,7 +369,7 @@ export default function AutomationsPage() {
               <Button onClick={() => setShowBuilder(true)}>Create your first rule</Button>
             }
           >
-            Use the rule builder to trigger tasks or reminders when something happens in the practice.
+            Use the rule builder to trigger tasks or reminders when something happens in the clinic.
           </EmptyState>
         ) : (
           <Table>

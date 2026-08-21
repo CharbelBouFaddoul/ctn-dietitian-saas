@@ -138,7 +138,7 @@ export default function AdminDietitianDetailPage() {
       <PageHeader
         eyebrow="Platform"
         title={dietitian.name}
-        description={`${dietitian.slug} · Practice ${statusLabel(dietitian.status)} · ${dietitian.subscription?.plan.name ?? "No plan"}`}
+        description={`${dietitian.slug} · Clinic ${statusLabel(dietitian.status)} · ${dietitian.subscription?.plan.name ?? "No plan"}`}
         actions={
           <Link href="/admin/dietitians" className="ui-btn ui-btn--secondary ui-btn--sm">
             Back
@@ -147,7 +147,7 @@ export default function AdminDietitianDetailPage() {
       />
       {error ? <Alert tone="danger">{error}</Alert> : null}
 
-      <Section title="Practice status" tone="mint">
+      <Section title="Clinic status" tone="mint">
         <div className="ui-row" style={{ marginBottom: 12 }}>
           <StatusBadge status={dietitian.status} label={statusLabel(dietitian.status)} />
           {dietitian.subscription ? (
@@ -247,7 +247,7 @@ export default function AdminDietitianDetailPage() {
         </div>
       </Section>
 
-      <Section title="Effective entitlements" description="Plan defaults with optional practice overrides.">
+      <Section title="Effective entitlements" description="Plan defaults with optional clinic overrides.">
         <Field label="Override reason">
           <Input value={reason} onChange={(event) => setReason(event.target.value)} />
         </Field>

@@ -149,6 +149,18 @@ Tenant-scoped queries via dietitianAccountId (tenantWhere)
 - Phase 6 client portfolio: `GET …/clients/:clientId/portfolio` composes identity, profile, latest measurements/BMI, goals, assessment, meal plan, appointment, messages, small recent timeline, and missing/alerts. Portal profile is read-only lightweight fields for the active connection.
 - Phase 7 (tenancy remount): canonical tenant key is `dietitianAccountId`. Admin manages accounts at `/api/v1/admin/dietitians`. Portal remains `ClientAccount` + `activeClientId`.
 - **Product Phase 7 (portfolio / evolution / assessments):** practice chart adds Evolution (`GET …/evolution` + SVG charts), assessment question editor + `schemaSnapshot`, portal `/assessments` + `/evolution`. Distinct from tenancy Phase 7 above.
+- **Assessments V1 hardening:** server-side answer validation on save/complete; immutable `COMPLETED` assessments; Patient Evaluation Form UX (preview, progress, submit confirm); multi-connection isolation via `activeClientId` unchanged.
+
+**Assessment concepts**
+
+```text
+AssessmentTemplate  → live reusable form (practice-owned)
+Assessment          → one client instance
+schemaSnapshot      → frozen form used to render/validate that instance
+responses           → answers keyed by question id
+```
+
+Portal lists only assessments for `Session.activeClientId`. Switching practice connection switches visible evaluations; assessments never merge across dietitians.
 - **Product Phase 8 (food + reusable meals):** curated catalog, `Food.dietitianAccountId` custom foods, Recipes as meal library. Distinct from older “Phase 8 tracking” docs.
 - **Product Phase 9 (meal plans):** editor composes meals from foods + recipes; live meal/day nutrition via existing snapshot path; portal shows published composition + macros. No new Meal catalog / migration.
 - **Product Phase 10 (patient tracking + progress):** enrich daily tracking summary (`byMeal`, water target/entries, sleep week), portal weight logging, meal-plan→food-log for FOOD items only, practice/portal UX polish. Reuses existing log models — no duplicate tables.

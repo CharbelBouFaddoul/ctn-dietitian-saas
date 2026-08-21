@@ -11,6 +11,7 @@ export default tseslint.config(
       "**/.turbo/**",
       "**/coverage/**",
       "apps/web/next-env.d.ts",
+      "apps/api/food-data/**",
     ],
   },
   eslint.configs.recommended,

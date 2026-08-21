@@ -5,15 +5,15 @@ import {
   type MarketingFeatureCategory,
 } from "../../../lib/marketing/features-catalog";
 
-const DIETITIAN_PREVIEW_KEYS = new Set(["Practice & clients", "Meal planning", "Messaging", "AI"]);
+const DIETITIAN_PREVIEW_KEYS = new Set(["Clinic & clients", "Meal planning", "Messaging", "AI"]);
 const PATIENT_PREVIEW_KEYS = new Set(["My Plan", "Tracking", "Join-code onboarding"]);
 
 function CategoryVisual({ name }: { name: string }) {
   const rows: Record<string, [string, string][]> = {
-    "Practice & clients": [
+    "Clinic & clients": [
       ["Client roster", "Search · tags"],
       ["Assessments", "Templates"],
-      ["Join codes", "Practice + reconnect"],
+      ["Join codes", "Clinic + reconnect"],
     ],
     "Meal planning": [
       ["Draft plan", "Per client"],
@@ -21,7 +21,7 @@ function CategoryVisual({ name }: { name: string }) {
       ["History", "Versioned"],
     ],
     Messaging: [
-      ["Inbox", "Practice"],
+      ["Inbox", "Clinic"],
       ["Thread", "One per client"],
     ],
     AI: [
@@ -128,9 +128,9 @@ export default function FeaturesPage() {
       <section className="ui-mkt__band ui-mkt__band--hero">
         <div className="ui-mkt__hero">
           <p className="ui-eyebrow">Features</p>
-          <h1>Capabilities for practice and portal.</h1>
+          <h1>Capabilities for clinic and portal.</h1>
           <p>
-            Everything listed here exists in the product today. Dietitian tools power the practice workspace; patient
+            Everything listed here exists in the product today. Dietitian tools power the clinic workspace; patient
             tools power the client portal.
           </p>
           <div className="ui-mkt__hero-ctas">
@@ -147,8 +147,8 @@ export default function FeaturesPage() {
       <AudienceFeatures
         anchor="dietitian"
         eyebrow="Dietitian platform"
-        title="Everything in the practice workspace."
-        description="Client charts, meal planning, tracking review, communication, billing workflows, and practice operations."
+        title="Everything in the clinic workspace."
+        description="Client charts, meal planning, tracking review, communication, billing workflows, and clinic operations."
         categories={dietitianFeatureCategories()}
         previewKeys={DIETITIAN_PREVIEW_KEYS}
         band="ui-mkt__band--warm"
@@ -167,7 +167,7 @@ export default function FeaturesPage() {
       <section className="ui-mkt__band ui-mkt__band--cta">
         <div className="ui-mkt__cta-band">
           <h2>See how the join code connects both sides.</h2>
-          <p>Patients create their own accounts. Your practice code connects them to the right chart.</p>
+          <p>Patients create their own accounts. Your clinic code connects them to the right chart.</p>
           <div className="ui-mkt__hero-ctas" style={{ justifyContent: "center" }}>
             <Link href="/how-it-works" className="ui-btn ui-btn--primary ui-btn--lg">
               How it works

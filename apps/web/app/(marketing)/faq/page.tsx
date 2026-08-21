@@ -6,11 +6,11 @@ const FAQ_CATEGORIES = [
     items: [
       {
         q: "What is this platform?",
-        a: "It is a nutrition practice SaaS for dietitians and the patients they work with. Dietitians use a practice workspace; patients use a client portal connected by a practice join code.",
+        a: "It is a nutrition clinic SaaS for dietitians and the patients they work with. Dietitians use a clinic workspace; patients use a client portal connected by a clinic join code.",
       },
       {
         q: "Who is it for?",
-        a: "Dietitians and nutrition practices who want client charts, meal plans, tracking, messaging, documents, invoices, and related practice tools in one place — and patients who need a simple portal to follow care.",
+        a: "Dietitians and nutrition clinics who want client charts, meal plans, tracking, messaging, documents, invoices, and related clinic tools in one place — and patients who need a simple portal to follow care.",
       },
       {
         q: "Is there a separate admin product on the public website?",
@@ -23,15 +23,15 @@ const FAQ_CATEGORIES = [
     items: [
       {
         q: "Can a dietitian manage multiple clients?",
-        a: "Yes. The practice workspace includes a client roster with search, filters, tags, and full client charts.",
+        a: "Yes. The clinic workspace includes a client roster with search, filters, tags, and full client charts.",
       },
       {
         q: "Can dietitians create meal plans and recipes?",
         a: "Yes. You can draft and publish meal plans per client, create recipes, and use the food database (including organization overrides).",
       },
       {
-        q: "What practice operations are included?",
-        a: "Appointments and a practice calendar, messaging, documents, invoices, tasks, analytics, and practice settings. AI assistance and automations are available on plans that include those capabilities.",
+        q: "What clinic operations are included?",
+        a: "Appointments and a clinic calendar, messaging, documents, invoices, tasks, analytics, and clinic settings. AI assistance and automations are available on plans that include those capabilities.",
       },
     ],
   },
@@ -40,7 +40,7 @@ const FAQ_CATEGORIES = [
     items: [
       {
         q: "How does a patient join a dietitian?",
-        a: "Patients create their own account, verify email, sign in, then enter the practice join code provided by their dietitian. That connects them to the correct practice roster.",
+        a: "Patients create their own account, verify email, sign in, then enter the clinic join code provided by their dietitian. That connects them to the correct clinic roster.",
       },
       {
         q: "What can patients track?",
@@ -48,7 +48,7 @@ const FAQ_CATEGORIES = [
       },
       {
         q: "Can patients see invoices?",
-        a: "Yes — invoices are viewable in the portal. Online payment is not built into the product; practices manage payment status from the practice side.",
+        a: "Yes — invoices are viewable in the portal. Online payment is not built into the product; clinics manage payment status from the clinic side.",
       },
     ],
   },
@@ -57,7 +57,7 @@ const FAQ_CATEGORIES = [
     items: [
       {
         q: "Do patients need an invitation link with a temporary password?",
-        a: "No. Patients register with their own credentials, then use a short practice join code to connect. That is the supported onboarding path.",
+        a: "No. Patients register with their own credentials, then use a short clinic join code to connect. That is the supported onboarding path.",
       },
       {
         q: "Is email verification required?",
@@ -74,11 +74,11 @@ const FAQ_CATEGORIES = [
     items: [
       {
         q: "How do meal plans reach patients?",
-        a: "Dietitians draft meal plans in the practice workspace and publish them. Patients see the published plan in My Plan on the portal.",
+        a: "Dietitians draft meal plans in the clinic workspace and publish them. Patients see the published plan in My Plan on the portal.",
       },
       {
         q: "Can dietitians review what patients log?",
-        a: "Yes. Food, water, exercise, sleep, and habit logs appear on the client chart tracking area for practice review.",
+        a: "Yes. Food, water, exercise, sleep, and habit logs appear on the client chart tracking area for clinic review.",
       },
     ],
   },
@@ -87,7 +87,7 @@ const FAQ_CATEGORIES = [
     items: [
       {
         q: "Does the platform support AI?",
-        a: "Yes, as an optional plan capability. Practice users can use AI assistance for things like client summaries, meal-plan help, nutrition assistance, consultation notes, and message drafts when the organization plan includes AI.",
+        a: "Yes, as an optional plan capability. Clinic users can use AI assistance for things like client summaries, meal-plan help, nutrition assistance, consultation notes, and message drafts when the organization plan includes AI.",
       },
       {
         q: "What do automations do?",
@@ -100,7 +100,7 @@ const FAQ_CATEGORIES = [
     items: [
       {
         q: "How do I start as a dietitian?",
-        a: "Use Get Started / Create practice account, verify your email, sign in, and open your practice workspace.",
+        a: "Use Get Started / Create clinic account, verify your email, sign in, and open your clinic workspace.",
       },
       {
         q: "How do I start as a patient?",
@@ -108,7 +108,7 @@ const FAQ_CATEGORIES = [
       },
       {
         q: "Where do I learn the full join-code flow?",
-        a: "See the How it works page for the step-by-step relationship between practice and patient.",
+        a: "See the How it works page for the step-by-step relationship between clinic and patient.",
       },
     ],
   },

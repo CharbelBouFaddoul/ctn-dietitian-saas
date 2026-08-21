@@ -14,6 +14,7 @@ import {
   EmptyState,
   Field,
   Input,
+  LoadingState,
   PageHeader,
   Section,
   Select,
@@ -29,8 +30,11 @@ import { AiPanel } from "../../../../../components/ai-panel";
 import { JoinCodePanel } from "../../../../../components/join-code-panel";
 import { ClientAssessmentsPanel } from "../../../../../components/client-assessments-panel";
 import { ClientEvolutionPanel } from "../../../../../components/client-evolution-panel";
+import { ClientTimelinePanel } from "../../../../../components/client-timeline-panel";
+import { ClientTrackingPanel } from "../../../../../components/client-tracking-panel";
+import { ClinicTagsManager } from "../../../../../components/clinic-tags-manager";
 import { api, apiUrl } from "../../../../../lib/api";
-import { formatDate, formatMoney, nutritionLabel } from "../../../../../lib/format";
+import { formatDate, formatMoney } from "../../../../../lib/format";
 import { errorMessage } from "../../../../../lib/humanize-error";
 import { canManageClients } from "../../../../../lib/practice-access";
 import { portalStatusLabel, statusLabel, activityLabel } from "../../../../../lib/practice-labels";
@@ -52,25 +56,77 @@ type Tab =
   | "ai"
   | "portal";
 
-const tabs: Array<{ id: Tab; label: string }> = [
-  { id: "overview", label: "Overview" },
-  { id: "evolution", label: "Evolution" },
-  { id: "assessments", label: "Assessments" },
-  { id: "meal-plan", label: "Meal Plans" },
-  { id: "tracking", label: "Tracking" },
-  { id: "documents", label: "Documents" },
-  { id: "messages", label: "Messages" },
-  { id: "appointments", label: "Appointments" },
-  { id: "personal", label: "Personal" },
-  { id: "goals", label: "Goals" },
-  { id: "timeline", label: "Timeline" },
-  { id: "invoices", label: "Invoices" },
-  { id: "ai", label: "AI" },
-  { id: "portal", label: "Portal" },
+type ChartSection = {
+  id: string;
+  label: string;
+  tabs: Array<{ id: Tab; label: string }>;
+};
+
+const chartSections: ChartSection[] = [
+  {
+    id: "overview",
+    label: "Overview",
+    tabs: [{ id: "overview", label: "Summary" }],
+  },
+  {
+    id: "personal",
+    label: "Personal data",
+    tabs: [
+      { id: "personal", label: "Profile" },
+      { id: "goals", label: "Goals" },
+    ],
+  },
+  {
+    id: "evaluation",
+    label: "Evaluation",
+    tabs: [{ id: "assessments", label: "Patient evaluation" }],
+  },
+  {
+    id: "progress",
+    label: "Progress & tracking",
+    tabs: [
+      { id: "evolution", label: "Evolution" },
+      { id: "tracking", label: "Tracking" },
+      { id: "timeline", label: "Timeline" },
+    ],
+  },
+  {
+    id: "nutrition",
+    label: "Nutrition",
+    tabs: [{ id: "meal-plan", label: "Meal plans" }],
+  },
+  {
+    id: "care",
+    label: "Care & communication",
+    tabs: [
+      { id: "appointments", label: "Appointments" },
+      { id: "documents", label: "Documents" },
+      { id: "messages", label: "Messages" },
+    ],
+  },
+  {
+    id: "portal",
+    label: "Portal",
+    tabs: [{ id: "portal", label: "Connection" }],
+  },
+  {
+    id: "practice",
+    label: "Clinic tools",
+    tabs: [
+      { id: "invoices", label: "Invoices" },
+      { id: "ai", label: "AI" },
+    ],
+  },
 ];
+
+const tabs = chartSections.flatMap((section) => section.tabs);
 
 function isTab(value: string | null): value is Tab {
   return tabs.some((item) => item.id === value);
+}
+
+function sectionForTab(tab: Tab): ChartSection {
+  return chartSections.find((section) => section.tabs.some((item) => item.id === tab)) ?? chartSections[0]!;
 }
 
 type Portfolio = {
@@ -389,8 +445,6 @@ function ClientWorkspacePage() {
     const next = new Date(Date.UTC(parts[0] ?? 0, (parts[1] ?? 1) - 1, (parts[2] ?? 1) + days));
     setTrackingDate(next.toISOString().slice(0, 10));
   }
-  const [chatMessages, setChatMessages] = useState<Array<{ id: string; body: string; createdAt: string }>>([]);
-  const [messageBody, setMessageBody] = useState("");
 
   const [clientDocuments, setClientDocuments] = useState<Array<{ id: string; filename: string; visibility: string }>>([]);
   const [clientInvoices, setClientInvoices] = useState<
@@ -417,11 +471,41 @@ function ClientWorkspacePage() {
   const [confirmRevoke, setConfirmRevoke] = useState(false);
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
 
-  function selectTab(next: string) {
+  function selectTab(next: string, extras?: { metric?: string }) {
     const value = isTab(next) ? next : "overview";
+    if (value === "messages") {
+      router.push(`/practice/${dietitianAccountId}/messages?clientId=${clientId}`);
+      return;
+    }
     setTab(value);
-    router.replace(`/practice/${dietitianAccountId}/clients/${clientId}?tab=${value}`, { scroll: false });
+    const params = new URLSearchParams();
+    params.set("tab", value);
+    if (value === "evolution" && extras?.metric) {
+      params.set("metric", extras.metric);
+    }
+    router.replace(`/practice/${dietitianAccountId}/clients/${clientId}?${params.toString()}`, { scroll: false });
   }
+
+  function openEvolution(metric: "WEIGHT" | "HEIGHT" | "BMI") {
+    selectTab("evolution", { metric });
+  }
+
+  function selectSection(sectionId: string) {
+    const section = chartSections.find((item) => item.id === sectionId) ?? chartSections[0]!;
+    const current = sectionForTab(tab);
+    if (current.id === section.id) return;
+    const firstTab = section.tabs[0];
+    if (firstTab) selectTab(firstTab.id);
+  }
+
+  const activeSection = sectionForTab(tab);
+  const activeSubTab = activeSection.tabs.find((item) => item.id === tab) ?? activeSection.tabs[0];
+
+  useEffect(() => {
+    if (tab === "messages") {
+      router.replace(`/practice/${dietitianAccountId}/messages?clientId=${clientId}`);
+    }
+  }, [tab, dietitianAccountId, clientId, router]);
 
   function applyPortfolio(data: Portfolio) {
     setPortfolio(data);
@@ -529,16 +613,6 @@ function ClientWorkspacePage() {
   }, [tab, trackingDate, base, dietitianAccountId]);
 
   useEffect(() => {
-    if (tab !== "messages") return;
-    void api<typeof chatMessages>(`${base}/conversation/messages`)
-      .then((messages) => {
-        setChatMessages(messages);
-        return api(`${base}/conversation/read`, { method: "POST", body: JSON.stringify({}) });
-      })
-      .catch((err) => setError(errorMessage(err, "Unable to load messages")));
-  }, [tab, base]);
-
-  useEffect(() => {
     if (tab !== "documents") return;
     void api<typeof clientDocuments>(`${base}/documents`)
       .then(setClientDocuments)
@@ -588,8 +662,26 @@ function ClientWorkspacePage() {
         actions={client ? <Avatar name={name} /> : undefined}
       />
 
-      <div className="ui-client-chart__tabs">
-        <Tabs items={tabs} value={tab} onChange={selectTab} />
+      <div className="ui-client-chart__tabs ui-client-chart__nav">
+        <div className="ui-client-chart__sections">
+          <Tabs
+            items={chartSections.map((section) => ({ id: section.id, label: section.label }))}
+            value={activeSection.id}
+            onChange={selectSection}
+          />
+        </div>
+        {activeSection.tabs.length > 1 ? (
+          <div className="ui-client-chart__subnav">
+            <p className="ui-client-chart__crumb">
+              <span>{activeSection.label}</span>
+              <span aria-hidden="true">/</span>
+              <strong>{activeSubTab?.label}</strong>
+            </p>
+            <div className="ui-client-chart__subtabs">
+              <Tabs items={activeSection.tabs} value={tab} onChange={selectTab} />
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {error ? (
@@ -601,78 +693,118 @@ function ClientWorkspacePage() {
       {/* ── OVERVIEW ── */}
       {tab === "overview" && portfolio ? (
         <div className="ui-client-chart__panel ui-stack">
-          <div className="ui-client-chart__metrics">
-            <div className="ui-client-chart__metric">
-              <span className="ui-client-chart__metric-label">Weight</span>
-              <span className="ui-client-chart__metric-value">
-                {weightMeasurement ? `${weightMeasurement.value} ${weightMeasurement.unit}` : "—"}
-              </span>
-            </div>
-            <div className="ui-client-chart__metric">
-              <span className="ui-client-chart__metric-label">Height</span>
-              <span className="ui-client-chart__metric-value">
-                {heightMeasurement ? `${heightMeasurement.value} ${heightMeasurement.unit}` : "—"}
-              </span>
-            </div>
-            <div className="ui-client-chart__metric">
-              <span className="ui-client-chart__metric-label">BMI</span>
-              <span className="ui-client-chart__metric-value">{portfolio.bmi ?? "—"}</span>
-            </div>
-            <div className="ui-client-chart__metric">
-              <span className="ui-client-chart__metric-label">Primary goal</span>
-              <span className="ui-client-chart__metric-value">
-                {portfolio.primaryGoal?.title ?? "—"}
-                {portfolio.activeGoalsCount > 0 ? (
-                  <span className="ui-muted"> ({portfolio.activeGoalsCount} active)</span>
-                ) : null}
-              </span>
-            </div>
-            <div className="ui-client-chart__metric">
-              <span className="ui-client-chart__metric-label">Latest assessment</span>
-              <span className="ui-client-chart__metric-value">
-                {portfolio.latestAssessment
-                  ? `${portfolio.latestAssessment.templateName} · ${humanizeLabel(portfolio.latestAssessment.status)}`
-                  : "—"}
-              </span>
-            </div>
-            <div className="ui-client-chart__metric">
-              <span className="ui-client-chart__metric-label">Meal plan</span>
-              <span className="ui-client-chart__metric-value">
-                {portfolio.activeMealPlan
-                  ? `${portfolio.activeMealPlan.name}${
-                      portfolio.activeMealPlan.publishedVersion
-                        ? ` · v${portfolio.activeMealPlan.publishedVersion.versionNumber}`
-                        : ""
-                    }`
-                  : "—"}
-              </span>
-            </div>
-            <div className="ui-client-chart__metric">
-              <span className="ui-client-chart__metric-label">Upcoming appointment</span>
-              <span className="ui-client-chart__metric-value">
-                {portfolio.upcomingAppointment
-                  ? `${portfolio.upcomingAppointment.title} · ${formatDate(portfolio.upcomingAppointment.startAt)}`
-                  : "—"}
-              </span>
-            </div>
-            <div className="ui-client-chart__metric">
-              <span className="ui-client-chart__metric-label">Unread messages</span>
-              <span className="ui-client-chart__metric-value">{portfolio.recentMessages.unreadCount}</span>
-            </div>
-            <div className="ui-client-chart__metric">
-              <span className="ui-client-chart__metric-label">Evolution</span>
-              <span className="ui-client-chart__metric-value">
-                {portfolio.evolutionSummary
-                  ? `Δ weight ${portfolio.evolutionSummary.weightDelta ?? "—"} ${
-                      portfolio.evolutionSummary.weightUnit ?? ""
-                    }`.trim()
-                  : "Need 2+ weights"}
-              </span>
-              {portfolio.evolutionSummary?.bmiCurrent != null ? (
-                <span className="ui-muted">
-                  BMI {portfolio.evolutionSummary.bmiBaseline ?? "—"} → {portfolio.evolutionSummary.bmiCurrent}
+          <div className="ui-client-chart__snapshot">
+            <div className="ui-client-chart__vitals" role="group" aria-label="Body metrics">
+              <button type="button" className="ui-client-chart__vital" onClick={() => openEvolution("WEIGHT")}>
+                <span className="ui-client-chart__metric-label">Weight</span>
+                <span className="ui-client-chart__vital-value">
+                  {weightMeasurement ? (
+                    <>
+                      {weightMeasurement.value}
+                      <span className="ui-client-chart__vital-unit">{weightMeasurement.unit}</span>
+                    </>
+                  ) : (
+                    "—"
+                  )}
                 </span>
-              ) : null}
+              </button>
+              <button type="button" className="ui-client-chart__vital" onClick={() => openEvolution("HEIGHT")}>
+                <span className="ui-client-chart__metric-label">Height</span>
+                <span className="ui-client-chart__vital-value">
+                  {heightMeasurement ? (
+                    <>
+                      {heightMeasurement.value}
+                      <span className="ui-client-chart__vital-unit">{heightMeasurement.unit}</span>
+                    </>
+                  ) : (
+                    "—"
+                  )}
+                </span>
+              </button>
+              <button type="button" className="ui-client-chart__vital" onClick={() => openEvolution("BMI")}>
+                <span className="ui-client-chart__metric-label">BMI</span>
+                <span className="ui-client-chart__vital-value">{portfolio.bmi ?? "—"}</span>
+              </button>
+              <button
+                type="button"
+                className="ui-client-chart__vital ui-client-chart__vital--trend"
+                onClick={() => openEvolution("WEIGHT")}
+              >
+                <span className="ui-client-chart__metric-label">Evolution</span>
+                <span className="ui-client-chart__vital-value">
+                  {portfolio.evolutionSummary
+                    ? `${portfolio.evolutionSummary.weightDelta ?? "—"} ${
+                        portfolio.evolutionSummary.weightUnit ?? ""
+                      }`.trim()
+                    : "—"}
+                </span>
+                <span className="ui-client-chart__vital-meta">
+                  {portfolio.evolutionSummary?.bmiCurrent != null
+                    ? `BMI ${portfolio.evolutionSummary.bmiBaseline ?? "—"} → ${portfolio.evolutionSummary.bmiCurrent}`
+                    : "Need 2+ weights"}
+                </span>
+              </button>
+            </div>
+
+            <div className="ui-client-chart__care-grid" role="group" aria-label="Care snapshot">
+              <button type="button" className="ui-client-chart__care-card" onClick={() => selectTab("goals")}>
+                <span className="ui-client-chart__metric-label">Primary goal</span>
+                <span className="ui-client-chart__care-value">{portfolio.primaryGoal?.title ?? "No goal set"}</span>
+                {portfolio.activeGoalsCount > 0 ? (
+                  <span className="ui-client-chart__care-meta">{portfolio.activeGoalsCount} active</span>
+                ) : null}
+              </button>
+              <button type="button" className="ui-client-chart__care-card" onClick={() => selectTab("assessments")}>
+                <span className="ui-client-chart__metric-label">Latest evaluation</span>
+                <span className="ui-client-chart__care-value">
+                  {portfolio.latestAssessment?.templateName ?? "None yet"}
+                </span>
+                {portfolio.latestAssessment ? (
+                  <span className="ui-client-chart__care-meta">
+                    {humanizeLabel(portfolio.latestAssessment.status)}
+                  </span>
+                ) : null}
+              </button>
+              <button type="button" className="ui-client-chart__care-card" onClick={() => selectTab("meal-plan")}>
+                <span className="ui-client-chart__metric-label">Meal plan</span>
+                <span className="ui-client-chart__care-value">
+                  {portfolio.activeMealPlan?.name ?? "No active plan"}
+                </span>
+                {portfolio.activeMealPlan?.publishedVersion ? (
+                  <span className="ui-client-chart__care-meta">
+                    v{portfolio.activeMealPlan.publishedVersion.versionNumber}
+                  </span>
+                ) : null}
+              </button>
+              <button
+                type="button"
+                className="ui-client-chart__care-card ui-client-chart__care-card--wide"
+                onClick={() => selectTab("appointments")}
+              >
+                <span className="ui-client-chart__metric-label">Upcoming appointment</span>
+                <span className="ui-client-chart__care-value">
+                  {portfolio.upcomingAppointment?.title ?? "Nothing scheduled"}
+                </span>
+                {portfolio.upcomingAppointment ? (
+                  <span className="ui-client-chart__care-meta">
+                    {new Date(portfolio.upcomingAppointment.startAt).toLocaleString(undefined, {
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                    })}
+                  </span>
+                ) : null}
+              </button>
+              <button
+                type="button"
+                className="ui-client-chart__care-card ui-client-chart__care-card--messages"
+                onClick={() => selectTab("messages")}
+              >
+                <span className="ui-client-chart__metric-label">Unread messages</span>
+                <span className="ui-client-chart__care-value ui-client-chart__care-value--stat">
+                  {portfolio.recentMessages.unreadCount}
+                </span>
+                <span className="ui-client-chart__care-meta">Open chat</span>
+              </button>
             </div>
           </div>
 
@@ -730,7 +862,7 @@ function ClientWorkspacePage() {
           {allowManage && client?.status === "ACTIVE" ? (
             <Section title="Chart management">
               <div className="ui-client-chart__toolbar">
-                <Button variant="danger" onClick={() => setConfirmArchive(true)}>
+                <Button variant="secondary" size="sm" onClick={() => setConfirmArchive(true)}>
                   Archive client
                 </Button>
               </div>
@@ -741,7 +873,20 @@ function ClientWorkspacePage() {
 
       {/* ── EVOLUTION ── */}
       {tab === "evolution" ? (
-        <ClientEvolutionPanel base={base} allowManage={allowManage} onError={setError} />
+        <ClientEvolutionPanel
+          base={base}
+          allowManage={allowManage}
+          onError={setError}
+          initialMetric={searchParams.get("metric")}
+          onMetricChange={(metric) => {
+            const params = new URLSearchParams(searchParams.toString());
+            params.set("tab", "evolution");
+            params.set("metric", metric);
+            router.replace(`/practice/${dietitianAccountId}/clients/${clientId}?${params.toString()}`, {
+              scroll: false,
+            });
+          }}
+        />
       ) : null}
 
       {/* ── PERSONAL ── */}
@@ -797,8 +942,10 @@ function ClientWorkspacePage() {
                 </Field>
                 <Field label="Phone">
                   <Input
+                    type="tel"
                     value={clientForm.phone}
                     onChange={(event) => setClientForm({ ...clientForm, phone: event.target.value })}
+                    placeholder="+961 71 123 456"
                   />
                 </Field>
                 <Field label="Date of birth">
@@ -820,7 +967,7 @@ function ClientWorkspacePage() {
                   </Select>
                 </Field>
               </div>
-              <Button type="submit" disabled={!allowManage}>
+              <Button type="submit" size="sm" variant="secondary" disabled={!allowManage}>
                 Save identity
               </Button>
             </form>
@@ -875,47 +1022,61 @@ function ClientWorkspacePage() {
                   />
                 </Field>
               </div>
-              <Button type="submit" disabled={!allowManage}>
+              <Button type="submit" size="sm" variant="secondary" disabled={!allowManage}>
                 Save profile
               </Button>
             </form>
           </Section>
 
           <Section title="Tags">
-            {orgTags.length === 0 ? (
-              <EmptyState title="No practice tags yet" />
-            ) : (
-              <form
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void api(`${orgBase}/clients/${clientId}/tags`, {
-                    method: "PUT",
-                    body: JSON.stringify({ tagIds: selectedTagIds }),
-                  })
-                    .then(() => loadPortfolio())
-                    .catch((err) => setError(errorMessage(err, "Unable to save tags")));
+            <div className="ui-client-tags">
+              <ClinicTagsManager
+                dietitianAccountId={dietitianAccountId}
+                tags={orgTags}
+                disabled={!allowManage}
+                compact
+                onChange={(next) => {
+                  setOrgTags(next);
+                  setSelectedTagIds((prev) => prev.filter((id) => next.some((tag) => tag.id === id)));
+                  void loadPortfolio();
                 }}
-              >
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 12 }}>
-                  {orgTags.map((tag) => (
-                    <Checkbox
-                      key={tag.id}
-                      label={tag.name}
-                      checked={selectedTagIds.includes(tag.id)}
-                      onChange={(event) => {
-                        const checked = event.target.checked;
-                        setSelectedTagIds((prev) =>
-                          checked ? [...prev, tag.id] : prev.filter((id) => id !== tag.id),
-                        );
-                      }}
-                    />
-                  ))}
-                </div>
-                <Button type="submit" disabled={!allowManage}>
-                  Save tags
-                </Button>
-              </form>
-            )}
+              />
+              {orgTags.length > 0 ? (
+                <form
+                  className="ui-client-tags__assign"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void api(`${orgBase}/clients/${clientId}/tags`, {
+                      method: "PUT",
+                      body: JSON.stringify({ tagIds: selectedTagIds }),
+                    })
+                      .then(() => loadPortfolio())
+                      .catch((err) => setError(errorMessage(err, "Unable to save tags")));
+                  }}
+                >
+                  <p className="ui-client-tags__assign-label">Assigned to this client</p>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 12 }}>
+                    {orgTags.map((tag) => (
+                      <Checkbox
+                        key={tag.id}
+                        label={tag.name}
+                        checked={selectedTagIds.includes(tag.id)}
+                        disabled={!allowManage}
+                        onChange={(event) => {
+                          const checked = event.target.checked;
+                          setSelectedTagIds((prev) =>
+                            checked ? [...prev, tag.id] : prev.filter((id) => id !== tag.id),
+                          );
+                        }}
+                      />
+                    ))}
+                  </div>
+                  <Button type="submit" size="sm" variant="secondary" disabled={!allowManage}>
+                    Save tags
+                  </Button>
+                </form>
+              ) : null}
+            </div>
           </Section>
 
           <Section
@@ -951,7 +1112,7 @@ function ClientWorkspacePage() {
                   style={{ width: 130 }}
                   disabled={!allowManage}
                 />
-                <Button type="submit" size="sm" disabled={!allowManage}>
+                <Button type="submit" size="sm" variant="secondary" disabled={!allowManage}>
                   Record
                 </Button>
               </form>
@@ -988,6 +1149,8 @@ function ClientWorkspacePage() {
       {/* ── ASSESSMENTS ── */}
       {tab === "assessments" ? (
         <ClientAssessmentsPanel
+          dietitianAccountId={dietitianAccountId}
+          clientId={clientId}
           base={base}
           orgBase={orgBase}
           allowManage={allowManage}
@@ -1039,7 +1202,7 @@ function ClientWorkspacePage() {
                   />
                 </Field>
               </div>
-              <Button type="submit" disabled={!allowManage || !goalTitle.trim()}>
+              <Button type="submit" size="sm" variant="secondary" disabled={!allowManage || !goalTitle.trim()}>
                 Add goal
               </Button>
             </form>
@@ -1080,7 +1243,7 @@ function ClientWorkspacePage() {
                           </Button>
                           <Button
                             size="sm"
-                            variant="danger"
+                            variant="ghost"
                             onClick={() => {
                               void api(`${base}/goals/${goal.id}/cancel`, { method: "POST" })
                                 .then(() => Promise.all([loadGoals(), loadPortfolio()]))
@@ -1114,7 +1277,7 @@ function ClientWorkspacePage() {
             <EmptyState
               title="No meal plans for this client"
               action={
-                <Link href={`/practice/${dietitianAccountId}/meal-plans`} className="ui-btn ui-btn--primary">
+                <Link href={`/practice/${dietitianAccountId}/meal-plans`} className="ui-btn ui-btn--secondary ui-btn--sm">
                   Open meal plans
                 </Link>
               }
@@ -1140,325 +1303,55 @@ function ClientWorkspacePage() {
 
       {/* ── TRACKING ── */}
       {tab === "tracking" ? (
-        <div className="ui-client-chart__panel ui-stack">
-          <Section
-            title="Tracking day"
-            description="Patient-entered logs for this calendar day. Measurements live on Evolution."
-          >
-            <div className="ui-row" style={{ gap: 8, flexWrap: "wrap", alignItems: "end" }}>
-              <Button type="button" size="sm" variant="secondary" onClick={() => shiftTrackingDate(-1)}>
-                Previous
-              </Button>
-              <Field label="Date">
-                <Input
-                  type="date"
-                  value={trackingDate}
-                  onChange={(event) => setTrackingDate(event.target.value)}
-                />
-              </Field>
-              <Button type="button" size="sm" variant="secondary" onClick={() => shiftTrackingDate(1)}>
-                Next
-              </Button>
-            </div>
-          </Section>
-
-          {trackingSummary ? (
-            <>
-              <div className="ui-client-chart__metrics">
-                <div className="ui-client-chart__metric">
-                  <span className="ui-client-chart__metric-label">Calories</span>
-                  <span className="ui-client-chart__metric-value">
-                    {nutritionLabel(trackingSummary.food.presented.energyKcal, "kcal")}
-                  </span>
-                </div>
-                <div className="ui-client-chart__metric">
-                  <span className="ui-client-chart__metric-label">Protein</span>
-                  <span className="ui-client-chart__metric-value">
-                    {nutritionLabel(trackingSummary.food.presented.proteinG, "g")}
-                  </span>
-                </div>
-                <div className="ui-client-chart__metric">
-                  <span className="ui-client-chart__metric-label">Carbs</span>
-                  <span className="ui-client-chart__metric-value">
-                    {nutritionLabel(trackingSummary.food.presented.carbohydrateG, "g")}
-                  </span>
-                </div>
-                <div className="ui-client-chart__metric">
-                  <span className="ui-client-chart__metric-label">Fat</span>
-                  <span className="ui-client-chart__metric-value">
-                    {nutritionLabel(trackingSummary.food.presented.fatG, "g")}
-                  </span>
-                </div>
-                <div className="ui-client-chart__metric">
-                  <span className="ui-client-chart__metric-label">Water</span>
-                  <span className="ui-client-chart__metric-value">
-                    {trackingSummary.water.targetMl != null
-                      ? `${trackingSummary.water.totalLiters.toFixed(1)} / ${(trackingSummary.water.targetMl / 1000).toFixed(1)} L`
-                      : `${trackingSummary.water.totalLiters.toFixed(1)} L`}
-                  </span>
-                </div>
-                <div className="ui-client-chart__metric">
-                  <span className="ui-client-chart__metric-label">Exercise</span>
-                  <span className="ui-client-chart__metric-value">
-                    {trackingSummary.exercise.totalDurationMinutes} min
-                  </span>
-                </div>
-              </div>
-
-              <Section title="Food by meal">
-                {trackingSummary.food.byMeal.length === 0 ? (
-                  <EmptyState title="No food logged for this day" />
-                ) : (
-                  <div className="ui-stack" style={{ gap: 16 }}>
-                    {trackingSummary.food.byMeal.map((meal) => (
-                      <div key={meal.category}>
-                        <div className="ui-row" style={{ justifyContent: "space-between", marginBottom: 6 }}>
-                          <strong>{humanizeLabel(meal.category)}</strong>
-                          <span className="ui-muted">
-                            {meal.presented?.energyKcal != null ? `${meal.presented.energyKcal} kcal` : "—"}
-                          </span>
-                        </div>
-                        <Table>
-                          <thead>
-                            <tr>
-                              <th>Food</th>
-                              <th>Quantity</th>
-                              <th>Calories</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {meal.items.map((row) => (
-                              <tr key={row.id}>
-                                <Td label="Food">{row.foodName}</Td>
-                                <Td label="Quantity">
-                                  {row.quantity} {humanizeLabel(row.unit)}
-                                </Td>
-                                <Td label="Calories">
-                                  {row.presented?.energyKcal != null
-                                    ? `${row.presented.energyKcal} kcal`
-                                    : "—"}
-                                </Td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </Table>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </Section>
-
-              <Section title="Water">
-                {trackingSummary.water.entries.length === 0 ? (
-                  <p className="ui-muted" style={{ margin: 0 }}>
-                    No water logged.
-                  </p>
-                ) : (
-                  <ul className="ui-client-chart__list">
-                    {trackingSummary.water.entries.map((row) => (
-                      <li key={row.id}>
-                        <span>{row.amountMl} ml</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </Section>
-
-              <Section title="Exercise">
-                {trackingSummary.exercise.entries.length === 0 ? (
-                  <p className="ui-muted" style={{ margin: 0 }}>
-                    No exercise logged.
-                  </p>
-                ) : (
-                  <ul className="ui-client-chart__list">
-                    {trackingSummary.exercise.entries.map((row) => (
-                      <li key={row.id}>
-                        <span>
-                          {row.activityType} · {row.durationMinutes} min
-                          {row.intensity ? ` · ${humanizeLabel(row.intensity)}` : ""}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </Section>
-
-              <Section title="Sleep">
-                {trackingSummary.sleep?.durationMinutes != null ? (
-                  <p style={{ margin: 0 }}>
-                    {Math.floor(trackingSummary.sleep.durationMinutes / 60)}h{" "}
-                    {trackingSummary.sleep.durationMinutes % 60}m
-                    {trackingSummary.sleep.quality != null
-                      ? ` · quality ${trackingSummary.sleep.quality}/5`
-                      : ""}
-                    {trackingSummary.sleepWeek.averageDurationMinutes != null
-                      ? ` · week avg ${Math.floor(trackingSummary.sleepWeek.averageDurationMinutes / 60)}h ${trackingSummary.sleepWeek.averageDurationMinutes % 60}m`
-                      : ""}
-                  </p>
-                ) : (
-                  <p className="ui-muted" style={{ margin: 0 }}>
-                    No sleep logged.
-                  </p>
-                )}
-              </Section>
-
-              <Section title="Habits">
-                {trackingSummary.plannedMeals ? (
-                  <p className="ui-muted" style={{ marginTop: 0 }}>
-                    Planned meals logged today: {trackingSummary.plannedMeals.logged}
-                    {trackingSummary.plannedMeals.total > 0
-                      ? ` / ${trackingSummary.plannedMeals.total}`
-                      : ""}
-                  </p>
-                ) : null}
-                {trackingSummary.habits.items.length === 0 ? (
-                  <p className="ui-muted" style={{ margin: 0 }}>
-                    No habits assigned.
-                  </p>
-                ) : (
-                  <ul className="ui-client-chart__list">
-                    {trackingSummary.habits.items.map((item) => (
-                      <li key={item.habitKey}>
-                        <span>
-                          {item.completed ? "✓" : "○"} {item.habitLabel}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                <div className="ui-inline-form" style={{ marginTop: 12 }}>
-                  <Field label="Assign habit">
-                    <Select value={assignHabitId} onChange={(e) => setAssignHabitId(e.target.value)}>
-                      <option value="">Select…</option>
-                      {habitCatalog
-                        .filter((h) => !clientHabits.some((c) => c.habitDefinitionId === h.id))
-                        .map((habit) => (
-                          <option key={habit.id} value={habit.id}>
-                            {habit.name}
-                            {habit.scope === "global" ? " (global)" : ""}
-                          </option>
-                        ))}
-                    </Select>
-                  </Field>
-                  <div className="ui-inline-form__action">
-                    <Button
-                      type="button"
-                      size="sm"
-                      disabled={!assignHabitId || !allowManage}
-                      onClick={() => {
-                        void api(`${base}/habits`, {
-                          method: "POST",
-                          body: JSON.stringify({ habitDefinitionId: assignHabitId }),
-                        })
-                          .then(() => api<typeof clientHabits>(`${base}/habits`))
-                          .then((rows) => {
-                            setClientHabits(rows);
-                            setAssignHabitId("");
-                            return api<NonNullable<typeof trackingSummary>>(
-                              `${base}/tracking/summary${trackingDate ? `?date=${trackingDate}` : ""}`,
-                            );
-                          })
-                          .then(setTrackingSummary)
-                          .catch((err) => setError(errorMessage(err, "Unable to assign habit")));
-                      }}
-                    >
-                      Assign
-                    </Button>
-                  </div>
-                </div>
-                {clientHabits.length > 0 ? (
-                  <ul className="ui-client-chart__list" style={{ marginTop: 12 }}>
-                    {clientHabits.map((habit) => (
-                      <li key={habit.habitDefinitionId}>
-                        <span>
-                          Assigned: {habit.name}
-                          {habit.targetValue != null
-                            ? ` (${habit.targetValue}${habit.targetUnit ? ` ${habit.targetUnit}` : ""})`
-                            : ""}
-                        </span>
-                        {allowManage ? (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="secondary"
-                            onClick={() => {
-                              void api(`${base}/habits/${habit.habitDefinitionId}`, { method: "DELETE" })
-                                .then(() => api<typeof clientHabits>(`${base}/habits`))
-                                .then((rows) => {
-                                  setClientHabits(rows);
-                                  return api<NonNullable<typeof trackingSummary>>(
-                                    `${base}/tracking/summary${trackingDate ? `?date=${trackingDate}` : ""}`,
-                                  );
-                                })
-                                .then(setTrackingSummary)
-                                .catch((err) => setError(errorMessage(err, "Unable to unassign habit")));
-                            }}
-                          >
-                            Remove
-                          </Button>
-                        ) : null}
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-              </Section>
-            </>
-          ) : (
-            <div className="ui-client-chart__metrics">
-              {[1, 2, 3, 4].map((i) => (
-                <Skeleton key={i} style={{ height: 76, borderRadius: 14 }} />
-              ))}
-            </div>
-          )}
+        <div className="ui-client-chart__panel">
+          <ClientTrackingPanel
+            dietitianAccountId={dietitianAccountId}
+            clientId={clientId}
+            summary={trackingSummary}
+            trackingDate={trackingDate}
+            onDateChange={setTrackingDate}
+            onShiftDate={shiftTrackingDate}
+            habitCatalog={habitCatalog}
+            clientHabits={clientHabits}
+            assignHabitId={assignHabitId}
+            onAssignHabitIdChange={setAssignHabitId}
+            allowManage={allowManage}
+            onAssignHabit={() => {
+              void api(`${base}/habits`, {
+                method: "POST",
+                body: JSON.stringify({ habitDefinitionId: assignHabitId }),
+              })
+                .then(() => api<typeof clientHabits>(`${base}/habits`))
+                .then((rows) => {
+                  setClientHabits(rows);
+                  setAssignHabitId("");
+                  return api<NonNullable<typeof trackingSummary>>(
+                    `${base}/tracking/summary${trackingDate ? `?date=${trackingDate}` : ""}`,
+                  );
+                })
+                .then(setTrackingSummary)
+                .catch((err) => setError(errorMessage(err, "Unable to assign habit")));
+            }}
+            onRemoveHabit={(habitDefinitionId) => {
+              void api(`${base}/habits/${habitDefinitionId}`, { method: "DELETE" })
+                .then(() => api<typeof clientHabits>(`${base}/habits`))
+                .then((rows) => {
+                  setClientHabits(rows);
+                  return api<NonNullable<typeof trackingSummary>>(
+                    `${base}/tracking/summary${trackingDate ? `?date=${trackingDate}` : ""}`,
+                  );
+                })
+                .then(setTrackingSummary)
+                .catch((err) => setError(errorMessage(err, "Unable to unassign habit")));
+            }}
+          />
         </div>
       ) : null}
 
-      {/* ── MESSAGES ── */}
+      {/* ── MESSAGES (opens inbox) ── */}
       {tab === "messages" ? (
-        <div className="ui-client-chart__panel ui-stack">
-          <Section title="Conversation">
-            <div className="ui-client-chart__chat">
-              {chatMessages.length === 0 ? (
-                <EmptyState title="No messages yet" />
-              ) : (
-                chatMessages.map((message) => (
-                  <div key={message.id} className="ui-client-chart__bubble">
-                    <div className="ui-client-chart__bubble-body">{message.body}</div>
-                    <div className="ui-hint">{formatDate(message.createdAt)}</div>
-                  </div>
-                ))
-              )}
-            </div>
-          </Section>
-          <Section title="New message">
-            <form
-              onSubmit={(event) => {
-                event.preventDefault();
-                void api(`${base}/conversation/messages`, {
-                  method: "POST",
-                  body: JSON.stringify({ body: messageBody }),
-                })
-                  .then(() => {
-                    setMessageBody("");
-                    return api<typeof chatMessages>(`${base}/conversation/messages`);
-                  })
-                  .then(setChatMessages)
-                  .catch((err) => setError(errorMessage(err, "Unable to send message")));
-              }}
-            >
-              <Field label="Message">
-                <Textarea
-                  value={messageBody}
-                  onChange={(event) => setMessageBody(event.target.value)}
-                  placeholder="Type a message to the client…"
-                  style={{ minHeight: 100 }}
-                />
-              </Field>
-              <Button type="submit" disabled={!messageBody.trim()}>
-                Send message
-              </Button>
-            </form>
-          </Section>
+        <div className="ui-client-chart__panel">
+          <LoadingState>Opening client chat…</LoadingState>
         </div>
       ) : null}
 
@@ -1492,7 +1385,9 @@ function ClientWorkspacePage() {
                 <option value="INTERNAL">Internal only</option>
                 <option value="SHARED">Shared with client</option>
               </Select>
-              <Button type="submit">Upload</Button>
+              <Button type="submit" size="sm" variant="secondary">
+                Upload
+              </Button>
             </form>
           </Section>
 
@@ -1605,7 +1500,9 @@ function ClientWorkspacePage() {
                   />
                 </Field>
               </div>
-              <Button type="submit">Schedule</Button>
+              <Button type="submit" size="sm" variant="secondary">
+                Schedule
+              </Button>
             </form>
           </Section>
 
@@ -1631,66 +1528,30 @@ function ClientWorkspacePage() {
 
       {/* ── TIMELINE ── */}
       {tab === "timeline" ? (
-        <div className="ui-client-chart__panel ui-stack">
-          <Section title="Clinical notes">
-            <form
-              onSubmit={(event) => {
-                event.preventDefault();
-                void api(`${base}/profile`, {
-                  method: "PATCH",
-                  body: JSON.stringify({ notes: timelineNotes }),
-                })
-                  .then(() => loadPortfolio())
-                  .catch((err) => setError(errorMessage(err, "Unable to save notes")));
-              }}
-            >
-              <Field label="Notes">
-                <Textarea
-                  value={timelineNotes}
-                  onChange={(event) => setTimelineNotes(event.target.value)}
-                  style={{ minHeight: 120 }}
-                  disabled={!allowManage}
-                />
-              </Field>
-              <Button type="submit" disabled={!allowManage}>
-                Save notes
-              </Button>
-            </form>
-          </Section>
-
-          <Section title="Timeline">
-            {timeline.length === 0 && !timelineLoading ? (
-              <EmptyState title="No timeline events yet" />
-            ) : (
-              <>
-                <ul className="ui-client-chart__list">
-                  {timeline.map((row) => (
-                    <li key={row.id}>
-                      <span>{activityLabel(row.type)}</span>
-                      <span className="ui-muted">{formatDate(row.occurredAt)}</span>
-                    </li>
-                  ))}
-                </ul>
-                {timelineHasMore ? (
-                  <div style={{ marginTop: 12 }}>
-                    <Button
-                      variant="secondary"
-                      disabled={timelineLoading}
-                      onClick={() => {
-                        const last = timeline[timeline.length - 1];
-                        if (!last) return;
-                        void loadTimeline(last.occurredAt).catch((err) =>
-                          setError(errorMessage(err, "Unable to load more timeline")),
-                        );
-                      }}
-                    >
-                      {timelineLoading ? "Loading…" : "Load more"}
-                    </Button>
-                  </div>
-                ) : null}
-              </>
-            )}
-          </Section>
+        <div className="ui-client-chart__panel">
+          <ClientTimelinePanel
+            notes={timelineNotes}
+            onNotesChange={setTimelineNotes}
+            onSaveNotes={() => {
+              void api(`${base}/profile`, {
+                method: "PATCH",
+                body: JSON.stringify({ notes: timelineNotes }),
+              })
+                .then(() => loadPortfolio())
+                .catch((err) => setError(errorMessage(err, "Unable to save notes")));
+            }}
+            allowManage={allowManage}
+            events={timeline}
+            loading={timelineLoading}
+            hasMore={timelineHasMore}
+            onLoadMore={() => {
+              const last = timeline[timeline.length - 1];
+              if (!last) return;
+              void loadTimeline(last.occurredAt).catch((err) =>
+                setError(errorMessage(err, "Unable to load more timeline")),
+              );
+            }}
+          />
         </div>
       ) : null}
 
@@ -1740,7 +1601,7 @@ function ClientWorkspacePage() {
       {tab === "portal" ? (
         <JoinCodePanel
           title="Reconnect portal"
-          description="Use this only for an existing chart. New clients create their own account and join with the practice code from the Clients page."
+          description="Use this only for an existing chart. New clients create their own account and join with the clinic code from the Clients page."
           connectionStatus={connectionStatus}
           plainJoinCode={plainJoinCode}
           hint={portalAccount?.joinCode?.hint ?? null}
@@ -1768,9 +1629,8 @@ function ClientWorkspacePage() {
       <ConfirmDialog
         open={confirmArchive}
         title="Archive this client?"
-        description="The chart stays in the practice but is no longer active."
+        description="The chart stays in the clinic but is no longer active."
         confirmLabel="Archive"
-        danger
         onConfirm={() => {
           void api(`${base}/archive`, { method: "POST" })
             .then(() => {
@@ -1785,7 +1645,6 @@ function ClientWorkspacePage() {
         open={confirmRevoke}
         title="Revoke this reconnect code?"
         confirmLabel="Revoke"
-        danger
         onConfirm={() => {
           setPortalBusy(true);
           void api(`${base}/account/join-code`, { method: "DELETE" })
@@ -1802,7 +1661,6 @@ function ClientWorkspacePage() {
         open={confirmDeactivate}
         title="Deactivate this portal connection?"
         confirmLabel="Deactivate"
-        danger
         onConfirm={() => {
           void api(`${base}/account/deactivate`, { method: "POST" }).then(() => {
             setPlainJoinCode(null);

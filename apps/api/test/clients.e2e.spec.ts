@@ -356,6 +356,20 @@ describe("Phase 5 practice clients", () => {
       .expect(404);
 
     await request(ctx.app.getHttpServer())
+      .patch(`/api/v1/dietitian/${org.id}/tags/${tag.body.id}`)
+      .set("Cookie", owner.cookie)
+      .send({ name: "Priority" })
+      .expect(200)
+      .expect((res) => {
+        expect(res.body.name).toBe("Priority");
+      });
+
+    await request(ctx.app.getHttpServer())
+      .delete(`/api/v1/dietitian/${org.id}/tags/${tag.body.id}`)
+      .set("Cookie", owner.cookie)
+      .expect(200);
+
+    await request(ctx.app.getHttpServer())
       .post(`/api/v1/dietitian/${org.id}/clients/${client.body.id}/goals/${goal.body.id}/complete`)
       .set("Cookie", owner.cookie)
       .expect(201);
@@ -382,7 +396,17 @@ describe("Phase 5 practice clients", () => {
     const template = await request(ctx.app.getHttpServer())
       .post(`/api/v1/dietitian/${org.id}/assessment-templates`)
       .set("Cookie", owner.cookie)
-      .send({ name: "Intake", schema: { sections: [] } })
+      .send({
+        name: "Intake",
+        schema: {
+          sections: [
+            {
+              id: "main",
+              questions: [{ id: "reason", type: "TEXT", label: "Reason", required: false, active: true }],
+            },
+          ],
+        },
+      })
       .expect(201);
 
     const started = await request(ctx.app.getHttpServer())
@@ -402,7 +426,16 @@ describe("Phase 5 practice clients", () => {
     await request(ctx.app.getHttpServer())
       .patch(`/api/v1/dietitian/${org.id}/assessment-templates/${template.body.id}`)
       .set("Cookie", owner.cookie)
-      .send({ schema: { sections: [{ id: "v2" }] } })
+      .send({
+        schema: {
+          sections: [
+            {
+              id: "v2",
+              questions: [{ id: "new", type: "TEXT", label: "New", active: true }],
+            },
+          ],
+        },
+      })
       .expect(200)
       .expect((res) => expect(res.body.version).toBe(2));
 

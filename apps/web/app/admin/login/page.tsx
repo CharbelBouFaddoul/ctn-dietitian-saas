@@ -5,7 +5,7 @@ export default function AdminLoginPage() {
     <SignInForm
       audience="admin"
       title="Admin sign in"
-      description="Platform administration is assigned, not self-registered. Practice owners cannot use this area."
+      description="Platform administration is assigned, not self-registered. Clinic owners cannot use this area."
     />
   );
 }

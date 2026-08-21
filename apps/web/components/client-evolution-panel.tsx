@@ -44,15 +44,31 @@ const METRICS = [
   { id: "MUSCLE_MASS", label: "Muscle mass" },
 ] as const;
 
+const METRIC_IDS = METRICS.map((m) => m.id);
+
+function isMetricId(value: string | null | undefined): value is (typeof METRICS)[number]["id"] {
+  return !!value && (METRIC_IDS as readonly string[]).includes(value);
+}
+
 type Props = {
   base: string;
   allowManage: boolean;
   onError: (message: string) => void;
+  initialMetric?: string | null;
+  onMetricChange?: (metric: string) => void;
 };
 
-export function ClientEvolutionPanel({ base, allowManage, onError }: Props) {
+export function ClientEvolutionPanel({
+  base,
+  allowManage,
+  onError,
+  initialMetric,
+  onMetricChange,
+}: Props) {
   const [data, setData] = useState<EvolutionResponse | null>(null);
-  const [metric, setMetric] = useState<string>("WEIGHT");
+  const [metric, setMetric] = useState<string>(() =>
+    isMetricId(initialMetric) ? initialMetric : "WEIGHT",
+  );
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [rangePreset, setRangePreset] = useState<"7" | "30" | "90" | "all" | "custom">("all");
@@ -75,6 +91,17 @@ export function ClientEvolutionPanel({ base, allowManage, onError }: Props) {
   useEffect(() => {
     void load().catch((err) => onError(errorMessage(err, "Unable to load evolution")));
   }, [base, from, to]);
+
+  useEffect(() => {
+    if (isMetricId(initialMetric) && initialMetric !== metric) {
+      setMetric(initialMetric);
+    }
+  }, [initialMetric]);
+
+  function selectMetric(next: string) {
+    setMetric(next);
+    onMetricChange?.(next);
+  }
 
   const points = useMemo(() => {
     if (!data) return [];
@@ -123,7 +150,7 @@ export function ClientEvolutionPanel({ base, allowManage, onError }: Props) {
     <div className="ui-evo">
       <div className="ui-evo__toolbar">
         <Field label="Metric">
-          <Select value={metric} onChange={(e) => setMetric(e.target.value)}>
+          <Select value={metric} onChange={(e) => selectMetric(e.target.value)}>
             {METRICS.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.label}
@@ -300,7 +327,7 @@ export function ClientEvolutionPanel({ base, allowManage, onError }: Props) {
               <Input type="date" value={measureAt} onChange={(e) => setMeasureAt(e.target.value)} required />
             </Field>
             <div className="ui-evo__form-action">
-              <Button type="submit" disabled={saving}>
+              <Button type="submit" size="sm" variant="secondary" disabled={saving}>
                 {saving ? "Saving…" : "Save"}
               </Button>
             </div>

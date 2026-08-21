@@ -132,18 +132,18 @@ export default function AdminUserDetailPage() {
       </Section>
 
       {user.dietitianAccount ? (
-        <Section title="Dietitian practice">
+        <Section title="Dietitian clinic">
           <Table>
             <thead>
               <tr>
-                <th>Practice</th>
+                <th>Clinic</th>
                 <th>Role</th>
                 <th>Status</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <Td label="Practice">
+                <Td label="Clinic">
                   <Link href={`/admin/dietitians/${user.dietitianAccount.id}`} className="ui-link">
                     {user.dietitianAccount.displayName}
                   </Link>
@@ -167,7 +167,7 @@ export default function AdminUserDetailPage() {
             <thead>
               <tr>
                 <th>Client</th>
-                <th>Practice</th>
+                <th>Clinic</th>
                 <th>Status</th>
               </tr>
             </thead>
@@ -175,7 +175,7 @@ export default function AdminUserDetailPage() {
               {user.clientAccounts.map((account) => (
                 <tr key={account.id}>
                   <Td label="Client">{account.clientName || "—"}</Td>
-                  <Td label="Practice">
+                  <Td label="Clinic">
                     <Link href={`/admin/dietitians/${account.practiceId}`} className="ui-link">
                       {account.practiceName}
                     </Link>
@@ -192,8 +192,8 @@ export default function AdminUserDetailPage() {
 
       {!user.dietitianAccount && (!user.clientAccounts || user.clientAccounts.length === 0) ? (
         <Section title="Linked accounts">
-          <EmptyState title="No practice or patient link">
-            This login is not connected to a dietitian practice or patient chart.
+          <EmptyState title="No clinic or patient link">
+            This login is not connected to a dietitian clinic or patient chart.
           </EmptyState>
         </Section>
       ) : null}

@@ -15,6 +15,7 @@ import {
   reorderQuestions,
   toPrismaSchema,
   upsertQuestion,
+  validateAssessmentResponses,
 } from "./assessment-schema";
 
 @Injectable()
@@ -259,9 +260,15 @@ export class AssessmentService {
     if (existing.status === "COMPLETED" || existing.status === "ARCHIVED") {
       throw new BadRequestException("Completed assessments cannot be rewritten");
     }
+    const schema = this.schemaForAssessment(existing);
+    const cleaned = validateAssessmentResponses(schema, responses, { mode: "save" });
     const assessment = await this.prisma.assessment.update({
       where: { id: assessmentId },
-      data: { responses, status: "IN_PROGRESS", startedAt: existing.startedAt ?? new Date() },
+      data: {
+        responses: cleaned as Prisma.InputJsonValue,
+        status: "IN_PROGRESS",
+        startedAt: existing.startedAt ?? new Date(),
+      },
       include: { template: true },
     });
     return this.toResponse(assessment);
@@ -278,12 +285,18 @@ export class AssessmentService {
     if (existing.status === "COMPLETED" || existing.status === "ARCHIVED") {
       throw new BadRequestException("Completed assessments cannot be rewritten");
     }
+    const schema = this.schemaForAssessment(existing);
+    const merged =
+      responses !== undefined
+        ? responses
+        : ((existing.responses as Record<string, unknown> | null) ?? {});
+    const cleaned = validateAssessmentResponses(schema, merged, { mode: "complete" });
     const assessment = await this.prisma.assessment.update({
       where: { id: assessmentId },
       data: {
         status: "COMPLETED",
         completedAt: new Date(),
-        responses: responses ?? existing.responses ?? undefined,
+        responses: cleaned as Prisma.InputJsonValue,
         templateVersion: existing.templateVersion,
         schemaSnapshot: existing.schemaSnapshot ?? undefined,
       },
@@ -325,11 +338,19 @@ export class AssessmentService {
   private async requireAssessment(dietitianAccountId: string, clientId: string, assessmentId: string) {
     const assessment = await this.prisma.assessment.findFirst({
       where: { id: assessmentId, clientId, ...tenantWhere(dietitianAccountId) },
+      include: { template: true },
     });
     if (!assessment) {
       throw new NotFoundException("Assessment not found");
     }
     return assessment;
+  }
+
+  private schemaForAssessment(row: {
+    schemaSnapshot?: Prisma.JsonValue | null;
+    template: { schema: Prisma.JsonValue };
+  }): AssessmentSchema {
+    return parseAssessmentSchema(row.schemaSnapshot ?? row.template.schema);
   }
 
   private toResponse(row: {

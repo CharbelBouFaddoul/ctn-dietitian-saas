@@ -46,7 +46,7 @@ export default function ContactPage() {
       <section className="ui-mkt__band ui-mkt__band--white">
         <div className="ui-mkt__hero">
           <p className="ui-eyebrow">Contact</p>
-          <h1>Let’s talk about your practice.</h1>
+          <h1>Let’s talk about your clinic.</h1>
           <p>Questions about getting started, the dietitian workspace, or the patient portal — reach out and we’ll help.</p>
         </div>
       </section>

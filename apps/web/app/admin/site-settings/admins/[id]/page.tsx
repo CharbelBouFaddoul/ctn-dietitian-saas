@@ -165,7 +165,7 @@ export default function SiteAdminDetailPage() {
       <Section
         title="Platform admin"
         tone="mint"
-        description="Platform console operators do not need a dietitian practice."
+        description="Platform console operators do not need a dietitian clinic."
         actions={
           <div className="ui-row">
             {!editing ? (
