@@ -6,6 +6,7 @@ import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { EmailService } from "../email/email.service";
 import { EntitlementService } from "../entitlements/entitlement.service";
 import { SubscriptionLifecycleService } from "../entitlements/subscription-lifecycle.service";
+import { ConversationService } from "../messaging/conversation.service";
 import { NotificationService } from "../notifications/notification.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { TaskService } from "../tasks/task.service";
@@ -29,6 +30,7 @@ export class AutomationExecutorService {
     private readonly notifications: NotificationService,
     private readonly email: EmailService,
     private readonly tasks: TaskService,
+    private readonly conversations: ConversationService,
   ) {}
 
   async executeCandidate(rule: AutomationRule, candidate: AutomationCandidate): Promise<void> {
@@ -218,6 +220,25 @@ export class AutomationExecutorService {
           automationRunId: runId,
         });
         break;
+      case "SEND_MESSAGE": {
+        if (!candidate.clientId) throw new Error("client_required");
+        if (!context.assignedUserId) throw new Error("sender_missing");
+        const client = await this.prisma.client.findUniqueOrThrow({ where: { id: candidate.clientId } });
+        const conversation = await this.conversations.getOrCreate(client);
+        const portalAccount = await this.prisma.clientAccount.findFirst({
+          where: { clientId: client.id, status: "ACTIVE" },
+          select: { userId: true },
+        });
+        await this.conversations.sendMessage({
+          conversation,
+          client,
+          senderUserId: context.assignedUserId,
+          body: this.templates.render(configuration.messageBody!, context),
+          notifyUserIds: portalAccount ? [portalAccount.userId] : [],
+          senderIsClient: false,
+        });
+        break;
+      }
     }
   }
 

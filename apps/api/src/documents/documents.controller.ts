@@ -34,6 +34,19 @@ interface UploadedFilePayload {
   mimetype: string;
 }
 
+const DEFAULT_MAX_DOCUMENT_BYTES = 20 * 1024 * 1024;
+
+function maxDocumentBytes(): number {
+  const raw = process.env.MAX_DOCUMENT_BYTES;
+  const parsed = raw ? Number(raw) : DEFAULT_MAX_DOCUMENT_BYTES;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_MAX_DOCUMENT_BYTES;
+}
+
+const uploadInterceptor = () =>
+  FileInterceptor("file", {
+    limits: { fileSize: maxDocumentBytes() },
+  });
+
 @ApiTags("portal")
 @ApiCookieAuth()
 @UseGuards(SessionGuard)
@@ -61,10 +74,17 @@ export class PortalDocumentsController {
     const client = await this.access.assertPortalAccess(user.id, { activeClientId: session.activeClientId });
     try {
       const document = await this.documents.getMetadata(documentId, client, true);
-      const file = this.documents.openDownloadStream(document);
+      const file = await this.documents.openDownloadStream(document);
       res.setHeader("Content-Type", file.mimeType);
       res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(file.filename)}"`);
       res.setHeader("Cache-Control", "private, no-store");
+      file.stream.on("error", () => {
+        if (!res.headersSent) {
+          res.status(404).json({ statusCode: 404, message: "Document not found" });
+        } else {
+          res.destroy();
+        }
+      });
       file.stream.pipe(res);
     } catch {
       await this.documents.recordDownloadDenied(user.id, requireDietitianAccountId(client), documentId);
@@ -75,7 +95,7 @@ export class PortalDocumentsController {
   @Post()
   @ApiConsumes("multipart/form-data")
   @ApiBody({ schema: { type: "object", properties: { file: { type: "string", format: "binary" } } } })
-  @UseInterceptors(FileInterceptor("file"))
+  @UseInterceptors(uploadInterceptor())
   @UseGuards(ThrottlerGuard)
   @Throttle({ [THROTTLE_NAMES.UPLOAD]: {} })
   async upload(@CurrentUser() user: AuthenticatedRequestUser,
@@ -113,7 +133,7 @@ export class ClientDocumentsController {
 
   @Post()
   @ApiConsumes("multipart/form-data")
-  @UseInterceptors(FileInterceptor("file"))
+  @UseInterceptors(uploadInterceptor())
   @UseGuards(ThrottlerGuard)
   @Throttle({ [THROTTLE_NAMES.UPLOAD]: {} })
   async upload(
@@ -145,12 +165,26 @@ export class ClientDocumentsController {
     @Res() res: Response,
   ) {
     const client = await this.access.assertCanAccess(tenant, clientId, "read");
-    const document = await this.documents.getMetadata(documentId, client, false);
-    const file = this.documents.openDownloadStream(document);
-    res.setHeader("Content-Type", file.mimeType);
-    res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(file.filename)}"`);
-    res.setHeader("Cache-Control", "private, no-store");
-    file.stream.pipe(res);
+    try {
+      const document = await this.documents.getMetadata(documentId, client, false);
+      const file = await this.documents.openDownloadStream(document);
+      res.setHeader("Content-Type", file.mimeType);
+      res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(file.filename)}"`);
+      res.setHeader("Cache-Control", "private, no-store");
+      file.stream.on("error", () => {
+        if (!res.headersSent) {
+          res.status(404).json({ statusCode: 404, message: "File missing from storage" });
+        } else {
+          res.destroy();
+        }
+      });
+      file.stream.pipe(res);
+    } catch (err) {
+      if (err instanceof NotFoundException) {
+        throw err;
+      }
+      throw new NotFoundException("Document not found");
+    }
   }
 
   @Patch(":documentId/visibility")

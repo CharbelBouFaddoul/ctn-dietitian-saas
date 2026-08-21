@@ -57,6 +57,7 @@ class CreateAutomationDto {
     "SEND_EMAIL",
     "CREATE_TASK",
     "CREATE_CLIENT_NOTIFICATION",
+    "SEND_MESSAGE",
   ])
   actionType!: AutomationActionType;
 
@@ -105,6 +106,7 @@ class UpdateAutomationDto {
     "SEND_EMAIL",
     "CREATE_TASK",
     "CREATE_CLIENT_NOTIFICATION",
+    "SEND_MESSAGE",
   ])
   actionType?: AutomationActionType;
 

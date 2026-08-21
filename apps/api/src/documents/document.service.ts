@@ -226,7 +226,11 @@ export class DocumentService {
     return this.toResponse(updated);
   }
 
-  openDownloadStream(document: Document) {
+  async openDownloadStream(document: Document) {
+    const onDisk = await this.storage.exists(document.storageKey);
+    if (!onDisk) {
+      throw new NotFoundException("File missing from storage");
+    }
     return {
       stream: this.storage.createReadStreamForKey(document.storageKey),
       mimeType: document.mimeType,

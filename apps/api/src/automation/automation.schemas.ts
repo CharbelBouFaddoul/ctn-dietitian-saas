@@ -23,15 +23,28 @@ const configurationSchema = z
     timing: timingSchema.optional(),
     recipient: z.enum(AUTOMATION_RECIPIENTS),
     memberId: z.string().uuid().optional(),
+    /** ALL = every client in the clinic; SELECTED = only clientIds. */
+    clientScope: z.enum(["ALL", "SELECTED"]).default("ALL"),
+    clientIds: z.array(z.string().uuid()).max(500).optional(),
     notificationTitle: z.string().min(1).max(200).optional(),
     notificationBody: z.string().min(1).max(5000).optional(),
     emailSubject: z.string().min(1).max(200).optional(),
     emailBody: z.string().min(1).max(10000).optional(),
+    messageBody: z.string().min(1).max(10000).optional(),
     taskTitle: z.string().min(1).max(200).optional(),
     taskDescription: z.string().max(5000).optional(),
     taskPriority: z.enum(["LOW", "NORMAL", "HIGH", "URGENT"]).optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((value, ctx) => {
+    if (value.clientScope === "SELECTED" && (!value.clientIds || value.clientIds.length === 0)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Select at least one client when scope is Selected clients",
+        path: ["clientIds"],
+      });
+    }
+  });
 
 export type AutomationConfiguration = z.infer<typeof configurationSchema>;
 export type AutomationConditions = z.infer<typeof conditionsSchema>;
@@ -51,8 +64,20 @@ export function validateRulePayload(input: {
   configuration: unknown;
   conditions?: unknown;
 }): { configuration: AutomationConfiguration; conditions: AutomationConditions | null } {
-  const configuration = parseAutomationConfiguration(input.configuration);
+  const parsed = parseAutomationConfiguration(input.configuration);
   const conditions = parseAutomationConditions(input.conditions);
+
+  const configuration: AutomationConfiguration =
+    parsed.clientScope === "SELECTED"
+      ? {
+          ...parsed,
+          clientIds: [...new Set(parsed.clientIds ?? [])],
+        }
+      : {
+          ...parsed,
+          clientScope: "ALL",
+          clientIds: undefined,
+        };
 
   if (configuration.recipient === "SPECIFIC_MEMBER" && !configuration.memberId) {
     throw new Error("memberId is required when recipient is SPECIFIC_MEMBER");
@@ -63,6 +88,7 @@ export function validateRulePayload(input: {
     configuration.notificationBody,
     configuration.emailSubject,
     configuration.emailBody,
+    configuration.messageBody,
     configuration.taskTitle,
     configuration.taskDescription,
   ].filter(Boolean) as string[];
@@ -107,6 +133,14 @@ function validateTriggerActionPair(
       }
       if (configuration.recipient !== "CLIENT") {
         throw new Error("CREATE_CLIENT_NOTIFICATION requires CLIENT recipient");
+      }
+      break;
+    case "SEND_MESSAGE":
+      if (!configuration.messageBody) {
+        throw new Error("messageBody is required");
+      }
+      if (configuration.recipient !== "CLIENT") {
+        throw new Error("SEND_MESSAGE requires CLIENT recipient");
       }
       break;
   }

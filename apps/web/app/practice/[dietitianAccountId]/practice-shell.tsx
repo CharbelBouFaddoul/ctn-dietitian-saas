@@ -38,6 +38,8 @@ interface PracticeContextValue {
   name: string;
   role: string;
   subscriptionAccess: SubscriptionAccess | null;
+  /** False when AI entitlement or runtime (AI_ENABLED) is off. */
+  aiAvailable: boolean;
 }
 
 const PracticeContext = createContext<PracticeContextValue | null>(null);
@@ -64,6 +66,7 @@ export function PracticeShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [practice, setPractice] = useState<PracticeDetail | null>(null);
   const [access, setAccess] = useState<SubscriptionAccess | null>(null);
+  const [aiAvailable, setAiAvailable] = useState(false);
   const [state, setState] = useState<"loading" | "ok" | "locked" | "unauth" | "forbidden">("loading");
   const [unreadMessages, setUnreadMessages] = useState(0);
 
@@ -115,6 +118,19 @@ export function PracticeShell({ children }: { children: ReactNode }) {
         const practiceData = await api<PracticeDetail>(`/api/v1/dietitian/${dietitianAccountId}`);
         if (cancelled) return;
         setPractice(practiceData);
+        try {
+          const aiUsage = await api<{ available?: boolean; enabled?: boolean; providerConfigured?: boolean }>(
+            `/api/v1/dietitian/${dietitianAccountId}/ai/usage`,
+          );
+          if (!cancelled) {
+            setAiAvailable(
+              aiUsage.available === true ||
+                (aiUsage.enabled === true && aiUsage.providerConfigured !== false),
+            );
+          }
+        } catch {
+          if (!cancelled) setAiAvailable(false);
+        }
         setState("ok");
       } catch (error) {
         if (cancelled) return;
@@ -197,7 +213,6 @@ export function PracticeShell({ children }: { children: ReactNode }) {
       label: "Patients",
       items: [
         { href: `${base}/clients`, label: "Clients", icon: PracticeNavIcons.clients },
-        { href: `${base}/documents`, label: "Documents", icon: PracticeNavIcons.documents },
         { href: `${base}/messages`, label: "Messages", icon: PracticeNavIcons.messages, badge: unreadMessages },
       ],
     },
@@ -222,7 +237,7 @@ export function PracticeShell({ children }: { children: ReactNode }) {
       label: "Insights",
       items: [
         { href: `${base}/analytics`, label: "Analytics", icon: PracticeNavIcons.analytics },
-        { href: `${base}/ai`, label: "AI", icon: PracticeNavIcons.ai },
+        ...(aiAvailable ? [{ href: `${base}/ai`, label: "AI", icon: PracticeNavIcons.ai }] : []),
         { href: `${base}/automations`, label: "Automations", icon: PracticeNavIcons.automations },
       ],
     },
@@ -258,6 +273,7 @@ export function PracticeShell({ children }: { children: ReactNode }) {
         name: practice.name,
         role,
         subscriptionAccess: access,
+        aiAvailable,
       }}
     >
       <AppShell

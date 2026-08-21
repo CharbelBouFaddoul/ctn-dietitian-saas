@@ -48,7 +48,16 @@ Run three application services from the same images:
 
 Plus managed PostgreSQL, Redis, and a persistent volume mounted at `FILE_STORAGE_PATH` (`/data/storage`).
 
-Document binaries live under `$FILE_STORAGE_PATH/documents/organizations/{orgId}/clients/{clientId}/`. API and worker containers must share the same volume mount.
+Document binaries live under `$FILE_STORAGE_PATH/dietitians/{dietitianAccountId}/clients/{clientId}/`. API and worker containers must share the same volume mount. All binary uploads go through `StorageService` under this root so one Coolify volume covers documents and any future upload types (photos, etc.).
+
+### Coolify persistent storage checklist
+
+1. Attach a **persistent volume** to the **API** service at `/data/storage` (named volume or host bind that survives redeploys — not an ephemeral container filesystem).
+2. If you run a **worker**, mount the **same** volume at `/data/storage` on that service too.
+3. Set `FILE_STORAGE_PATH=/data/storage` on API and worker (same value everywhere).
+4. Do **not** point `FILE_STORAGE_PATH` at a path inside the image or an unsaved container layer; uploads will disappear on every deploy.
+5. After first deploy, confirm a test upload creates files under `/data/storage/dietitians/...` on the volume and that downloads still work after a redeploy.
+6. Optional: `MAX_DOCUMENT_BYTES` (default `20971520` = 20 MB) for upload size; keep UI and API aligned if you change it.
 
 ### Required production environment
 

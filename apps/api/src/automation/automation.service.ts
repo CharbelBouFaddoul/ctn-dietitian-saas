@@ -14,6 +14,7 @@ import type {
 import { z } from "@nutrition-saas/validation";
 import { SecurityEventLogger } from "../auth/security-event.logger";
 import { EntitlementService } from "../entitlements/entitlement.service";
+import { PlatformSettingsService } from "../platform-settings/platform-settings.service";
 import { PrismaService } from "../prisma/prisma.service";
 import type { DietitianTenantContext } from "../dietitian/dietitian.types";
 import { tenantWhere } from "../dietitian/tenant-scope";
@@ -28,6 +29,7 @@ export class AutomationService {
     private readonly entitlements: EntitlementService,
     private readonly usage: AutomationUsageService,
     private readonly security: SecurityEventLogger,
+    private readonly platformSettings: PlatformSettingsService,
   ) {}
 
   assertCanManage(_tenant: DietitianTenantContext): void {
@@ -61,6 +63,8 @@ export class AutomationService {
   ) {
     this.assertCanManage(tenant);
     const { configuration, conditions } = this.validatePayload(input);
+    await this.assertEmailActionAllowed(input.actionType);
+    await this.assertClientScope(tenant.dietitianAccountId, configuration);
     const enabled = await this.entitlements.can(tenant.dietitianAccountId, FEATURE_KEYS.AUTOMATION);
     if (!enabled) {
       throw new ForbiddenException("Automation is not enabled for this organization");
@@ -131,6 +135,8 @@ export class AutomationService {
     const configuration = input.configuration ?? existing.configuration;
     const conditions = input.conditions === undefined ? existing.conditions : input.conditions;
     const validated = this.validatePayload({ triggerType, actionType, configuration, conditions });
+    await this.assertEmailActionAllowed(actionType);
+    await this.assertClientScope(tenant.dietitianAccountId, validated.configuration);
 
     const rule = await this.prisma.automationRule.update({
       where: { id: automationId },
@@ -160,6 +166,7 @@ export class AutomationService {
   async activate(tenant: DietitianTenantContext, automationId: string) {
     this.assertCanManage(tenant);
     const existing = await this.findRule(tenant.dietitianAccountId, automationId);
+    await this.assertEmailActionAllowed(existing.actionType);
     const enabled = await this.entitlements.can(tenant.dietitianAccountId, FEATURE_KEYS.AUTOMATION);
     if (!enabled) {
       throw new ForbiddenException("Automation is not enabled for this organization");
@@ -260,7 +267,40 @@ export class AutomationService {
 
   async getUsage(tenant: DietitianTenantContext) {
     this.assertCanManage(tenant);
-    return this.usage.getUsageSummary(tenant.dietitianAccountId);
+    const [summary, productEmailEnabled] = await Promise.all([
+      this.usage.getUsageSummary(tenant.dietitianAccountId),
+      this.platformSettings.isEmailNotificationsEnabled(),
+    ]);
+    return { ...summary, productEmailEnabled };
+  }
+
+  private async assertEmailActionAllowed(actionType: AutomationActionType): Promise<void> {
+    if (actionType !== "SEND_EMAIL") return;
+    const enabled = await this.platformSettings.isEmailNotificationsEnabled();
+    if (!enabled) {
+      throw new BadRequestException("Product email is disabled for this platform");
+    }
+  }
+
+  private async assertClientScope(
+    dietitianAccountId: string,
+    configuration: { clientScope?: string; clientIds?: string[] },
+  ): Promise<void> {
+    if (configuration.clientScope !== "SELECTED") return;
+    const ids = [...new Set(configuration.clientIds ?? [])];
+    if (ids.length === 0) {
+      throw new BadRequestException("Select at least one client for this automation");
+    }
+    const count = await this.prisma.client.count({
+      where: {
+        dietitianAccountId,
+        id: { in: ids },
+        archivedAt: null,
+      },
+    });
+    if (count !== ids.length) {
+      throw new BadRequestException("One or more selected clients were not found in this clinic");
+    }
   }
 
   async getAdminSummary(dietitianAccountId: string) {
@@ -293,13 +333,23 @@ export class AutomationService {
     actionType: AutomationActionType;
     configuration: unknown;
   }): string {
-    const config = rule.configuration as { timing?: Record<string, unknown>; recipient?: string };
+    const config = rule.configuration as {
+      timing?: Record<string, unknown>;
+      recipient?: string;
+      clientScope?: string;
+      clientIds?: string[];
+    };
     const timing = config.timing ?? {};
+    const scopeLabel =
+      config.clientScope === "SELECTED" && config.clientIds?.length
+        ? `Clients: ${config.clientIds.length} selected`
+        : "Clients: all";
     const parts = [
       `When: ${TRIGGER_LABELS[rule.triggerType]}`,
       Object.keys(timing).length ? `Timing: ${JSON.stringify(timing)}` : null,
       `Then: ${ACTION_LABELS[rule.actionType]}`,
       config.recipient ? `To: ${config.recipient}` : null,
+      scopeLabel,
     ].filter(Boolean);
     return `${rule.name} — ${parts.join(". ")}`;
   }

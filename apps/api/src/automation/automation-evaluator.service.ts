@@ -32,26 +32,69 @@ export class AutomationEvaluatorService {
     const configuration = rule.configuration as AutomationConfiguration;
     const conditions = (rule.conditions ?? {}) as AutomationConditions;
 
+    let candidates: AutomationCandidate[];
     switch (rule.triggerType) {
       case "APPOINTMENT_UPCOMING":
-        return this.appointmentUpcoming(this.accountId(rule), configuration, conditions, timezone, localDate);
+        candidates = await this.appointmentUpcoming(
+          this.accountId(rule),
+          configuration,
+          conditions,
+          timezone,
+          localDate,
+        );
+        break;
       case "APPOINTMENT_MISSED":
-        return this.appointmentMissed(this.accountId(rule), configuration, timezone, localDate);
+        candidates = await this.appointmentMissed(this.accountId(rule), configuration, timezone, localDate);
+        break;
       case "CLIENT_INACTIVE":
-        return this.clientInactive(this.accountId(rule), configuration, timezone, localDate);
+        candidates = await this.clientInactive(this.accountId(rule), configuration, timezone, localDate);
+        break;
       case "MEAL_PLAN_ENDING":
-        return this.mealPlanEnding(this.accountId(rule), configuration, timezone, localDate);
+        candidates = await this.mealPlanEnding(this.accountId(rule), configuration, timezone, localDate);
+        break;
       case "INVOICE_OVERDUE":
-        return this.invoiceOverdue(this.accountId(rule), conditions, localDate);
+        candidates = await this.invoiceOverdue(this.accountId(rule), conditions, localDate);
+        break;
       case "TASK_DUE":
-        return this.taskDue(this.accountId(rule), conditions, timezone, localDate);
+        candidates = await this.taskDue(this.accountId(rule), conditions, timezone, localDate);
+        break;
       case "CLIENT_CHECKIN_DUE":
-        return this.clientCheckinDue(rule, configuration, timezone, localDate);
+        candidates = await this.clientCheckinDue(rule, configuration, timezone, localDate);
+        break;
       case "SCHEDULED_DATE_TIME":
-        return this.scheduledDateTime(rule, configuration, timezone, localDate);
+        candidates = await this.scheduledDateTime(rule, configuration, timezone, localDate);
+        break;
       default:
-        return [];
+        candidates = [];
     }
+
+    return this.applyClientScope(candidates, configuration);
+  }
+
+  /** Narrow candidates to selected clients, or expand org-wide triggers per selected client. */
+  private applyClientScope(
+    candidates: AutomationCandidate[],
+    configuration: AutomationConfiguration,
+  ): AutomationCandidate[] {
+    if (configuration.clientScope !== "SELECTED" || !configuration.clientIds?.length) {
+      return candidates;
+    }
+    const allowed = new Set(configuration.clientIds);
+    const scoped: AutomationCandidate[] = [];
+    for (const candidate of candidates) {
+      if (candidate.clientId) {
+        if (allowed.has(candidate.clientId)) scoped.push(candidate);
+        continue;
+      }
+      for (const clientId of configuration.clientIds) {
+        scoped.push({
+          ...candidate,
+          clientId,
+          triggerKey: `${candidate.triggerKey}:client:${clientId}`,
+        });
+      }
+    }
+    return scoped;
   }
 
   private async appointmentUpcoming(

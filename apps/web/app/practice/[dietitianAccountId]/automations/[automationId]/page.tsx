@@ -15,6 +15,11 @@ import {
   humanizeLabel,
 } from "@nutrition-saas/ui";
 import { api } from "../../../../../lib/api";
+import {
+  automationActionLabel,
+  automationRecipientLabel,
+  automationTriggerLabel,
+} from "../../../../../lib/automation-labels";
 import { errorMessage } from "../../../../../lib/humanize-error";
 
 interface AutomationRule {
@@ -24,7 +29,7 @@ interface AutomationRule {
   summary: string;
   triggerType: string;
   actionType: string;
-  configuration: unknown;
+  configuration: { recipient?: string } | unknown;
 }
 
 interface AutomationRun {
@@ -39,35 +44,19 @@ interface AutomationRun {
   createdAt: string;
 }
 
-const TRIGGERS: Record<string, string> = {
-  APPOINTMENT_UPCOMING: "Appointment is approaching",
-  CLIENT_INACTIVE: "Client has no recent activity",
-  INVOICE_OVERDUE: "Invoice is overdue",
-  TASK_DUE: "Task is due today",
-  MEAL_PLAN_ENDING: "Meal plan is ending soon",
-  CLIENT_CHECKIN_DUE: "Client check-in is due",
-};
-
-const ACTIONS: Record<string, string> = {
-  SEND_IN_APP_NOTIFICATION: "Send in-app notification",
-  SEND_EMAIL: "Send email",
-  CREATE_TASK: "Create follow-up task",
-  CREATE_CLIENT_NOTIFICATION: "Notify client (portal)",
-};
-
-function triggerLabel(value: string): string {
-  return TRIGGERS[value] ?? humanizeLabel(value);
-}
-
-function actionLabel(value: string): string {
-  return ACTIONS[value] ?? humanizeLabel(value);
-}
-
 function runDuration(run: AutomationRun): string {
   if (!run.startedAt || !run.completedAt) return "—";
   const ms = new Date(run.completedAt).getTime() - new Date(run.startedAt).getTime();
   if (ms < 1000) return `${ms}ms`;
   return `${(ms / 1000).toFixed(1)}s`;
+}
+
+function configRecipient(configuration: AutomationRule["configuration"]): string | null {
+  if (configuration && typeof configuration === "object" && "recipient" in configuration) {
+    const value = (configuration as { recipient?: string }).recipient;
+    return value ?? null;
+  }
+  return null;
 }
 
 export default function AutomationDetailPage() {
@@ -107,11 +96,23 @@ export default function AutomationDetailPage() {
     return <ErrorState title="Automation not found" />;
   }
 
-  const successCount = runs.filter((r) => r.status === "COMPLETED" || r.status === "SUCCESS").length;
+  const successCount = runs.filter(
+    (r) => r.status === "SUCCEEDED" || r.status === "COMPLETED" || r.status === "SUCCESS",
+  ).length;
   const failCount = runs.filter((r) => r.status === "FAILED" || r.status === "ERROR").length;
+  const recipient = configRecipient(rule.configuration);
+  const showWho = rule.actionType !== "CREATE_TASK" && recipient;
+  const config =
+    rule.configuration && typeof rule.configuration === "object"
+      ? (rule.configuration as { clientScope?: string; clientIds?: string[] })
+      : {};
+  const scopeText =
+    config.clientScope === "SELECTED" && config.clientIds?.length
+      ? `${config.clientIds.length} selected client${config.clientIds.length === 1 ? "" : "s"}`
+      : "All clients";
 
   return (
-    <section>
+    <section className="ui-automations">
       <Breadcrumbs
         items={[
           { href: `/practice/${dietitianAccountId}/automations`, label: "Automations" },
@@ -121,18 +122,26 @@ export default function AutomationDetailPage() {
 
       <PageHeader
         title={rule.name}
-        description={`When ${triggerLabel(rule.triggerType).toLowerCase()} → ${actionLabel(rule.actionType).toLowerCase()}`}
+        description={`When ${automationTriggerLabel(rule.triggerType).toLowerCase()} → ${automationActionLabel(rule.actionType).toLowerCase()}`}
         actions={<StatusBadge status={rule.status} label={humanizeLabel(rule.status)} />}
       />
 
-      <Section title="Rule details" tone="muted">
-        <dl style={{ display: "grid", gridTemplateColumns: "max-content 1fr", gap: "8px 24px", margin: 0 }}>
-          <dt className="ui-muted" style={{ fontSize: "0.875rem" }}>WHEN</dt>
-          <dd style={{ margin: 0, fontWeight: 500 }}>{triggerLabel(rule.triggerType)}</dd>
-          <dt className="ui-muted" style={{ fontSize: "0.875rem" }}>THEN</dt>
-          <dd style={{ margin: 0, fontWeight: 500 }}>{actionLabel(rule.actionType)}</dd>
-          <dt className="ui-muted" style={{ fontSize: "0.875rem" }}>Status</dt>
-          <dd style={{ margin: 0 }}>
+      <Section title="Rule details" tone="mint">
+        <dl className="ui-automations__detail-grid">
+          <dt>When</dt>
+          <dd>{automationTriggerLabel(rule.triggerType)}</dd>
+          <dt>Then</dt>
+          <dd>{automationActionLabel(rule.actionType)}</dd>
+          {showWho ? (
+            <>
+              <dt>Who</dt>
+              <dd>{automationRecipientLabel(recipient)}</dd>
+            </>
+          ) : null}
+          <dt>Apply to</dt>
+          <dd>{scopeText}</dd>
+          <dt>Status</dt>
+          <dd>
             <StatusBadge status={rule.status} label={humanizeLabel(rule.status)} />
           </dd>
         </dl>

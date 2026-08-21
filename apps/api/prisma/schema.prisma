@@ -674,6 +674,7 @@ enum AutomationActionType {
   SEND_EMAIL
   CREATE_TASK
   CREATE_CLIENT_NOTIFICATION
+  SEND_MESSAGE
 }
 
 enum AutomationRunStatus {

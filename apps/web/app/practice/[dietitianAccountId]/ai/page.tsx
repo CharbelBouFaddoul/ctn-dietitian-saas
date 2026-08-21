@@ -2,13 +2,16 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { Alert, Badge, Card, PageHeader, Section, humanizeLabel } from "@nutrition-saas/ui";
+import { useParams, useRouter } from "next/navigation";
+import { Alert, Badge, Card, LoadingState, PageHeader, Section, humanizeLabel } from "@nutrition-saas/ui";
 import { api } from "../../../../lib/api";
 import { errorMessage } from "../../../../lib/humanize-error";
+import { usePractice } from "../practice-shell";
 
 interface Usage {
   enabled: boolean;
+  available?: boolean;
+  providerConfigured?: boolean;
   limit: number | null;
   used: number;
   remaining: number | null;
@@ -45,16 +48,32 @@ const AI_TOOLS = [
 export default function PracticeAiPage() {
   const params = useParams<{ dietitianAccountId: string }>();
   const dietitianAccountId = params.dietitianAccountId;
+  const router = useRouter();
+  const { aiAvailable } = usePractice();
   const [usage, setUsage] = useState<Usage | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!aiAvailable) {
+      router.replace(`/practice/${dietitianAccountId}`);
+      return;
+    }
     void api<Usage>(`/api/v1/dietitian/${dietitianAccountId}/ai/usage`)
-      .then(setUsage)
+      .then((data) => {
+        const available = data.available ?? (data.enabled && data.providerConfigured !== false);
+        if (!available) {
+          router.replace(`/practice/${dietitianAccountId}`);
+          return;
+        }
+        setUsage(data);
+      })
       .catch((err) => setError(errorMessage(err, "Unable to load AI usage")));
-  }, [dietitianAccountId]);
+  }, [dietitianAccountId, aiAvailable, router]);
 
-  const aiEnabled = usage === null || usage.enabled;
+  if (!aiAvailable) {
+    return <LoadingState>Opening clinic…</LoadingState>;
+  }
+
   const usageText =
     usage && usage.enabled
       ? `${usage.used}${usage.limit !== null ? ` / ${usage.limit}` : ""} used this ${humanizeLabel(usage.periodKey)}${usage.remaining !== null ? ` · ${usage.remaining} remaining` : ""}`
@@ -79,42 +98,21 @@ export default function PracticeAiPage() {
           <Badge tone={usage.enabled ? "success" : "danger"}>
             {usage.enabled ? "AI enabled" : "AI not enabled for this clinic"}
           </Badge>
-        ) : (
-          <Badge tone="neutral">Checking…</Badge>
-        )}
+        ) : null}
         {usageText ? <Badge tone="neutral">{usageText}</Badge> : null}
       </div>
 
-      <Section
-        title="Available tools"
-        description="All tools run inside a client workspace. Select a client, then look for the AI assist tab."
-      >
+      <Section title="Available tools" description="Run these from a client chart under Clinic tools → AI.">
         <div className="ui-grid">
           {AI_TOOLS.map((tool) => (
-            <Card key={tool.key}>
-              <h3 style={{ margin: "0 0 6px", fontSize: "0.9375rem", fontWeight: 600 }}>{tool.title}</h3>
-              <p className="ui-muted" style={{ margin: 0, fontSize: "0.875rem", lineHeight: 1.55 }}>
+            <Card key={tool.key} title={tool.title}>
+              <p className="ui-muted" style={{ margin: 0 }}>
                 {tool.description}
               </p>
             </Card>
           ))}
         </div>
       </Section>
-
-      {!aiEnabled ? (
-        <Alert tone="warning">
-          AI is not currently enabled for this clinic. Contact support to enable the feature.
-        </Alert>
-      ) : (
-        <Section tone="muted">
-          <p style={{ margin: 0, fontSize: "0.875rem" }}>
-            AI tools open inside a client's workspace — not on this page.{" "}
-            <Link href={`/practice/${dietitianAccountId}/clients`} className="ui-link">
-              Browse clients →
-            </Link>
-          </p>
-        </Section>
-      )}
     </section>
   );
 }

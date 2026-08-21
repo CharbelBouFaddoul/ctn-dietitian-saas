@@ -27,6 +27,7 @@ import {
   humanizeLabel,
 } from "@nutrition-saas/ui";
 import { AiPanel } from "../../../../../components/ai-panel";
+import { DocumentsLibrary, type DocumentsLibraryItem } from "../../../../../components/documents-library";
 import { JoinCodePanel } from "../../../../../components/join-code-panel";
 import { ClientAssessmentsPanel } from "../../../../../components/client-assessments-panel";
 import { ClientEvolutionPanel } from "../../../../../components/client-evolution-panel";
@@ -34,6 +35,7 @@ import { ClientTimelinePanel } from "../../../../../components/client-timeline-p
 import { ClientTrackingPanel } from "../../../../../components/client-tracking-panel";
 import { ClinicTagsManager } from "../../../../../components/clinic-tags-manager";
 import { api, apiUrl } from "../../../../../lib/api";
+import { downloadAuthenticatedFile } from "../../../../../lib/documents";
 import { formatDate, formatMoney } from "../../../../../lib/format";
 import { errorMessage } from "../../../../../lib/humanize-error";
 import { canManageClients } from "../../../../../lib/practice-access";
@@ -119,14 +121,21 @@ const chartSections: ChartSection[] = [
   },
 ];
 
-const tabs = chartSections.flatMap((section) => section.tabs);
-
-function isTab(value: string | null): value is Tab {
-  return tabs.some((item) => item.id === value);
+function chartSectionsForAi(aiAvailable: boolean): ChartSection[] {
+  if (aiAvailable) return chartSections;
+  return chartSections.map((section) =>
+    section.id === "practice"
+      ? { ...section, tabs: section.tabs.filter((tab) => tab.id !== "ai") }
+      : section,
+  );
 }
 
-function sectionForTab(tab: Tab): ChartSection {
-  return chartSections.find((section) => section.tabs.some((item) => item.id === tab)) ?? chartSections[0]!;
+function isTab(value: string | null, sections: ChartSection[]): value is Tab {
+  return sections.some((section) => section.tabs.some((item) => item.id === value));
+}
+
+function sectionForTab(tab: Tab, sections: ChartSection[]): ChartSection {
+  return sections.find((section) => section.tabs.some((item) => item.id === tab)) ?? sections[0]!;
 }
 
 type Portfolio = {
@@ -363,10 +372,15 @@ function ClientWorkspacePage() {
   const router = useRouter();
   const practice = usePractice();
   const allowManage = canManageClients(practice.role);
+  const visibleSections = chartSectionsForAi(practice.aiAvailable);
   const base = `/api/v1/dietitian/${dietitianAccountId}/clients/${clientId}`;
   const orgBase = `/api/v1/dietitian/${dietitianAccountId}`;
   const tabFromQuery = searchParams.get("tab");
-  const [tab, setTab] = useState<Tab>(isTab(tabFromQuery) ? tabFromQuery : "overview");
+  const [tab, setTab] = useState<Tab>(() =>
+    isTab(tabFromQuery, chartSectionsForAi(true)) && !(tabFromQuery === "ai" && !practice.aiAvailable)
+      ? (tabFromQuery as Tab)
+      : "overview",
+  );
 
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -446,7 +460,9 @@ function ClientWorkspacePage() {
     setTrackingDate(next.toISOString().slice(0, 10));
   }
 
-  const [clientDocuments, setClientDocuments] = useState<Array<{ id: string; filename: string; visibility: string }>>([]);
+  const [clientDocuments, setClientDocuments] = useState<DocumentsLibraryItem[]>([]);
+  const [documentsUploading, setDocumentsUploading] = useState(false);
+  const [documentsDownloadingId, setDocumentsDownloadingId] = useState<string | null>(null);
   const [clientInvoices, setClientInvoices] = useState<
     Array<{ id: string; invoiceNumber: string | null; status: string; dueDate: string | null; total: number; currency: string }>
   >([]);
@@ -472,7 +488,7 @@ function ClientWorkspacePage() {
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
 
   function selectTab(next: string, extras?: { metric?: string }) {
-    const value = isTab(next) ? next : "overview";
+    const value = isTab(next, visibleSections) ? next : "overview";
     if (value === "messages") {
       router.push(`/practice/${dietitianAccountId}/messages?clientId=${clientId}`);
       return;
@@ -491,14 +507,14 @@ function ClientWorkspacePage() {
   }
 
   function selectSection(sectionId: string) {
-    const section = chartSections.find((item) => item.id === sectionId) ?? chartSections[0]!;
-    const current = sectionForTab(tab);
+    const section = visibleSections.find((item) => item.id === sectionId) ?? visibleSections[0]!;
+    const current = sectionForTab(tab, visibleSections);
     if (current.id === section.id) return;
     const firstTab = section.tabs[0];
     if (firstTab) selectTab(firstTab.id);
   }
 
-  const activeSection = sectionForTab(tab);
+  const activeSection = sectionForTab(tab, visibleSections);
   const activeSubTab = activeSection.tabs.find((item) => item.id === tab) ?? activeSection.tabs[0];
 
   useEffect(() => {
@@ -506,6 +522,13 @@ function ClientWorkspacePage() {
       router.replace(`/practice/${dietitianAccountId}/messages?clientId=${clientId}`);
     }
   }, [tab, dietitianAccountId, clientId, router]);
+
+  useEffect(() => {
+    if (tab === "ai" && !practice.aiAvailable) {
+      selectTab("overview");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only react when AI availability flips
+  }, [practice.aiAvailable, tab]);
 
   function applyPortfolio(data: Portfolio) {
     setPortfolio(data);
@@ -665,7 +688,7 @@ function ClientWorkspacePage() {
       <div className="ui-client-chart__tabs ui-client-chart__nav">
         <div className="ui-client-chart__sections">
           <Tabs
-            items={chartSections.map((section) => ({ id: section.id, label: section.label }))}
+            items={visibleSections.map((section) => ({ id: section.id, label: section.label }))}
             value={activeSection.id}
             onChange={selectSection}
           />
@@ -1357,66 +1380,50 @@ function ClientWorkspacePage() {
 
       {/* ── DOCUMENTS ── */}
       {tab === "documents" ? (
-        <div className="ui-client-chart__panel ui-stack">
-          <Section title="Upload document">
-            <form
-              className="ui-client-chart__toolbar"
-              onSubmit={(event) => {
-                event.preventDefault();
-                const form = event.currentTarget;
-                const fileInput = form.elements.namedItem("file") as HTMLInputElement;
-                const visibilityInput = form.elements.namedItem("visibility") as HTMLSelectElement;
-                const file = fileInput.files?.[0];
-                if (!file) return;
+        <div className="ui-client-chart__panel">
+          <DocumentsLibrary
+            variant="clinic"
+            documents={clientDocuments}
+            uploading={documentsUploading}
+            downloadingId={documentsDownloadingId}
+            onUpload={async (file, visibility) => {
+              setDocumentsUploading(true);
+              setError(null);
+              try {
                 const body = new FormData();
                 body.append("file", file);
-                body.append("visibility", visibilityInput.value);
-                void fetch(apiUrl(`${base}/documents`), { method: "POST", body, credentials: "include" })
-                  .then((res) => {
-                    if (!res.ok) throw new Error("Upload failed");
-                    fileInput.value = "";
-                    return api<typeof clientDocuments>(`${base}/documents`).then(setClientDocuments);
-                  })
-                  .catch((err) => setError(errorMessage(err, "Unable to upload document")));
-              }}
-            >
-              <input type="file" name="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.docx" style={{ flex: 1 }} />
-              <Select name="visibility" defaultValue="INTERNAL" style={{ width: "auto" }}>
-                <option value="INTERNAL">Internal only</option>
-                <option value="SHARED">Shared with client</option>
-              </Select>
-              <Button type="submit" size="sm" variant="secondary">
-                Upload
-              </Button>
-            </form>
-          </Section>
-
-          <Section title="Documents">
-            {clientDocuments.length === 0 ? (
-              <EmptyState title="No documents yet" />
-            ) : (
-              <ul className="ui-client-chart__list">
-                {clientDocuments.map((doc) => (
-                  <li key={doc.id}>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                      <span style={{ fontWeight: 500 }}>{doc.filename}</span>
-                      <a
-                        href={apiUrl(`${base}/documents/${doc.id}/download`)}
-                        className="ui-link"
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        Download
-                      </a>
-                    </div>
-                    <Badge tone={doc.visibility === "SHARED" ? "info" : "neutral"}>
-                      {humanizeLabel(doc.visibility)}
-                    </Badge>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Section>
+                body.append("visibility", visibility);
+                const res = await fetch(apiUrl(`${base}/documents`), {
+                  method: "POST",
+                  body,
+                  credentials: "include",
+                });
+                if (!res.ok) {
+                  throw new Error(res.status === 413 ? "File exceeds the 20 MB limit" : "Upload failed");
+                }
+                setClientDocuments(await api<DocumentsLibraryItem[]>(`${base}/documents`));
+              } catch (err) {
+                setError(errorMessage(err, "Unable to upload document"));
+                throw err;
+              } finally {
+                setDocumentsUploading(false);
+              }
+            }}
+            onDownload={async (doc) => {
+              setDocumentsDownloadingId(doc.id);
+              setError(null);
+              try {
+                await downloadAuthenticatedFile(
+                  apiUrl(`${base}/documents/${doc.id}/download`),
+                  doc.filename,
+                );
+              } catch (err) {
+                setError(errorMessage(err, "Unable to download document"));
+              } finally {
+                setDocumentsDownloadingId(null);
+              }
+            }}
+          />
         </div>
       ) : null}
 
@@ -1556,7 +1563,7 @@ function ClientWorkspacePage() {
       ) : null}
 
       {/* ── AI ── */}
-      {tab === "ai" ? (
+      {tab === "ai" && practice.aiAvailable ? (
         <div className="ui-client-chart__ai">
           <AiPanel
             dietitianAccountId={dietitianAccountId}

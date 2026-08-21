@@ -69,6 +69,7 @@ export class AiService {
     const remaining = limit === null ? null : Math.max(0, limit - used);
     return {
       enabled,
+      available: enabled && this.isRuntimeEnabled(),
       limit,
       used,
       remaining,

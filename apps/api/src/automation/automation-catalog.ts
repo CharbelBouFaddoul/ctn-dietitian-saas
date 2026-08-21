@@ -37,10 +37,11 @@ export const TRIGGER_LABELS: Record<AutomationTriggerType, string> = {
 };
 
 export const ACTION_LABELS: Record<AutomationActionType, string> = {
-  SEND_IN_APP_NOTIFICATION: "Send in-app notification",
+  SEND_IN_APP_NOTIFICATION: "Clinic notification",
   SEND_EMAIL: "Send email",
-  CREATE_TASK: "Create task",
-  CREATE_CLIENT_NOTIFICATION: "Send client notification",
+  CREATE_TASK: "Create follow-up task",
+  CREATE_CLIENT_NOTIFICATION: "Client portal notification",
+  SEND_MESSAGE: "Send message",
 };
 
 export const TEMPLATE_VAR_PATTERN = /\{\{([a-zA-Z0-9_.]+)\}\}/g;
