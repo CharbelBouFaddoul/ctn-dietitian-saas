@@ -9,7 +9,7 @@ import { ClientAccessService } from "../clients/client-access.service";
 import { ConversationService } from "./conversation.service";
 import { MessagingRecipientService } from "./messaging-recipient.service";
 import { NotificationService } from "../notifications/notification.service";
-import { MarkConversationReadDto, MessagePaginationQueryDto, SendMessageDto } from "./dto/messaging.dto";
+import { MarkConversationReadDto, MessagePaginationQueryDto, SendMessageDto, DeleteMessageDto } from "./dto/messaging.dto";
 import { requireDietitianAccountId } from "../dietitian/tenant-scope";
 
 @ApiTags("portal")
@@ -48,6 +48,7 @@ export class PortalMessagingController {
     return this.conversations.listMessages(
       conversation.id,
       requireDietitianAccountId(client),
+      user.id,
       query.before,
       query.limit ?? 50,
     );
@@ -71,6 +72,25 @@ export class PortalMessagingController {
       body: body.body,
       notifyUserIds,
       senderIsClient: true,
+    });
+  }
+
+  @Post("messages/:messageId/delete")
+  @ApiOperation({ summary: "Delete a message for me or for everyone" })
+  async deleteMessage(
+    @CurrentUser() user: AuthenticatedRequestUser,
+    @CurrentSession() session: AuthenticatedSession,
+    @Param("messageId", ParseUUIDPipe) messageId: string,
+    @Body() body: DeleteMessageDto,
+  ) {
+    const client = await this.access.assertPortalAccess(user.id, { activeClientId: session.activeClientId });
+    const conversation = await this.conversations.getOrCreate(client);
+    return this.conversations.deleteMessage({
+      conversation,
+      client,
+      messageId,
+      actorUserId: user.id,
+      scope: body.scope,
     });
   }
 

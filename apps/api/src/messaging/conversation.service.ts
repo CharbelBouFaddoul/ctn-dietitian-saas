@@ -8,6 +8,10 @@ import { MessagingRealtimeService } from "./messaging-realtime.service";
 import { MessagingRecipientService } from "./messaging-recipient.service";
 
 const PREVIEW_MAX = 120;
+/** Absolute max age to delete for everyone (from send time). */
+const DELETE_EVERYONE_MAX_AGE_MS = 30 * 60 * 1000;
+/** After a peer has seen the message, delete-for-everyone window from that seen time. */
+const DELETE_EVERYONE_AFTER_SEEN_MS = 60 * 1000;
 
 function previewText(value: string, max = PREVIEW_MAX): string {
   const chars = Array.from(value);
@@ -169,7 +173,7 @@ export class ConversationService {
       ),
     );
 
-    const response = this.toMessageResponse(message);
+    const response = this.toMessageResponse(message, input.senderUserId);
     this.realtime.emitMessageCreated({
       messageId: response.id,
       conversationId: response.conversationId,
@@ -196,18 +200,141 @@ export class ConversationService {
     return response;
   }
 
-  async listMessages(conversationId: string, dietitianAccountId: string, before?: string, limit = 50) {
-    const rows = await this.prisma.message.findMany({
+  async listMessages(
+    conversationId: string,
+    dietitianAccountId: string,
+    viewerUserId: string,
+    before?: string,
+    limit = 50,
+  ) {
+    const [rows, readStates] = await Promise.all([
+      this.prisma.message.findMany({
+        where: {
+          conversationId,
+          dietitianAccountId,
+          hides: { none: { userId: viewerUserId } },
+          ...(before ? { createdAt: { lt: new Date(before) } } : {}),
+        },
+        orderBy: { createdAt: "desc" },
+        take: Math.min(limit, 100),
+      }),
+      this.prisma.conversationReadState.findMany({
+        where: { conversationId },
+        select: { readerUserId: true, lastReadAt: true },
+      }),
+    ]);
+    const now = Date.now();
+    return rows
+      .reverse()
+      .map((row) => this.toMessageResponse(row, viewerUserId, readStates, now));
+  }
+
+  async deleteMessage(input: {
+    conversation: Conversation;
+    client: Client;
+    messageId: string;
+    actorUserId: string;
+    scope: "me" | "everyone";
+  }) {
+    const dietitianAccountId = requireDietitianAccountId(input.client);
+    const message = await this.prisma.message.findFirst({
       where: {
-        conversationId,
+        id: input.messageId,
+        conversationId: input.conversation.id,
         dietitianAccountId,
-        deletedAt: null,
-        ...(before ? { createdAt: { lt: new Date(before) } } : {}),
+        clientId: input.client.id,
       },
-      orderBy: { createdAt: "desc" },
-      take: Math.min(limit, 100),
     });
-    return rows.reverse().map((row) => this.toMessageResponse(row));
+    if (!message) {
+      throw new NotFoundException("Message not found");
+    }
+
+    if (input.scope === "me") {
+      await this.prisma.messageHide.upsert({
+        where: {
+          messageId_userId: { messageId: message.id, userId: input.actorUserId },
+        },
+        create: { messageId: message.id, userId: input.actorUserId },
+        update: {},
+      });
+      this.realtime.emitMessageDeleted({
+        messageId: message.id,
+        conversationId: input.conversation.id,
+        clientId: input.client.id,
+        scope: "me",
+        userId: input.actorUserId,
+      });
+      return { ok: true, scope: "me" as const, messageId: message.id };
+    }
+
+    if (message.senderUserId !== input.actorUserId) {
+      throw new ForbiddenException("Only the sender can delete a message for everyone");
+    }
+    if (message.deletedAt) {
+      return {
+        ok: true,
+        scope: "everyone" as const,
+        messageId: message.id,
+        message: this.toMessageResponse(message, input.actorUserId),
+      };
+    }
+
+    const readStates = await this.prisma.conversationReadState.findMany({
+      where: { conversationId: input.conversation.id },
+      select: { readerUserId: true, lastReadAt: true },
+    });
+    const eligibility = this.deleteForEveryoneEligibility(message, readStates, Date.now());
+    if (!eligibility.allowed) {
+      throw new BadRequestException(eligibility.reason);
+    }
+
+    const now = new Date();
+    const updated = await this.prisma.$transaction(async (tx) => {
+      // Soft-delete only: keep body in DB for audit/recovery; API never returns it once deleted.
+      const row = await tx.message.update({
+        where: { id: message.id },
+        data: { deletedAt: now },
+      });
+
+      if (input.conversation.lastMessageId === message.id) {
+        const previous = await tx.message.findFirst({
+          where: {
+            conversationId: input.conversation.id,
+            deletedAt: null,
+            id: { not: message.id },
+          },
+          orderBy: { createdAt: "desc" },
+        });
+        await tx.conversation.update({
+          where: { id: input.conversation.id },
+          data: previous
+            ? {
+                lastMessageId: previous.id,
+                lastMessageAt: previous.createdAt,
+                lastMessagePreview: previewText(previous.body),
+              }
+            : {
+                lastMessagePreview: "This message was deleted",
+              },
+        });
+      }
+
+      return row;
+    });
+
+    this.realtime.emitMessageDeleted({
+      messageId: updated.id,
+      conversationId: input.conversation.id,
+      clientId: input.client.id,
+      scope: "everyone",
+    });
+
+    return {
+      ok: true,
+      scope: "everyone" as const,
+      messageId: updated.id,
+      message: this.toMessageResponse(updated, input.actorUserId, readStates),
+    };
   }
 
   async markRead(
@@ -291,19 +418,72 @@ export class ConversationService {
     return map;
   }
 
-  private toMessageResponse(row: {
-    id: string;
-    conversationId: string;
-    senderUserId: string;
-    body: string;
-    createdAt: Date;
-  }) {
+  private deleteForEveryoneEligibility(
+    message: { senderUserId: string; createdAt: Date; deletedAt?: Date | null },
+    readStates: Array<{ readerUserId: string; lastReadAt: Date }>,
+    nowMs: number,
+  ): { allowed: true } | { allowed: false; reason: string } {
+    if (message.deletedAt) {
+      return { allowed: false, reason: "This message was already deleted" };
+    }
+
+    const ageMs = nowMs - message.createdAt.getTime();
+    if (ageMs > DELETE_EVERYONE_MAX_AGE_MS) {
+      return {
+        allowed: false,
+        reason: "Messages older than 30 minutes cannot be deleted for everyone",
+      };
+    }
+
+    const peerSeenAts = readStates
+      .filter(
+        (state) =>
+          state.readerUserId !== message.senderUserId &&
+          state.lastReadAt.getTime() >= message.createdAt.getTime(),
+      )
+      .map((state) => state.lastReadAt.getTime());
+
+    if (peerSeenAts.length > 0) {
+      const seenAtMs = Math.min(...peerSeenAts);
+      if (nowMs - seenAtMs > DELETE_EVERYONE_AFTER_SEEN_MS) {
+        return {
+          allowed: false,
+          reason: "Seen messages can only be deleted for everyone within 1 minute",
+        };
+      }
+    }
+
+    return { allowed: true };
+  }
+
+  private toMessageResponse(
+    row: {
+      id: string;
+      conversationId: string;
+      senderUserId: string;
+      body: string;
+      createdAt: Date;
+      deletedAt?: Date | null;
+    },
+    viewerUserId?: string,
+    readStates: Array<{ readerUserId: string; lastReadAt: Date }> = [],
+    nowMs = Date.now(),
+  ) {
+    const deleted = Boolean(row.deletedAt);
+    const isSender = viewerUserId != null && row.senderUserId === viewerUserId;
+    const canDeleteForEveryone =
+      isSender &&
+      this.deleteForEveryoneEligibility(row, readStates, nowMs).allowed;
+
     return {
       id: row.id,
       conversationId: row.conversationId,
       senderUserId: row.senderUserId,
-      body: row.body,
+      // Soft-deleted messages keep body in DB; clients only see a tombstone.
+      body: deleted ? "" : row.body,
       createdAt: row.createdAt.toISOString(),
+      deleted,
+      canDeleteForEveryone,
     };
   }
 }

@@ -28,7 +28,7 @@ export class PortalDashboardService {
     const conversation = await this.conversations.getOrCreate(client);
     const [messages, unreadMessages, upcoming, recentNotifications, unreadNotificationCount, tracking, mealPlan] =
       await Promise.all([
-        this.conversations.listMessages(conversation.id, dietitianAccountId, undefined, 5),
+        this.conversations.listMessages(conversation.id, dietitianAccountId, userId, undefined, 5),
         this.conversations.unreadCount(conversation.id, userId),
         this.prisma.appointment.findFirst({
           where: {

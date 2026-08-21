@@ -71,6 +71,7 @@ model User {
   mealPlansCreated        MealPlan[]               @relation("MealPlanCreatedBy")
   mealPlanVersionsCreated MealPlanVersion[]        @relation("MealPlanVersionCreatedBy")
   messagesSent            Message[]
+  messageHides            MessageHide[]
   documentsUploaded       Document[]               @relation("DocumentUploadedBy")
   documentsShared         Document[]               @relation("DocumentSharedBy")
   notifications           Notification[]
@@ -1483,10 +1484,25 @@ model Message {
   conversation     Conversation     @relation(fields: [conversationId], references: [id], onDelete: Restrict)
   sender           User             @relation(fields: [senderUserId], references: [id], onDelete: Restrict)
   dietitianAccount DietitianAccount @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
+  hides            MessageHide[]
 
   @@index([dietitianAccountId, clientId, createdAt])
   @@index([conversationId, createdAt])
   @@map("messages")
+}
+
+model MessageHide {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  messageId String   @map("message_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@index([userId, messageId])
+  @@map("message_hides")
 }
 
 model ConversationReadState {

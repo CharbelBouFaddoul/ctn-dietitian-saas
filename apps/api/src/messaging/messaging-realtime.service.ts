@@ -42,6 +42,15 @@ export type UnreadCountUpdatedEvent = {
   unreadCount: number;
 };
 
+export type MessageDeletedEvent = {
+  messageId: string;
+  conversationId: string;
+  clientId: string;
+  scope: "me" | "everyone";
+  /** Present when scope is "me" — only this user should drop the bubble. */
+  userId?: string;
+};
+
 /**
  * Thin emit helper so ConversationService can publish without depending on the gateway class.
  */
@@ -72,5 +81,14 @@ export class MessagingRealtimeService {
   emitUnreadCountUpdated(event: UnreadCountUpdatedEvent): void {
     if (!this.server) return;
     this.server.to(userRoom(event.userId)).emit("unread_count.updated", event);
+  }
+
+  emitMessageDeleted(event: MessageDeletedEvent): void {
+    if (!this.server) return;
+    if (event.scope === "me" && event.userId) {
+      this.server.to(userRoom(event.userId)).emit("message.deleted", event);
+      return;
+    }
+    this.server.to(conversationRoom(event.conversationId)).emit("message.deleted", event);
   }
 }

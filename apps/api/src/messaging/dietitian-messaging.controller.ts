@@ -20,7 +20,7 @@ import type { DietitianTenantContext } from "../dietitian/dietitian.types";
 import { requireDietitianAccountId } from "../dietitian/tenant-scope";
 import { ConversationService } from "./conversation.service";
 import { MessagingRecipientService } from "./messaging-recipient.service";
-import { MarkConversationReadDto, MessagePaginationQueryDto, SendMessageDto } from "./dto/messaging.dto";
+import { MarkConversationReadDto, MessagePaginationQueryDto, SendMessageDto, DeleteMessageDto } from "./dto/messaging.dto";
 import { NotificationService } from "../notifications/notification.service";
 import { PrismaService } from "../prisma/prisma.service";
 
@@ -84,6 +84,7 @@ export class DietitianMessagingController {
     return this.conversations.listMessages(
       conversation.id,
       requireDietitianAccountId(client),
+      tenant.userId,
       query.before,
       query.limit ?? 50,
     );
@@ -108,6 +109,25 @@ export class DietitianMessagingController {
       body: body.body,
       notifyUserIds,
       senderIsClient: false,
+    });
+  }
+
+  @Post("clients/:clientId/conversation/messages/:messageId/delete")
+  @ApiOperation({ summary: "Delete a message for me or for everyone" })
+  async deleteMessage(
+    @CurrentTenant() tenant: DietitianTenantContext,
+    @Param("clientId", ParseUUIDPipe) clientId: string,
+    @Param("messageId", ParseUUIDPipe) messageId: string,
+    @Body() body: DeleteMessageDto,
+  ) {
+    const client = await this.access.assertCanAccess(tenant, clientId, "read");
+    const conversation = await this.conversations.getOrCreate(client);
+    return this.conversations.deleteMessage({
+      conversation,
+      client,
+      messageId,
+      actorUserId: tenant.userId,
+      scope: body.scope,
     });
   }
 

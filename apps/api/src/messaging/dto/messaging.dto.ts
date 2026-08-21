@@ -7,6 +7,11 @@ export class SendMessageDto {
   body!: string;
 }
 
+export class DeleteMessageDto {
+  @IsIn(["me", "everyone"])
+  scope!: "me" | "everyone";
+}
+
 export class MarkConversationReadDto {
   @IsOptional()
   @IsString()
