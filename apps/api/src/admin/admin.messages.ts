@@ -2,6 +2,7 @@ export const ADMIN_MESSAGES = {
   forbidden: "Platform administration is not available",
   planNotAssignable: "Only ACTIVE plans can be assigned",
   planReferenced: "Plans that are referenced by subscriptions cannot be deleted",
+  lastPlatformAdmin: "At least one platform admin must remain",
   lastSuperAdmin: "At least one SUPER_ADMIN must remain",
   noSubscription: "Dietitian account has no subscription",
   featureNotFound: "Feature not found",

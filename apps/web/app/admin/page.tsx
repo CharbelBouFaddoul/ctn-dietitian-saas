@@ -49,7 +49,7 @@ export default function AdminHomePage() {
       try {
         const [dietitianList, userList, subList] = await Promise.all([
           api<ListResponse | unknown[]>("/api/v1/admin/dietitians"),
-          api<ListResponse | unknown[]>("/api/v1/admin/users"),
+          api<ListResponse | unknown[]>("/api/v1/admin/users?scope=app&pageSize=1"),
           api<ListResponse | unknown[]>("/api/v1/admin/subscriptions"),
         ]);
         setDietitians(countFrom(dietitianList));

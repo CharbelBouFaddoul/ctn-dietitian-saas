@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Alert,
   Button,
@@ -9,11 +10,27 @@ import {
   LoadingState,
   PageHeader,
   Section,
+  Tabs,
   Textarea,
 } from "@nutrition-saas/ui";
 import { api } from "../../../lib/api";
 import { errorMessage } from "../../../lib/humanize-error";
 import type { SiteFooterGroup, SiteNavItem, SiteSettings, SiteSocialLink } from "../../../lib/marketing/site-settings";
+import { SiteSettingsAdminsTab } from "./admins-tab";
+
+const SETTINGS_TABS = [
+  { id: "general", label: "General" },
+  { id: "navigation", label: "Navigation" },
+  { id: "footer", label: "Footer" },
+  { id: "contact", label: "Contact" },
+  { id: "admins", label: "Admins" },
+] as const;
+
+type SettingsTab = (typeof SETTINGS_TABS)[number]["id"];
+
+function isSettingsTab(value: string | null): value is SettingsTab {
+  return SETTINGS_TABS.some((tab) => tab.id === value);
+}
 
 function emptyNavItem(order: number): SiteNavItem {
   return { href: "/", label: "", visible: true, order };
@@ -27,11 +44,14 @@ function emptySocialLink(): SiteSocialLink {
   return { label: "", href: "" };
 }
 
-export default function AdminSiteSettingsPage() {
+function AdminSiteSettingsForm() {
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get("tab");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [tab, setTab] = useState<SettingsTab>(isSettingsTab(initialTab) ? initialTab : "general");
   const [brandText, setBrandText] = useState("");
   const [ctaText, setCtaText] = useState("");
   const [ctaHref, setCtaHref] = useState("");
@@ -91,6 +111,12 @@ export default function AdminSiteSettingsPage() {
   useEffect(() => {
     void load();
   }, []);
+
+  useEffect(() => {
+    if (isSettingsTab(initialTab)) {
+      setTab(initialTab);
+    }
+  }, [initialTab]);
 
   async function onSave(event: FormEvent) {
     event.preventDefault();
@@ -160,210 +186,202 @@ export default function AdminSiteSettingsPage() {
       <PageHeader
         eyebrow="Configuration"
         title="Site settings"
-        description="Configure public website brand, navigation, CTAs, footer, and contact details."
+        description="Configure public website brand, navigation, CTAs, footer, contact details, and platform admins."
       />
-      {error ? <Alert tone="danger">{error}</Alert> : null}
-      {message ? <Alert tone="success">{message}</Alert> : null}
+      {tab !== "admins" && error ? <Alert tone="danger">{error}</Alert> : null}
+      {tab !== "admins" && message ? <Alert tone="success">{message}</Alert> : null}
 
-      <form onSubmit={(event) => void onSave(event)} className="ui-stack">
-        <Section title="Brand">
-          <Field label="Brand text">
-            <Input value={brandText} onChange={(event) => setBrandText(event.target.value)} required />
-          </Field>
-        </Section>
+      <Tabs
+        items={[...SETTINGS_TABS]}
+        value={tab}
+        onChange={(id) => setTab(id as SettingsTab)}
+      />
 
-        <Section title="Header">
-          <Field label="Self-serve registration">
-            <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <input
-                type="checkbox"
-                checked={registrationEnabled}
-                onChange={(event) => setRegistrationEnabled(event.target.checked)}
-              />
-              Allow dietitian and patient self-registration
-            </label>
-          </Field>
-          <Field label="Product email notifications">
-            <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <input
-                type="checkbox"
-                checked={emailNotificationsEnabled}
-                onChange={(event) => setEmailNotificationsEnabled(event.target.checked)}
-              />
-              Send product emails (invoices, automation). Auth emails always send.
-            </label>
-          </Field>
-          <Field label="Dietitian sign-in label">
-            <Input value={dietitianSignInLabel} onChange={(event) => setDietitianSignInLabel(event.target.value)} required />
-          </Field>
-          <Field label="Patient sign-in label">
-            <Input value={patientSignInLabel} onChange={(event) => setPatientSignInLabel(event.target.value)} required />
-          </Field>
-          <Field label="CTA text">
-            <Input value={ctaText} onChange={(event) => setCtaText(event.target.value)} required />
-          </Field>
-          <Field label="CTA link">
-            <Input value={ctaHref} onChange={(event) => setCtaHref(event.target.value)} required />
-          </Field>
-          <label className="ui-check">
-            <input type="checkbox" checked={ctaVisible} onChange={(event) => setCtaVisible(event.target.checked)} />
-            <span>Show CTA button</span>
-          </label>
-        </Section>
-
-        <Section
-          title="Navigation"
-          description="Header links shown on the marketing site. Keep Pricing and Admin out of this list."
-          actions={
-            <Button
-              type="button"
-              size="sm"
-              variant="secondary"
-              onClick={() => setNavItems((current) => [...current, emptyNavItem(current.length)])}
-            >
-              Add link
-            </Button>
-          }
-        >
-          {navItems.length === 0 ? <p className="ui-muted">No navigation links yet.</p> : null}
-          <div className="ui-admin-editor-list">
-            {navItems.map((item, index) => (
-              <div key={`nav-${index}`} className="ui-admin-editor-row">
-                <Field label="Label">
-                  <Input
-                    value={item.label}
-                    onChange={(event) =>
-                      setNavItems((current) =>
-                        current.map((row, i) => (i === index ? { ...row, label: event.target.value } : row)),
-                      )
-                    }
-                    placeholder="Features"
-                    required
-                  />
-                </Field>
-                <Field label="Link">
-                  <Input
-                    value={item.href}
-                    onChange={(event) =>
-                      setNavItems((current) =>
-                        current.map((row, i) => (i === index ? { ...row, href: event.target.value } : row)),
-                      )
-                    }
-                    placeholder="/features"
-                    required
-                  />
-                </Field>
-                <label className="ui-check ui-admin-editor-check">
+      {tab === "admins" ? (
+        <div style={{ marginTop: 16 }}>
+          <SiteSettingsAdminsTab />
+        </div>
+      ) : (
+      <form onSubmit={(event) => void onSave(event)} className="ui-stack" style={{ marginTop: 16 }}>
+        {tab === "general" ? (
+          <Section title="General" description="Brand, registration, sign-in labels, and header CTA.">
+            <div className="ui-stack" style={{ maxWidth: 520, gap: 16 }}>
+              <Field label="Brand text">
+                <Input value={brandText} onChange={(event) => setBrandText(event.target.value)} required />
+              </Field>
+              <Field label="Self-serve registration">
+                <label className="ui-check">
                   <input
                     type="checkbox"
-                    checked={item.visible}
-                    onChange={(event) =>
-                      setNavItems((current) =>
-                        current.map((row, i) => (i === index ? { ...row, visible: event.target.checked } : row)),
-                      )
-                    }
+                    checked={registrationEnabled}
+                    onChange={(event) => setRegistrationEnabled(event.target.checked)}
                   />
-                  <span>Visible</span>
+                  <span>Allow dietitian and patient self-registration</span>
                 </label>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setNavItems((current) => current.filter((_, i) => i !== index))}
-                >
-                  Remove
-                </Button>
-              </div>
-            ))}
-          </div>
-        </Section>
+              </Field>
+              <Field label="Product email notifications">
+                <label className="ui-check">
+                  <input
+                    type="checkbox"
+                    checked={emailNotificationsEnabled}
+                    onChange={(event) => setEmailNotificationsEnabled(event.target.checked)}
+                  />
+                  <span>Send product emails (invoices, automation). Auth emails always send.</span>
+                </label>
+              </Field>
+              <Field label="Dietitian sign-in label">
+                <Input
+                  value={dietitianSignInLabel}
+                  onChange={(event) => setDietitianSignInLabel(event.target.value)}
+                  required
+                />
+              </Field>
+              <Field label="Patient sign-in label">
+                <Input
+                  value={patientSignInLabel}
+                  onChange={(event) => setPatientSignInLabel(event.target.value)}
+                  required
+                />
+              </Field>
+              <Field label="CTA text">
+                <Input value={ctaText} onChange={(event) => setCtaText(event.target.value)} required />
+              </Field>
+              <Field label="CTA link">
+                <Input value={ctaHref} onChange={(event) => setCtaHref(event.target.value)} required />
+              </Field>
+              <label className="ui-check">
+                <input
+                  type="checkbox"
+                  checked={ctaVisible}
+                  onChange={(event) => setCtaVisible(event.target.checked)}
+                />
+                <span>Show CTA button</span>
+              </label>
+            </div>
+          </Section>
+        ) : null}
 
-        <Section title="Footer">
-          <Field label="Footer description">
-            <Textarea rows={4} value={footerDescription} onChange={(event) => setFooterDescription(event.target.value)} required />
-          </Field>
-          <Field label="Copyright text">
-            <Input value={copyrightText} onChange={(event) => setCopyrightText(event.target.value)} required />
-          </Field>
-        </Section>
-
-        <Section
-          title="Footer link groups"
-          description="Columns of links in the site footer."
-          actions={
-            <Button type="button" size="sm" variant="secondary" onClick={() => setFooterGroups((current) => [...current, emptyFooterGroup()])}>
-              Add group
-            </Button>
-          }
-        >
-          {footerGroups.length === 0 ? <p className="ui-muted">No footer groups yet.</p> : null}
-          <div className="ui-admin-editor-list">
-            {footerGroups.map((group, groupIndex) => (
-              <div key={`footer-group-${groupIndex}`} className="ui-admin-editor-group">
-                <div className="ui-admin-editor-row">
-                  <Field label="Group title">
+        {tab === "navigation" ? (
+          <Section
+            title="Navigation"
+            description="Header links shown on the marketing site. Keep Pricing and Admin out of this list."
+            actions={
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                onClick={() => setNavItems((current) => [...current, emptyNavItem(current.length)])}
+              >
+                Add link
+              </Button>
+            }
+          >
+            {navItems.length === 0 ? <p className="ui-muted">No navigation links yet.</p> : null}
+            <div className="ui-admin-editor-list">
+              {navItems.map((item, index) => (
+                <div key={`nav-${index}`} className="ui-admin-editor-row">
+                  <Field label="Label">
                     <Input
-                      value={group.title}
+                      value={item.label}
                       onChange={(event) =>
-                        setFooterGroups((current) =>
-                          current.map((row, i) => (i === groupIndex ? { ...row, title: event.target.value } : row)),
+                        setNavItems((current) =>
+                          current.map((row, i) => (i === index ? { ...row, label: event.target.value } : row)),
                         )
                       }
-                      placeholder="Product"
+                      placeholder="Features"
                       required
                     />
                   </Field>
+                  <Field label="Link">
+                    <Input
+                      value={item.href}
+                      onChange={(event) =>
+                        setNavItems((current) =>
+                          current.map((row, i) => (i === index ? { ...row, href: event.target.value } : row)),
+                        )
+                      }
+                      placeholder="/features"
+                      required
+                    />
+                  </Field>
+                  <label className="ui-check ui-admin-editor-check">
+                    <input
+                      type="checkbox"
+                      checked={item.visible}
+                      onChange={(event) =>
+                        setNavItems((current) =>
+                          current.map((row, i) => (i === index ? { ...row, visible: event.target.checked } : row)),
+                        )
+                      }
+                    />
+                    <span>Visible</span>
+                  </label>
                   <Button
                     type="button"
                     size="sm"
                     variant="ghost"
-                    onClick={() => setFooterGroups((current) => current.filter((_, i) => i !== groupIndex))}
+                    onClick={() => setNavItems((current) => current.filter((_, i) => i !== index))}
                   >
-                    Remove group
+                    Remove
                   </Button>
                 </div>
-                <div className="ui-admin-editor-list">
-                  {group.links.map((link, linkIndex) => (
-                    <div key={`footer-link-${groupIndex}-${linkIndex}`} className="ui-admin-editor-row">
-                      <Field label="Label">
+              ))}
+            </div>
+          </Section>
+        ) : null}
+
+        {tab === "footer" ? (
+          <>
+            <Section title="Footer copy">
+              <div className="ui-stack" style={{ maxWidth: 520, gap: 16 }}>
+                <Field label="Footer description">
+                  <Textarea
+                    rows={4}
+                    value={footerDescription}
+                    onChange={(event) => setFooterDescription(event.target.value)}
+                    required
+                  />
+                </Field>
+                <Field label="Copyright text">
+                  <Input
+                    value={copyrightText}
+                    onChange={(event) => setCopyrightText(event.target.value)}
+                    required
+                  />
+                </Field>
+              </div>
+            </Section>
+
+            <Section
+              title="Footer link groups"
+              description="Columns of links in the site footer."
+              actions={
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => setFooterGroups((current) => [...current, emptyFooterGroup()])}
+                >
+                  Add group
+                </Button>
+              }
+            >
+              {footerGroups.length === 0 ? <p className="ui-muted">No footer groups yet.</p> : null}
+              <div className="ui-admin-editor-list">
+                {footerGroups.map((group, groupIndex) => (
+                  <div key={`footer-group-${groupIndex}`} className="ui-admin-editor-group">
+                    <div className="ui-admin-editor-row">
+                      <Field label="Group title">
                         <Input
-                          value={link.label}
+                          value={group.title}
                           onChange={(event) =>
                             setFooterGroups((current) =>
                               current.map((row, i) =>
-                                i === groupIndex
-                                  ? {
-                                      ...row,
-                                      links: row.links.map((item, j) =>
-                                        j === linkIndex ? { ...item, label: event.target.value } : item,
-                                      ),
-                                    }
-                                  : row,
+                                i === groupIndex ? { ...row, title: event.target.value } : row,
                               ),
                             )
                           }
-                          placeholder="Features"
-                          required
-                        />
-                      </Field>
-                      <Field label="Link">
-                        <Input
-                          value={link.href}
-                          onChange={(event) =>
-                            setFooterGroups((current) =>
-                              current.map((row, i) =>
-                                i === groupIndex
-                                  ? {
-                                      ...row,
-                                      links: row.links.map((item, j) =>
-                                        j === linkIndex ? { ...item, href: event.target.value } : item,
-                                      ),
-                                    }
-                                  : row,
-                              ),
-                            )
-                          }
-                          placeholder="/features"
+                          placeholder="Product"
                           required
                         />
                       </Field>
@@ -371,108 +389,188 @@ export default function AdminSiteSettingsPage() {
                         type="button"
                         size="sm"
                         variant="ghost"
-                        onClick={() =>
-                          setFooterGroups((current) =>
-                            current.map((row, i) =>
-                              i === groupIndex
-                                ? { ...row, links: row.links.filter((_, j) => j !== linkIndex) }
-                                : row,
-                            ),
-                          )
-                        }
+                        onClick={() => setFooterGroups((current) => current.filter((_, i) => i !== groupIndex))}
                       >
-                        Remove
+                        Remove group
                       </Button>
                     </div>
-                  ))}
-                </div>
+                    <div className="ui-admin-editor-list">
+                      {group.links.map((link, linkIndex) => (
+                        <div key={`footer-link-${groupIndex}-${linkIndex}`} className="ui-admin-editor-row">
+                          <Field label="Label">
+                            <Input
+                              value={link.label}
+                              onChange={(event) =>
+                                setFooterGroups((current) =>
+                                  current.map((row, i) =>
+                                    i === groupIndex
+                                      ? {
+                                          ...row,
+                                          links: row.links.map((item, j) =>
+                                            j === linkIndex ? { ...item, label: event.target.value } : item,
+                                          ),
+                                        }
+                                      : row,
+                                  ),
+                                )
+                              }
+                              placeholder="Features"
+                              required
+                            />
+                          </Field>
+                          <Field label="Link">
+                            <Input
+                              value={link.href}
+                              onChange={(event) =>
+                                setFooterGroups((current) =>
+                                  current.map((row, i) =>
+                                    i === groupIndex
+                                      ? {
+                                          ...row,
+                                          links: row.links.map((item, j) =>
+                                            j === linkIndex ? { ...item, href: event.target.value } : item,
+                                          ),
+                                        }
+                                      : row,
+                                  ),
+                                )
+                              }
+                              placeholder="/features"
+                              required
+                            />
+                          </Field>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() =>
+                              setFooterGroups((current) =>
+                                current.map((row, i) =>
+                                  i === groupIndex
+                                    ? { ...row, links: row.links.filter((_, j) => j !== linkIndex) }
+                                    : row,
+                                ),
+                              )
+                            }
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      onClick={() =>
+                        setFooterGroups((current) =>
+                          current.map((row, i) =>
+                            i === groupIndex ? { ...row, links: [...row.links, { href: "/", label: "" }] } : row,
+                          ),
+                        )
+                      }
+                    >
+                      Add link
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </Section>
+
+            <Section
+              title="Social links"
+              actions={
                 <Button
                   type="button"
                   size="sm"
                   variant="secondary"
-                  onClick={() =>
-                    setFooterGroups((current) =>
-                      current.map((row, i) =>
-                        i === groupIndex ? { ...row, links: [...row.links, { href: "/", label: "" }] } : row,
-                      ),
-                    )
-                  }
+                  onClick={() => setSocialLinks((current) => [...current, emptySocialLink()])}
                 >
                   Add link
                 </Button>
+              }
+            >
+              {socialLinks.length === 0 ? <p className="ui-muted">No social links yet.</p> : null}
+              <div className="ui-admin-editor-list">
+                {socialLinks.map((link, index) => (
+                  <div key={`social-${index}`} className="ui-admin-editor-row">
+                    <Field label="Label">
+                      <Input
+                        value={link.label}
+                        onChange={(event) =>
+                          setSocialLinks((current) =>
+                            current.map((row, i) => (i === index ? { ...row, label: event.target.value } : row)),
+                          )
+                        }
+                        placeholder="LinkedIn"
+                        required
+                      />
+                    </Field>
+                    <Field label="URL">
+                      <Input
+                        value={link.href}
+                        onChange={(event) =>
+                          setSocialLinks((current) =>
+                            current.map((row, i) => (i === index ? { ...row, href: event.target.value } : row)),
+                          )
+                        }
+                        placeholder="https://"
+                        required
+                      />
+                    </Field>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setSocialLinks((current) => current.filter((_, i) => i !== index))}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </Section>
+            </Section>
+          </>
+        ) : null}
 
-        <Section
-          title="Social links"
-          actions={
-            <Button type="button" size="sm" variant="secondary" onClick={() => setSocialLinks((current) => [...current, emptySocialLink()])}>
-              Add link
-            </Button>
-          }
-        >
-          {socialLinks.length === 0 ? <p className="ui-muted">No social links yet.</p> : null}
-          <div className="ui-admin-editor-list">
-            {socialLinks.map((link, index) => (
-              <div key={`social-${index}`} className="ui-admin-editor-row">
-                <Field label="Label">
-                  <Input
-                    value={link.label}
-                    onChange={(event) =>
-                      setSocialLinks((current) =>
-                        current.map((row, i) => (i === index ? { ...row, label: event.target.value } : row)),
-                      )
-                    }
-                    placeholder="LinkedIn"
-                    required
-                  />
-                </Field>
-                <Field label="URL">
-                  <Input
-                    value={link.href}
-                    onChange={(event) =>
-                      setSocialLinks((current) =>
-                        current.map((row, i) => (i === index ? { ...row, href: event.target.value } : row)),
-                      )
-                    }
-                    placeholder="https://"
-                    required
-                  />
-                </Field>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setSocialLinks((current) => current.filter((_, i) => i !== index))}
-                >
-                  Remove
-                </Button>
-              </div>
-            ))}
-          </div>
-        </Section>
+        {tab === "contact" ? (
+          <Section title="Contact" description="Shown on the public contact page and footer.">
+            <div className="ui-stack" style={{ maxWidth: 520, gap: 16 }}>
+              <Field label="Contact email">
+                <Input type="email" value={contactEmail} onChange={(event) => setContactEmail(event.target.value)} />
+              </Field>
+              <Field label="Contact phone">
+                <Input value={contactPhone} onChange={(event) => setContactPhone(event.target.value)} />
+              </Field>
+              <Field label="Contact address">
+                <Textarea
+                  rows={3}
+                  value={contactAddress}
+                  onChange={(event) => setContactAddress(event.target.value)}
+                />
+              </Field>
+              <Field label="Contact hours">
+                <Input value={contactHours} onChange={(event) => setContactHours(event.target.value)} />
+              </Field>
+            </div>
+          </Section>
+        ) : null}
 
-        <Section title="Contact">
-          <Field label="Contact email">
-            <Input type="email" value={contactEmail} onChange={(event) => setContactEmail(event.target.value)} />
-          </Field>
-          <Field label="Contact phone">
-            <Input value={contactPhone} onChange={(event) => setContactPhone(event.target.value)} />
-          </Field>
-          <Field label="Contact address">
-            <Textarea rows={3} value={contactAddress} onChange={(event) => setContactAddress(event.target.value)} />
-          </Field>
-          <Field label="Contact hours">
-            <Input value={contactHours} onChange={(event) => setContactHours(event.target.value)} />
-          </Field>
-        </Section>
-
-        <Button type="submit" disabled={saving}>
-          {saving ? "Saving…" : "Save site settings"}
-        </Button>
+        <div className="ui-row">
+          <Button type="submit" disabled={saving}>
+            {saving ? "Saving…" : "Save changes"}
+          </Button>
+        </div>
       </form>
+      )}
     </section>
+  );
+}
+
+export default function AdminSiteSettingsPage() {
+  return (
+    <Suspense fallback={<LoadingState>Loading site settings…</LoadingState>}>
+      <AdminSiteSettingsForm />
+    </Suspense>
   );
 }

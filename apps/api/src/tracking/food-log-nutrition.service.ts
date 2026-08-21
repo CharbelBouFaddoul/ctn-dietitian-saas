@@ -59,7 +59,75 @@ export interface FoodLogNutritionSnapshotV2 {
 
 export type FoodLogNutritionSnapshot = FoodLogNutritionSnapshotV1 | FoodLogNutritionSnapshotV2;
 
+function asNutritionValues(value: unknown): NutritionValues | null {
+  if (!value || typeof value !== "object") return null;
+  const row = value as Partial<NutritionValues>;
+  if (!("energyKcal" in row)) return null;
+  return {
+    energyKcal: row.energyKcal ?? null,
+    proteinG: row.proteinG ?? null,
+    carbohydrateG: row.carbohydrateG ?? null,
+    fatG: row.fatG ?? null,
+    fiberG: row.fiberG ?? null,
+    sugarG: row.sugarG ?? null,
+    sodiumMg: row.sodiumMg ?? null,
+  };
+}
+
+/**
+ * Normalize stored JSON into a usable snapshot. Demo/legacy rows sometimes store a bare
+ * NutritionValues object (no `nutrition`/`presented` wrappers).
+ */
 export function parseFoodLogNutritionSnapshot(value: unknown): FoodLogNutritionSnapshot {
+  if (!value || typeof value !== "object") {
+    const empty = roundNutrition({
+      energyKcal: 0,
+      proteinG: 0,
+      carbohydrateG: 0,
+      fatG: 0,
+      fiberG: 0,
+      sugarG: 0,
+      sodiumMg: 0,
+    });
+    return {
+      schemaVersion: 1,
+      foodId: "",
+      foodName: "Food",
+      quantity: 0,
+      unit: "g",
+      referenceQuantity: 100,
+      referenceUnit: "g",
+      nutrition: empty,
+      presented: empty,
+      capturedAt: new Date(0).toISOString(),
+    };
+  }
+
+  const raw = value as Record<string, unknown>;
+  const nested = asNutritionValues(raw.nutrition);
+  if (nested) {
+    const presented = asNutritionValues(raw.presented) ?? roundNutrition(nested);
+    return { ...(raw as object), nutrition: nested, presented } as FoodLogNutritionSnapshot;
+  }
+
+  // Flat nutrition object stored as the whole snapshot
+  const flat = asNutritionValues(raw);
+  if (flat && !("schemaVersion" in raw)) {
+    const presented = roundNutrition(flat);
+    return {
+      schemaVersion: 1,
+      foodId: typeof raw.foodId === "string" ? raw.foodId : "",
+      foodName: typeof raw.foodName === "string" ? raw.foodName : "Food",
+      quantity: typeof raw.quantity === "number" ? raw.quantity : 0,
+      unit: (typeof raw.unit === "string" ? raw.unit : "g") as QuantityUnit,
+      referenceQuantity: 100,
+      referenceUnit: "g",
+      nutrition: flat,
+      presented,
+      capturedAt: typeof raw.capturedAt === "string" ? raw.capturedAt : new Date(0).toISOString(),
+    };
+  }
+
   return value as FoodLogNutritionSnapshot;
 }
 

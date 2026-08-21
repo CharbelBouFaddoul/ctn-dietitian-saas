@@ -2,9 +2,7 @@ import { humanizeLabel } from "@nutrition-saas/ui";
 
 export function roleLabel(value: string | null | undefined): string {
   if (!value) return "";
-  if (value === "PLATFORM_ADMIN") return "Platform administrator";
-  if (value === "SUPER_ADMIN") return "Super admin";
-  if (value === "ADMIN") return "Admin";
+  if (value === "PLATFORM_ADMIN" || value === "SUPER_ADMIN" || value === "ADMIN") return "Admin";
   return humanizeLabel(value);
 }
 

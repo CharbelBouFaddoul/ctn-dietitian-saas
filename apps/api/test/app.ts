@@ -10,9 +10,6 @@ import { EmailVerificationService } from "../src/auth/email-verification.service
 import { SecurityEventLogger } from "../src/auth/security-event.logger";
 import { AdminModule } from "../src/admin/admin.module";
 import { EntitlementService } from "../src/entitlements/entitlement.service";
-import { seedEntitlementCatalog } from "../src/entitlements/catalog.seed";
-import { seedPlatformAssessmentTemplate } from "../src/assessments/platform-template.seed";
-import { seedPlatformSettings } from "../src/platform-settings/platform-settings.seed";
 import { PlatformSettingsModule } from "../src/platform-settings/platform-settings.module";
 import { DietitianModule } from "../src/dietitian/dietitian.module";
 import { DietitianLifecycleService } from "../src/dietitian/dietitian-lifecycle.service";
@@ -52,6 +49,8 @@ import { EmailModule } from "../src/email/email.module";
 import { PrismaModule } from "../src/prisma/prisma.module";
 import { PrismaService } from "../src/prisma/prisma.service";
 import { CapturingEmailProvider } from "./capturing-email.provider";
+import { assertTestWipeAllowed } from "../src/demo/safety";
+import { wipeApplicationData, seedPlatformBootstrap } from "../src/demo/wipe";
 
 export interface AuthTestContext {
   app: INestApplication;
@@ -153,82 +152,9 @@ export async function createAuthTestApp(options?: { realtime?: boolean }): Promi
 }
 
 export async function resetAuthDatabase(prisma: PrismaService): Promise<void> {
-  await assertTestDatabase(prisma);
-  await prisma.automationRun.deleteMany();
-  await prisma.automationRule.deleteMany();
-  await prisma.automationUsage.deleteMany();
-  await prisma.aiRequest.deleteMany();
-  await prisma.aiUsage.deleteMany();
-  await prisma.invoiceItem.deleteMany();
-  await prisma.invoice.deleteMany();
-  await prisma.invoiceSequence.deleteMany();
-  await prisma.task.deleteMany();
-  await prisma.habitLog.deleteMany();
-  await prisma.clientHabitAssignment.deleteMany();
-  await prisma.habitDefinition.deleteMany();
-  await prisma.notification.deleteMany();
-  await prisma.message.deleteMany();
-  await prisma.conversationReadState.deleteMany();
-  await prisma.conversation.deleteMany();
-  await prisma.document.deleteMany();
-  await prisma.sleepLog.deleteMany();
-  await prisma.exerciseLog.deleteMany();
-  await prisma.waterLog.deleteMany();
-  await prisma.foodLog.deleteMany();
-  await prisma.mealItem.deleteMany();
-  await prisma.meal.deleteMany();
-  await prisma.mealPlanDay.deleteMany();
-  await prisma.mealPlanVersion.deleteMany();
-  await prisma.mealPlan.deleteMany();
-  await prisma.recipeIngredient.deleteMany();
-  await prisma.recipe.deleteMany();
-  await prisma.foodOverride.deleteMany();
-  await prisma.timelineEvent.deleteMany();
-  await prisma.assessment.deleteMany();
-  await prisma.appointment.deleteMany();
-  await prisma.clientMeasurement.deleteMany();
-  await prisma.clientGoal.deleteMany();
-  await prisma.clientTag.deleteMany();
-  await prisma.clientProfile.deleteMany();
-  await prisma.clientAssignment.deleteMany();
-  await prisma.clientAccount.deleteMany();
-  await prisma.tag.deleteMany();
-  await prisma.assessmentTemplate.deleteMany();
-  await prisma.client.deleteMany();
-  await prisma.auditLog.deleteMany();
-  await prisma.featureOverride.deleteMany();
-  await prisma.subscription.deleteMany();
-  await prisma.dietitianSettings.deleteMany();
-  await prisma.dietitianAccount.deleteMany();
-  await prisma.consent.deleteMany();
-  await prisma.invitationToken.deleteMany();
-  await prisma.passwordResetToken.deleteMany();
-  await prisma.emailVerificationToken.deleteMany();
-  await prisma.session.deleteMany();
-  await prisma.user.deleteMany();
-  await prisma.food.deleteMany();
-  await prisma.foodSource.deleteMany();
-  await prisma.planFeature.deleteMany();
-  await prisma.feature.deleteMany();
-  await prisma.plan.deleteMany();
-  await seedEntitlementCatalog(prisma);
-  await seedPlatformAssessmentTemplate(prisma);
-  await seedPlatformSettings(prisma);
-  await seedGlobalHabits(prisma);
-  // Existing e2e suites rely on self-serve register/org create; Phase 3 gate defaults off.
-  await prisma.platformSettings.updateMany({
-    data: { registrationEnabled: true, emailNotificationsEnabled: false },
-  });
-}
-
-async function assertTestDatabase(prisma: PrismaService): Promise<void> {
-  const rows = await prisma.$queryRaw<Array<{ current_database: string }>>`SELECT current_database()`;
-  const name = rows[0]?.current_database ?? "";
-  if (name !== "nutrition_test") {
-    throw new Error(
-      `Refusing to wipe database "${name}". API tests must use nutrition_test, not the Docker development database.`,
-    );
-  }
+  await assertTestWipeAllowed(prisma);
+  await wipeApplicationData(prisma);
+  await seedPlatformBootstrap(prisma, { registrationEnabled: true });
 }
 
 export function extractEmailedToken(text: string): string {
@@ -272,68 +198,6 @@ export const DEFAULT_ORG_SETTINGS = {
   heightUnit: "cm",
   dateFormat: "YYYY_MM_DD",
 } as const;
-
-async function seedGlobalHabits(prisma: PrismaService) {
-  const existing = await prisma.habitDefinition.count({ where: { dietitianAccountId: null } });
-  if (existing > 0) return;
-  const now = new Date();
-  await prisma.habitDefinition.createMany({
-    data: [
-      {
-        name: "Eat vegetables",
-        description: "Include vegetables with at least one meal",
-        category: "nutrition",
-        frequency: "DAILY",
-        active: true,
-        sortOrder: 10,
-        createdAt: now,
-        updatedAt: now,
-      },
-      {
-        name: "Take a walk",
-        description: "Move for at least 10 minutes",
-        category: "activity",
-        defaultTargetValue: 10,
-        defaultTargetUnit: "min",
-        frequency: "DAILY",
-        active: true,
-        sortOrder: 20,
-        createdAt: now,
-        updatedAt: now,
-      },
-      {
-        name: "Eat breakfast",
-        description: "Start the day with a planned breakfast",
-        category: "nutrition",
-        frequency: "DAILY",
-        active: true,
-        sortOrder: 30,
-        createdAt: now,
-        updatedAt: now,
-      },
-      {
-        name: "Drink water goal",
-        description: "Hit your daily water target",
-        category: "hydration",
-        frequency: "DAILY",
-        active: true,
-        sortOrder: 40,
-        createdAt: now,
-        updatedAt: now,
-      },
-      {
-        name: "Sleep on schedule",
-        description: "Keep a consistent bedtime",
-        category: "sleep",
-        frequency: "DAILY",
-        active: true,
-        sortOrder: 50,
-        createdAt: now,
-        updatedAt: now,
-      },
-    ],
-  });
-}
 
 /** Phase 7: entitlements resolve by dietitianAccountId only. */
 export async function activateSubscription(

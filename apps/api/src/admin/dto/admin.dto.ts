@@ -13,6 +13,7 @@ import {
   IsString,
   IsUUID,
   Matches,
+  Max,
   MaxLength,
   Min,
   MinLength,
@@ -26,6 +27,38 @@ export class AdminSearchQueryDto {
   @IsString()
   @MaxLength(120)
   q?: string;
+}
+
+export class AdminUsersListQueryDto extends AdminSearchQueryDto {
+  @ApiPropertyOptional({ enum: ["app", "platform", "all"], description: "app = dietitians/patients only (default); platform = admins; all = no scope filter" })
+  @IsOptional()
+  @IsEnum(["app", "platform", "all"])
+  scope?: "app" | "platform" | "all";
+
+  @ApiPropertyOptional({ enum: ["dietitian", "patient", "all"], description: "Account type filter (app scope only)" })
+  @IsOptional()
+  @IsEnum(["dietitian", "patient", "all"])
+  type?: "dietitian" | "patient" | "all";
+
+  @ApiPropertyOptional({ enum: ["PENDING", "ACTIVE", "SUSPENDED", "ARCHIVED"] })
+  @IsOptional()
+  @IsEnum(["PENDING", "ACTIVE", "SUSPENDED", "ARCHIVED"])
+  status?: "PENDING" | "ACTIVE" | "SUSPENDED" | "ARCHIVED";
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  pageSize?: number;
 }
 
 export class AdminAuditQueryDto extends AdminSearchQueryDto {
@@ -127,12 +160,40 @@ export class UpdateUserStatusDto {
   status!: "ACTIVE" | "SUSPENDED" | "ARCHIVED";
 }
 
+export class UpdateAdminUserProfileDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  firstName?: string | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  lastName?: string | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MinLength(3)
+  @MaxLength(320)
+  email?: string;
+
+  @ApiPropertyOptional({ description: "Leave empty to keep the current password" })
+  @IsOptional()
+  @IsString()
+  @MinLength(8)
+  @MaxLength(128)
+  password?: string;
+}
+
 export class UpdatePlatformRoleDto {
-  @ApiProperty({ enum: ["SUPER_ADMIN", "ADMIN"], nullable: true })
+  @ApiProperty({ enum: ["ADMIN"], nullable: true, description: "Single platform admin role, or null to remove access" })
   @IsDefined()
   @ValidateIf((_, value) => value !== null)
-  @IsEnum(["SUPER_ADMIN", "ADMIN"])
-  platformRole!: "SUPER_ADMIN" | "ADMIN" | null;
+  @IsEnum(["ADMIN"])
+  platformRole!: "ADMIN" | null;
 }
 
 export class ProvisionDietitianDto {

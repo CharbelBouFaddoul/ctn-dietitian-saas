@@ -134,16 +134,17 @@ describe("platform admin, entitlements, and audit", () => {
       .patch(`/api/v1/admin/users/${owner.id}/platform-role`)
       .set("Cookie", admin.cookie)
       .send({ platformRole: "ADMIN" });
-    expect(roleChange.status).toBe(403);
+    expect(roleChange.status).toBe(200);
+    expect(roleChange.body.platformRole).toBe("ADMIN");
   });
 
-  it("allows SUPER_ADMIN to set platform roles", async () => {
-    const superAdmin = await makePlatformUser("SUPER_ADMIN");
+  it("allows platform admin to set platform roles", async () => {
+    const platformAdmin = await makePlatformUser("ADMIN");
     const user = await registerVerifyLogin();
 
     const updated = await request(ctx.app.getHttpServer())
       .patch(`/api/v1/admin/users/${user.id}/platform-role`)
-      .set("Cookie", superAdmin.cookie)
+      .set("Cookie", platformAdmin.cookie)
       .send({ platformRole: "ADMIN" })
       .expect(200);
     expect(updated.body.platformRole).toBe("ADMIN");

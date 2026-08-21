@@ -27,10 +27,14 @@ export class AdminDietitianAccountService {
             OR: [
               { displayName: { contains: search, mode: "insensitive" } },
               { slug: { contains: search, mode: "insensitive" } },
+              { user: { email: { contains: search, mode: "insensitive" } } },
             ],
           }
         : undefined,
-      include: { subscription: { include: { plan: true } } },
+      include: {
+        subscription: { include: { plan: true } },
+        user: { select: { email: true } },
+      },
       orderBy: { createdAt: "desc" },
       take: 100,
     });
@@ -112,6 +116,7 @@ export class AdminDietitianAccountService {
     slug: string;
     status: string;
     createdAt: Date;
+    user?: { email: string } | null;
     subscription: {
       status: string;
       plan: { id: string; name: string; slug: string };
@@ -122,6 +127,7 @@ export class AdminDietitianAccountService {
       name: account.displayName,
       slug: account.slug,
       status: account.status,
+      ownerEmail: account.user?.email ?? null,
       createdAt: account.createdAt.toISOString(),
       subscription: account.subscription
         ? {

@@ -1215,7 +1215,7 @@ function ClientWorkspacePage() {
                         <div className="ui-row" style={{ justifyContent: "space-between", marginBottom: 6 }}>
                           <strong>{humanizeLabel(meal.category)}</strong>
                           <span className="ui-muted">
-                            {meal.presented.energyKcal != null ? `${meal.presented.energyKcal} kcal` : "—"}
+                            {meal.presented?.energyKcal != null ? `${meal.presented.energyKcal} kcal` : "—"}
                           </span>
                         </div>
                         <Table>
@@ -1234,7 +1234,7 @@ function ClientWorkspacePage() {
                                   {row.quantity} {humanizeLabel(row.unit)}
                                 </Td>
                                 <Td label="Calories">
-                                  {row.presented.energyKcal != null
+                                  {row.presented?.energyKcal != null
                                     ? `${row.presented.energyKcal} kcal`
                                     : "—"}
                                 </Td>

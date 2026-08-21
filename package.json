@@ -16,6 +16,8 @@
     "prisma:migrate:dev": "pnpm --filter @nutrition-saas/api prisma:migrate:dev",
     "food:import": "pnpm --filter @nutrition-saas/api food:import",
     "recipe:import": "pnpm --filter @nutrition-saas/api recipe:import",
+    "demo:reset": "pnpm --filter @nutrition-saas/api demo:reset",
+    "demo:seed": "pnpm --filter @nutrition-saas/api demo:seed",
     "test": "pnpm --filter @nutrition-saas/api test"
   },
   "devDependencies": {

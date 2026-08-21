@@ -6,8 +6,7 @@ import { SessionGuard } from "../auth/guards/session.guard";
 import type { AuthenticatedRequestUser } from "../auth/auth.types";
 import { adminActor } from "./admin-actor";
 import { AdminUserService } from "./admin-user.service";
-import { AdminSearchQueryDto, UpdatePlatformRoleDto, UpdateUserStatusDto } from "./dto/admin.dto";
-import { PlatformRoles } from "./decorators/platform-roles.decorator";
+import { AdminUsersListQueryDto, UpdateAdminUserProfileDto, UpdatePlatformRoleDto, UpdateUserStatusDto } from "./dto/admin.dto";
 import { PlatformRolesGuard } from "./guards/platform-roles.guard";
 
 @ApiTags("admin")
@@ -19,8 +18,8 @@ export class AdminUsersController {
 
   @Get()
   @ApiOperation({ summary: "List users" })
-  list(@Query() query: AdminSearchQueryDto) {
-    return this.users.list(query.q);
+  list(@Query() query: AdminUsersListQueryDto) {
+    return this.users.list(query);
   }
 
   @Get(":userId")
@@ -40,9 +39,19 @@ export class AdminUsersController {
     return this.users.setStatus(userId, body.status, adminActor(user, req));
   }
 
+  @Patch(":userId")
+  @ApiOperation({ summary: "Update user profile (name, email, password)" })
+  updateProfile(
+    @CurrentUser() user: AuthenticatedRequestUser,
+    @Req() req: Request,
+    @Param("userId", ParseUUIDPipe) userId: string,
+    @Body() body: UpdateAdminUserProfileDto,
+  ) {
+    return this.users.updateProfile(userId, body, adminActor(user, req));
+  }
+
   @Patch(":userId/platform-role")
-  @PlatformRoles("SUPER_ADMIN")
-  @ApiOperation({ summary: "Set platform role (SUPER_ADMIN only)" })
+  @ApiOperation({ summary: "Grant or remove platform admin access" })
   setPlatformRole(
     @CurrentUser() user: AuthenticatedRequestUser,
     @Req() req: Request,

@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { AppShell, Button, LoadingState, type NavSection } from "@nutrition-saas/ui";
+import { AppShell, Button, ErrorState, LoadingState, type NavSection } from "@nutrition-saas/ui";
 import { ApiError, api, logout } from "../../lib/api";
 import { loginPathFor, resolveSessionHome } from "../../lib/session-home";
 import { AdminNavIcons } from "./admin-nav-icons";
@@ -12,23 +12,32 @@ import { AdminNavIcons } from "./admin-nav-icons";
 export function AdminShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [state, setState] = useState<"loading" | "ok" | "unauth" | "forbidden">("loading");
-  const [role, setRole] = useState<string | null>(null);
+  const [state, setState] = useState<"loading" | "ok" | "unauth" | "forbidden" | "unreachable">("loading");
+  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
+    let cancelled = false;
     void api<{ user: { platformRole: string } }>("/api/v1/admin/me")
-      .then((data) => {
-        setRole(data.user.platformRole);
+      .then(() => {
+        if (cancelled) return;
         setState("ok");
       })
       .catch((error) => {
+        if (cancelled) return;
         if (error instanceof ApiError && error.status === 401) {
           setState("unauth");
           return;
         }
+        if (!(error instanceof ApiError) || error.status === 0) {
+          setState("unreachable");
+          return;
+        }
         setState("forbidden");
       });
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [retryKey]);
 
   useEffect(() => {
     if (state === "unauth") {
@@ -36,15 +45,34 @@ export function AdminShell({ children }: { children: ReactNode }) {
       return;
     }
     if (state === "forbidden") {
-      void resolveSessionHome().then((home) => {
-        router.replace(home.kind === "unauthenticated" ? loginPathFor("dietitian") : home.path);
-      });
+      void resolveSessionHome()
+        .then((home) => {
+          router.replace(home.kind === "unauthenticated" ? loginPathFor("dietitian") : home.path);
+        })
+        .catch(() => {
+          router.replace(loginPathFor("admin"));
+        });
     }
   }, [state, router]);
 
   async function onLogout() {
     await logout();
     router.replace(loginPathFor("admin"));
+  }
+
+  if (state === "unreachable") {
+    return (
+      <ErrorState
+        title="API unreachable"
+        action={
+          <Button onClick={() => setRetryKey((value) => value + 1)}>
+            Retry
+          </Button>
+        }
+      >
+        Unable to reach the API. If Docker just restarted, wait a few seconds and try again.
+      </ErrorState>
+    );
   }
 
   if (state !== "ok") {
@@ -94,7 +122,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
     <AppShell
       theme="admin"
       brand="Nutrition"
-      meta={role === "SUPER_ADMIN" ? "Super admin" : "Admin"}
+      meta="Admin"
       navSections={navSections}
       pathname={pathname}
       linkComponent={Link}

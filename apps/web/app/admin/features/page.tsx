@@ -1,16 +1,14 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   Alert,
   Button,
   EmptyState,
-  Field,
-  Input,
   LoadingState,
   PageHeader,
   Section,
-  Select,
   StatusBadge,
   Table,
   Td,
@@ -30,11 +28,7 @@ interface FeatureRow {
 
 export default function AdminFeaturesPage() {
   const [rows, setRows] = useState<FeatureRow[] | null>(null);
-  const [key, setKey] = useState("");
-  const [name, setName] = useState("");
-  const [valueType, setValueType] = useState<"BOOLEAN" | "LIMIT">("BOOLEAN");
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
 
   async function load() {
     try {
@@ -48,25 +42,6 @@ export default function AdminFeaturesPage() {
   useEffect(() => {
     void load();
   }, []);
-
-  async function onCreate(event: FormEvent) {
-    event.preventDefault();
-    setBusy(true);
-    setError(null);
-    try {
-      await api("/api/v1/admin/features", {
-        method: "POST",
-        body: JSON.stringify({ key, name, valueType }),
-      });
-      setKey("");
-      setName("");
-      await load();
-    } catch (err) {
-      setError(errorMessage(err, "Unable to create feature"));
-    } finally {
-      setBusy(false);
-    }
-  }
 
   async function setStatus(id: string, status: "ACTIVE" | "INACTIVE") {
     setError(null);
@@ -87,32 +62,19 @@ export default function AdminFeaturesPage() {
         eyebrow="Catalog"
         title="Features"
         description="Global catalog status is separate from practice entitlement. Disabling a feature globally still denies access through entitlements."
+        actions={
+          <Link href="/admin/features/new" className="ui-btn ui-btn--primary ui-btn--sm">
+            Add feature
+          </Link>
+        }
       />
       {error ? <Alert tone="danger">{error}</Alert> : null}
 
-      <Section title="Add feature" tone="muted">
-        <form onSubmit={(event) => void onCreate(event)} className="ui-admin-toolbar">
-          <Field label="Key">
-            <Input value={key} onChange={(event) => setKey(event.target.value)} placeholder="FEATURE_KEY" required />
-          </Field>
-          <Field label="Display name">
-            <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Name" required />
-          </Field>
-          <Field label="Type">
-            <Select value={valueType} onChange={(event) => setValueType(event.target.value as "BOOLEAN" | "LIMIT")}>
-              <option value="BOOLEAN">On / off</option>
-              <option value="LIMIT">Limit</option>
-            </Select>
-          </Field>
-          <Button type="submit" disabled={busy}>
-            {busy ? "Creating…" : "Create"}
-          </Button>
-        </form>
-      </Section>
-
       <Section title="Feature catalog">
         {rows === null ? <LoadingState>Loading features…</LoadingState> : null}
-        {rows && rows.length === 0 ? <EmptyState title="No features yet">Create a feature to define plan capabilities.</EmptyState> : null}
+        {rows && rows.length === 0 ? (
+          <EmptyState title="No features yet">Create a feature to define plan capabilities.</EmptyState>
+        ) : null}
         {rows && rows.length > 0 ? (
           <Table>
             <thead>

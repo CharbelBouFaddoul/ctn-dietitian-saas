@@ -331,7 +331,7 @@ export default function ClientTrackingPage() {
                   <div key={meal.category}>
                     <div className="ui-row" style={{ justifyContent: "space-between", marginBottom: 6 }}>
                       <strong>{MEAL_LABELS[meal.category] ?? meal.category}</strong>
-                      <span className="ui-muted">{formatKcal(meal.presented.energyKcal)}</span>
+                      <span className="ui-muted">{formatKcal(meal.presented?.energyKcal ?? null)}</span>
                     </div>
                     <ul className="ui-client-meal-items">
                       {meal.items.map((row) => (
@@ -343,7 +343,7 @@ export default function ClientTrackingPage() {
                             </span>
                           </span>
                           <span className="ui-row" style={{ gap: 8, alignItems: "center" }}>
-                            <span className="ui-muted">{formatKcal(row.presented.energyKcal)}</span>
+                            <span className="ui-muted">{formatKcal(row.presented?.energyKcal ?? null)}</span>
                             <Button
                               type="button"
                               size="sm"

@@ -61,7 +61,7 @@ export async function resolveSessionHome(audience?: SessionAudience): Promise<Se
   try {
     me = await api<AuthMe>("/api/v1/auth/me");
   } catch (err) {
-    if (err instanceof ApiError && err.status === 401) {
+    if (err instanceof ApiError && (err.status === 401 || err.status === 0)) {
       return { kind: "unauthenticated", path: "/" };
     }
     throw err;
@@ -72,7 +72,7 @@ export async function resolveSessionHome(audience?: SessionAudience): Promise<Se
     const accounts = await api<DietitianAccountRow[]>("/api/v1/dietitian");
     dietitianAccountIds = accounts.map((account) => account.id);
   } catch (err) {
-    if (!(err instanceof ApiError && (err.status === 401 || err.status === 403))) {
+    if (!(err instanceof ApiError && (err.status === 401 || err.status === 403 || err.status === 0))) {
       throw err;
     }
   }
@@ -83,7 +83,7 @@ export async function resolveSessionHome(audience?: SessionAudience): Promise<Se
       const onboarding = await api<PortalOnboarding>("/api/v1/portal/onboarding");
       hasPortal = onboarding.status === "connected";
     } catch (err) {
-      if (!(err instanceof ApiError && (err.status === 401 || err.status === 403))) {
+      if (!(err instanceof ApiError && (err.status === 401 || err.status === 403 || err.status === 0))) {
         throw err;
       }
     }
