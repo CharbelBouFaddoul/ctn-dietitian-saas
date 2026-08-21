@@ -327,6 +327,9 @@ export function ClientEvolutionPanel({
               <Input type="date" value={measureAt} onChange={(e) => setMeasureAt(e.target.value)} required />
             </Field>
             <div className="ui-evo__form-action">
+              <span className="ui-label" aria-hidden="true">
+                Save
+              </span>
               <Button type="submit" size="sm" variant="secondary" disabled={saving}>
                 {saving ? "Saving…" : "Save"}
               </Button>

@@ -402,7 +402,9 @@ No user
 
 > Platform admin should eventually provision accounts and assign them to users. Self-registration will eventually be disabled.
 
-**Phase 3 update (2026-08-20):** Implemented. `registrationEnabled` defaults to `false`; admin `POST /api/v1/admin/dietitians` provisions User + DietitianAccount + optional subscription + `DIETITIAN_ACTIVATION` email. Self-serve register/org create are gated. See [TENANCY_MIGRATION.md](./TENANCY_MIGRATION.md).
+**Phase 3 update (2026-08-20):** Implemented. Registration defaults off; audience-specific `dietitianRegistrationEnabled` / `patientRegistrationEnabled` (legacy `registrationEnabled` = either). Admin `POST /api/v1/admin/dietitians` provisions User + DietitianAccount + optional subscription + `DIETITIAN_ACTIVATION` email. Self-serve register/org create are gated. See [TENANCY_MIGRATION.md](./TENANCY_MIGRATION.md).
+
+**Dietitian-managed patient mode (done):** Same `Client` / `ClientAccount` architecture. Chart-only create; practice manages clinical data without requiring portal usage; measurements feed Evolution; patient daily tracking remains portal-owned; join later / revoke-rejoin unchanged. E2E: `dietitian-managed-client.e2e.spec.ts`.
 
 **Phase 4 (done):** subscription lifecycle enforcement — see [TENANCY_MIGRATION.md](./TENANCY_MIGRATION.md).
 

@@ -114,6 +114,16 @@ export class ClientPortfolioService {
       .filter((m) => m.type === "HEIGHT")
       .slice()
       .sort((a, b) => a.measuredAt.getTime() - b.measuredAt.getTime());
+    const latestWeight = weightSeries.length > 0 ? weightSeries[weightSeries.length - 1]! : null;
+    const previousWeightRow =
+      weightSeries.length >= 2 ? weightSeries[weightSeries.length - 2]! : null;
+    const previousWeight = previousWeightRow
+      ? {
+          value: Number(previousWeightRow.value),
+          unit: previousWeightRow.unit,
+          measuredAt: previousWeightRow.measuredAt.toISOString(),
+        }
+      : null;
     let evolutionSummary: {
       weightDelta: number | null;
       weightUnit: string | null;
@@ -123,7 +133,7 @@ export class ClientPortfolioService {
     } | null = null;
     if (weightSeries.length >= 2) {
       const first = weightSeries[0]!;
-      const last = weightSeries[weightSeries.length - 1]!;
+      const last = latestWeight!;
       const firstH = heightSeries.filter((h) => h.measuredAt.getTime() <= first.measuredAt.getTime()).at(-1);
       const lastH = heightSeries.filter((h) => h.measuredAt.getTime() <= last.measuredAt.getTime()).at(-1);
       evolutionSummary = {
@@ -262,6 +272,7 @@ export class ClientPortfolioService {
           }
         : null,
       latestMeasurements,
+      previousWeight,
       bmi,
       evolutionSummary,
       primaryGoal: primaryGoal

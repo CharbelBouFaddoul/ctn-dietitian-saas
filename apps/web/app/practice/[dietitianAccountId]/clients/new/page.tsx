@@ -67,7 +67,7 @@ export default function NewClientPage() {
       });
       try {
         await api(`/api/v1/dietitian/${dietitianAccountId}/clients/${created.id}`);
-        router.push(`/practice/${dietitianAccountId}/clients/${created.id}`);
+        router.push(`/practice/${dietitianAccountId}/clients/${created.id}?created=1`);
       } catch (accessErr) {
         if (accessErr instanceof ApiError && accessErr.status === 403) {
           router.push(clientsHref);
@@ -87,7 +87,7 @@ export default function NewClientPage() {
       <Breadcrumbs items={[{ label: "Clients", href: clientsHref }, { label: "New client" }]} />
       <PageHeader
         title="Add a client chart"
-        description="Use this for existing clients you already work with. New clients should create their own account and join using the clinic code from the Clients page."
+        description="Creates a clinic chart you can manage from your dashboard — profile, measurements, meal plans, appointments, and more. Portal login is optional: invite the patient later from their Portal tab when they are ready to use the app."
         actions={
           <Link href={clientsHref} className="ui-btn ui-btn--secondary ui-btn--sm">
             Back to clients

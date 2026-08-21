@@ -19,8 +19,11 @@ type Props = {
   allowManage: boolean;
   events: TimelineEventRow[];
   loading: boolean;
-  hasMore: boolean;
-  onLoadMore: () => void;
+  page: number;
+  hasNewer: boolean;
+  hasOlder: boolean;
+  onNewer: () => void;
+  onOlder: () => void;
 };
 
 function dayKey(iso: string) {
@@ -77,10 +80,14 @@ export function ClientTimelinePanel({
   allowManage,
   events,
   loading,
-  hasMore,
-  onLoadMore,
+  page,
+  hasNewer,
+  hasOlder,
+  onNewer,
+  onOlder,
 }: Props) {
   const groups = groupEvents(events);
+  const showPager = hasNewer || hasOlder || page > 1;
 
   return (
     <div className="ui-chart-timeline">
@@ -101,37 +108,55 @@ export function ClientTimelinePanel({
               Activity will appear here as the chart is used.
             </EmptyState>
           ) : (
-            <div className="ui-chart-timeline__groups">
-              {groups.map((group) => (
-                <div key={group.day} className="ui-chart-timeline__day">
-                  <h3 className="ui-chart-timeline__day-label">{formatDayHeading(group.day)}</h3>
-                  <ol className="ui-chart-timeline__rail">
-                    {group.items.map((row) => (
-                      <li key={row.id} className="ui-chart-timeline__event">
-                        <div className="ui-chart-timeline__dot" aria-hidden="true" />
-                        <div className="ui-chart-timeline__event-body">
-                          <p className="ui-chart-timeline__event-title">{activityLabel(row.type)}</p>
-                          <time className="ui-chart-timeline__event-time" dateTime={row.occurredAt}>
-                            {formatTime(row.occurredAt)}
-                            <span className="ui-chart-timeline__event-sep">·</span>
-                            {formatDate(row.occurredAt)}
-                          </time>
-                        </div>
-                      </li>
-                    ))}
-                  </ol>
+            <>
+              <div className="ui-chart-timeline__scroll">
+                <div className="ui-chart-timeline__groups">
+                  {groups.map((group) => (
+                    <div key={group.day} className="ui-chart-timeline__day">
+                      <h3 className="ui-chart-timeline__day-label">{formatDayHeading(group.day)}</h3>
+                      <ol className="ui-chart-timeline__rail">
+                        {group.items.map((row) => (
+                          <li key={row.id} className="ui-chart-timeline__event">
+                            <div className="ui-chart-timeline__dot" aria-hidden="true" />
+                            <div className="ui-chart-timeline__event-body">
+                              <p className="ui-chart-timeline__event-title">{activityLabel(row.type)}</p>
+                              <time className="ui-chart-timeline__event-time" dateTime={row.occurredAt}>
+                                {formatTime(row.occurredAt)}
+                                <span className="ui-chart-timeline__event-sep">·</span>
+                                {formatDate(row.occurredAt)}
+                              </time>
+                            </div>
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </div>
+              {showPager ? (
+                <div className="ui-chart-timeline__pager">
+                  <span className="ui-muted">Page {page}</span>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={loading || !hasNewer}
+                    onClick={onNewer}
+                  >
+                    Newer
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={loading || !hasOlder}
+                    onClick={onOlder}
+                  >
+                    {loading ? "Loading…" : "Older"}
+                  </Button>
+                </div>
+              ) : null}
+            </>
           )}
 
-          {hasMore ? (
-            <div className="ui-chart-timeline__more">
-              <Button variant="secondary" size="sm" disabled={loading} onClick={onLoadMore}>
-                {loading ? "Loading…" : "Load earlier activity"}
-              </Button>
-            </div>
-          ) : null}
           {loading && events.length === 0 ? (
             <p className="ui-muted" style={{ margin: 0 }}>
               Loading timeline…

@@ -167,16 +167,17 @@ Session + `TenantGuard`. Client-scoped routes also run `ClientAccessGuard` / `Cl
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | GET | `/practice/dashboard` | Owner (`DietitianGuard`) | Aggregated practice home: `clientCount`, `clientLimit`, `unreadMessageCount`, appointments (`endAt`/`status`), messages, notifications, needsAttention, recentlyActive |
-| GET/POST | `/clients` | Member; create OWNER/DIETITIAN | List (search/status/tag/assignee/page) / create. Optional `invitePortal` |
+| GET | `/clients/:clientId/portfolio` | Client access | Chart overview aggregate: vitals, `previousWeight`, goals, meal plan, appointment, portal `connectionStatus`, timeline |
+| GET/POST | `/clients` | Member; create OWNER/DIETITIAN | List (search/status/tag/assignee/page) / create chart-only Client (no User/ClientAccount). Portal invite is a separate join-code step |
 | GET/PATCH | `/clients/:clientId` | Client access | Read / update identity |
 | POST | `/clients/:clientId/archive` | OWNER/DIETITIAN assigned | Archive; close assignments; deactivate portal; revoke sessions |
 | POST | `/clients/:clientId/restore` | OWNER/DIETITIAN assigned | Restore to ACTIVE/INACTIVE without duplicating identity |
 | GET/POST | `/clients/:clientId/assignments` | Read / assign | History retained; reassignment closes the previous row |
-| GET/POST | `/clients/:clientId/account` `.../invite` `.../deactivate` `.../disconnect-request/dismiss` | Read / invite | Portal link only; passwords never returned. Dismiss clears a patient leave request without deactivating |
-| GET/PATCH | `/clients/:clientId/profile` | Read / update | Extended practice profile |
+| GET/POST | `/clients/:clientId/account` `.../join-code` `.../deactivate` `.../disconnect-request/dismiss` | Read / invite | Portal link only; passwords never returned. Chart remains manageable when portal is not activated or deactivated |
+| GET/PATCH | `/clients/:clientId/profile` | Read / update | Extended practice profile (dietitian-managed without portal login) |
 | GET/POST | `/clients/:clientId/goals` | Read / manageRecords | Lightweight care-plan goals |
 | POST | `/clients/:clientId/goals/:goalId/complete` or `/cancel` | manageRecords | Goal lifecycle |
-| GET/POST | `/clients/:clientId/measurements` | Read / manageRecords | Typed rows; stored in kg/cm/%; optional `type`, `from`, `to` filters on GET |
+| GET/POST | `/clients/:clientId/measurements` | Read / manageRecords | Typed rows; stored in kg/cm/%; optional `type`, `from`, `to` filters on GET. Practice writes feed Evolution |
 | GET | `/clients/:clientId/evolution` | Read | Measurement series, BMI series, baseline/current comparison, date range |
 | GET | `/clients/:clientId/timeline` | Read | Organization-scoped **and** client-access scoped |
 | GET/POST | `/tags` | DietitianGuard | Clinic tag library (create) |
@@ -313,7 +314,7 @@ Authenticated client account only (`Session.activeClientId`). Mutations use `ass
 
 ### Client tracking — dietitian review (`/api/v1/dietitian/:dietitianAccountId/clients/:clientId/tracking`)
 
-Read-only. `ClientAccessService` `read`. Same summary/list shapes as portal (including Phase 10 summary enrichment).
+Read-only. `ClientAccessService` `read`. Same summary/list shapes as portal (including Phase 10 summary enrichment). There are **no** practice POST routes for food/water/exercise/sleep logs — daily tracking remains patient-owned. Dietitian-managed care uses profile, measurements, goals, meal plans, assessments, and appointments instead.
 
 | Method | Path | Description |
 |---|---|---|

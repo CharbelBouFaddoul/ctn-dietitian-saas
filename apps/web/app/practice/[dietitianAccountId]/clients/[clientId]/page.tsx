@@ -70,6 +70,9 @@ type ChartSection = {
   tabs: Array<{ id: Tab; label: string }>;
 };
 
+const MEASUREMENTS_PAGE_SIZE = 8;
+const TIMELINE_PAGE_SIZE = 25;
+
 const chartSections: ChartSection[] = [
   {
     id: "overview",
@@ -177,6 +180,7 @@ type Portfolio = {
     unit: string;
     measuredAt: string;
   }>;
+  previousWeight: { value: number; unit: string; measuredAt: string } | null;
   bmi: number | null;
   evolutionSummary: {
     weightDelta: number | null;
@@ -390,12 +394,14 @@ function ClientWorkspacePage() {
 
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showCreatedTip, setShowCreatedTip] = useState(() => searchParams.get("created") === "1");
 
   const [clientForm, setClientForm] = useState<ClientForm>(emptyClientForm);
   const [profileForm, setProfileForm] = useState<ProfileForm>(emptyProfileForm);
   const [orgTags, setOrgTags] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [measurements, setMeasurements] = useState<MeasurementRow[]>([]);
+  const [measurementsPage, setMeasurementsPage] = useState(1);
   const [weight, setWeight] = useState("");
 
   const [goals, setGoals] = useState<GoalRow[]>([]);
@@ -495,7 +501,9 @@ function ClientWorkspacePage() {
   const [endAt, setEndAt] = useState("");
 
   const [timeline, setTimeline] = useState<TimelineRow[]>([]);
-  const [timelineHasMore, setTimelineHasMore] = useState(false);
+  const [timelinePages, setTimelinePages] = useState<TimelineRow[][]>([]);
+  const [timelinePageIndex, setTimelinePageIndex] = useState(0);
+  const [timelineHasOlder, setTimelineHasOlder] = useState(false);
   const [timelineNotes, setTimelineNotes] = useState("");
   const [timelineLoading, setTimelineLoading] = useState(false);
 
@@ -594,6 +602,7 @@ function ClientWorkspacePage() {
   async function loadMeasurements() {
     const rows = await api<MeasurementRow[]>(`${base}/measurements`);
     setMeasurements(rows);
+    setMeasurementsPage(1);
   }
 
   async function loadAppointments() {
@@ -601,17 +610,45 @@ function ClientWorkspacePage() {
     setAppointments(rows);
   }
 
-  async function loadTimeline(before?: string) {
+  async function loadTimelinePage(before?: string, replace = true) {
     setTimelineLoading(true);
     try {
-      const query = new URLSearchParams({ limit: "50" });
+      const query = new URLSearchParams({ limit: String(TIMELINE_PAGE_SIZE) });
       if (before) query.set("before", before);
       const rows = await api<TimelineRow[]>(`${base}/timeline?${query.toString()}`);
-      setTimeline((prev) => (before ? [...prev, ...rows] : rows));
-      setTimelineHasMore(rows.length >= 50);
+      if (replace) {
+        setTimelinePages([rows]);
+        setTimelinePageIndex(0);
+      } else {
+        setTimelinePages((prev) => [...prev, rows]);
+        setTimelinePageIndex((index) => index + 1);
+      }
+      setTimeline(rows);
+      setTimelineHasOlder(rows.length >= TIMELINE_PAGE_SIZE);
     } finally {
       setTimelineLoading(false);
     }
+  }
+
+  function goTimelineNewer() {
+    if (timelinePageIndex <= 0) return;
+    const next = timelinePageIndex - 1;
+    setTimelinePageIndex(next);
+    setTimeline(timelinePages[next] ?? []);
+  }
+
+  function goTimelineOlder() {
+    const cached = timelinePages[timelinePageIndex + 1];
+    if (cached) {
+      setTimelinePageIndex(timelinePageIndex + 1);
+      setTimeline(cached);
+      return;
+    }
+    const last = timeline[timeline.length - 1];
+    if (!last || !timelineHasOlder) return;
+    void loadTimelinePage(last.occurredAt, false).catch((err) =>
+      setError(errorMessage(err, "Unable to load older timeline")),
+    );
   }
 
   useEffect(() => {
@@ -631,7 +668,10 @@ function ClientWorkspacePage() {
   useEffect(() => {
     if (tab !== "timeline") return;
     setTimeline([]);
-    void loadTimeline().catch((err) => setError(errorMessage(err, "Unable to load timeline")));
+    setTimelinePages([]);
+    setTimelinePageIndex(0);
+    setTimelineHasOlder(false);
+    void loadTimelinePage().catch((err) => setError(errorMessage(err, "Unable to load timeline")));
   }, [tab, base]);
 
   useEffect(() => {
@@ -680,6 +720,22 @@ function ClientWorkspacePage() {
   const connectionStatus = client?.connectionStatus ?? portalAccount?.connectionStatus;
   const weightMeasurement = portfolio ? measurementOf(portfolio, "WEIGHT") : null;
   const heightMeasurement = portfolio ? measurementOf(portfolio, "HEIGHT") : null;
+  const previousWeight = portfolio?.previousWeight ?? null;
+  const recentWeightChange =
+    weightMeasurement && previousWeight && weightMeasurement.unit === previousWeight.unit
+      ? Math.round((weightMeasurement.value - previousWeight.value) * 1000) / 1000
+      : null;
+
+  function dismissCreatedTip() {
+    setShowCreatedTip(false);
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete("created");
+    const query = next.toString();
+    router.replace(
+      `/practice/${dietitianAccountId}/clients/${clientId}${query ? `?${query}` : ""}`,
+      { scroll: false },
+    );
+  }
 
   return (
     <section className="ui-client-chart">
@@ -737,6 +793,18 @@ function ClientWorkspacePage() {
         </div>
       ) : null}
 
+      {showCreatedTip ? (
+        <div style={{ margin: "0 0 12px" }}>
+          <Alert tone="neutral">
+            Client chart created. Manage profile, measurements, meal plans, and appointments from this
+            workspace — portal login is optional. Invite them later from the Portal tab when ready.{" "}
+            <button type="button" className="ui-link" onClick={dismissCreatedTip}>
+              Dismiss
+            </button>
+          </Alert>
+        </div>
+      ) : null}
+
       {/* ── OVERVIEW ── */}
       {tab === "overview" && portfolio ? (
         <div className="ui-client-chart__panel ui-stack">
@@ -754,6 +822,39 @@ function ClientWorkspacePage() {
                     "—"
                   )}
                 </span>
+              </button>
+              <button type="button" className="ui-client-chart__vital" onClick={() => openEvolution("WEIGHT")}>
+                <span className="ui-client-chart__metric-label">Previous weight</span>
+                <span className="ui-client-chart__vital-value">
+                  {previousWeight ? (
+                    <>
+                      {previousWeight.value}
+                      <span className="ui-client-chart__vital-unit">{previousWeight.unit}</span>
+                    </>
+                  ) : (
+                    "—"
+                  )}
+                </span>
+                {previousWeight ? (
+                  <span className="ui-client-chart__vital-meta">
+                    {formatDate(previousWeight.measuredAt)}
+                  </span>
+                ) : null}
+              </button>
+              <button type="button" className="ui-client-chart__vital" onClick={() => openEvolution("WEIGHT")}>
+                <span className="ui-client-chart__metric-label">Weight change</span>
+                <span className="ui-client-chart__vital-value">
+                  {recentWeightChange != null ? (
+                    <>
+                      {recentWeightChange > 0 ? "+" : ""}
+                      {recentWeightChange}
+                      <span className="ui-client-chart__vital-unit">{weightMeasurement?.unit}</span>
+                    </>
+                  ) : (
+                    "—"
+                  )}
+                </span>
+                <span className="ui-client-chart__vital-meta">vs previous</span>
               </button>
               <button type="button" className="ui-client-chart__vital" onClick={() => openEvolution("HEIGHT")}>
                 <span className="ui-client-chart__metric-label">Height</span>
@@ -794,6 +895,17 @@ function ClientWorkspacePage() {
             </div>
 
             <div className="ui-client-chart__care-grid" role="group" aria-label="Care snapshot">
+              <button type="button" className="ui-client-chart__care-card" onClick={() => selectTab("portal")}>
+                <span className="ui-client-chart__metric-label">Portal status</span>
+                <span className="ui-client-chart__care-value">
+                  {portalStatusLabel(connectionStatus)}
+                </span>
+                <span className="ui-client-chart__care-meta">
+                  {connectionStatus === "connected"
+                    ? "Patient can use the portal"
+                    : "Manage this chart without portal login"}
+                </span>
+              </button>
               <button type="button" className="ui-client-chart__care-card" onClick={() => selectTab("goals")}>
                 <span className="ui-client-chart__metric-label">Primary goal</span>
                 <span className="ui-client-chart__care-value">{portfolio.primaryGoal?.title ?? "No goal set"}</span>
@@ -1126,11 +1238,10 @@ function ClientWorkspacePage() {
             </div>
           </Section>
 
-          <Section
-            title="Measurements"
-            actions={
+          <Section title="Measurements">
+            {allowManage ? (
               <form
-                className="ui-client-chart__toolbar"
+                className="ui-client-chart__measure-form"
                 onSubmit={(event) => {
                   event.preventDefault();
                   void api(`${base}/measurements`, {
@@ -1149,45 +1260,82 @@ function ClientWorkspacePage() {
                     .catch((err) => setError(errorMessage(err, "Unable to record measurement")));
                 }}
               >
-                <Input
-                  type="number"
-                  step="0.1"
-                  value={weight}
-                  onChange={(event) => setWeight(event.target.value)}
-                  placeholder="Weight (kg)"
-                  required
-                  style={{ width: 130 }}
-                  disabled={!allowManage}
-                />
-                <Button type="submit" size="sm" variant="secondary" disabled={!allowManage}>
-                  Record
-                </Button>
+                <Field label="Weight (kg)">
+                  <Input
+                    type="number"
+                    step="0.1"
+                    value={weight}
+                    onChange={(event) => setWeight(event.target.value)}
+                    placeholder="e.g. 72.5"
+                    required
+                  />
+                </Field>
+                <div className="ui-client-chart__measure-action">
+                  <span className="ui-label" aria-hidden="true">
+                    Record
+                  </span>
+                  <Button type="submit" size="sm" variant="secondary">
+                    Record
+                  </Button>
+                </div>
               </form>
-            }
-          >
+            ) : null}
             {measurements.length === 0 ? (
               <EmptyState title="No measurements yet" />
             ) : (
-              <Table>
-                <thead>
-                  <tr>
-                    <th>Type</th>
-                    <th>Value</th>
-                    <th>Date</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {measurements.map((row) => (
-                    <tr key={row.id}>
-                      <Td label="Type">{humanizeLabel(row.type)}</Td>
-                      <Td label="Value">
-                        {row.value} {row.unit}
-                      </Td>
-                      <Td label="Date">{formatDate(row.measuredAt)}</Td>
+              <>
+                <Table>
+                  <thead>
+                    <tr>
+                      <th style={{ width: "28%" }}>Type</th>
+                      <th style={{ width: "28%" }}>Value</th>
+                      <th style={{ width: "44%" }}>Date</th>
                     </tr>
-                  ))}
-                </tbody>
-              </Table>
+                  </thead>
+                  <tbody>
+                    {measurements
+                      .slice(
+                        (measurementsPage - 1) * MEASUREMENTS_PAGE_SIZE,
+                        measurementsPage * MEASUREMENTS_PAGE_SIZE,
+                      )
+                      .map((row) => (
+                        <tr key={row.id}>
+                          <Td label="Type">{humanizeLabel(row.type)}</Td>
+                          <Td label="Value">
+                            {row.value} {row.unit}
+                          </Td>
+                          <Td label="Date">{formatDate(row.measuredAt)}</Td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </Table>
+                {measurements.length > MEASUREMENTS_PAGE_SIZE ? (
+                  <p className="ui-row" style={{ marginTop: 12, justify: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <span className="ui-muted">
+                      Page {measurementsPage} of{" "}
+                      {Math.max(1, Math.ceil(measurements.length / MEASUREMENTS_PAGE_SIZE))}
+                      {" · "}
+                      {measurements.length} total
+                    </span>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      disabled={measurementsPage <= 1}
+                      onClick={() => setMeasurementsPage((p) => p - 1)}
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      disabled={measurementsPage >= Math.ceil(measurements.length / MEASUREMENTS_PAGE_SIZE)}
+                      onClick={() => setMeasurementsPage((p) => p + 1)}
+                    >
+                      Next
+                    </Button>
+                  </p>
+                ) : null}
+              </>
             )}
           </Section>
         </div>
@@ -1350,7 +1498,10 @@ function ClientWorkspacePage() {
 
       {/* ── TRACKING ── */}
       {tab === "tracking" ? (
-        <div className="ui-client-chart__panel">
+        <div className="ui-client-chart__panel ui-stack">
+          <p className="ui-hint" style={{ margin: "0 0 0.75rem", padding: "0.35rem 0 0.15rem", lineHeight: 1.45 }}>
+            Food, water, exercise, sleep, and habits are logged by the patient in the portal. Assign habits here; you don’t need to enter everyday tracking for them.
+          </p>
           <ClientTrackingPanel
             dietitianAccountId={dietitianAccountId}
             clientId={clientId}
@@ -1698,14 +1849,11 @@ function ClientWorkspacePage() {
             allowManage={allowManage}
             events={timeline}
             loading={timelineLoading}
-            hasMore={timelineHasMore}
-            onLoadMore={() => {
-              const last = timeline[timeline.length - 1];
-              if (!last) return;
-              void loadTimeline(last.occurredAt).catch((err) =>
-                setError(errorMessage(err, "Unable to load more timeline")),
-              );
-            }}
+            page={timelinePageIndex + 1}
+            hasNewer={timelinePageIndex > 0}
+            hasOlder={timelinePageIndex < timelinePages.length - 1 || timelineHasOlder}
+            onNewer={goTimelineNewer}
+            onOlder={goTimelineOlder}
           />
         </div>
       ) : null}
@@ -1755,8 +1903,8 @@ function ClientWorkspacePage() {
       {/* ── PORTAL ── */}
       {tab === "portal" ? (
         <JoinCodePanel
-          title="Reconnect portal"
-          description="Use this only for an existing chart. New clients create their own account and join with the clinic code from the Clients page."
+          title="Portal connection"
+          description="Portal login is optional. Manage this patient from the chart without them signing in. Generate a join code when they are ready to use the patient app — they create their own account and connect with the code."
           connectionStatus={connectionStatus}
           plainJoinCode={plainJoinCode}
           hint={portalAccount?.joinCode?.hint ?? null}

@@ -50,6 +50,7 @@ No Organization layer. No OrganizationMember. No STAFF tenancy. No `organization
 - Join responses: `{ status: "joined" | "already_connected", practiceName, dietitianDisplayName, clientId, … }`.
 - Connected patients may open `/client/join` to link another practice; portal layout connection switcher uses `Session.activeClientId`.
 - Isolation: `assertPortalAccess` + `DietitianGuard`; no Organization / STAFF reintroduction.
+- **Dietitian-managed patients:** `POST …/clients` creates a chart without `User`/`ClientAccount`. Practice can manage profile, measurements (→ Evolution), goals, meal plans, assessments, and appointments without portal login. Portal join later reuses the same Client. Daily tracking writes stay on `/portal/tracking` only. Covered by `test/dietitian-managed-client.e2e.spec.ts`.
 
 ## Phase 4 notes
 

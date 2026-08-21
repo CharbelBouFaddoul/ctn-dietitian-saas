@@ -7,10 +7,11 @@ export function connectionStatusLabel(status: string | null | undefined): string
     case "expired":
       return "Join code expired";
     case "connected":
-      return "Portal connected";
+      return "Portal active";
     case "deactivated":
-      return "Portal deactivated";
+      return "Portal access deactivated";
+    case "not_connected":
     default:
-      return "Not connected";
+      return "Portal not activated";
   }
 }

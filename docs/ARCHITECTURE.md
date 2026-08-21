@@ -100,6 +100,21 @@ Dietitian/Owner creates Client record
 
 A Client record can exist before a portal account exists. Invitation tokens are never reusable after activation or expiry.
 
+### 2.2.1 Dietitian-managed patients
+
+The same `Client` + optional `ClientAccount` model supports two usage modes — **not** a second patient type:
+
+| Mode | Who drives day-to-day | Portal |
+|---|---|---|
+| **Dietitian-managed** | Practice chart: profile, goals, measurements, meal plans, assessments, appointments | Optional — often `connectionStatus: not_connected` |
+| **Self-managed** | Patient logs food/water/exercise/sleep/habits in the portal | `ClientAccount` ACTIVE |
+
+Dietitians create a chart with `POST …/clients` (no User/ClientAccount). They manage clinical/progress data from the practice workspace. Daily self-reported tracking stays patient-owned (practice tracking APIs are **read-only**). When the patient later joins via join code, the same Client row is used — no migration. Revoke/rejoin (`ClientAccount` DEACTIVATED → new code → ACTIVE) leaves chart data intact.
+
+Practice measurements write the same `ClientMeasurement` rows as the portal; Evolution/charts update immediately without patient login.
+
+Portal status labels (derived `connectionStatus`): Portal not activated / Waiting for client / Join code expired / Portal active / Portal access deactivated.
+
 ### 2.3 Sessions and authentication (Phase 2)
 
 Authentication is **identity only**. NestJS `AuthModule` answers who the caller is. It does not check organizations, clients, subscriptions, or feature entitlements.
@@ -141,7 +156,7 @@ Tenant-scoped queries via dietitianAccountId (tenantWhere)
 ```
 
 - Platform roles stay on `users` (`SUPER_ADMIN` \| `ADMIN`).
-- Self-serve register/practice create is gated by `PlatformSettings.registrationEnabled` (default off); admins provision dietitians.
+- Self-serve register/practice create is gated by `PlatformSettings.dietitianRegistrationEnabled` and `patientRegistrationEnabled` (defaults off; legacy `registrationEnabled` is computed as either-on); admins provision dietitians.
 - Patients may connect to multiple dietitians (isolated `Client` per link); clinical portal ops require a selected `Session.activeClientId` when more than one connection exists.
 - Web practice UI is `/practice/:dietitianAccountId`. Practice APIs are `/api/v1/dietitian/:dietitianAccountId` with `DietitianGuard`.
 - Subscription access is derived (`ACTIVE` / `GRACE` / `READ_ONLY` / `LOCKED`) from period end + status; `DietitianGuard` enforces mutations vs reads. See [TENANCY_MIGRATION.md](./TENANCY_MIGRATION.md).
@@ -476,9 +491,9 @@ Evolution API (measurements → series / BMI)
 
 **Habits (Product Phase 11):** `habit_definitions` (global `dietitianAccountId=null` + practice-owned) → `client_habit_assignments` → daily `habit_logs`. Portal checklist is assignment-driven. `client_goals` remains the nutrition-target layer (e.g. water `targetMl`).
 
-**Measurements:** practice and portal write `ClientMeasurement`; Evolution stays the single progress series API (`from`/`to` filters).
+**Measurements:** practice and portal write `ClientMeasurement`; Evolution stays the single progress series API (`from`/`to` filters). Dietitian-recorded weights appear in Evolution without portal login (dietitian-managed workflow).
 
-**Dietitian access:** read-only review APIs under `/clients/:clientId/tracking`. Clients mutate via `/portal/tracking` and `/portal/habits`. Timeline records create events (`FOOD_LOGGED`, `WATER_LOGGED`, …), not every edit.
+**Dietitian access:** read-only review APIs under `/clients/:clientId/tracking`. Clients mutate via `/portal/tracking` and `/portal/habits`. Dietitians do **not** simulate daily Food/Water/Exercise/Sleep/Habit logs. Timeline records create events (`FOOD_LOGGED`, `WATER_LOGGED`, …), not every edit.
 
 **Timezone:** practice `timezone` maps event timestamps to local `tracking_date` / `log_date` / sleep `date`.
 
