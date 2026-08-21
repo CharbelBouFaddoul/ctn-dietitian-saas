@@ -351,7 +351,13 @@ V1 import source is **USDA FoodData Central Foundation Foods** (US government wo
 Import (existing importer only):
 
 ```bash
-pnpm food:import --file=apps/api/food-data/usda-foundation-curated.json
+pnpm food:import
+# Prefer: runs tsx importer (no Nest dist wipe). Host or:
+# docker compose -f docker-compose.dev.yml exec api pnpm food:import
+# Dataset path relative to apps/api: food-data/usda-foundation-curated.json
+
+pnpm recipe:import
+# After foods: imports platform Starter recipes from recipe-data/myplate-kitchen-starter.json
 ```
 
 Platform admin may also run `POST /api/v1/admin/food-sources/import` (bundled curated file; no remote URL fetch). Idempotent upsert on `(food_source_id, source_food_id)`. Duplicate IDs in one file: first wins, later rows skipped. Similar names are never merged.
@@ -406,9 +412,9 @@ meal_plan_versions.snapshot       # written once at publish
 
 There is **one** calculation path. Controllers and React do not reimplement food lookup, override resolution, calories, macros, unit conversion, or rounding.
 
-**Recipes** belong to a `DietitianAccount` (`ACTIVE` / `ARCHIVED`). Ingredient quantities are whole-recipe mass/volume amounts. Ingredients may reference global catalog foods or this practice’s custom foods only. Total = sum of ingredients (`null` stays `null`; empty recipe is known zero). Per serving = total / `servings`. Meal items use `unit = serving`; `quantity` is the number of servings (`perServing × quantity`).
+**Recipes** may be platform **Starter** (`dietitianAccountId` null — read-only for practices, usable in plans) or practice-owned (`ACTIVE` / `ARCHIVED`). Ingredient quantities are whole-recipe mass/volume amounts. Ingredients may reference global catalog foods or this practice’s custom foods only. Total = sum of ingredients (`null` stays `null`; empty recipe is known zero). Per serving = total / `servings`. Meal items use `unit = serving`; `quantity` is the number of servings (`perServing × quantity`).
 
-**Meal plans** belong to dietitian account + client. Plan status (`DRAFT` / `ACTIVE` / `ARCHIVED`) is not version publication status. Versions: `DRAFT` → `PUBLISHED`; the previous published version becomes `SUPERSEDED` and is retained. Publishing is transactional: validate, write snapshot, supersede, mark published, set plan `ACTIVE`.
+**Meal plans** belong to dietitian account + client. Plan status (`DRAFT` / `ACTIVE` / `ARCHIVED`) is not version publication status. Versions: `DRAFT` → `PUBLISHED`; the previous published version becomes `SUPERSEDED` and is retained. Publishing is transactional: validate, write snapshot, supersede, mark published, set plan `ACTIVE`. Presentation **weeks** derive from global `dayNumber` (no week table); `POST …/weeks` appends 7 days.
 
 ### Meal composition (Product Phase 9)
 
@@ -422,7 +428,7 @@ Meal = concrete meal inside a meal-plan day (Breakfast, Lunch, …)
 
 Meal items may only reference global ACTIVE foods, the current practice’s custom foods, or the current practice’s ACTIVE recipes. No separate reusable Meal catalog table.
 
-**Authorization:** recipes are tenant-scoped via `DietitianGuard`. Meal plans use `ClientAccessService` (`read` / `manageRecords`). Portal `GET /api/v1/portal/meal-plan` returns only that client’s current `PUBLISHED` snapshot. Clients never see private recipe libraries, drafts, superseded versions, or other clients.
+**Authorization:** recipes are tenant-scoped via `DietitianGuard` (practice recipes) plus shared Starter catalog. Meal plans use `ClientAccessService` (`read` / `manageRecords`). Portal `GET /api/v1/portal/meal-plan` returns only that client’s current `PUBLISHED` snapshot. Clients never see private practice recipe libraries, drafts, superseded versions, or other clients. Marketing site routes are guest-only; signed-in users redirect via `resolveSessionHome`.
 
 **Migration:** none for Product Phase 9 (schema already supports FOOD/RECIPE items + snapshot).
 

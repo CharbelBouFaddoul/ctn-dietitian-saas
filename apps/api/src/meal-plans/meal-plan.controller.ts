@@ -88,6 +88,16 @@ export class MealPlanController {
     return this.plans.publish(tenant, planId, versionId);
   }
 
+  @Post(":planId/versions/:versionId/weeks")
+  @ApiOperation({ summary: "Append 7 days (one presentation week) to a draft version" })
+  addWeek(
+    @CurrentTenant() tenant: DietitianTenantContext,
+    @Param("planId", ParseUUIDPipe) planId: string,
+    @Param("versionId", ParseUUIDPipe) versionId: string,
+  ) {
+    return this.plans.addWeek(tenant, planId, versionId);
+  }
+
   @Post(":planId/versions/:versionId/days")
   addDay(
     @CurrentTenant() tenant: DietitianTenantContext,

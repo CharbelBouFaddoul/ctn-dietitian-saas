@@ -12,8 +12,6 @@ import {
   Field,
   Input,
   LoadingState,
-  PageHeader,
-  Section,
   Select,
   StatusBadge,
   Table,
@@ -24,6 +22,7 @@ import { api } from "../../../../../lib/api";
 import { ExtraNutrientTables } from "../../../../../lib/extra-nutrient-tables";
 import { type ExtraNutrients } from "../../../../../lib/micronutrients";
 import { errorMessage } from "../../../../../lib/humanize-error";
+import { groupDaysByWeek, weekOfDay } from "../../../../../lib/meal-plan-weeks";
 import { statusLabel, unitLabel } from "../../../../../lib/practice-labels";
 
 interface Nutrition {
@@ -112,16 +111,32 @@ const UNITS = ["g", "kg", "oz", "lb", "ml", "l", "fl_oz"] as const;
 
 function nutritionLine(n: Nutrition): string | undefined {
   const parts: string[] = [];
-  if (n.energyKcal !== null) parts.push(`${n.energyKcal} kcal`);
-  if (n.proteinG !== null) parts.push(`P ${n.proteinG}g`);
-  if (n.carbohydrateG !== null) parts.push(`C ${n.carbohydrateG}g`);
-  if (n.fatG !== null) parts.push(`F ${n.fatG}g`);
-  if (n.fiberG !== null) parts.push(`Fiber ${n.fiberG}g`);
+  if (n.energyKcal !== null && n.energyKcal !== 0) parts.push(`${n.energyKcal} kcal`);
+  if (n.proteinG !== null && n.proteinG !== 0) parts.push(`P ${n.proteinG}g`);
+  if (n.carbohydrateG !== null && n.carbohydrateG !== 0) parts.push(`C ${n.carbohydrateG}g`);
+  if (n.fatG !== null && n.fatG !== 0) parts.push(`F ${n.fatG}g`);
+  if (n.fiberG !== null && n.fiberG !== 0) parts.push(`Fiber ${n.fiberG}g`);
   return parts.length > 0 ? parts.join(" · ") : undefined;
 }
 
-function dayDisplayLabel(day: { title: string | null; weekday?: string | null; dayNumber: number }): string {
-  return day.title ?? day.weekday ?? `Day ${day.dayNumber}`;
+function dayInWeek(dayNumber: number): number {
+  return ((dayNumber - 1) % 7) + 1;
+}
+
+function dayWeek(dayNumber: number): number {
+  return Math.floor((dayNumber - 1) / 7) + 1;
+}
+
+function dayTabLabel(day: { title: string | null; weekday?: string | null; dayNumber: number }): string {
+  if (day.weekday) return day.weekday;
+  if (day.title) return day.title;
+  return `Day ${dayInWeek(day.dayNumber)}`;
+}
+
+function dayFullLabel(day: { title: string | null; weekday?: string | null; dayNumber: number }): string {
+  if (day.title) return day.title;
+  if (day.weekday) return `Week ${dayWeek(day.dayNumber)} · ${day.weekday}`;
+  return `Week ${dayWeek(day.dayNumber)} · Day ${dayInWeek(day.dayNumber)}`;
 }
 
 export default function MealPlanEditorPage() {
@@ -132,6 +147,7 @@ export default function MealPlanEditorPage() {
   const [plan, setPlan] = useState<PlanDetail | null>(null);
   const [version, setVersion] = useState<VersionDetail | null>(null);
   const [activeDayId, setActiveDayId] = useState<string>("");
+  const [activeWeek, setActiveWeek] = useState(1);
   const [editingMealId, setEditingMealId] = useState<string | null>(null);
   const [foodQuery, setFoodQuery] = useState("");
   const [recipeQuery, setRecipeQuery] = useState("");
@@ -169,8 +185,17 @@ export default function MealPlanEditorPage() {
       `/api/v1/dietitian/${dietitianAccountId}/meal-plans/${planId}/versions/${selected}`,
     );
     setVersion(loaded);
-    if (!activeDayId && loaded.snapshot.days[0]) {
-      setActiveDayId(loaded.snapshot.days[0].id);
+    const first = loaded.snapshot.days[0];
+    if (!activeDayId && first) {
+      setActiveDayId(first.id);
+      setActiveWeek(weekOfDay(first.dayNumber));
+    } else if (activeDayId) {
+      const still = loaded.snapshot.days.find((d) => d.id === activeDayId);
+      if (still) setActiveWeek(weekOfDay(still.dayNumber));
+      else if (first) {
+        setActiveDayId(first.id);
+        setActiveWeek(weekOfDay(first.dayNumber));
+      }
     }
   }
 
@@ -224,6 +249,23 @@ export default function MealPlanEditorPage() {
       await load(version.id);
     } catch (err) {
       setError(errorMessage(err, "Could not add day"));
+    }
+  }
+
+  async function addWeek() {
+    if (!version) return;
+    setError(null);
+    setBusy(true);
+    try {
+      await api(`/api/v1/dietitian/${dietitianAccountId}/meal-plans/${planId}/versions/${version.id}/weeks`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      await load(version.id);
+    } catch (err) {
+      setError(errorMessage(err, "Could not add week"));
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -418,7 +460,7 @@ export default function MealPlanEditorPage() {
     const target =
       version.snapshot.days.find((d) => d.id === activeDayId) ?? version.snapshot.days[0];
     if (!target) return;
-    if (!window.confirm(`Remove ${dayDisplayLabel(target)} from this draft?`)) return;
+    if (!window.confirm(`Remove ${dayFullLabel(target)} from this draft?`)) return;
     setError(null);
     try {
       await api(
@@ -440,13 +482,21 @@ export default function MealPlanEditorPage() {
     );
   }
 
-  const dayTabs = version.snapshot.days.map((d) => ({
+  const weekGroups = groupDaysByWeek(version.snapshot.days);
+  const currentWeek = weekGroups.some((g) => g.week === activeWeek)
+    ? activeWeek
+    : (weekGroups[0]?.week ?? 1);
+  const weekDays = weekGroups.find((g) => g.week === currentWeek)?.days ?? [];
+  const dayTabs = weekDays.map((d) => ({
     id: d.id,
-    label: dayDisplayLabel(d),
+    label: dayTabLabel(d),
   }));
+  const focusedDay =
+    weekDays.find((d) => d.id === activeDayId) ?? weekDays[0] ?? null;
+  const hasMultipleVersions = plan.versions.length > 1;
 
   return (
-    <section className="ui-stack" style={{ gap: 20 }}>
+    <section className="ui-meal-editor">
       <Breadcrumbs
         items={[
           { href: `/practice/${dietitianAccountId}/meal-plans`, label: "Meal plans" },
@@ -454,228 +504,272 @@ export default function MealPlanEditorPage() {
         ]}
       />
 
-      <PageHeader
-        title={plan.name}
-        description={
-          <>
-            Version {version.versionNumber}
-            {" · "}
-            {version.immutable ? "Published snapshot (read-only)" : "Draft — live nutrition from foods & recipes"}
-            {" · "}
+      <header className="ui-meal-editor__header">
+        <div className="ui-meal-editor__title-block">
+          <h1 className="ui-meal-editor__title">{plan.name}</h1>
+          <p className="ui-meal-editor__meta">
+            <span>
+              v{version.versionNumber} · {version.immutable ? "Published" : "Draft"}
+            </span>
             <StatusBadge status={plan.status} label={statusLabel(plan.status)} />
-          </>
-        }
-        actions={
-          <div className="ui-row" style={{ gap: 8, flexWrap: "wrap" }}>
-            <Link href={`/practice/${dietitianAccountId}/meal-plans`} className="ui-btn ui-btn--secondary">
-              Back
-            </Link>
-            {canEdit ? (
-              <>
-                <Button variant="secondary" onClick={() => void addDay()} disabled={busy}>
-                  Add day
-                </Button>
-                <Button onClick={() => void publish()} disabled={busy}>
-                  Publish
-                </Button>
-              </>
-            ) : (
-              <Button onClick={() => void newDraft()} disabled={busy}>
-                New draft
-              </Button>
-            )}
-            {plan.status !== "ARCHIVED" ? (
-              <Button variant="danger" onClick={() => void archivePlan()} disabled={busy}>
-                Delete plan
-              </Button>
-            ) : null}
-          </div>
-        }
-      />
+          </p>
+        </div>
+        <div className="ui-meal-editor__actions">
+          <Link
+            href={`/practice/${dietitianAccountId}/meal-plans`}
+            className="ui-btn ui-btn--ghost ui-btn--sm"
+          >
+            Back
+          </Link>
+          {canEdit ? (
+            <Button size="sm" onClick={() => void publish()} disabled={busy}>
+              Publish
+            </Button>
+          ) : (
+            <Button size="sm" onClick={() => void newDraft()} disabled={busy}>
+              New draft
+            </Button>
+          )}
+        </div>
+      </header>
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
 
-      <Section
-        title="Day labels"
-        tone="muted"
-        description="Choose how days appear in this plan and for the client after publish. Switching updates draft day names."
-      >
-        <Field label="Show days as">
-          <Select
-            value={plan.dayLabelMode ?? "NUMBERED"}
-            disabled={busy || plan.status === "ARCHIVED"}
-            onChange={(event) => void setDayLabelMode(event.target.value as "NUMBERED" | "WEEKDAY")}
-          >
-            <option value="NUMBERED">Day 1, Day 2, Day 3…</option>
-            <option value="WEEKDAY">Monday, Tuesday, Wednesday…</option>
-          </Select>
-        </Field>
-      </Section>
+      <div className="ui-meal-editor__nav">
+        {weekGroups.length > 0 ? (
+          <div className="ui-meal-editor__nav-row">
+            <div className="ui-meal-editor__chips" role="tablist" aria-label="Weeks">
+              {weekGroups.map((group) => (
+                <button
+                  key={group.week}
+                  type="button"
+                  className={
+                    group.week === currentWeek ? "ui-meal-editor__chip is-active" : "ui-meal-editor__chip"
+                  }
+                  onClick={() => {
+                    setActiveWeek(group.week);
+                    const first = group.days[0];
+                    if (first) setActiveDayId(first.id);
+                  }}
+                >
+                  Week {group.week}
+                </button>
+              ))}
+            </div>
+            {canEdit ? (
+              <div className="ui-meal-editor__nav-tools">
+                <Button size="sm" variant="ghost" onClick={() => void addDay()} disabled={busy}>
+                  + Day
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => void addWeek()} disabled={busy}>
+                  + Week
+                </Button>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
 
-      <Section title="Versions" tone="muted" description="Switch between draft and published snapshots.">
-        <div className="ui-row" style={{ flexWrap: "wrap", gap: 8 }}>
-          {plan.versions.map((row) => (
-            <a
-              key={row.id}
-              href={`/practice/${dietitianAccountId}/meal-plans/${planId}?versionId=${row.id}`}
-              style={{ textDecoration: "none" }}
-            >
-              <StatusBadge
-                status={row.status}
-                label={`v${row.versionNumber} · ${statusLabel(row.status)}`}
-                tone={row.id === version.id ? undefined : "neutral"}
-              />
-            </a>
-          ))}
-        </div>
-      </Section>
-
-      {dayTabs.length > 0 ? (
-        <>
+        {dayTabs.length > 0 ? (
           <Tabs
             items={dayTabs}
-            value={day?.id ?? ""}
+            value={focusedDay?.id ?? ""}
             onChange={(id) => {
               setActiveDayId(id);
+              const selected = version.snapshot.days.find((d) => d.id === id);
+              if (selected) setActiveWeek(weekOfDay(selected.dayNumber));
               setEditingMealId(null);
               setFoodHits([]);
               setRecipeHits([]);
               setRenameMealId(null);
             }}
           />
+        ) : null}
 
-          {day ? (
-            <div className="ui-stack" style={{ marginTop: 16, gap: 20 }}>
-              <Section
-                title={dayDisplayLabel(day)}
-                description="Daily total = sum of all meals (API)."
-                actions={
-                  canEdit && version.snapshot.days.length > 1 ? (
-                    <Button variant="danger" size="sm" onClick={() => void deleteDay()}>
-                      Delete day
-                    </Button>
-                  ) : null
-                }
-              >
-                <p style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>
-                  {nutritionLine(day.presented) ??
-                    "No items yet — totals appear when you add foods or recipes."}
-                </p>
-                {day.presentedExtraNutrients ? (
-                  <div style={{ marginTop: 12 }}>
-                    <ExtraNutrientTables
-                      values={day.presentedExtraNutrients}
-                      caption="day total"
-                      emptyMessage="No micronutrient data for this day’s foods yet."
-                    />
+        {hasMultipleVersions || canEdit || plan.status !== "ARCHIVED" ? (
+          <details className="ui-meal-editor__more">
+            <summary>Plan settings</summary>
+            <div className="ui-meal-editor__more-body">
+              {hasMultipleVersions ? (
+                <div className="ui-meal-editor__tool">
+                  <span>Versions</span>
+                  <div className="ui-meal-editor__chips">
+                    {plan.versions.map((row) => (
+                      <a
+                        key={row.id}
+                        href={`/practice/${dietitianAccountId}/meal-plans/${planId}?versionId=${row.id}`}
+                        className={
+                          row.id === version.id ? "ui-meal-editor__chip is-active" : "ui-meal-editor__chip"
+                        }
+                      >
+                        v{row.versionNumber} · {statusLabel(row.status)}
+                      </a>
+                    ))}
                   </div>
-                ) : null}
-              </Section>
-
-              {canEdit ? (
-                <Section title="Add a meal" tone="muted" description="Slots like Breakfast, Lunch, or a custom name.">
-                  <form onSubmit={(event) => void createMeal(event)} className="ui-inline-form">
-                    <Field label="Meal type">
-                      <Select value={newMealName} onChange={(e) => setNewMealName(e.target.value)}>
-                        {MEAL_NAME_PRESETS.map((name) => (
-                          <option key={name} value={name}>
-                            {name}
-                          </option>
-                        ))}
-                        <option value="Custom">Custom…</option>
-                      </Select>
-                    </Field>
-                    {newMealName === "Custom" ? (
-                      <Field label="Custom name">
-                        <Input
-                          value={customMealName}
-                          onChange={(e) => setCustomMealName(e.target.value)}
-                          placeholder="Meal name…"
-                          required
-                        />
-                      </Field>
-                    ) : null}
-                    <div className="ui-inline-form__action">
-                      <Button type="submit">Create meal</Button>
-                    </div>
-                  </form>
-                </Section>
+                </div>
               ) : null}
-
-              {day.meals.length === 0 ? (
-                <EmptyState title="No meals in this day">
-                  {canEdit
-                    ? "Create a meal, then add foods and reusable recipes."
-                    : "This day has no meals."}
-                </EmptyState>
-              ) : (
-                <div className="ui-stack" style={{ gap: 16 }}>
-                  {day.meals.map((meal, mealIndex) => (
-                  <Section
-                    key={meal.id}
-                    tone={mealIndex % 2 === 0 ? "plain" : "muted"}
-                    title={meal.name}
-                    description={nutritionLine(meal.presented) ?? "Empty — add foods or a reusable meal"}
-                    actions={
-                      canEdit ? (
-                        <div className="ui-row" style={{ gap: 8, flexWrap: "wrap" }}>
-                          {renameMealId === meal.id ? (
-                            <>
-                              <Input
-                                value={renameValue}
-                                onChange={(e) => setRenameValue(e.target.value)}
-                                style={{ width: 140 }}
-                              />
-                              <Button size="sm" onClick={() => void saveRename(meal.id)}>
-                                Save
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                onClick={() => setRenameMealId(null)}
-                              >
-                                Cancel
-                              </Button>
-                            </>
-                          ) : (
-                            <>
-                              <Button
-                                variant="secondary"
-                                size="sm"
-                                onClick={() => {
-                                  setRenameMealId(meal.id);
-                                  setRenameValue(meal.name);
-                                }}
-                              >
-                                Rename
-                              </Button>
-                              <Button
-                                variant="secondary"
-                                size="sm"
-                                onClick={() => {
-                                  setEditingMealId(editingMealId === meal.id ? null : meal.id);
-                                  setFoodHits([]);
-                                  setRecipeHits([]);
-                                  setFoodQuery("");
-                                  setRecipeQuery("");
-                                  setServingHint(null);
-                                }}
-                              >
-                                {editingMealId === meal.id ? "Done" : "Add items"}
-                              </Button>
-                              <Button
-                                variant="danger"
-                                size="sm"
-                                onClick={() => void deleteMeal(meal.id)}
-                              >
-                                Delete
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      ) : null
+              {canEdit || plan.status !== "ARCHIVED" ? (
+                <label className="ui-meal-editor__tool">
+                  <span>Day labels</span>
+                  <Select
+                    value={plan.dayLabelMode ?? "NUMBERED"}
+                    disabled={busy || plan.status === "ARCHIVED"}
+                    onChange={(event) =>
+                      void setDayLabelMode(event.target.value as "NUMBERED" | "WEEKDAY")
                     }
                   >
+                    <option value="NUMBERED">Week N · Day 1–7</option>
+                    <option value="WEEKDAY">Weekdays</option>
+                  </Select>
+                </label>
+              ) : null}
+              {plan.status !== "ARCHIVED" ? (
+                <button
+                  type="button"
+                  className="ui-meal-editor__danger-link"
+                  disabled={busy}
+                  onClick={() => void archivePlan()}
+                >
+                  Delete plan…
+                </button>
+              ) : null}
+            </div>
+          </details>
+        ) : null}
+      </div>
+
+      {dayTabs.length > 0 ? (
+        focusedDay ? (
+          <div className="ui-meal-editor__day">
+            <div className="ui-meal-editor__day-head">
+              <div>
+                <h2 className="ui-meal-editor__day-title">{dayFullLabel(focusedDay)}</h2>
+                {nutritionLine(focusedDay.presented) ? (
+                  <p className="ui-meal-editor__day-nutrition">{nutritionLine(focusedDay.presented)}</p>
+                ) : (
+                  <p className="ui-meal-editor__day-nutrition is-empty">No foods yet</p>
+                )}
+              </div>
+              {canEdit && version.snapshot.days.length > 1 ? (
+                <button
+                  type="button"
+                  className="ui-meal-editor__danger-link"
+                  onClick={() => void deleteDay()}
+                >
+                  Remove day
+                </button>
+              ) : null}
+            </div>
+
+            {focusedDay.presentedExtraNutrients ? (
+              <details className="ui-meal-editor__micros">
+                <summary>Micronutrients</summary>
+                <ExtraNutrientTables
+                  values={focusedDay.presentedExtraNutrients}
+                  caption="day total"
+                  emptyMessage="No micronutrient data for this day’s foods yet."
+                />
+              </details>
+            ) : null}
+
+            {canEdit ? (
+              <form onSubmit={(event) => void createMeal(event)} className="ui-meal-editor__add-meal">
+                <Select
+                  value={newMealName}
+                  onChange={(e) => setNewMealName(e.target.value)}
+                  aria-label="Meal type"
+                >
+                  {MEAL_NAME_PRESETS.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                  <option value="Custom">Custom…</option>
+                </Select>
+                {newMealName === "Custom" ? (
+                  <Input
+                    value={customMealName}
+                    onChange={(e) => setCustomMealName(e.target.value)}
+                    placeholder="Meal name…"
+                    required
+                    aria-label="Custom meal name"
+                  />
+                ) : null}
+                <Button type="submit" size="sm" variant="secondary">
+                  Add meal
+                </Button>
+              </form>
+            ) : null}
+
+            {focusedDay.meals.length === 0 ? (
+              <EmptyState title="No meals yet">
+                {canEdit ? "Add a meal above, then add foods or recipes." : "This day has no meals."}
+              </EmptyState>
+            ) : (
+              <div className="ui-meal-editor__meals">
+                {focusedDay.meals.map((meal) => (
+                  <article key={meal.id} className="ui-meal-editor__meal">
+                    <div className="ui-meal-editor__meal-head">
+                      <div className="ui-meal-editor__meal-title-block">
+                        {renameMealId === meal.id ? (
+                          <div className="ui-meal-editor__rename">
+                            <Input
+                              value={renameValue}
+                              onChange={(e) => setRenameValue(e.target.value)}
+                              aria-label="Meal name"
+                            />
+                            <Button size="sm" onClick={() => void saveRename(meal.id)}>
+                              Save
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => setRenameMealId(null)}>
+                              Cancel
+                            </Button>
+                          </div>
+                        ) : (
+                          <>
+                            <h3 className="ui-meal-editor__meal-title">{meal.name}</h3>
+                            <p className="ui-meal-editor__meal-meta">
+                              {nutritionLine(meal.presented) ?? "Empty"}
+                            </p>
+                          </>
+                        )}
+                      </div>
+                      {canEdit && renameMealId !== meal.id ? (
+                        <div className="ui-meal-editor__meal-actions">
+                          <Button
+                            variant={editingMealId === meal.id ? "secondary" : "ghost"}
+                            size="sm"
+                            onClick={() => {
+                              setEditingMealId(editingMealId === meal.id ? null : meal.id);
+                              setFoodHits([]);
+                              setRecipeHits([]);
+                              setFoodQuery("");
+                              setRecipeQuery("");
+                              setServingHint(null);
+                            }}
+                          >
+                            {editingMealId === meal.id ? "Done" : "Add foods"}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setRenameMealId(meal.id);
+                              setRenameValue(meal.name);
+                            }}
+                          >
+                            Rename
+                          </Button>
+                          <button
+                            type="button"
+                            className="ui-meal-editor__danger-link"
+                            onClick={() => void deleteMeal(meal.id)}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+
                     {meal.items.length > 0 ? (
                       <Table>
                         <thead>
@@ -698,9 +792,7 @@ export default function MealPlanEditorPage() {
                                       <Badge tone="accent">Recipe</Badge>
                                     ) : item.food?.origin === "custom" ? (
                                       <Badge tone="accent">Custom</Badge>
-                                    ) : (
-                                      <Badge tone="neutral">Catalog</Badge>
-                                    )}
+                                    ) : null}
                                   </div>
                                   {item.food?.servingDescription ? (
                                     <div className="ui-muted" style={{ fontSize: 12 }}>
@@ -739,18 +831,16 @@ export default function MealPlanEditorPage() {
                                     </>
                                   )}
                                 </Td>
-                                <Td label="Nutrition">
-                                  {nutritionLine(item.presented) ?? "—"}
-                                </Td>
+                                <Td label="Nutrition">{nutritionLine(item.presented) ?? "—"}</Td>
                                 {canEdit ? (
                                   <Td label="">
-                                    <Button
-                                      variant="danger"
-                                      size="sm"
+                                    <button
+                                      type="button"
+                                      className="ui-meal-editor__danger-link"
                                       onClick={() => void removeItem(item.id)}
                                     >
                                       Remove
-                                    </Button>
+                                    </button>
                                   </Td>
                                 ) : null}
                               </tr>
@@ -759,30 +849,21 @@ export default function MealPlanEditorPage() {
                         </tbody>
                       </Table>
                     ) : (
-                      <p className="ui-muted" style={{ margin: "8px 0" }}>
-                        No items yet. Add catalog/custom foods or a reusable recipe.
+                      <p className="ui-muted ui-meal-editor__empty-hint">
+                        No items yet. Use Add foods to search the catalog or meal library.
                       </p>
                     )}
 
                     {canEdit && editingMealId === meal.id ? (
-                      <div
-                        style={{
-                          marginTop: 16,
-                          paddingTop: 16,
-                          borderTop: "1px solid var(--border, #e5e7eb)",
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: 20,
-                        }}
-                      >
-                        <div>
-                          <p style={{ fontWeight: 600, marginBottom: 8, fontSize: 13 }}>Add food</p>
+                      <div className="ui-meal-editor__picker">
+                        <div className="ui-meal-editor__picker-block">
+                          <p className="ui-meal-editor__picker-label">Food</p>
                           <div className="ui-inline-form">
-                            <Field label="Search food">
+                            <Field label="Search">
                               <Input
                                 value={foodQuery}
                                 onChange={(e) => setFoodQuery(e.target.value)}
-                                placeholder="Catalog or custom food…"
+                                placeholder="Catalog or custom…"
                               />
                             </Field>
                             <Field label="Amount">
@@ -798,7 +879,7 @@ export default function MealPlanEditorPage() {
                               </Select>
                             </Field>
                             <div className="ui-inline-form__action">
-                              <Button variant="secondary" onClick={() => void searchFoods()}>
+                              <Button variant="secondary" size="sm" onClick={() => void searchFoods()}>
                                 Search
                               </Button>
                             </div>
@@ -830,11 +911,7 @@ export default function MealPlanEditorPage() {
                                   >
                                     + {hit.name}
                                   </Button>
-                                  {hit.origin === "custom" ? (
-                                    <Badge tone="accent">Custom</Badge>
-                                  ) : (
-                                    <Badge tone="neutral">Catalog</Badge>
-                                  )}
+                                  {hit.origin === "custom" ? <Badge tone="accent">Custom</Badge> : null}
                                   {hit.hasOverride ? <Badge tone="warning">Overridden</Badge> : null}
                                   {hit.servingDescription ? (
                                     <span className="ui-muted" style={{ fontSize: 12 }}>
@@ -847,12 +924,10 @@ export default function MealPlanEditorPage() {
                           ) : null}
                         </div>
 
-                        <div>
-                          <p style={{ fontWeight: 600, marginBottom: 8, fontSize: 13 }}>
-                            Add reusable recipe
-                          </p>
+                        <div className="ui-meal-editor__picker-block">
+                          <p className="ui-meal-editor__picker-label">Recipe</p>
                           <div className="ui-inline-form">
-                            <Field label="Search recipe">
+                            <Field label="Search">
                               <Input
                                 value={recipeQuery}
                                 onChange={(e) => setRecipeQuery(e.target.value)}
@@ -866,7 +941,7 @@ export default function MealPlanEditorPage() {
                               />
                             </Field>
                             <div className="ui-inline-form__action">
-                              <Button variant="secondary" onClick={() => void searchRecipes()}>
+                              <Button variant="secondary" size="sm" onClick={() => void searchRecipes()}>
                                 Search
                               </Button>
                             </div>
@@ -881,7 +956,7 @@ export default function MealPlanEditorPage() {
                                   onClick={() => void addRecipe(meal.id, hit.id)}
                                 >
                                   + {hit.name}
-                                  {hit.servings != null ? ` (${hit.servings} srv recipe)` : ""}
+                                  {hit.servings != null ? ` (${hit.servings} srv)` : ""}
                                 </Button>
                               ))}
                             </div>
@@ -889,13 +964,12 @@ export default function MealPlanEditorPage() {
                         </div>
                       </div>
                     ) : null}
-                  </Section>
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : null}
-        </>
+                  </article>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : null
       ) : (
         <EmptyState title="No days yet">
           {canEdit ? (

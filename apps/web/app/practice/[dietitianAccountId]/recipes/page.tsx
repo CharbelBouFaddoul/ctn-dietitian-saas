@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
   Alert,
+  Badge,
   Button,
   EmptyState,
   Field,
@@ -26,6 +27,8 @@ interface RecipeRow {
   status: string;
   ingredientCount: number;
   description?: string | null;
+  origin?: "starter" | "practice";
+  readOnly?: boolean;
 }
 
 interface ListResponse {
@@ -97,7 +100,7 @@ export default function RecipesPage() {
       <PageHeader
         eyebrow="Nutrition"
         title="Meal library"
-        description="Reusable meals you can drop into any client meal plan. Built from catalog and custom foods — nutrition is calculated automatically."
+        description="Reusable meals from the platform Starter catalog and your practice library. Nutrition is calculated from foods automatically."
         actions={
           <Link href={`/practice/${dietitianAccountId}/recipes/new`} className="ui-btn ui-btn--primary">
             New reusable meal
@@ -162,6 +165,7 @@ export default function RecipesPage() {
             <thead>
               <tr>
                 <th>Meal</th>
+                <th>Origin</th>
                 <th>Servings</th>
                 <th>Ingredients</th>
                 <th>Status</th>
@@ -181,6 +185,11 @@ export default function RecipesPage() {
                       </div>
                     ) : null}
                   </Td>
+                  <Td label="Origin">
+                    <Badge tone={row.origin === "starter" ? "info" : "neutral"}>
+                      {row.origin === "starter" ? "Starter" : "Practice"}
+                    </Badge>
+                  </Td>
                   <Td label="Servings">{row.servings}</Td>
                   <Td label="Ingredients">{row.ingredientCount}</Td>
                   <Td label="Status">
@@ -194,7 +203,7 @@ export default function RecipesPage() {
                       >
                         Open
                       </Link>
-                      {row.status === "ACTIVE" ? (
+                      {row.status === "ACTIVE" && !row.readOnly ? (
                         <Button
                           variant="danger"
                           size="sm"

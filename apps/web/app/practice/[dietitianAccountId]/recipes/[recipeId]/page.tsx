@@ -51,6 +51,8 @@ interface RecipeDetail {
   instructions: string | null;
   servings: number;
   status: string;
+  origin?: "starter" | "practice";
+  readOnly?: boolean;
   nutrition: {
     presentedTotal: Nutrition;
     presentedPerServing: Nutrition;
@@ -277,7 +279,7 @@ export default function RecipeDetailPage() {
     total.proteinG !== null ||
     total.carbohydrateG !== null ||
     total.fatG !== null;
-  const canEdit = recipe.status === "ACTIVE";
+  const canEdit = recipe.status === "ACTIVE" && !recipe.readOnly;
   const ingredientCount = recipe.nutrition.ingredients.length;
 
   return (
@@ -302,7 +304,12 @@ export default function RecipeDetailPage() {
         title={recipe.name}
         description={
           <>
+            <Badge tone={recipe.origin === "starter" ? "info" : "neutral"}>
+              {recipe.origin === "starter" ? "Starter" : "Practice"}
+            </Badge>
+            {" · "}
             Reusable meal · {recipe.servings} serving{recipe.servings !== 1 ? "s" : ""}
+            {recipe.readOnly ? " · Platform recipes are read-only (duplicate to customize)" : ""}
             {recipe.status !== "ACTIVE" ? (
               <>
                 {" · "}

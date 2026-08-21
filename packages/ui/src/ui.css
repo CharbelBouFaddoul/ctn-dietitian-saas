@@ -6828,3 +6828,308 @@
   }
 }
 
+/* ── Meal plan editor (clean hierarchy) ─────────────────────────────────── */
+
+.ui-meal-editor {
+  display: grid;
+  gap: 1rem;
+}
+
+.ui-meal-editor__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+}
+
+.ui-meal-editor__title {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.ui-meal-editor__meta {
+  margin: 0.3rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--color-muted, #64748b);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.ui-meal-editor__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.ui-meal-editor__nav {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.85rem 1rem;
+  background: var(--color-surface, #fff);
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 12px;
+}
+
+.ui-meal-editor__nav-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 0.75rem;
+}
+
+.ui-meal-editor__nav-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem;
+}
+
+.ui-meal-editor__tool {
+  display: grid;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.ui-meal-editor__tool > span {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-muted, #64748b);
+}
+
+.ui-meal-editor__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.ui-meal-editor__chip {
+  appearance: none;
+  border: 1px solid transparent;
+  background: color-mix(in srgb, var(--color-border, #e2e8f0) 55%, #fff);
+  color: inherit;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 0.28rem 0.65rem;
+  border-radius: 999px;
+  cursor: pointer;
+  text-decoration: none;
+  line-height: 1.2;
+}
+
+.ui-meal-editor__chip:hover {
+  background: color-mix(in srgb, var(--color-accent, #0d9488) 10%, #fff);
+}
+
+.ui-meal-editor__chip.is-active {
+  background: color-mix(in srgb, var(--color-accent, #0d9488) 14%, #fff);
+  border-color: color-mix(in srgb, var(--color-accent, #0d9488) 35%, transparent);
+  color: var(--color-accent, #0d9488);
+  font-weight: 600;
+}
+
+.ui-meal-editor__more {
+  font-size: 0.8125rem;
+  color: var(--color-muted, #64748b);
+}
+
+.ui-meal-editor__more > summary {
+  cursor: pointer;
+  font-weight: 500;
+  list-style: none;
+  width: fit-content;
+}
+
+.ui-meal-editor__more > summary::-webkit-details-marker {
+  display: none;
+}
+
+.ui-meal-editor__more > summary::before {
+  content: "▸ ";
+  opacity: 0.7;
+}
+
+.ui-meal-editor__more[open] > summary::before {
+  content: "▾ ";
+}
+
+.ui-meal-editor__more-body {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.65rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--color-border, #e2e8f0);
+}
+
+.ui-meal-editor__danger-link {
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  font-size: 0.8125rem;
+  color: var(--color-muted, #64748b);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.ui-meal-editor__danger-link:hover:not(:disabled) {
+  color: var(--color-danger, #b91c1c);
+}
+
+.ui-meal-editor__danger-link:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ui-meal-editor__day {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.ui-meal-editor__day-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
+
+.ui-meal-editor__day-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 650;
+}
+
+.ui-meal-editor__day-nutrition {
+  margin: 0.2rem 0 0;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-muted, #64748b);
+}
+
+.ui-meal-editor__day-nutrition:not(.is-empty) {
+  color: var(--color-text, #0f172a);
+  font-weight: 600;
+}
+
+.ui-meal-editor__micros {
+  font-size: 0.875rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 10px;
+  background: var(--color-surface, #fff);
+}
+
+.ui-meal-editor__micros summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.ui-meal-editor__add-meal {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ui-meal-editor__add-meal .ui-select,
+.ui-meal-editor__add-meal .ui-input {
+  min-width: 10rem;
+  max-width: 16rem;
+}
+
+.ui-meal-editor__meals {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.ui-meal-editor__meal {
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 12px;
+  background: var(--color-surface, #fff);
+  display: grid;
+  gap: 0.75rem;
+}
+
+.ui-meal-editor__meal-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem 0.75rem;
+}
+
+.ui-meal-editor__meal-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 650;
+}
+
+.ui-meal-editor__meal-meta {
+  margin: 0.15rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--color-muted, #64748b);
+}
+
+.ui-meal-editor__meal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.15rem 0.35rem;
+}
+
+.ui-meal-editor__rename {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.ui-meal-editor__rename .ui-input {
+  width: 10rem;
+}
+
+.ui-meal-editor__empty-hint {
+  margin: 0;
+  font-size: 0.8125rem;
+}
+
+.ui-meal-editor__picker {
+  display: grid;
+  gap: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--color-border, #e2e8f0);
+}
+
+.ui-meal-editor__picker-label {
+  margin: 0 0 0.45rem;
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-muted, #64748b);
+}
+
+@media (max-width: 640px) {
+  .ui-meal-editor__header {
+    flex-direction: column;
+  }
+
+  .ui-meal-editor__actions {
+    width: 100%;
+  }
+}
+

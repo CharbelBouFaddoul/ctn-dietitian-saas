@@ -34,17 +34,23 @@ const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Satur
 
 export type DayLabelMode = "NUMBERED" | "WEEKDAY";
 
-/** Labels for plan days: Day 1/2… or Monday/Tuesday… (cycles each week). */
+/** Labels for plan days. Weeks are derived from dayNumber (no MealPlanWeek table). */
 export function dayLabels(dayNumber: number, mode: DayLabelMode): { title: string; weekday: string | null } {
+  const week = Math.ceil(dayNumber / 7);
   if (mode === "WEEKDAY") {
     const weekday = WEEKDAYS[(dayNumber - 1) % 7]!;
-    const week = Math.ceil(dayNumber / 7);
     return {
       title: week > 1 ? `${weekday} · week ${week}` : weekday,
       weekday,
     };
   }
-  return { title: `Day ${dayNumber}`, weekday: null };
+  const dayInWeek = ((dayNumber - 1) % 7) + 1;
+  return { title: `Week ${week} · Day ${dayInWeek}`, weekday: null };
+}
+
+/** Week index (1-based) derived from global dayNumber. */
+export function weekOfDay(dayNumber: number): number {
+  return Math.ceil(dayNumber / 7);
 }
 
 export interface MealPlanSnapshot {
@@ -498,7 +504,7 @@ export class MealPlanService {
     tenant: DietitianTenantContext,
     planId: string,
     versionId: string,
-    input: { title?: string | null; weekday?: string | null; notes?: string | null },
+    input: { title?: string | null; weekday?: string | null; notes?: string | null } = {},
   ) {
     const version = await this.assertDraft(tenant, planId, versionId);
     const plan = await this.requirePlan(tenant, planId, "manageRecords");
@@ -527,6 +533,16 @@ export class MealPlanService {
         sortOrder: index,
       })),
     });
+    return this.getVersion(tenant, planId, versionId);
+  }
+
+  /** Append 7 days (Breakfast/Lunch/Dinner each). Presentation weeks derive from dayNumber. */
+  async addWeek(tenant: DietitianTenantContext, planId: string, versionId: string) {
+    await this.assertDraft(tenant, planId, versionId);
+    await this.requirePlan(tenant, planId, "manageRecords");
+    for (let i = 0; i < 7; i += 1) {
+      await this.addDay(tenant, planId, versionId, {});
+    }
     return this.getVersion(tenant, planId, versionId);
   }
 
@@ -715,7 +731,10 @@ export class MealPlanService {
       }
     }
     const recipes = await this.prisma.recipe.findMany({
-      where: { id: { in: [...recipeIds] }, dietitianAccountId },
+      where: {
+        id: { in: [...recipeIds] },
+        OR: [{ dietitianAccountId: null }, { dietitianAccountId }],
+      },
       include: { ingredients: true },
     });
     for (const recipe of recipes) {

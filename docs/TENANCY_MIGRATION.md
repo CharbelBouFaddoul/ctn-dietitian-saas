@@ -41,6 +41,7 @@ No Organization layer. No OrganizationMember. No STAFF tenancy. No `organization
 - `ClientAssignment` rekeyed to `userId`; Appointment/Task use `assignedUserId`. Assignments are **not** used for authorization.
 - Admin: `/api/v1/admin/dietitians/:dietitianAccountId`. Web: `/practice/:dietitianAccountId`.
 - Portal unchanged: `ClientAccount` + `Session.activeClientId`.
+- Shared catalogs: `Food.dietitianAccountId` and `Recipe.dietitianAccountId` may be **null** for platform catalog/Starter rows (readable by all practices; not practice-private). Marketing routes are guest-only for signed-in users.
 
 ## Phase 3 notes
 

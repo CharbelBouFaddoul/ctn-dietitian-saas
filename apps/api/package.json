@@ -15,7 +15,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
     "prisma:migrate:dev": "prisma migrate dev",
-    "food:import": "nest start --entryFile foods/import/cli"
+    "food:import": "tsx src/foods/import/cli.ts",
+    "recipe:import": "tsx src/recipes/import/cli.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.10",
@@ -58,6 +59,7 @@
     "prisma": "^6.5.0",
     "socket.io-client": "^4.8.0",
     "supertest": "^7.0.0",
+    "tsx": "^4.23.12",
     "typescript": "^5.7.3",
     "unplugin-swc": "^1.5.5",
     "vitest": "^3.0.5"

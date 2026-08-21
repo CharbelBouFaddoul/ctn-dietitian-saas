@@ -1,0 +1,979 @@
+{
+  "source": {
+    "key": "usda-myplate-kitchen-starter",
+    "name": "MyPlate Kitchen\u2013style starter recipes (platform catalog)",
+    "provider": "Curated for Nutrition SaaS from USDA MyPlate Kitchen public-domain patterns",
+    "datasetVersion": "2026-08-21-starter-v1",
+    "license": "United States government work / public domain in the U.S. Commercial use permitted. No USDA endorsement claimed.",
+    "attribution": "Recipe structures inspired by USDA MyPlate Kitchen public-domain recipes. Ingredient nutrient values come from USDA FoodData Central Foundation Foods already imported into this product.",
+    "homepage": "https://www.myplate.gov/myplate-kitchen"
+  },
+  "recipes": [
+    {
+      "sourceRecipeId": "oatmeal-banana-breakfast",
+      "name": "Banana oatmeal breakfast",
+      "category": "Breakfast",
+      "description": "Warm oats with banana and milk.",
+      "servings": 1,
+      "instructions": "Cook oats with water or milk. Top with sliced banana.",
+      "ingredients": [
+        {
+          "sourceFoodId": "168876",
+          "quantity": 40,
+          "unit": "g",
+          "displayNote": "dry oats, cooked weight ~1 cup cooked"
+        },
+        {
+          "sourceFoodId": "170880",
+          "quantity": 120,
+          "unit": "ml",
+          "displayNote": "nonfat milk"
+        },
+        {
+          "sourceFoodId": "171689",
+          "quantity": 80,
+          "unit": "g",
+          "displayNote": "banana"
+        }
+      ]
+    },
+    {
+      "sourceRecipeId": "greek-yogurt-berry-bowl",
+      "name": "Greek yogurt berry bowl",
+      "category": "Breakfast",
+      "description": "High-protein yogurt with berries and almonds.",
+      "servings": 1,
+      "instructions": "Spoon yogurt into a bowl. Add berries and almonds.",
+      "ingredients": [
+        {
+          "sourceFoodId": "170903",
+          "quantity": 170,
+          "unit": "g",
+          "displayNote": "nonfat Greek yogurt"
+        },
+        {
+          "sourceFoodId": "171699",
+          "quantity": 80,
+          "unit": "g",
+          "displayNote": "strawberries"
+        },
+        {
+          "sourceFoodId": "171686",
+          "quantity": 40,
+          "unit": "g",
+          "displayNote": "blueberries"
+        },
+        {
+          "sourceFoodId": "170567",
+          "quantity": 15,
+          "unit": "g",
+          "displayNote": "almonds"
+        }
+      ]
+    },
+    {
+      "sourceRecipeId": "veggie-egg-scramble",
+      "name": "Vegetable egg scramble",
+      "category": "Breakfast",
+      "description": "Eggs scrambled with spinach, tomato, and onion.",
+      "servings": 2,
+      "instructions": "Scramble eggs with vegetables in a lightly oiled pan.",
+      "ingredients": [
+        {
+          "sourceFoodId": "172183",
+          "quantity": 100,
+          "unit": "g",
+          "displayNote": "whole eggs (~2 large)"
+        },
+        {
+          "sourceFoodId": "170000",
+          "quantity": 40,
+          "unit": "g",
+          "displayNote": "spinach"
+        },
+        {
+          "sourceFoodId": "170003",
+          "quantity": 60,
+          "unit": "g",
+          "displayNote": "tomato"
+        },
+        {
+          "sourceFoodId": "170007",
+          "quantity": 30,
+          "unit": "g",
+          "displayNote": "onion"
+        },
+        {
+          "sourceFoodId": "171413",
+          "quantity": 5,
+          "unit": "ml",
+          "displayNote": "olive oil"
+        }
+      ]
+    },
+    {
+      "sourceRecipeId": "overnight-oats-apple",
+      "name": "Apple cinnamon overnight oats",
+      "category": "Breakfast",
+      "description": "Oats soaked overnight with milk and apple.",
+      "servings": 1,
+      "instructions": "Combine oats, milk, and diced apple. Chill overnight.",
+      "ingredients": [
+        {
+          "sourceFoodId": "168876",
+          "quantity": 45,
+          "unit": "g",
+          "displayNote": "oats"
+        },
+        {
+          "sourceFoodId": "170879",
+          "quantity": 150,
+          "unit": "ml",
+          "displayNote": "2% milk"
+        },
+        {
+          "sourceFoodId": "171688",
+          "quantity": 80,
+          "unit": "g",
+          "displayNote": "apple"
+        }
+      ]
+    },
+    {
+      "sourceRecipeId": "cottage-cheese-peach",
+      "name": "Cottage cheese with peach",
+      "category": "Snack",
+      "description": "Simple high-protein snack.",
+      "servings": 1,
+      "instructions": "Top cottage cheese with diced peach.",
+      "ingredients": [
+        {
+          "sourceFoodId": "173416",
+          "quantity": 150,
+          "unit": "g",
+          "displayNote": "lowfat cottage cheese"
+        },
+        {
+          "sourceFoodId": "167760",
+          "quantity": 100,
+          "unit": "g",
+          "displayNote": "peach"
+        }
+      ]
+    },
+    {
+      "sourceRecipeId": "tuna-cucumber-snack",
+      "name": "Tuna cucumber boats",
+      "category": "Snack",
+      "description": "Canned tuna on cucumber slices.",
+      "servings": 1,
+      "instructions": "Drain tuna and spoon onto cucumber.",
+      "ingredients": [
+        {
+          "sourceFoodId": "175168b",
+          "quantity": 85,
+          "unit": "g",
+          "displayNote": "canned tuna, drained"
+        },
+        {
+          "sourceFoodId": "170004",
+          "quantity": 120,
+          "unit": "g",
+          "displayNote": "cucumber"
+        }
+      ]
+    },
+    {
+      "sourceRecipeId": "apple-almond-butter",
+      "name": "Apple with almond butter",
+      "category": "Snack",
+      "description": "Fruit and nut butter snack.",
+      "servings": 1,
+      "instructions": "Slice apple and serve with almond butter.",
+      "ingredients": [
+        {
+          "sourceFoodId": "171688",
+          "quantity": 140,
+          "unit": "g",
+          "displayNote": "apple"
+        },
+        {
+          "sourceFoodId": "173739",
+          "quantity": 16,
+          "unit": "g",
+          "displayNote": "peanut butter (smooth)"
+        }
+      ]
+    },
+    {
+      "sourceRecipeId": "hummus-carrot-snack",
+      "name": "Carrots with chickpea hummus",
+      "category": "Snack",
+      "description": "Chickpea mash with raw carrots.",
+      "servings": 2,
+      "instructions": "Mash chickpeas with olive oil and lemon. Serve with carrots.",
+      "ingredients": [
+        {
+          "sourceFoodId": "173737",
+          "quantity": 120,
+          "unit": "g",
+          "displayNote": "cooked chickpeas"
+        },
+        {
+          "sourceFoodId": "171413",
+          "quantity": 10,
+          "unit": "ml",
+          "displayNote": "olive oil"
+        },
+        {
+          "sourceFoodId": "167756",
+          "quantity": 15,
+          "unit": "g",
+          "displayNote": "lemon"
+        },
+        {
+          "sourceFoodId": "170005",
+          "quantity": 120,
+          "unit": "g",
+          "displayNote": "carrots"
+        }
+      ]
+    },
+    {
+      "sourceRecipeId": "chicken-rice-bowl",
+      "name": "Chicken rice bowl",
+      "category": "Lunch",
+      "description": "Roasted chicken breast over rice with broccoli.",
+      "servings": 2,
+      "instructions": "Serve sliced chicken over rice with steamed broccoli.",
+      "ingredients": [
+        {
+          "sourceFoodId": "171077",
+          "quantity": 200,
+          "unit": "g",
+          "displayNote": "cooked chicken breast"
+        },
+        {
+          "sourceFoodId": "168875",
+          "quantity": 200,
+          "unit": "g",
+          "displayNote": "cooked brown rice"
+        },
+        {
+          "sourceFoodId": "170457",
+          "quantity": 150,
+          "unit": "g",
+          "displayNote": "broccoli"
+        },
+        {
+          "sourceFoodId": "171413",
+          "quantity": 8,
+          "unit": "ml",
+          "displayNote": "olive oil"
+        }
+      ]
+    },
+    {
+      "sourceRecipeId": "turkey-quinoa-bowl",
+      "name": "Turkey quinoa bowl",
+      "category": "Lunch",
+      "description": "Ground turkey with quinoa and peppers.",
+      "servings": 2,
+      "instructions": "Cook turkey with peppers and onion. Serve over quinoa.",
+      "ingredients": [
+        {
+          "sourceFoodId": "171116",
+          "quantity": 180,
+          "unit": "g",
+          "displayNote": "cooked ground turkey"
+        },
+        {
+          "sourceFoodId": "168877",
+          "quantity": 200,
+          "unit": "g",
+          "displayNote": "cooked quinoa"
+        },
+        {
+          "sourceFoodId": "170006",
+          "quantity": 80,
+          "unit": "g",
+          "displayNote": "bell pepper"
+        },
+        {
+          "sourceFoodId": "170007",
+          "quantity": 40,
+          "unit": "g",
+          "displayNote": "onion"
+        }
+      ]
+    },
+    {
+      "sourceRecipeId": "salmon-sweet-potato",
+      "name": "Salmon with sweet potato",
+      "category": "Dinner",
+      "description": "Baked salmon and sweet potato with greens.",
+      "servings": 2,
+      "instructions": "Bake salmon and sweet potato. Serve with spinach salad.",
+      "ingredients": [
+        {
+          "sourceFoodId": "175034",
+          "quantity": 200,
+          "unit": "g",
+          "displayNote": "cooked salmon"
+        },
+        {
+          "sourceFoodId": "170010",
+          "quantity": 250,
+          "unit": "g",
+          "displayNote": "baked sweet potato"
+        },
+        {
+          "sourceFoodId": "170000",
+          "quantity": 80,
+          "unit": "g",
+          "displayNote": "spinach"
+        },
+        {
+          "sourceFoodId": "171413",
+          "quantity": 8,
+          "unit": "ml",
+          "displayNote": "olive oil"
+        }
+      ]
+    },
+    {
+      "sourceRecipeId": "beef-sirloin-veggies",
+      "name": "Sirloin with roasted vegetables",
+      "category": "Dinner",
+      "description": "Grilled sirloin with carrots and zucchini.",
+      "servings": 2,
+      "instructions": "Grill steak. Roast vegetables with olive oil.",
+      "ingredients": [
+        {
+          "sourceFoodId": "174570",
+          "quantity": 200,
+          "unit": "g",
+          "displayNote": "grilled sirloin"
+        },
+        {
+          "sourceFoodId": "170005",
+          "quantity": 120,
+          "unit": "g",
+          "displayNote": "carrots"
+        },
+        {
+          "sourceFoodId": "170014",
+          "quantity": 150,
+          "unit": "g",
+          "displayNote": "zucchini"
+        },
+        {
+          "sourceFoodId": "171413",
+          "quantity": 10,
+          "unit": "ml",
+          "displayNote": "olive oil"
+        }
+      ]
+    },
+    {
+      "sourceRecipeId": "pork-tenderloin-potato",
+      "name": "Pork tenderloin with potato",
+      "category": "Dinner",
+      "description": "Roasted pork with baked potato and green beans.",
+      "servings": 2,
+      "instructions": "Roast pork and potato. Serve with green beans.",
+      "ingredients": [
+        {
+          "sourceFoodId": "172068",
+          "quantity": 200,
+          "unit": "g",
+          "displayNote": "roasted pork tenderloin"
+        },
+        {
+          "sourceFoodId": "170009",
+          "quantity": 250,
+          "unit": "g",
+          "displayNote": "baked potato"
+        },
+        {
+          "sourceFoodId": "170013",
+          "quantity": 150,
+          "unit": "g",
+          "displayNote": "green beans"
+        }
+      ]
+    },
+    {
+      "sourceRecipeId": "shrimp-quinoa-salad",
+      "name": "Shrimp quinoa salad",
+      "category": "Lunch",
+      "description": "Cooked shrimp over quinoa with cucumber and tomato.",
+      "servings": 2,
+      "instructions": "Toss shrimp with quinoa and chopped vegetables.",
+      "ingredients": [
+        {
+          "sourceFoodId": "174036",
+          "quantity": 160,
+          "unit": "g",
+          "displayNote": "cooked shrimp"
+        },
+        {
+          "sourceFoodId": "168877",
+          "quantity": 200,
+          "unit": "g",
+          "displayNote": "cooked quinoa"
+        },
+        {
+          "sourceFoodId": "170004",
+          "quantity": 80,
+          "unit": "g",
+          "displayNote": "cucumber"
+        },
+        {
+          "sourceFoodId": "170003",
+          "quantity": 100,
+          "unit": "g",
+          "displayNote": "tomato"
+        },
+        {
+          "sourceFoodId": "171413",
+          "quantity": 8,
+          "unit": "ml",
+          "displayNote": "olive oil"
+        }
+      ]
+    },
+    {
+      "sourceRecipeId": "cod-rice-asparagus",
+      "name": "Cod with rice and asparagus",
+      "category": "Dinner",
+      "description": "Baked cod plate with rice and asparagus.",
+      "servings": 2,
+      "instructions": "Bake cod. Serve with rice and asparagus.",
+      "ingredients": [
+        {
+          "sourceFoodId": "175167b",
+          "quantity": 200,
+          "unit": "g",
+          "displayNote": "cooked cod"
+        },
+        {
+          "sourceFoodId": "168878",
+          "quantity": 200,
+          "unit": "g",
+          "displayNote": "cooked white rice"
+        },
+        {
+          "sourceFoodId": "170019",
+          "quantity": 150,
+          "unit": "g",
+          "displayNote": "asparagus"
+        }
+      ]
+    },
+    {
+      "sourceRecipeId": "tilapia-veggie-plate",
+      "name": "Tilapia vegetable plate",
+      "category": "Dinner",
+      "description": "Tilapia with broccoli and carrots.",
+      "servings": 2,
+      "instructions": "Bake tilapia. Steam vegetables.",
+      "ingredients": [
+        {
+          "sourceFoodId": "175167c",
+          "quantity": 200,
+          "unit": "g",
+          "displayNote": "cooked tilapia"
+        },
+        {
+          "sourceFoodId": "170457",
+          "quantity": 150,
+          "unit": "g",
+          "displayNote": "broccoli"
+        },
+        {
+          "sourceFoodId": "170005",
+          "quantity": 100,
+          "unit": "g",
+          "displayNote": "carrots"
+        },
+        {
+          "sourceFoodId": "171413",
+          "quantity": 8,
+          "unit": "ml",
+          "displayNote": "olive oil"
+        }
+      ]
+    },
+    {
+      "sourceRecipeId": "black-bean-bowl",
+      "name": "Black bean burrito bowl",
+      "category": "Lunch",
+      "description": "Beans, rice, corn, salsa, and avocado.",
+      "servings": 2,
+      "instructions": "Layer rice, beans, corn, salsa, and avocado.",
+      "ingredients": [
+        {
+          "sourceFoodId": "173735",
+          "quantity": 180,
+          "unit": "g",
+          "displayNote": "cooked black beans"
+        },
+        {
+          "sourceFoodId": "168875",
+          "quantity": 200,
+          "unit": "g",
+          "displayNote": "cooked brown rice"
+        },
+        {
+          "sourceFoodId": "170011",
+          "quantity": 100,
+          "unit": "g",
+          "displayNote": "corn"
+        },
+        {
+          "sourceFoodId": "172341",
+          "quantity": 60,
+          "unit": "g",
+          "displayNote": "salsa"
+        },
+        {
+          "sourceFoodId": "173944",
+          "quantity": 60,
+          "unit": "g",
+          "displayNote": "avocado"
+        }
+      ]
+    },
+    {
+      "sourceRecipeId": "lentil-veggie-stew",
+      "name": "Lentil vegetable stew",
+      "category": "Dinner",
+      "description": "Lentils simmered with tomato, carrot, and onion.",
+      "servings": 4,
+      "instructions": "Simmer lentils with vegetables until tender.",
+      "ingredients": [
+        {
+          "sourceFoodId": "173738",
+          "quantity": 300,
+          "unit": "g",
+          "displayNote": "cooked lentils"
+        },
+        {
+          "sourceFoodId": "170003",
+          "quantity": 200,
+          "unit": "g",
+          "displayNote": "tomato"
+        },
+        {
+          "sourceFoodId": "170005",
+          "quantity": 120,
+          "unit": "g",
+          "displayNote": "carrots"
+        },
+        {
+          "sourceFoodId": "170007",
+          "quantity": 80,
+          "unit": "g",
+          "displayNote": "onion"
+        },
+        {
+          "sourceFoodId": "170008",
+          "quantity": 6,
+          "unit": "g",
+          "displayNote": "garlic"
+        },
+        {
+          "sourceFoodId": "171413",
+          "quantity": 10,
+          "unit": "ml",
+          "displayNote": "olive oil"
+        }
+      ]
+    },
+    {
+      "sourceRecipeId": "chickpea-salad",
+      "name": "Chickpea salad",
+      "category": "Salad",
+      "description": "Chickpeas with cucumber, tomato, and feta.",
+      "servings": 2,
+      "instructions": "Combine ingredients and dress with olive oil and vinegar.",
+      "ingredients": [
+        {
+          "sourceFoodId": "173737",
+          "quantity": 200,
+          "unit": "g",
+          "displayNote": "cooked chickpeas"
+        },
+        {
+          "sourceFoodId": "170004",
+          "quantity": 100,
+          "unit": "g",
+          "displayNote": "cucumber"
+        },
+        {
+          "sourceFoodId": "170003",
+          "quantity": 120,
+          "unit": "g",
+          "displayNote": "tomato"
+        },
+        {
+          "sourceFoodId": "173417",
+          "quantity": 40,
+          "unit": "g",
+          "displayNote": "feta"
+        },
+        {
+          "sourceFoodId": "171413",
+          "quantity": 10,
+          "unit": "ml",
+          "displayNote": "olive oil"
+        },
+        {
+          "sourceFoodId": "172339",
+          "quantity": 10,
+          "unit": "ml",
+          "displayNote": "balsamic vinegar"
+        }
+      ]
+    },
+    {
+      "sourceRecipeId": "spinach-egg-salad",
+      "name": "Spinach egg salad",
+      "category": "Salad",
+      "description": "Hard-boiled eggs over spinach with tomato.",
+      "servings": 1,
+      "instructions": "Slice eggs over spinach and tomato. Drizzle olive oil.",
+      "ingredients": [
+        {
+          "sourceFoodId": "170379",
+          "quantity": 100,
+          "unit": "g",
+          "displayNote": "hard-boiled eggs"
+        },
+        {
+          "sourceFoodId": "170000",
+          "quantity": 80,
+          "unit": "g",
+          "displayNote": "spinach"
+        },
+        {
+          "sourceFoodId": "170003",
+          "quantity": 80,
+          "unit": "g",
+          "displayNote": "tomato"
+        },
+        {
+          "sourceFoodId": "171413",
+          "quantity": 8,
+          "unit": "ml",
+          "displayNote": "olive oil"
+        }
+      ]
+    },
+    {
+      "sourceRecipeId": "kale-chicken-salad",
+      "name": "Kale chicken salad",
+      "category": "Salad",
+      "description": "Chicken breast over kale with berries.",
+      "servings": 2,
+      "instructions": "Toss kale with oil. Top with chicken and blueberries.",
+      "ingredients": [
+        {
+          "sourceFoodId": "171077",
+          "quantity": 160,
+          "unit": "g",
+          "displayNote": "cooked chicken breast"
+        },
+        {
+          "sourceFoodId": "170001",
+          "quantity": 100,
+          "unit": "g",
+          "displayNote": "kale"
+        },
+        {
+          "sourceFoodId": "171686",
+          "quantity": 60,
+          "unit": "g",
+          "displayNote": "blueberries"
+        },
+        {
+          "sourceFoodId": "171413",
+          "quantity": 10,
+          "unit": "ml",
+          "displayNote": "olive oil"
+        }
+      ]
+    },
+    {
+      "sourceRecipeId": "romaine-tuna-salad",
+      "name": "Romaine tuna salad",
+      "category": "Salad",
+      "description": "Tuna salad over romaine.",
+      "servings": 1,
+      "instructions": "Flake tuna over romaine with cucumber.",
+      "ingredients": [
+        {
+          "sourceFoodId": "175168b",
+          "quantity": 85,
+          "unit": "g",
+          "displayNote": "canned tuna"
+        },
+        {
+          "sourceFoodId": "170002",
+          "quantity": 100,
+          "unit": "g",
+          "displayNote": "romaine"
+        },
+        {
+          "sourceFoodId": "170004",
+          "quantity": 80,
+          "unit": "g",
+          "displayNote": "cucumber"
+        },
+        {
+          "sourceFoodId": "171413",
+          "quantity": 8,
+          "unit": "ml",
+          "displayNote": "olive oil"
+        }
+      ]
+    },
+    {
+      "sourceRecipeId": "tofu-veggie-stirfry",
+      "name": "Tofu vegetable stir-fry",
+      "category": "Dinner",
+      "description": "Firm tofu with broccoli, pepper, and sesame oil.",
+      "servings": 2,
+      "instructions": "Stir-fry tofu and vegetables.",
+      "ingredients": [
+        {
+          "sourceFoodId": "173740",
+          "quantity": 200,
+          "unit": "g",
+          "displayNote": "firm tofu"
+        },
+        {
+          "sourceFoodId": "170457",
+          "quantity": 150,
+          "unit": "g",
+          "displayNote": "broccoli"
+        },
+        {
+          "sourceFoodId": "170006",
+          "quantity": 80,
+          "unit": "g",
+          "displayNote": "bell pepper"
+        },
+        {
+          "sourceFoodId": "171416",
+          "quantity": 8,
+          "unit": "ml",
+          "displayNote": "sesame oil"
+        }
+      ]
+    },
+    {
+      "sourceRecipeId": "pasta-marinara-chicken",
+      "name": "Chicken pasta marinara",
+      "category": "Dinner",
+      "description": "Pasta with marinara and chicken.",
+      "servings": 3,
+      "instructions": "Toss cooked pasta with sauce and sliced chicken.",
+      "ingredients": [
+        {
+          "sourceFoodId": "168874",
+          "quantity": 300,
+          "unit": "g",
+          "displayNote": "cooked pasta"
+        },
+        {
+          "sourceFoodId": "172340",
+          "quantity": 180,
+          "unit": "g",
+          "displayNote": "marinara sauce"
+        },
+        {
+          "sourceFoodId": "171077",
+          "quantity": 180,
+          "unit": "g",
+          "displayNote": "cooked chicken breast"
+        }
+      ]
+    },
+    {
+      "sourceRecipeId": "whole-wheat-avocado-toast",
+      "name": "Avocado toast with egg",
+      "category": "Breakfast",
+      "description": "Whole-wheat toast with avocado and hard-boiled egg.",
+      "servings": 1,
+      "instructions": "Mash avocado on toast. Top with sliced egg.",
+      "ingredients": [
+        {
+          "sourceFoodId": "168873",
+          "quantity": 56,
+          "unit": "g",
+          "displayNote": "whole-wheat bread (~2 slices)"
+        },
+        {
+          "sourceFoodId": "173944",
+          "quantity": 50,
+          "unit": "g",
+          "displayNote": "avocado"
+        },
+        {
+          "sourceFoodId": "170379",
+          "quantity": 50,
+          "unit": "g",
+          "displayNote": "hard-boiled egg"
+        }
+      ]
+    },
+    {
+      "sourceRecipeId": "bean-rice-simple",
+      "name": "Kidney beans and rice",
+      "category": "Simple meals",
+      "description": "Classic beans and rice plate.",
+      "servings": 2,
+      "instructions": "Warm beans and serve over rice with onion.",
+      "ingredients": [
+        {
+          "sourceFoodId": "173736",
+          "quantity": 200,
+          "unit": "g",
+          "displayNote": "cooked kidney beans"
+        },
+        {
+          "sourceFoodId": "168875",
+          "quantity": 250,
+          "unit": "g",
+          "displayNote": "cooked brown rice"
+        },
+        {
+          "sourceFoodId": "170007",
+          "quantity": 40,
+          "unit": "g",
+          "displayNote": "onion"
+        }
+      ]
+    },
+    {
+      "sourceRecipeId": "ham-egg-breakfast",
+      "name": "Ham and egg plate",
+      "category": "Breakfast",
+      "description": "Eggs with lean ham and tomato.",
+      "servings": 1,
+      "instructions": "Cook eggs. Serve with ham and tomato.",
+      "ingredients": [
+        {
+          "sourceFoodId": "172183",
+          "quantity": 100,
+          "unit": "g",
+          "displayNote": "eggs"
+        },
+        {
+          "sourceFoodId": "175167",
+          "quantity": 40,
+          "unit": "g",
+          "displayNote": "ham"
+        },
+        {
+          "sourceFoodId": "170003",
+          "quantity": 80,
+          "unit": "g",
+          "displayNote": "tomato"
+        }
+      ]
+    },
+    {
+      "sourceRecipeId": "ground-beef-pasta",
+      "name": "Lean beef pasta skillet",
+      "category": "Dinner",
+      "description": "Ground beef with pasta and marinara.",
+      "servings": 3,
+      "instructions": "Brown beef, combine with pasta and sauce.",
+      "ingredients": [
+        {
+          "sourceFoodId": "174032",
+          "quantity": 200,
+          "unit": "g",
+          "displayNote": "cooked lean ground beef"
+        },
+        {
+          "sourceFoodId": "168874",
+          "quantity": 300,
+          "unit": "g",
+          "displayNote": "cooked pasta"
+        },
+        {
+          "sourceFoodId": "172340",
+          "quantity": 180,
+          "unit": "g",
+          "displayNote": "marinara"
+        }
+      ]
+    },
+    {
+      "sourceRecipeId": "mushroom-spinach-omelette",
+      "name": "Mushroom spinach omelette",
+      "category": "Breakfast",
+      "description": "Egg omelette with mushrooms and spinach.",
+      "servings": 1,
+      "instructions": "Cook eggs with mushrooms and spinach.",
+      "ingredients": [
+        {
+          "sourceFoodId": "172183",
+          "quantity": 100,
+          "unit": "g",
+          "displayNote": "eggs"
+        },
+        {
+          "sourceFoodId": "170018",
+          "quantity": 60,
+          "unit": "g",
+          "displayNote": "mushrooms"
+        },
+        {
+          "sourceFoodId": "170000",
+          "quantity": 40,
+          "unit": "g",
+          "displayNote": "spinach"
+        },
+        {
+          "sourceFoodId": "171413",
+          "quantity": 5,
+          "unit": "ml",
+          "displayNote": "olive oil"
+        }
+      ]
+    },
+    {
+      "sourceRecipeId": "pea-carrot-side",
+      "name": "Peas and carrots side",
+      "category": "Simple meals",
+      "description": "Simple vegetable side dish.",
+      "servings": 2,
+      "instructions": "Warm peas and carrots. Season lightly.",
+      "ingredients": [
+        {
+          "sourceFoodId": "170012",
+          "quantity": 150,
+          "unit": "g",
+          "displayNote": "cooked peas"
+        },
+        {
+          "sourceFoodId": "170005",
+          "quantity": 120,
+          "unit": "g",
+          "displayNote": "carrots"
+        },
+        {
+          "sourceFoodId": "170870",
+          "quantity": 5,
+          "unit": "g",
+          "displayNote": "butter"
+        }
+      ]
+    }
+  ]
+}

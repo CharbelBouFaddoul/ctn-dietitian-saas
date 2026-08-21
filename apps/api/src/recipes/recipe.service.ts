@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
@@ -7,7 +8,6 @@ import type { Prisma, QuantityUnit } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { SecurityEventLogger } from "../auth/security-event.logger";
 import type { DietitianTenantContext } from "../dietitian/dietitian.types";
-import { tenantWhere } from "../dietitian/tenant-scope";
 import { RecipeNutritionService } from "./recipe-nutrition.service";
 import { isFoodQuantityUnit } from "./recipe-nutrition.service";
 
@@ -26,6 +26,13 @@ export interface IngredientWriteInput {
   sortOrder?: number;
 }
 
+/** Practice recipes + platform Starter recipes (dietitianAccountId null). */
+export function recipeVisibleWhere(dietitianAccountId: string): Prisma.RecipeWhereInput {
+  return {
+    OR: [{ dietitianAccountId: null }, { dietitianAccountId }],
+  };
+}
+
 @Injectable()
 export class RecipeService {
   constructor(
@@ -41,7 +48,7 @@ export class RecipeService {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 20;
     const where: Prisma.RecipeWhereInput = {
-      ...tenantWhere(tenant.dietitianAccountId),
+      ...recipeVisibleWhere(tenant.dietitianAccountId),
       ...(query.status ? { status: query.status } : { status: "ACTIVE" }),
       ...(query.q ? { name: { contains: query.q.trim(), mode: "insensitive" } } : {}),
     };
@@ -49,7 +56,7 @@ export class RecipeService {
       this.prisma.recipe.count({ where }),
       this.prisma.recipe.findMany({
         where,
-        orderBy: [{ name: "asc" }, { createdAt: "desc" }],
+        orderBy: [{ dietitianAccountId: "asc" }, { name: "asc" }, { createdAt: "desc" }],
         skip: (page - 1) * pageSize,
         take: pageSize,
         include: { _count: { select: { ingredients: true } } },
@@ -65,6 +72,8 @@ export class RecipeService {
         description: row.description,
         servings: Number(row.servings),
         status: row.status,
+        origin: row.dietitianAccountId == null ? ("starter" as const) : ("practice" as const),
+        readOnly: row.dietitianAccountId == null,
         ingredientCount: row._count.ingredients,
         updatedAt: row.updatedAt.toISOString(),
       })),
@@ -74,8 +83,9 @@ export class RecipeService {
   async get(tenant: DietitianTenantContext, recipeId: string) {
     const recipe = await this.requireRecipe(tenant.dietitianAccountId, recipeId);
     const ingredients = await this.prisma.recipeIngredient.findMany({
-      where: { recipeId, ...tenantWhere(tenant.dietitianAccountId) },
+      where: { recipeId },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      include: { food: { select: { id: true, name: true, servingDescription: true } } },
     });
     const calculated = await this.nutrition.calculate(tenant.dietitianAccountId, recipe, ingredients);
     return {
@@ -85,9 +95,21 @@ export class RecipeService {
       instructions: recipe.instructions,
       servings: Number(recipe.servings),
       status: recipe.status,
+      origin: recipe.dietitianAccountId == null ? ("starter" as const) : ("practice" as const),
+      readOnly: recipe.dietitianAccountId == null,
       createdAt: recipe.createdAt.toISOString(),
       updatedAt: recipe.updatedAt.toISOString(),
       archivedAt: recipe.archivedAt?.toISOString() ?? null,
+      ingredients: ingredients.map((row) => ({
+        id: row.id,
+        foodId: row.foodId,
+        foodName: row.food.name,
+        servingDescription: row.food.servingDescription,
+        quantity: Number(row.quantity),
+        unit: row.unit,
+        displayNote: row.displayNote,
+        sortOrder: row.sortOrder,
+      })),
       nutrition: calculated,
     };
   }
@@ -119,7 +141,7 @@ export class RecipeService {
 
   async update(tenant: DietitianTenantContext, recipeId: string, input: RecipeWriteInput) {
     this.assertCanManage(tenant);
-    const recipe = await this.requireRecipe(tenant.dietitianAccountId, recipeId);
+    const recipe = await this.requireOwnedRecipe(tenant.dietitianAccountId, recipeId);
     if (recipe.status === "ARCHIVED") {
       throw new BadRequestException("Archived recipes cannot be edited");
     }
@@ -148,7 +170,7 @@ export class RecipeService {
 
   async archive(tenant: DietitianTenantContext, recipeId: string) {
     this.assertCanManage(tenant);
-    const recipe = await this.requireRecipe(tenant.dietitianAccountId, recipeId);
+    const recipe = await this.requireOwnedRecipe(tenant.dietitianAccountId, recipeId);
     await this.prisma.recipe.update({
       where: { id: recipe.id },
       data: { status: "ARCHIVED", archivedAt: new Date() },
@@ -168,7 +190,7 @@ export class RecipeService {
     this.assertCanManage(tenant);
     const recipe = await this.requireRecipe(tenant.dietitianAccountId, recipeId);
     const ingredients = await this.prisma.recipeIngredient.findMany({
-      where: { recipeId: recipe.id, ...tenantWhere(tenant.dietitianAccountId) },
+      where: { recipeId: recipe.id },
       orderBy: { sortOrder: "asc" },
     });
     const copy = await this.prisma.$transaction(async (tx) => {
@@ -211,7 +233,7 @@ export class RecipeService {
 
   async replaceIngredients(tenant: DietitianTenantContext, recipeId: string, items: IngredientWriteInput[]) {
     this.assertCanManage(tenant);
-    const recipe = await this.requireRecipe(tenant.dietitianAccountId, recipeId);
+    const recipe = await this.requireOwnedRecipe(tenant.dietitianAccountId, recipeId);
     if (recipe.status === "ARCHIVED") {
       throw new BadRequestException("Archived recipes cannot be edited");
     }
@@ -228,7 +250,7 @@ export class RecipeService {
 
     await this.prisma.$transaction(async (tx) => {
       await tx.recipeIngredient.deleteMany({
-        where: { recipeId: recipe.id, ...tenantWhere(tenant.dietitianAccountId) },
+        where: { recipeId: recipe.id },
       });
       if (items.length > 0) {
         await tx.recipeIngredient.createMany({
@@ -264,9 +286,10 @@ export class RecipeService {
     return recipe;
   }
 
+  /** Visible recipe: practice-owned or platform Starter. */
   async requireRecipe(dietitianAccountId: string, recipeId: string) {
     const recipe = await this.prisma.recipe.findFirst({
-      where: { id: recipeId, ...tenantWhere(dietitianAccountId) },
+      where: { id: recipeId, ...recipeVisibleWhere(dietitianAccountId) },
     });
     if (!recipe) {
       throw new NotFoundException("Recipe not found");
@@ -274,8 +297,19 @@ export class RecipeService {
     return recipe;
   }
 
-  private assertCanManage(_tenant: DietitianTenantContext) {
+  /** Practice-owned only — mutations on Starter recipes are forbidden. */
+  async requireOwnedRecipe(dietitianAccountId: string, recipeId: string) {
+    const recipe = await this.requireRecipe(dietitianAccountId, recipeId);
+    if (recipe.dietitianAccountId == null) {
+      throw new ForbiddenException("Platform Starter recipes are read-only");
+    }
+    if (recipe.dietitianAccountId !== dietitianAccountId) {
+      throw new NotFoundException("Recipe not found");
+    }
+    return recipe;
   }
+
+  private assertCanManage(_tenant: DietitianTenantContext) {}
 
   private assertServings(servings: number) {
     if (!(servings > 0) || !Number.isFinite(servings)) {

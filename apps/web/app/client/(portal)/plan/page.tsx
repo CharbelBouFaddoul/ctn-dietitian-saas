@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Button,
@@ -11,6 +11,7 @@ import {
 } from "@nutrition-saas/ui";
 import { api } from "../../../../lib/api";
 import { errorMessage } from "../../../../lib/humanize-error";
+import { groupDaysByWeek, weekOfDay } from "../../../../lib/meal-plan-weeks";
 import { unitLabel } from "../../../../lib/practice-labels";
 
 interface Nutrition {
@@ -78,6 +79,7 @@ function mealHasFoodItems(meal: Snapshot["days"][number]["meals"][number]): bool
 export default function ClientPlanPage() {
   const [data, setData] = useState<PortalPlan | null>(null);
   const [dayIndex, setDayIndex] = useState(0);
+  const [activeWeek, setActiveWeek] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -85,7 +87,11 @@ export default function ClientPlanPage() {
 
   useEffect(() => {
     void api<PortalPlan>("/api/v1/portal/meal-plan")
-      .then(setData)
+      .then((payload) => {
+        setData(payload);
+        const first = payload.plan?.snapshot.days[0];
+        if (first) setActiveWeek(weekOfDay(first.dayNumber));
+      })
       .catch((err) => setError(errorMessage(err, "Unable to load your meal plan")))
       .finally(() => setLoading(false));
   }, []);
@@ -119,7 +125,13 @@ export default function ClientPlanPage() {
   }
 
   const plan = data?.plan;
-  const day = plan?.snapshot.days[dayIndex];
+  const weekGroups = useMemo(
+    () => (plan ? groupDaysByWeek(plan.snapshot.days) : []),
+    [plan],
+  );
+  const weekDays = weekGroups.find((g) => g.week === activeWeek)?.days ?? weekGroups[0]?.days ?? [];
+  const dayInWeekIndex = Math.min(dayIndex, Math.max(weekDays.length - 1, 0));
+  const day = weekDays[dayInWeekIndex];
 
   return (
     <section>
@@ -148,14 +160,32 @@ export default function ClientPlanPage() {
             ) : null}
           </Section>
 
+          {weekGroups.length > 1 ? (
+            <div className="ui-row" style={{ flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+              {weekGroups.map((group) => (
+                <Button
+                  key={group.week}
+                  size="sm"
+                  variant={group.week === activeWeek ? "primary" : "secondary"}
+                  onClick={() => {
+                    setActiveWeek(group.week);
+                    setDayIndex(0);
+                  }}
+                >
+                  Week {group.week}
+                </Button>
+              ))}
+            </div>
+          ) : null}
+
           {day ? (
             <Section title={dayLabel(day)} description={nutritionSummary(day.presented) || undefined}>
               <div className="ui-client-plan-day" role="tablist" aria-label="Plan days">
-                {plan.snapshot.days.map((item, index) => (
+                {weekDays.map((item, index) => (
                   <button
                     key={item.dayNumber}
                     type="button"
-                    className={index === dayIndex ? "is-active" : undefined}
+                    className={index === dayInWeekIndex ? "is-active" : undefined}
                     onClick={() => setDayIndex(index)}
                   >
                     {dayLabel(item)}

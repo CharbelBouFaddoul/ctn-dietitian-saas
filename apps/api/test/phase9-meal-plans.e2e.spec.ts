@@ -401,7 +401,7 @@ describe("phase9 meal plans composition nutrition", () => {
       .get(`/api/v1/dietitian/${practice.id}/meal-plans/${numbered.body.id}/versions/${numberedVersionId}`)
       .set("Cookie", owner.cookie)
       .expect(200);
-    expect(version.body.snapshot.days[0].title).toBe("Day 1");
+    expect(version.body.snapshot.days[0].title).toBe("Week 1 · Day 1");
     expect(version.body.snapshot.dayLabelMode).toBe("NUMBERED");
 
     version = await request(ctx.app.getHttpServer())
@@ -409,7 +409,10 @@ describe("phase9 meal plans composition nutrition", () => {
       .set("Cookie", owner.cookie)
       .send({})
       .expect(201);
-    expect(version.body.snapshot.days.map((d: { title: string }) => d.title)).toEqual(["Day 1", "Day 2"]);
+    expect(version.body.snapshot.days.map((d: { title: string }) => d.title)).toEqual([
+      "Week 1 · Day 1",
+      "Week 1 · Day 2",
+    ]);
 
     const weekdayPlan = await request(ctx.app.getHttpServer())
       .post(`/api/v1/dietitian/${practice.id}/meal-plans`)
@@ -445,7 +448,10 @@ describe("phase9 meal plans composition nutrition", () => {
       .get(`/api/v1/dietitian/${practice.id}/meal-plans/${weekdayPlan.body.id}/versions/${weekdayVersionId}`)
       .set("Cookie", owner.cookie)
       .expect(200);
-    expect(version.body.snapshot.days.map((d: { title: string }) => d.title)).toEqual(["Day 1", "Day 2"]);
+    expect(version.body.snapshot.days.map((d: { title: string }) => d.title)).toEqual([
+      "Week 1 · Day 1",
+      "Week 1 · Day 2",
+    ]);
     expect(version.body.snapshot.dayLabelMode).toBe("NUMBERED");
   });
 });

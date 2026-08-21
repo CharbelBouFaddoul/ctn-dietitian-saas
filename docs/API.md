@@ -205,7 +205,11 @@ Session + `TenantGuard`. Client-scoped routes also run `ClientAccessGuard` / `Cl
 | DELETE | `/foods/:foodId/override` | OWNER/DIETITIAN | Deactivate override; effective values return to global |
 | GET | `/food-sources` | Member | Active datasets (version, attribution, food count) |
 
-Global catalog foods are never mutated by dietitian `PATCH`. Import-only via `pnpm food:import --file=…` or platform admin `POST /api/v1/admin/food-sources/import` (bundled curated dataset; no remote URL fetch).
+Global catalog foods are never mutated by dietitian `PATCH`. Import via `pnpm food:import` (runs `tsx src/foods/import/cli.ts` — avoids Nest wiping Docker-mounted `dist`) or platform admin `POST /api/v1/admin/food-sources/import` (bundled curated dataset; no remote URL fetch). Prefer host import when `DATABASE_URL` points at Postgres, or `docker compose -f docker-compose.dev.yml exec api pnpm food:import` when using the dev stack.
+
+Platform **Starter recipes** (`dietitianAccountId` null) are imported with `pnpm recipe:import` from `apps/api/recipe-data/myplate-kitchen-starter.json` after foods are imported. Practices can list/use Starters in meal plans but cannot edit/archive them. Practice recipes remain practice-owned.
+
+Meal-plan **weeks** are presentation-only: `dayNumber` stays global; `POST .../versions/:versionId/weeks` appends 7 days. Labels use `Week N · Day D` in `NUMBERED` mode.
 
 **Product Phase 8:** `Food.dietitianAccountId` — `null` = global catalog; non-null = practice custom. Recipes remain the reusable meal database (no separate Meal catalog table). `Meal` inside meal plans is still a plan-day structure only. Meal-plan editor/publish redesign is Phase 9.
 

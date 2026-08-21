@@ -1109,42 +1109,48 @@ enum QuantityUnit {
 }
 
 model Recipe {
-  id                 String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  dietitianAccountId String       @map("dietitian_account_id") @db.Uuid
+  id                 String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  /// null = platform Starter catalog; set = practice-owned recipe
+  dietitianAccountId String?       @map("dietitian_account_id") @db.Uuid
+  sourceKey          String?       @map("source_key")
+  sourceRecipeId     String?       @map("source_recipe_id")
   name               String
-  description        String?      @db.Text
-  instructions       String?      @db.Text
-  servings           Decimal      @db.Decimal(12, 4)
-  status             RecipeStatus @default(ACTIVE)
-  createdById        String?      @map("created_by_id") @db.Uuid
-  createdAt          DateTime     @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt          DateTime     @updatedAt @map("updated_at") @db.Timestamptz
-  archivedAt         DateTime?    @map("archived_at") @db.Timestamptz
+  description        String?       @db.Text
+  instructions       String?       @db.Text
+  servings           Decimal       @db.Decimal(12, 4)
+  status             RecipeStatus  @default(ACTIVE)
+  createdById        String?       @map("created_by_id") @db.Uuid
+  createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+  archivedAt         DateTime?     @map("archived_at") @db.Timestamptz
 
-  dietitianAccount DietitianAccount   @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
+  dietitianAccount DietitianAccount?  @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
   createdBy        User?              @relation("RecipeCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   ingredients      RecipeIngredient[]
   mealItems        MealItem[]
 
+  @@unique([sourceKey, sourceRecipeId])
   @@index([dietitianAccountId, status, name])
+  @@index([status, name])
   @@map("recipes")
 }
 
 model RecipeIngredient {
-  id                 String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  dietitianAccountId String       @map("dietitian_account_id") @db.Uuid
-  recipeId           String       @map("recipe_id") @db.Uuid
-  foodId             String       @map("food_id") @db.Uuid
-  quantity           Decimal      @db.Decimal(12, 4)
+  id                 String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  /// null when parent recipe is a platform Starter recipe
+  dietitianAccountId String?       @map("dietitian_account_id") @db.Uuid
+  recipeId           String        @map("recipe_id") @db.Uuid
+  foodId             String        @map("food_id") @db.Uuid
+  quantity           Decimal       @db.Decimal(12, 4)
   unit               QuantityUnit
-  displayNote        String?      @map("display_note")
-  sortOrder          Int          @default(0) @map("sort_order")
-  createdAt          DateTime     @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt          DateTime     @updatedAt @map("updated_at") @db.Timestamptz
+  displayNote        String?       @map("display_note")
+  sortOrder          Int           @default(0) @map("sort_order")
+  createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime      @updatedAt @map("updated_at") @db.Timestamptz
 
-  dietitianAccount DietitianAccount @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
-  recipe           Recipe           @relation(fields: [recipeId], references: [id], onDelete: Cascade)
-  food             Food             @relation(fields: [foodId], references: [id], onDelete: Restrict)
+  dietitianAccount DietitianAccount? @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
+  recipe           Recipe            @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  food             Food              @relation(fields: [foodId], references: [id], onDelete: Restrict)
 
   @@index([dietitianAccountId, recipeId])
   @@index([recipeId, sortOrder])

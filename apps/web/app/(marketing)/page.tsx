@@ -2,10 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { API_URL } from "../../lib/api";
 import { highlightedFeatures } from "../../lib/marketing/features-catalog";
-import { resolveSessionHome } from "../../lib/session-home";
 
 function ProductPreview() {
   return (
@@ -62,17 +60,11 @@ function ProductPreview() {
 }
 
 export default function HomePage() {
-  const router = useRouter();
   const [registrationEnabled, setRegistrationEnabled] = useState(false);
   const dietitianHighlights = highlightedFeatures("dietitian").slice(0, 4);
   const patientHighlights = highlightedFeatures("patient").slice(0, 4);
 
   useEffect(() => {
-    void resolveSessionHome().then((home) => {
-      if (home.kind !== "unauthenticated") {
-        router.replace(home.path);
-      }
-    });
     void fetch(`${API_URL}/api/v1/public/site-settings`)
       .then(async (res) => {
         if (!res.ok) return;
@@ -80,7 +72,7 @@ export default function HomePage() {
         setRegistrationEnabled(data.registrationEnabled === true);
       })
       .catch(() => undefined);
-  }, [router]);
+  }, []);
 
   return (
     <>
