@@ -130,7 +130,7 @@ export default function ClientPortalLayout({ children }: { children: ReactNode }
       label: "My nutrition",
       items: [
         { href: "/client/plan", label: "My Plan", icon: PatientNavIcons.plan },
-        { href: "/client/tracking", label: "Tracking", icon: PatientNavIcons.tracking },
+        { href: "/client/tracking", label: "Daily log", icon: PatientNavIcons.tracking },
         { href: "/client/progress", label: "Progress", icon: PatientNavIcons.progress },
         { href: "/client/assessments", label: "Assessments", icon: PatientNavIcons.assessments },
       ],

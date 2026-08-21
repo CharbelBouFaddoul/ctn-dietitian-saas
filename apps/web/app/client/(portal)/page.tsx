@@ -200,7 +200,7 @@ export default function ClientHomePage() {
       <nav className="ui-client-quick" aria-label="Quick links">
         {(data?.quickLinks ?? [
           { href: "/client/plan", label: "My Plan" },
-          { href: "/client/tracking", label: "Tracking" },
+          { href: "/client/tracking", label: "Daily log" },
           { href: "/client/messages", label: "Messages" },
           { href: "/client/documents", label: "Documents" },
         ]).map((link) => (

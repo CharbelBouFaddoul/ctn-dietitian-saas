@@ -18,7 +18,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body className={plex.className}>
+      <body className={plex.className} suppressHydrationWarning>
         <Providers>{children}</Providers>
       </body>
     </html>

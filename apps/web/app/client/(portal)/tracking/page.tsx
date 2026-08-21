@@ -1,6 +1,8 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, Suspense, useEffect, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   Alert,
   Button,
@@ -33,7 +35,14 @@ interface Summary {
     presented: Nutrition;
     byMeal: Array<{
       category: MealCategory;
-      items: Array<{ id: string; foodName: string; quantity: number; unit: string; presented: Nutrition }>;
+      items: Array<{
+        id: string;
+        foodName: string;
+        quantity: number;
+        unit: string;
+        presented: Nutrition;
+        sourceType?: string;
+      }>;
       presented: Nutrition;
     }>;
   };
@@ -64,7 +73,7 @@ interface Summary {
       habitDefinitionId?: string | null;
     }>;
   };
-  plannedMeals?: { logged: number; total: number };
+  plannedMeals?: { logged: number; total: number; loggedMealIds?: string[] };
 }
 
 type PortalHabit = {
@@ -75,8 +84,6 @@ type PortalHabit = {
   targetUnit: string | null;
 };
 
-const UNITS = ["g", "kg", "oz", "lb", "ml", "l", "fl_oz"] as const;
-const MEAL_CATEGORIES = ["BREAKFAST", "LUNCH", "DINNER", "SNACK", "OTHER"] as const;
 const INTENSITIES = ["LOW", "MODERATE", "HIGH"] as const;
 const WATER_CHIPS = [250, 500, 750] as const;
 
@@ -108,16 +115,21 @@ function shiftDate(date: string, days: number): string {
 }
 
 export default function ClientTrackingPage() {
+  return (
+    <Suspense fallback={<LoadingState>Loading today’s log…</LoadingState>}>
+      <ClientTrackingPageInner />
+    </Suspense>
+  );
+}
+
+function ClientTrackingPageInner() {
+  const searchParams = useSearchParams();
+  const initialDate = searchParams.get("date");
   const [date, setDate] = useState("");
   const [summary, setSummary] = useState<Summary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [foodQuery, setFoodQuery] = useState("");
-  const [foodHits, setFoodHits] = useState<Array<{ id: string; name: string }>>([]);
-  const [quantity, setQuantity] = useState("100");
-  const [unit, setUnit] = useState("g");
-  const [mealCategory, setMealCategory] = useState<(typeof MEAL_CATEGORIES)[number]>("LUNCH");
   const [waterAmount, setWaterAmount] = useState("500");
   const [activityType, setActivityType] = useState("Walking");
   const [duration, setDuration] = useState("30");
@@ -144,8 +156,10 @@ export default function ClientTrackingPage() {
   }
 
   useEffect(() => {
-    void load().catch((err) => setError(errorMessage(err, "Unable to load tracking")));
-  }, []);
+    const seed =
+      initialDate && /^\d{4}-\d{2}-\d{2}$/.test(initialDate) ? initialDate : undefined;
+    void load(seed).catch((err) => setError(errorMessage(err, "Unable to load tracking")));
+  }, [initialDate]);
 
   async function run(action: () => Promise<void>, fallback: string) {
     setError(null);
@@ -158,31 +172,6 @@ export default function ClientTrackingPage() {
     } finally {
       setBusy(false);
     }
-  }
-
-  async function searchFoods() {
-    await run(async () => {
-      const result = await api<{ items: Array<{ id: string; name: string }> }>(
-        `/api/v1/portal/foods?q=${encodeURIComponent(foodQuery)}&pageSize=8`,
-      );
-      setFoodHits(result.items);
-    }, "Unable to search foods");
-  }
-
-  async function addFood(foodId: string) {
-    await run(async () => {
-      await api("/api/v1/portal/tracking/food-logs", {
-        method: "POST",
-        body: JSON.stringify({
-          foodId,
-          quantity: Number(quantity),
-          unit,
-          mealCategory,
-        }),
-      });
-      setFoodHits([]);
-      await load(date);
-    }, "Unable to add food");
   }
 
   async function removeFood(logId: string) {
@@ -288,9 +277,9 @@ export default function ClientTrackingPage() {
   return (
     <section>
       <PageHeader
-        eyebrow="Daily log"
-        title="Tracking"
-        description="Log food, water, movement, sleep, habits, and weight for the day."
+        eyebrow="What I did"
+        title="Daily log"
+        description="Log planned meals from My Plan, plus anything else you ate that wasn’t on your plan — water, exercise, sleep, and habits too."
         actions={
           summary ? (
             <div className="ui-row">
@@ -301,7 +290,7 @@ export default function ClientTrackingPage() {
                 type="date"
                 value={date}
                 onChange={(event) => void load(event.target.value)}
-                aria-label="Tracking date"
+                aria-label="Log date"
                 style={{ width: "auto" }}
               />
               <Button variant="secondary" size="sm" onClick={() => void load(shiftDate(date, 1))}>
@@ -313,37 +302,72 @@ export default function ClientTrackingPage() {
       />
       {error ? <Alert tone="danger">{error}</Alert> : null}
       {notice ? <Alert tone="success">{notice}</Alert> : null}
-      {!summary ? <LoadingState>Loading today’s tracking…</LoadingState> : null}
+      {!summary ? <LoadingState>Loading today’s log…</LoadingState> : null}
 
       {summary ? (
         <div className="ui-client-stack">
+          {summary.plannedMeals && summary.plannedMeals.total > 0 ? (
+            <div className="ui-client-plan-bridge">
+              <div>
+                <strong>From your plan</strong>
+                <p className="ui-muted">
+                  {summary.plannedMeals.logged} of {summary.plannedMeals.total} planned meal
+                  {summary.plannedMeals.total === 1 ? "" : "s"} logged today
+                </p>
+              </div>
+              <Link href="/client/plan" className="ui-btn ui-btn--ghost ui-btn--sm">
+                View My Plan
+              </Link>
+            </div>
+          ) : null}
+
           <Section
             className="ui-client-panel ui-client-panel--food"
-            title="Food"
+            title="Food logged"
             description={`${formatKcal(summary.food.presented.energyKcal)} · P ${summary.food.presented.proteinG ?? "—"}g · C ${summary.food.presented.carbohydrateG ?? "—"}g · F ${summary.food.presented.fatG ?? "—"}g · Fiber ${summary.food.presented.fiberG ?? "—"}g`}
-            tone="mint"
+            actions={
+              <Link
+                href={`/client/tracking/add-food${date ? `?date=${encodeURIComponent(date)}` : ""}`}
+                className="ui-btn ui-btn--primary ui-btn--sm"
+              >
+                + Add food
+              </Link>
+            }
           >
             {summary.food.byMeal.length === 0 ? (
-              <EmptyState title="No food logged yet">Search and add foods below.</EmptyState>
+              <EmptyState title="Nothing logged yet">
+                Tap <strong>+ Add food</strong> to search and log, or log a meal from{" "}
+                <Link href="/client/plan" className="ui-link">
+                  My Plan
+                </Link>
+                .
+              </EmptyState>
             ) : (
-              <div className="ui-stack" style={{ gap: 14 }}>
+              <div className="ui-client-food-groups">
                 {summary.food.byMeal.map((meal) => (
-                  <div key={meal.category}>
-                    <div className="ui-row" style={{ justifyContent: "space-between", marginBottom: 6 }}>
+                  <div key={meal.category} className="ui-client-food-group">
+                    <div className="ui-client-food-group__head">
                       <strong>{MEAL_LABELS[meal.category] ?? meal.category}</strong>
-                      <span className="ui-muted">{formatKcal(meal.presented?.energyKcal ?? null)}</span>
+                      <span className="ui-client-kcal">{formatKcal(meal.presented?.energyKcal ?? null)}</span>
                     </div>
-                    <ul className="ui-client-meal-items">
+                    <ul className="ui-client-food-list">
                       {meal.items.map((row) => (
                         <li key={row.id}>
-                          <span>
-                            {row.foodName}{" "}
-                            <span className="ui-muted">
-                              {row.quantity} {unitLabel(row.unit)}
+                          <div className="ui-client-food-list__main">
+                            <span className="ui-client-food-list__name">
+                              {row.foodName}
+                              {row.sourceType === "PLANNED_MEAL" ? (
+                                <span className="ui-client-log-from-plan"> from plan</span>
+                              ) : null}
                             </span>
-                          </span>
-                          <span className="ui-row" style={{ gap: 8, alignItems: "center" }}>
-                            <span className="ui-muted">{formatKcal(row.presented?.energyKcal ?? null)}</span>
+                            <span className="ui-client-food-list__meta">
+                              {row.quantity} {unitLabel(row.unit)}
+                              {row.presented?.energyKcal != null
+                                ? ` · ${formatKcal(row.presented.energyKcal)}`
+                                : ""}
+                            </span>
+                          </div>
+                          <div className="ui-client-food-list__actions">
                             <Button
                               type="button"
                               size="sm"
@@ -353,73 +377,17 @@ export default function ClientTrackingPage() {
                             >
                               Remove
                             </Button>
-                          </span>
+                          </div>
                         </li>
                       ))}
                     </ul>
                   </div>
                 ))}
-                <p style={{ margin: 0, fontWeight: 650 }}>
-                  Total {formatKcal(summary.food.presented.energyKcal)}
+                <p className="ui-client-food-total">
+                  Total <span className="ui-client-kcal">{formatKcal(summary.food.presented.energyKcal)}</span>
                 </p>
               </div>
             )}
-            <div className="ui-inline-form" style={{ marginTop: 12 }}>
-              <Field label="Search food">
-                <Input
-                  value={foodQuery}
-                  onChange={(event) => setFoodQuery(event.target.value)}
-                  placeholder="Food name"
-                />
-              </Field>
-              <Field label="Amount">
-                <Input value={quantity} onChange={(event) => setQuantity(event.target.value)} />
-              </Field>
-              <Field label="Unit">
-                <Select value={unit} onChange={(event) => setUnit(event.target.value)}>
-                  {UNITS.map((item) => (
-                    <option key={item} value={item}>
-                      {unitLabel(item)}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              <Field label="Meal">
-                <Select
-                  value={mealCategory}
-                  onChange={(event) =>
-                    setMealCategory(event.target.value as (typeof MEAL_CATEGORIES)[number])
-                  }
-                >
-                  {MEAL_CATEGORIES.map((item) => (
-                    <option key={item} value={item}>
-                      {MEAL_LABELS[item]}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              <div className="ui-inline-form__action">
-                <Button type="button" disabled={busy} onClick={() => void searchFoods()}>
-                  Find
-                </Button>
-              </div>
-            </div>
-            {foodHits.length > 0 ? (
-              <div className="ui-row" style={{ marginTop: 10, flexWrap: "wrap" }}>
-                {foodHits.map((hit) => (
-                  <Button
-                    key={hit.id}
-                    type="button"
-                    size="sm"
-                    variant="secondary"
-                    disabled={busy}
-                    onClick={() => void addFood(hit.id)}
-                  >
-                    Add {hit.name}
-                  </Button>
-                ))}
-              </div>
-            ) : null}
           </Section>
 
           <Section className="ui-client-panel ui-client-panel--water" title="Water" description={waterDesc}>

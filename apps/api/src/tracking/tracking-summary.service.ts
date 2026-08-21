@@ -168,11 +168,12 @@ export class TrackingSummaryService {
       const mealTotals = sumNutrition(items.map((row) => row.nutrition));
       return {
         category,
-        items: items.map(({ id, foodName, displayName, sourceType, quantity, unit, presented }) => ({
+        items: items.map(({ id, foodName, displayName, sourceType, sourceMealId, quantity, unit, presented }) => ({
           id,
           foodName,
           displayName,
           sourceType,
+          sourceMealId,
           quantity,
           unit,
           presented,
@@ -208,6 +209,13 @@ export class TrackingSummaryService {
 
     const plannedMealLogs = foodLogs.filter((row) => row.sourceType === "PLANNED_MEAL");
     const plannedMealsTotal = this.plannedMealTotalForDate(publishedVersion?.snapshot, dateKey);
+    const loggedPlannedMealIds = [
+      ...new Set(
+        plannedMealLogs
+          .map((row) => row.sourceMealId)
+          .filter((id): id is string => typeof id === "string" && id.length > 0),
+      ),
+    ];
 
     const weekDurations = weekSleep
       .map((row) => row.durationMinutes)
@@ -275,6 +283,7 @@ export class TrackingSummaryService {
       plannedMeals: {
         logged: plannedMealLogs.length,
         total: plannedMealsTotal,
+        loggedMealIds: loggedPlannedMealIds,
       },
       goals: mappedGoals,
     };

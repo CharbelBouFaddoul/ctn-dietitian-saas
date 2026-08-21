@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
@@ -56,6 +57,11 @@ interface PortalPlan {
   } | null;
 }
 
+interface TrackingSummaryLite {
+  date: string;
+  plannedMeals?: { logged: number; total: number; loggedMealIds?: string[] };
+}
+
 function nutritionSummary(n: Nutrition): string {
   const parts: string[] = [];
   if (n.energyKcal !== null) parts.push(`${n.energyKcal} kcal`);
@@ -70,53 +76,65 @@ function dayLabel(day: { title: string | null; weekday?: string | null; dayNumbe
   return day.title ?? day.weekday ?? `Day ${day.dayNumber}`;
 }
 
-function mealHasFoodItems(meal: Snapshot["days"][number]["meals"][number]): boolean {
-  return meal.items.some(
-    (item) => item.itemType === "FOOD" || (item.food != null && item.recipe == null),
-  );
+function mealHasLoggableItems(meal: Snapshot["days"][number]["meals"][number]): boolean {
+  return meal.items.length > 0;
 }
 
 export default function ClientPlanPage() {
   const [data, setData] = useState<PortalPlan | null>(null);
   const [dayIndex, setDayIndex] = useState(0);
   const [activeWeek, setActiveWeek] = useState(1);
+  const [loggedMealIds, setLoggedMealIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyMealId, setBusyMealId] = useState<string | null>(null);
 
+  async function refreshLoggedToday() {
+    const summary = await api<TrackingSummaryLite>("/api/v1/portal/tracking/summary");
+    setLoggedMealIds(new Set(summary.plannedMeals?.loggedMealIds ?? []));
+  }
+
   useEffect(() => {
-    void api<PortalPlan>("/api/v1/portal/meal-plan")
-      .then((payload) => {
+    void Promise.all([
+      api<PortalPlan>("/api/v1/portal/meal-plan"),
+      api<TrackingSummaryLite>("/api/v1/portal/tracking/summary").catch(() => null),
+    ])
+      .then(([payload, summary]) => {
         setData(payload);
         const first = payload.plan?.snapshot.days[0];
         if (first) setActiveWeek(weekOfDay(first.dayNumber));
+        if (summary?.plannedMeals?.loggedMealIds) {
+          setLoggedMealIds(new Set(summary.plannedMeals.loggedMealIds));
+        }
       })
       .catch((err) => setError(errorMessage(err, "Unable to load your meal plan")))
       .finally(() => setLoading(false));
   }, []);
 
-  async function logMeal(mealId: string) {
+  async function logMeal(mealId: string, alreadyLogged: boolean) {
+    if (alreadyLogged) {
+      const ok = window.confirm(
+        "You already logged this meal today. Log it again anyway? It will add another entry to your Daily log.",
+      );
+      if (!ok) return;
+    }
     setError(null);
     setNotice(null);
     setBusyMealId(mealId);
     try {
-      const result = await api<{
-        createdCount: number;
-        skippedRecipes: Array<{ name: string }>;
-      }>("/api/v1/portal/tracking/log-planned-meal", {
+      const result = await api<{ createdCount: number }>("/api/v1/portal/tracking/log-planned-meal", {
         method: "POST",
         body: JSON.stringify({ mealId }),
       });
-      const recipeNote =
-        result.skippedRecipes.length > 0
-          ? ` Recipes not auto-logged: ${result.skippedRecipes.map((r) => r.name).join(", ")}.`
-          : "";
       setNotice(
         result.createdCount > 0
-          ? `Logged ${result.createdCount} food item${result.createdCount === 1 ? "" : "s"}.${recipeNote}`
-          : `No food items logged.${recipeNote}`,
+          ? alreadyLogged
+            ? "Logged again — check Daily log for today’s entries."
+            : "Added to today’s Daily log."
+          : "Nothing was logged for this meal.",
       );
+      await refreshLoggedToday();
     } catch (err) {
       setError(errorMessage(err, "Unable to log meal"));
     } finally {
@@ -129,16 +147,22 @@ export default function ClientPlanPage() {
     () => (plan ? groupDaysByWeek(plan.snapshot.days) : []),
     [plan],
   );
+  const weekCount = weekGroups.length;
   const weekDays = weekGroups.find((g) => g.week === activeWeek)?.days ?? weekGroups[0]?.days ?? [];
   const dayInWeekIndex = Math.min(dayIndex, Math.max(weekDays.length - 1, 0));
   const day = weekDays[dayInWeekIndex];
 
   return (
-    <section>
+    <section className="ui-client-plan-page">
       <PageHeader
-        eyebrow="Nutrition"
+        eyebrow="What to eat"
         title="My Plan"
-        description="Your current nutrition plan from your dietitian."
+        description="Your dietitian’s meal plan. Use Daily log if you ate something beyond what’s planned here."
+        actions={
+          <Link href="/client/tracking" className="ui-btn ui-btn--ghost ui-btn--sm">
+            Open Daily log
+          </Link>
+        }
       />
       {error ? <Alert tone="danger">{error}</Alert> : null}
       {notice ? <Alert tone="success">{notice}</Alert> : null}
@@ -151,35 +175,56 @@ export default function ClientPlanPage() {
         </Section>
       ) : null}
       {plan ? (
-        <>
-          <Section title={plan.name} description={plan.description || undefined} tone="mint">
-            {plan.publishedAt ? (
-              <p className="ui-muted" style={{ margin: 0 }}>
-                Updated {new Date(plan.publishedAt).toLocaleDateString()}
-              </p>
-            ) : null}
-          </Section>
+        <div className="ui-client-stack">
+          <div className="ui-client-plan-intro">
+            <div>
+              <h2 className="ui-client-plan-intro__title">{plan.name}</h2>
+              {plan.description ? <p className="ui-muted">{plan.description}</p> : null}
+              {plan.publishedAt ? (
+                <p className="ui-muted ui-client-plan-intro__meta">
+                  Updated {new Date(plan.publishedAt).toLocaleDateString()}
+                  {weekCount > 1 ? ` · ${weekCount} weeks` : ""}
+                </p>
+              ) : null}
+            </div>
+          </div>
 
-          {weekGroups.length > 1 ? (
-            <div className="ui-row" style={{ flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-              {weekGroups.map((group) => (
-                <Button
-                  key={group.week}
-                  size="sm"
-                  variant={group.week === activeWeek ? "primary" : "secondary"}
-                  onClick={() => {
-                    setActiveWeek(group.week);
-                    setDayIndex(0);
-                  }}
-                >
-                  Week {group.week}
-                </Button>
-              ))}
+          {weekCount > 1 ? (
+            <div className="ui-client-plan-weeks" role="tablist" aria-label="Plan weeks">
+              <p className="ui-client-plan-weeks__label">
+                Week {activeWeek} of {weekCount}
+              </p>
+              <div className="ui-client-plan-weeks__tabs">
+                {weekGroups.map((group) => (
+                  <button
+                    key={group.week}
+                    type="button"
+                    className={group.week === activeWeek ? "is-active" : undefined}
+                    onClick={() => {
+                      setActiveWeek(group.week);
+                      setDayIndex(0);
+                    }}
+                  >
+                    Week {group.week}
+                  </button>
+                ))}
+              </div>
             </div>
           ) : null}
 
           {day ? (
-            <Section title={dayLabel(day)} description={nutritionSummary(day.presented) || undefined}>
+            <Section
+              title={dayLabel(day)}
+              description={
+                [
+                  weekCount > 1 ? `Week ${activeWeek}` : null,
+                  nutritionSummary(day.presented) || null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ") || undefined
+              }
+              className="ui-client-plan-day-section"
+            >
               <div className="ui-client-plan-day" role="tablist" aria-label="Plan days">
                 {weekDays.map((item, index) => (
                   <button
@@ -193,59 +238,69 @@ export default function ClientPlanPage() {
                 ))}
               </div>
               {day.notes ? <p className="ui-muted">{day.notes}</p> : null}
-              {day.meals.map((meal) => (
-                <details key={meal.id || meal.name} className="ui-client-meal" open>
-                  <summary>
-                    <span>{meal.name}</span>
-                    <span className="ui-muted">
-                      {meal.presented.energyKcal != null ? `${meal.presented.energyKcal} kcal` : " "}
-                    </span>
-                  </summary>
-                  {meal.notes ? <p className="ui-muted">{meal.notes}</p> : null}
-                  <ul className="ui-client-meal-items">
-                    {meal.items.map((item, index) => (
-                      <li key={`${item.food?.name ?? item.recipe?.name}-${index}`}>
-                        <span>
-                          {item.food?.name ?? item.recipe?.name}
-                          {item.recipe ? " (recipe)" : ""}
-                          {item.notes ? ` — ${item.notes}` : ""}
-                        </span>
-                        <span className="ui-muted">
-                          {item.quantity} {unitLabel(item.unit)}
-                          {item.presented.energyKcal != null
-                            ? ` · ${item.presented.energyKcal} kcal`
-                            : ""}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                  {nutritionSummary(meal.presented) ? (
-                    <p className="ui-muted" style={{ marginTop: 8, fontSize: 13 }}>
-                      Meal nutrition: {nutritionSummary(meal.presented)}
-                    </p>
-                  ) : null}
-                  {mealHasFoodItems(meal) ? (
-                    <div style={{ marginTop: 10 }}>
-                      <Button
-                        type="button"
-                        size="sm"
-                        disabled={busyMealId === meal.id}
-                        onClick={() => void logMeal(meal.id)}
-                      >
-                        {busyMealId === meal.id ? "Logging…" : "Log meal"}
-                      </Button>
-                      {meal.items.some((i) => i.recipe) ? (
-                        <p className="ui-muted" style={{ margin: "6px 0 0", fontSize: 12 }}>
-                          Recipes in this meal are skipped — log those foods separately.
-                        </p>
-                      ) : null}
-                    </div>
-                  ) : null}
-                </details>
-              ))}
+
+              <div className="ui-client-plan-meals">
+                {day.meals.map((meal) => {
+                  const alreadyLogged = loggedMealIds.has(meal.id);
+                  return (
+                    <article key={meal.id || meal.name} className="ui-client-plan-meal">
+                      <header className="ui-client-plan-meal__head">
+                        <h3>
+                          {meal.name}
+                          {meal.presented.energyKcal != null ? (
+                            <span className="ui-client-kcal">{meal.presented.energyKcal} kcal</span>
+                          ) : null}
+                        </h3>
+                        <div className="ui-client-plan-meal__tools">
+                          {alreadyLogged ? (
+                            <span className="ui-client-plan-meal__badge">Logged today</span>
+                          ) : null}
+                          {mealHasLoggableItems(meal) ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              disabled={busyMealId === meal.id}
+                              onClick={() => void logMeal(meal.id, alreadyLogged)}
+                            >
+                              {busyMealId === meal.id
+                                ? "Logging…"
+                                : alreadyLogged
+                                  ? "Log again"
+                                  : "Log to today"}
+                            </Button>
+                          ) : null}
+                        </div>
+                      </header>
+                      {meal.notes ? <p className="ui-muted ui-client-plan-meal__notes">{meal.notes}</p> : null}
+                      <ul className="ui-client-food-list">
+                        {meal.items.map((item, index) => (
+                          <li key={`${item.food?.name ?? item.recipe?.name}-${index}`}>
+                            <div className="ui-client-food-list__main">
+                              <span className="ui-client-food-list__name">
+                                {item.food?.name ?? item.recipe?.name}
+                                {item.recipe ? " (recipe)" : ""}
+                              </span>
+                              <span className="ui-client-food-list__meta">
+                                {item.quantity} {unitLabel(item.unit)}
+                                {item.presented.energyKcal != null
+                                  ? ` · ${item.presented.energyKcal} kcal`
+                                  : ""}
+                              </span>
+                              {item.notes ? (
+                                <span className="ui-muted ui-client-food-list__note">{item.notes}</span>
+                              ) : null}
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </article>
+                  );
+                })}
+              </div>
             </Section>
           ) : null}
-        </>
+        </div>
       ) : null}
     </section>
   );
