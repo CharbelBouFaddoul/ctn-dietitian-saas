@@ -13,10 +13,13 @@ export function JoinCodePanel({
   expiresAt,
   allowManage,
   portalBusy,
+  disconnectRequestedAt,
+  disconnectRequestNote,
   onGenerate,
   onCopy,
   onRevoke,
   onDeactivate,
+  onDismissDisconnectRequest,
 }: {
   title: string;
   description: string;
@@ -26,14 +29,18 @@ export function JoinCodePanel({
   expiresAt: string | null;
   allowManage: boolean;
   portalBusy: boolean;
+  disconnectRequestedAt?: string | null;
+  disconnectRequestNote?: string | null;
   onGenerate: () => void;
   onCopy: () => void;
   onRevoke: () => void;
   onDeactivate?: () => void;
+  onDismissDisconnectRequest?: () => void;
 }) {
   const [copied, setCopied] = useState(false);
   const connected = connectionStatus === "connected";
   const waiting = Boolean(plainJoinCode || hint);
+  const leaveRequested = Boolean(disconnectRequestedAt);
 
   async function handleCopy() {
     onCopy();
@@ -44,6 +51,25 @@ export function JoinCodePanel({
   return (
     <Section title={title}>
       <p className="ui-muted">{description}</p>
+
+      {leaveRequested ? (
+        <div
+          className="ui-alert ui-alert--warning"
+          style={{ marginTop: 12 }}
+          role="status"
+        >
+          <strong>Patient asked to leave this clinic</strong>
+          <p className="ui-muted" style={{ margin: "6px 0 0", lineHeight: 1.5 }}>
+            {disconnectRequestNote?.trim()
+              ? `Note: “${disconnectRequestNote.trim()}”. `
+              : null}
+            Deactivate portal to approve, or dismiss to keep them connected.
+            {disconnectRequestedAt
+              ? ` Requested ${new Date(disconnectRequestedAt).toLocaleString()}.`
+              : null}
+          </p>
+        </div>
+      ) : null}
 
       <div className="ui-client-chart__toolbar" style={{ margin: "12px 0 8px" }}>
         <span className="ui-muted" style={{ fontSize: "0.875rem" }}>
@@ -102,8 +128,13 @@ export function JoinCodePanel({
           </Button>
         ) : null}
         {onDeactivate ? (
-          <Button size="sm" variant="ghost" onClick={onDeactivate}>
-            Deactivate portal
+          <Button size="sm" variant="secondary" onClick={onDeactivate}>
+            {leaveRequested ? "Approve & deactivate" : "Deactivate portal"}
+          </Button>
+        ) : null}
+        {leaveRequested && onDismissDisconnectRequest ? (
+          <Button size="sm" variant="secondary" disabled={portalBusy} onClick={onDismissDisconnectRequest}>
+            Dismiss request
           </Button>
         ) : null}
       </div>

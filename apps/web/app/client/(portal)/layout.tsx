@@ -14,13 +14,8 @@ import { PatientNavIcons } from "./patient-nav-icons";
 interface PortalMe {
   client: { id: string; firstName: string; lastName: string; displayName: string | null };
   practiceName?: string | null;
+  dietitianDisplayName?: string | null;
   activeClientId?: string;
-}
-
-interface PortalConnection {
-  clientId: string;
-  practiceName: string;
-  dietitianAccountId: string | null;
 }
 
 export default function ClientPortalLayout({ children }: { children: ReactNode }) {
@@ -28,8 +23,6 @@ export default function ClientPortalLayout({ children }: { children: ReactNode }
   const pathname = usePathname();
   const [state, setState] = useState<"loading" | "ok">("loading");
   const [me, setMe] = useState<PortalMe | null>(null);
-  const [connections, setConnections] = useState<PortalConnection[]>([]);
-  const [switching, setSwitching] = useState(false);
   const [unreadMessages, setUnreadMessages] = useState(0);
 
   const refreshUnreadMessages = useCallback(async () => {
@@ -55,12 +48,8 @@ export default function ClientPortalLayout({ children }: { children: ReactNode }
   }, [state, refreshUnreadMessages, pathname, me?.client.id]);
 
   const load = useCallback(async () => {
-    const [profile, links] = await Promise.all([
-      api<PortalMe>("/api/v1/portal/me"),
-      api<PortalConnection[]>("/api/v1/portal/connections").catch(() => [] as PortalConnection[]),
-    ]);
+    const profile = await api<PortalMe>("/api/v1/portal/me");
     setMe(profile);
-    setConnections(links);
     setState("ok");
   }, []);
 
@@ -75,12 +64,14 @@ export default function ClientPortalLayout({ children }: { children: ReactNode }
           router.replace(loginPathFor("client"));
           return;
         }
-        const home = await resolveSessionHome();
+        // Soft-revoke / no ACTIVE connection: session stays valid but /portal/me is 403.
+        // Never redirect back to /client here — that would loop with this layout.
+        const home = await resolveSessionHome("client");
         if (home.kind === "unauthenticated") {
           router.replace(loginPathFor("client"));
           return;
         }
-        router.replace(home.path);
+        router.replace(home.path === "/client" ? "/client/join" : home.path);
       }
     })();
     return () => {
@@ -88,27 +79,17 @@ export default function ClientPortalLayout({ children }: { children: ReactNode }
     };
   }, [router, load]);
 
+  useEffect(() => {
+    function onConnectionChanged() {
+      void load().catch(() => undefined);
+    }
+    window.addEventListener("portal-connection-changed", onConnectionChanged);
+    return () => window.removeEventListener("portal-connection-changed", onConnectionChanged);
+  }, [load]);
+
   async function onLogout() {
     await logout();
     router.replace(loginPathFor("client"));
-  }
-
-  async function onSwitch(clientId: string) {
-    if (clientId === me?.client.id) return;
-    setSwitching(true);
-    try {
-      await api("/api/v1/portal/connections/active", {
-        method: "POST",
-        body: JSON.stringify({ clientId }),
-      });
-      await load();
-      window.dispatchEvent(new CustomEvent("portal-connection-changed"));
-      router.refresh();
-    } catch {
-      /* keep current */
-    } finally {
-      setSwitching(false);
-    }
   }
 
   if (state !== "ok") {
@@ -168,31 +149,14 @@ export default function ClientPortalLayout({ children }: { children: ReactNode }
       linkComponent={Link}
       collapsible
       footer={
-        <div style={{ display: "grid", gap: 8 }}>
+        <div className="ui-portal-sidebar-foot">
           <NotificationBell
             key={me?.client.id ?? "portal"}
             mode={{ kind: "portal" }}
             enabled={state === "ok"}
             placement="above"
           />
-          {connections.length > 1 ? (
-            <label className="ui-field" style={{ margin: 0 }}>
-              <span style={{ fontSize: 12 }}>Active clinic</span>
-              <select
-                className="ui-input"
-                value={me?.client.id ?? ""}
-                disabled={switching}
-                onChange={(event) => void onSwitch(event.target.value)}
-              >
-                {connections.map((row) => (
-                  <option key={row.clientId} value={row.clientId}>
-                    {row.practiceName}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : null}
-          <Button variant="ghost" size="sm" onClick={() => void onLogout()}>
+          <Button variant="secondary" size="sm" onClick={() => void onLogout()}>
             Sign out
           </Button>
         </div>

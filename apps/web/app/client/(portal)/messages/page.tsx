@@ -16,6 +16,7 @@ interface Conversation {
   clientId: string;
   unreadCount: number;
   lastMessagePreview: string | null;
+  lastMessageAt?: string | null;
 }
 
 interface Message {
@@ -126,6 +127,9 @@ export default function ClientMessagesPage() {
           ),
         );
       }
+      void api<Conversation>("/api/v1/portal/conversation")
+        .then((conv) => setConversation(conv))
+        .catch(() => undefined);
     },
     [],
   );
@@ -133,6 +137,18 @@ export default function ClientMessagesPage() {
   const { connected, subscribe, unsubscribe } = useMessagingRealtime(true, {
     onMessageCreated: onRealtimeMessage,
     onMessageDeleted: onRealtimeDeleted,
+    onConversationUpdated: (event) => {
+      if (clientIdRef.current && event.clientId !== clientIdRef.current) return;
+      setConversation((prev) =>
+        prev
+          ? {
+              ...prev,
+              lastMessagePreview: event.lastMessagePreview,
+              lastMessageAt: event.lastMessageAt ?? prev.lastMessageAt,
+            }
+          : prev,
+      );
+    },
     onMessageRead: (event) => {
       if (clientIdRef.current && event.clientId !== clientIdRef.current) return;
       if (!me?.user.id || event.readerUserId === me.user.id) return;
@@ -251,6 +267,8 @@ export default function ClientMessagesPage() {
           ),
         );
       }
+      const conv = await api<Conversation>("/api/v1/portal/conversation").catch(() => null);
+      if (conv) setConversation(conv);
     } catch (err) {
       setError(errorMessage(err, "Unable to delete message"));
     } finally {

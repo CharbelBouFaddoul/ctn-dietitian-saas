@@ -25,6 +25,8 @@ export type ConversationUpdatedEvent = {
   clientId: string;
   lastMessageAt: string | null;
   lastMessagePreview: string | null;
+  /** When set, only this user should apply the preview (delete-for-me). */
+  userId?: string;
 };
 
 export type MessageReadEvent = {
@@ -90,5 +92,14 @@ export class MessagingRealtimeService {
       return;
     }
     this.server.to(conversationRoom(event.conversationId)).emit("message.deleted", event);
+  }
+
+  emitConversationUpdated(event: ConversationUpdatedEvent): void {
+    if (!this.server) return;
+    if (event.userId) {
+      this.server.to(userRoom(event.userId)).emit("conversation.updated", event);
+      return;
+    }
+    this.server.to(conversationRoom(event.conversationId)).emit("conversation.updated", event);
   }
 }

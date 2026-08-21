@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import type { Client, Conversation } from "@prisma/client";
+import type { Client, Conversation, Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { requireDietitianAccountId } from "../dietitian/tenant-scope";
 import { TimelineService } from "../timeline/timeline.service";
@@ -62,7 +62,7 @@ export class ConversationService {
     return conversation;
   }
 
-  async listInbox(dietitianAccountId: string, clientIds: string[]) {
+  async listInbox(dietitianAccountId: string, clientIds: string[], viewerUserId: string) {
     if (clientIds.length === 0) return [];
     const rows = await this.prisma.conversation.findMany({
       where: { dietitianAccountId, clientId: { in: clientIds }, status: "ACTIVE" },
@@ -80,16 +80,41 @@ export class ConversationService {
         },
       },
     });
-    return rows.map((row) => ({
-      id: row.id,
-      clientId: row.clientId,
-      clientName: row.client.displayName ?? `${row.client.firstName} ${row.client.lastName}`,
-      clientEmail: row.client.email,
-      clientPhone: row.client.phone,
-      status: row.status,
-      lastMessageAt: row.lastMessageAt?.toISOString() ?? null,
-      lastMessagePreview: row.lastMessagePreview,
-    }));
+    const previews = await this.latestVisiblePreviews(
+      rows.map((row) => row.id),
+      viewerUserId,
+    );
+    const mapped = rows.map((row) => {
+      const visible = previews.get(row.id);
+      return {
+        id: row.id,
+        clientId: row.clientId,
+        clientName: row.client.displayName ?? `${row.client.firstName} ${row.client.lastName}`,
+        clientEmail: row.client.email,
+        clientPhone: row.client.phone,
+        status: row.status,
+        lastMessageAt: visible?.createdAt.toISOString() ?? null,
+        lastMessagePreview: visible?.preview ?? null,
+      };
+    });
+    mapped.sort((a, b) => {
+      const ta = a.lastMessageAt ? Date.parse(a.lastMessageAt) : 0;
+      const tb = b.lastMessageAt ? Date.parse(b.lastMessageAt) : 0;
+      return tb - ta;
+    });
+    return mapped;
+  }
+
+  /** Conversation summary with a preview visible to this viewer (excludes soft-deletes + their hides). */
+  async summarizeForViewer(conversation: Conversation, viewerUserId: string) {
+    const visible = await this.latestVisibleMessage(conversation.id, viewerUserId);
+    return {
+      id: conversation.id,
+      clientId: conversation.clientId,
+      status: conversation.status,
+      lastMessageAt: visible?.createdAt.toISOString() ?? null,
+      lastMessagePreview: visible ? previewText(visible.body) : null,
+    };
   }
 
   async sendMessage(input: {
@@ -257,11 +282,19 @@ export class ConversationService {
         create: { messageId: message.id, userId: input.actorUserId },
         update: {},
       });
+      const visible = await this.latestVisibleMessage(input.conversation.id, input.actorUserId);
       this.realtime.emitMessageDeleted({
         messageId: message.id,
         conversationId: input.conversation.id,
         clientId: input.client.id,
         scope: "me",
+        userId: input.actorUserId,
+      });
+      this.realtime.emitConversationUpdated({
+        conversationId: input.conversation.id,
+        clientId: input.client.id,
+        lastMessageAt: visible?.createdAt.toISOString() ?? null,
+        lastMessagePreview: visible ? previewText(visible.body) : null,
         userId: input.actorUserId,
       });
       return { ok: true, scope: "me" as const, messageId: message.id };
@@ -295,31 +328,13 @@ export class ConversationService {
         where: { id: message.id },
         data: { deletedAt: now },
       });
-
-      if (input.conversation.lastMessageId === message.id) {
-        const previous = await tx.message.findFirst({
-          where: {
-            conversationId: input.conversation.id,
-            deletedAt: null,
-            id: { not: message.id },
-          },
-          orderBy: { createdAt: "desc" },
-        });
-        await tx.conversation.update({
-          where: { id: input.conversation.id },
-          data: previous
-            ? {
-                lastMessageId: previous.id,
-                lastMessageAt: previous.createdAt,
-                lastMessagePreview: previewText(previous.body),
-              }
-            : {
-                lastMessagePreview: "This message was deleted",
-              },
-        });
-      }
-
+      await this.syncSharedLastMessage(tx, input.conversation.id);
       return row;
+    });
+
+    const shared = await this.prisma.conversation.findUniqueOrThrow({
+      where: { id: input.conversation.id },
+      select: { lastMessageAt: true, lastMessagePreview: true },
     });
 
     this.realtime.emitMessageDeleted({
@@ -327,6 +342,12 @@ export class ConversationService {
       conversationId: input.conversation.id,
       clientId: input.client.id,
       scope: "everyone",
+    });
+    this.realtime.emitConversationUpdated({
+      conversationId: input.conversation.id,
+      clientId: input.client.id,
+      lastMessageAt: shared.lastMessageAt?.toISOString() ?? null,
+      lastMessagePreview: shared.lastMessagePreview,
     });
 
     return {
@@ -416,6 +437,58 @@ export class ConversationService {
       }),
     );
     return map;
+  }
+
+  private async latestVisibleMessage(conversationId: string, viewerUserId: string) {
+    return this.prisma.message.findFirst({
+      where: {
+        conversationId,
+        deletedAt: null,
+        hides: { none: { userId: viewerUserId } },
+      },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, body: true, createdAt: true },
+    });
+  }
+
+  private async latestVisiblePreviews(conversationIds: string[], viewerUserId: string) {
+    const map = new Map<string, { preview: string; createdAt: Date; id: string }>();
+    if (conversationIds.length === 0) return map;
+    await Promise.all(
+      conversationIds.map(async (conversationId) => {
+        const message = await this.latestVisibleMessage(conversationId, viewerUserId);
+        if (!message) return;
+        map.set(conversationId, {
+          id: message.id,
+          preview: previewText(message.body),
+          createdAt: message.createdAt,
+        });
+      }),
+    );
+    return map;
+  }
+
+  /** Shared denormalized preview: latest message that is not soft-deleted for everyone. */
+  private async syncSharedLastMessage(tx: Prisma.TransactionClient, conversationId: string) {
+    const previous = await tx.message.findFirst({
+      where: { conversationId, deletedAt: null },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, body: true, createdAt: true },
+    });
+    await tx.conversation.update({
+      where: { id: conversationId },
+      data: previous
+        ? {
+            lastMessageId: previous.id,
+            lastMessageAt: previous.createdAt,
+            lastMessagePreview: previewText(previous.body),
+          }
+        : {
+            lastMessageId: null,
+            lastMessageAt: null,
+            lastMessagePreview: null,
+          },
+    });
   }
 
   private deleteForEveryoneEligibility(

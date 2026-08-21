@@ -502,6 +502,8 @@ function ClientWorkspacePage() {
   const [portalAccount, setPortalAccount] = useState<{
     connectionStatus: string;
     joinCode: { expiresAt: string; hint: string | null } | null;
+    disconnectRequestedAt?: string | null;
+    disconnectRequestNote?: string | null;
   } | null>(null);
   const [plainJoinCode, setPlainJoinCode] = useState<string | null>(null);
   const [portalBusy, setPortalBusy] = useState(false);
@@ -1761,6 +1763,8 @@ function ClientWorkspacePage() {
           expiresAt={portalAccount?.joinCode?.expiresAt ?? null}
           allowManage={allowManage}
           portalBusy={portalBusy}
+          disconnectRequestedAt={portalAccount?.disconnectRequestedAt}
+          disconnectRequestNote={portalAccount?.disconnectRequestNote}
           onGenerate={() => {
             setPortalBusy(true);
             void api<{ code: string }>(`${base}/account/join-code`, { method: "POST" })
@@ -1775,6 +1779,17 @@ function ClientWorkspacePage() {
           onRevoke={() => setConfirmRevoke(true)}
           onDeactivate={
             allowManage && connectionStatus === "connected" ? () => setConfirmDeactivate(true) : undefined
+          }
+          onDismissDisconnectRequest={
+            allowManage && portalAccount?.disconnectRequestedAt
+              ? () => {
+                  setPortalBusy(true);
+                  void api(`${base}/account/disconnect-request/dismiss`, { method: "POST" })
+                    .then(() => load())
+                    .catch((err) => setError(errorMessage(err, "Could not dismiss request")))
+                    .finally(() => setPortalBusy(false));
+                }
+              : undefined
           }
         />
       ) : null}
@@ -1879,8 +1894,12 @@ function ClientWorkspacePage() {
       />
       <ConfirmDialog
         open={confirmDeactivate}
-        title="Deactivate this portal connection?"
-        confirmLabel="Deactivate"
+        title={
+          portalAccount?.disconnectRequestedAt
+            ? "Approve disconnect and deactivate portal?"
+            : "Deactivate this portal connection?"
+        }
+        confirmLabel={portalAccount?.disconnectRequestedAt ? "Approve & deactivate" : "Deactivate"}
         onConfirm={() => {
           void api(`${base}/account/deactivate`, { method: "POST" }).then(() => {
             setPlainJoinCode(null);

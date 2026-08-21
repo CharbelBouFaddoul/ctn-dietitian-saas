@@ -13,3 +13,9 @@ export const JOIN_PRACTICE_LOCKED =
   "This practice is not accepting new connections right now. Ask your dietitian after their subscription is renewed.";
 export const PORTAL_CONNECTION_REQUIRED =
   "Select an active practice connection before continuing.";
+export const DISCONNECT_REQUEST_PENDING =
+  "You already asked to leave this clinic. Your dietitian still needs to confirm.";
+export const DISCONNECT_REQUEST_NONE = "There is no pending disconnect request for this connection.";
+/** Optional leave note: keep short for dietitian notifications. */
+export const DISCONNECT_NOTE_MAX_WORDS = 50;
+export const DISCONNECT_NOTE_TOO_LONG = `Keep your note to ${DISCONNECT_NOTE_MAX_WORDS} words or fewer.`;

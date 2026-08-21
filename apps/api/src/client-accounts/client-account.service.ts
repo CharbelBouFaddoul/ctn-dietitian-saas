@@ -20,8 +20,13 @@ import { TimelineService } from "../timeline/timeline.service";
 import { ClientAccessService } from "../clients/client-access.service";
 import { NotificationService } from "../notifications/notification.service";
 import {
+  CLIENT_ACCESS_DENIED,
   CLIENT_ACCOUNT_EXISTS,
   CLIENT_LIMIT_REACHED,
+  DISCONNECT_NOTE_MAX_WORDS,
+  DISCONNECT_NOTE_TOO_LONG,
+  DISCONNECT_REQUEST_NONE,
+  DISCONNECT_REQUEST_PENDING,
   JOIN_ALREADY_CONNECTED,
   JOIN_CODE_EXPIRED,
   JOIN_CODE_INVALID,
@@ -146,9 +151,16 @@ export class ClientAccountService {
     }
     await this.prisma.clientAccount.update({
       where: { id: account.id },
-      data: { status: "DEACTIVATED", deactivatedAt: new Date() },
+      data: {
+        status: "DEACTIVATED",
+        deactivatedAt: new Date(),
+        disconnectRequestedAt: null,
+        disconnectRequestNote: null,
+      },
     });
-    await this.sessions.revokeAllForUser(account.userId);
+    // Soft revoke: keep the patient signed in so they can reconnect via a new join code.
+    // Clear/switch activeClientId only for sessions that pointed at this client.
+    await this.sessions.reassignActiveClientAfterDeactivate(account.userId, clientId);
     await this.timeline.record({
       dietitianAccountId: tenant.dietitianAccountId,
       clientId,
@@ -206,19 +218,37 @@ export class ClientAccountService {
   }
 
   /**
-   * Preview-only: validates a practice join code and returns safe identity for confirm UI.
+   * Preview-only: validates a practice or per-client join code and returns safe identity for confirm UI.
    * Does not create Client/ClientAccount. Browser must still send the code to POST /join.
    */
   async resolveJoinCode(userId: string, input: { code: string }) {
     await this.assertCanUsePortalOnboarding(userId);
     const { invitation, dietitianAccountId } = await this.requireUsableJoinInvitation(input.code);
+    const identity = await this.safePracticeIdentity(dietitianAccountId);
 
     if (invitation.clientId) {
-      // Per-client codes skip resolve-confirm preview; patient joins directly.
-      throw new BadRequestException(JOIN_CODE_INVALID);
+      if (invitation.usedAt) {
+        throw new BadRequestException(JOIN_CODE_USED);
+      }
+      const existing = await this.prisma.clientAccount.findFirst({
+        where: { userId, clientId: invitation.clientId },
+      });
+      if (existing?.status === "ACTIVE") {
+        return {
+          status: "already_connected" as const,
+          practiceName: identity.practiceName,
+          dietitianDisplayName: identity.dietitianDisplayName,
+          clientId: existing.clientId,
+        };
+      }
+      return {
+        status: "ok" as const,
+        practiceName: identity.practiceName,
+        dietitianDisplayName: identity.dietitianDisplayName,
+        clientId: invitation.clientId,
+      };
     }
 
-    const identity = await this.safePracticeIdentity(dietitianAccountId);
     const existing = await this.prisma.clientAccount.findFirst({
       where: { userId, dietitianAccountId, status: "ACTIVE" },
     });
@@ -287,12 +317,22 @@ export class ClientAccountService {
       requireSelection: false,
     });
     const accountId = requireDietitianAccountId(client);
-    const [account, profile] = await Promise.all([
+    const [account, profile, portalAccount] = await Promise.all([
       this.prisma.dietitianAccount.findUnique({
         where: { id: accountId },
+        include: { settings: true, user: true },
       }),
       this.prisma.clientProfile.findUnique({ where: { clientId: client.id } }),
+      this.prisma.clientAccount.findFirst({
+        where: { userId, clientId: client.id, status: "ACTIVE" },
+      }),
     ]);
+    const dietitianDisplayName =
+      account
+        ? [account.user.firstName, account.user.lastName].filter(Boolean).join(" ").trim() ||
+          account.professionalTitle?.trim() ||
+          account.displayName
+        : null;
     return {
       client: {
         id: client.id,
@@ -313,9 +353,131 @@ export class ClientAccountService {
             lifestyle: profile.lifestyle,
           }
         : null,
-      practiceName: account?.displayName ?? null,
+      practiceName: await this.practiceNameForAccount(accountId, account),
+      dietitianDisplayName,
       activeClientId: client.id,
+      disconnectRequestedAt: portalAccount?.disconnectRequestedAt?.toISOString() ?? null,
+      disconnectRequestNote: portalAccount?.disconnectRequestNote ?? null,
     };
+  }
+
+  /**
+   * Patient asks to leave the active (or specified) practice. Does not deactivate —
+   * dietitian must approve via deactivate.
+   */
+  async requestDisconnect(
+    userId: string,
+    activeClientId: string | null | undefined,
+    input: { clientId?: string; note?: string } = {},
+  ) {
+    await this.assertCanUsePortalOnboarding(userId);
+    const client = await this.access.assertPortalAccess(userId, {
+      clientId: input.clientId,
+      activeClientId,
+      requireSelection: true,
+    });
+    const account = await this.prisma.clientAccount.findFirst({
+      where: { userId, clientId: client.id, status: "ACTIVE" },
+    });
+    if (!account) {
+      throw new ForbiddenException(CLIENT_ACCESS_DENIED);
+    }
+    if (account.disconnectRequestedAt) {
+      throw new ConflictException(DISCONNECT_REQUEST_PENDING);
+    }
+
+    const note = this.normalizeDisconnectNote(input.note);
+    const updated = await this.prisma.clientAccount.update({
+      where: { id: account.id },
+      data: {
+        disconnectRequestedAt: new Date(),
+        disconnectRequestNote: note,
+      },
+    });
+
+    await this.security.record({
+      type: "disconnect_requested",
+      outcome: "success",
+      userId,
+      dietitianAccountId: account.dietitianAccountId,
+      targetType: "client_account",
+      targetId: account.id,
+      metadata: { clientId: client.id, hasNote: Boolean(note) },
+    });
+
+    await this.notifyDietitianDisconnectRequested(
+      account.dietitianAccountId,
+      client.id,
+      note,
+    );
+
+    return {
+      status: "requested" as const,
+      clientId: client.id,
+      disconnectRequestedAt: updated.disconnectRequestedAt!.toISOString(),
+      disconnectRequestNote: updated.disconnectRequestNote,
+    };
+  }
+
+  /** Patient cancels a pending leave request (still connected). */
+  async cancelDisconnectRequest(
+    userId: string,
+    activeClientId: string | null | undefined,
+    clientId?: string,
+  ) {
+    await this.assertCanUsePortalOnboarding(userId);
+    const client = await this.access.assertPortalAccess(userId, {
+      clientId,
+      activeClientId,
+      requireSelection: true,
+    });
+    const account = await this.prisma.clientAccount.findFirst({
+      where: { userId, clientId: client.id, status: "ACTIVE" },
+    });
+    if (!account?.disconnectRequestedAt) {
+      throw new NotFoundException(DISCONNECT_REQUEST_NONE);
+    }
+
+    await this.prisma.clientAccount.update({
+      where: { id: account.id },
+      data: { disconnectRequestedAt: null, disconnectRequestNote: null },
+    });
+    await this.security.record({
+      type: "disconnect_request_cancelled",
+      outcome: "success",
+      userId,
+      dietitianAccountId: account.dietitianAccountId,
+      targetType: "client_account",
+      targetId: account.id,
+      metadata: { clientId: client.id },
+    });
+    return { status: "cancelled" as const, clientId: client.id };
+  }
+
+  /** Dietitian declines a leave request without deactivating the portal. */
+  async dismissDisconnectRequest(tenant: DietitianTenantContext, clientId: string) {
+    await this.access.assertCanAccess(tenant, clientId, "invite");
+    const account = await this.prisma.clientAccount.findUnique({ where: { clientId } });
+    if (!account) {
+      throw new NotFoundException("Portal account not found");
+    }
+    if (!account.disconnectRequestedAt) {
+      throw new NotFoundException(DISCONNECT_REQUEST_NONE);
+    }
+    await this.prisma.clientAccount.update({
+      where: { id: account.id },
+      data: { disconnectRequestedAt: null, disconnectRequestNote: null },
+    });
+    await this.security.record({
+      type: "disconnect_request_dismissed",
+      outcome: "success",
+      userId: tenant.userId,
+      dietitianAccountId: tenant.dietitianAccountId,
+      targetType: "client_account",
+      targetId: account.id,
+      metadata: { clientId },
+    });
+    return this.connectionFor(clientId);
   }
 
   async updatePortalMe(
@@ -395,28 +557,51 @@ export class ClientAccountService {
       where: { userId, status: "ACTIVE" },
       include: {
         client: true,
-        dietitianAccount: { select: { id: true, displayName: true } },
+        dietitianAccount: {
+          select: {
+            id: true,
+            displayName: true,
+            professionalTitle: true,
+            settings: { select: { practiceName: true } },
+            user: { select: { firstName: true, lastName: true } },
+          },
+        },
       },
       orderBy: { activatedAt: "asc" },
     });
 
     return accounts
       .filter((row) => row.client.status === "ACTIVE")
-      .map((row) => ({
-        clientId: row.clientId,
-        practiceName:
-          row.dietitianAccount?.displayName ??
-          row.client.displayName ??
-          "Practice",
-        dietitianAccountId: row.dietitianAccountId,
-        client: {
-          id: row.client.id,
-          firstName: row.client.firstName,
-          lastName: row.client.lastName,
-          displayName: row.client.displayName,
-        },
-        activatedAt: row.activatedAt?.toISOString() ?? null,
-      }));
+      .map((row) => {
+        const practiceName =
+          row.dietitianAccount?.settings?.practiceName?.trim() ||
+          row.dietitianAccount?.displayName ||
+          "Practice";
+        const dietitianDisplayName =
+          [row.dietitianAccount?.user.firstName, row.dietitianAccount?.user.lastName]
+            .filter(Boolean)
+            .join(" ")
+            .trim() ||
+          row.dietitianAccount?.professionalTitle?.trim() ||
+          null;
+        return {
+          clientId: row.clientId,
+          practiceName,
+          dietitianDisplayName:
+            dietitianDisplayName && dietitianDisplayName !== practiceName
+              ? dietitianDisplayName
+              : null,
+          dietitianAccountId: row.dietitianAccountId,
+          client: {
+            id: row.client.id,
+            firstName: row.client.firstName,
+            lastName: row.client.lastName,
+            displayName: row.client.displayName,
+          },
+          activatedAt: row.activatedAt?.toISOString() ?? null,
+          disconnectRequestedAt: row.disconnectRequestedAt?.toISOString() ?? null,
+        };
+      });
   }
 
   async setActiveConnection(userId: string, sessionId: string, clientId: string) {
@@ -563,6 +748,8 @@ export class ClientAccountService {
               status: "ACTIVE",
               activatedAt: new Date(),
               deactivatedAt: null,
+              disconnectRequestedAt: null,
+              disconnectRequestNote: null,
               dietitianAccountId,
             },
           })
@@ -631,6 +818,8 @@ export class ClientAccountService {
         status: "ACTIVE",
         activatedAt: new Date(),
         deactivatedAt: null,
+        disconnectRequestedAt: null,
+        disconnectRequestNote: null,
         dietitianAccountId,
       },
     });
@@ -654,6 +843,16 @@ export class ClientAccountService {
     await this.notifyDietitianClientJoined(
       dietitianAccountId, clientId);
     return this.connectedResult(dietitianAccountId, clientId);
+  }
+
+  private normalizeDisconnectNote(raw?: string): string | null {
+    const trimmed = raw?.trim() ?? "";
+    if (!trimmed) return null;
+    const words = trimmed.split(/\s+/).filter(Boolean);
+    if (words.length > DISCONNECT_NOTE_MAX_WORDS) {
+      throw new BadRequestException(DISCONNECT_NOTE_TOO_LONG);
+    }
+    return words.join(" ").slice(0, 500);
   }
 
   private async notifyDietitianClientJoined(
@@ -682,6 +881,40 @@ export class ClientAccountService {
       body: `${name} connected to your practice.`,
       targetType: "client",
       targetId: clientId,
+    });
+  }
+
+  private async notifyDietitianDisconnectRequested(
+    dietitianAccountId: string,
+    clientId: string,
+    note: string | null,
+  ) {
+    const account = await this.prisma.dietitianAccount.findUnique({
+      where: { id: dietitianAccountId },
+      select: { userId: true },
+    });
+    if (!account) return;
+    const client = await this.prisma.client.findUnique({
+      where: { id: clientId },
+      select: { displayName: true, firstName: true, lastName: true },
+    });
+    const name =
+      client?.displayName?.trim() ||
+      `${client?.firstName ?? ""} ${client?.lastName ?? ""}`.trim() ||
+      "A patient";
+    const body = note
+      ? `${name} asked to leave your practice: “${note}”. Deactivate their portal to approve.`
+      : `${name} asked to leave your practice. Deactivate their portal to approve.`;
+    await this.notifications.create({
+      dietitianAccountId,
+      userId: account.userId,
+      clientId,
+      type: "DISCONNECT_REQUESTED",
+      title: "Disconnect requested",
+      body,
+      targetType: "client",
+      targetId: clientId,
+      metadata: note ? { note } : undefined,
     });
   }
 
@@ -776,6 +1009,8 @@ export class ClientAccountService {
       email: account?.user.email ?? null,
       activatedAt: account?.activatedAt?.toISOString() ?? null,
       deactivatedAt: account?.deactivatedAt?.toISOString() ?? null,
+      disconnectRequestedAt: account?.disconnectRequestedAt?.toISOString() ?? null,
+      disconnectRequestNote: account?.disconnectRequestNote ?? null,
       portalStatus: account?.status ?? null,
       connectionStatus,
       joinCode: openInvite

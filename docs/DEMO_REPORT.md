@@ -288,6 +288,19 @@ Related docs: [TESTING.md](./TESTING.md), [QA.md](./QA.md), [DEMO.md](./DEMO.md)
 
 ---
 
+## 13b. Revoke / rejoin portal behavior
+
+- Deactivating a `ClientAccount` does **not** revoke patient sessions.
+- Sessions that pointed at the deactivated client switch `activeClientId` to another ACTIVE connection when one exists; otherwise `activeClientId` is cleared and onboarding returns `needs_join`.
+- Routing: authenticated + ACTIVE → `/client`; authenticated + no ACTIVE → `/client/join`; unauthenticated → login. `/client/join` stays reachable without a portal↔join redirect loop.
+- Resolve supports practice **and** per-client codes (`ok` / `already_connected`). Rejoin reactivates the same row for the same practice; data stays intact and cross-practice isolation is preserved.
+
+E2E: `apps/api/test/revoke-rejoin.e2e.spec.ts`.
+
+**Patient leave request:** portal `POST /api/v1/portal/connections/disconnect-request` sets `ClientAccount.disconnectRequestedAt` and notifies the dietitian (`DISCONNECT_REQUESTED`). Access stays until the practice deactivates (or dismisses / patient cancels). E2E: `apps/api/test/disconnect-request.e2e.spec.ts`.
+
+---
+
 ## 14. AI note
 
 - Automated tests use **MockAiProvider** (`AI_PROVIDER=mock`).

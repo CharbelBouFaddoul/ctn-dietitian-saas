@@ -103,6 +103,33 @@ export class SessionService {
     });
   }
 
+  /**
+   * After a ClientAccount is deactivated: keep sessions alive, but move
+   * `activeClientId` off the deactivated client onto another ACTIVE connection
+   * when one exists (otherwise null → patient stays logged in on /client/join).
+   */
+  async reassignActiveClientAfterDeactivate(
+    userId: string,
+    deactivatedClientId: string,
+  ): Promise<void> {
+    const remaining = await this.prisma.clientAccount.findFirst({
+      where: {
+        userId,
+        status: "ACTIVE",
+        clientId: { not: deactivatedClientId },
+      },
+      include: { client: true },
+      orderBy: { activatedAt: "asc" },
+    });
+    const nextClientId =
+      remaining && remaining.client.status === "ACTIVE" ? remaining.clientId : null;
+
+    await this.prisma.session.updateMany({
+      where: { userId, revokedAt: null, activeClientId: deactivatedClientId },
+      data: { activeClientId: nextClientId },
+    });
+  }
+
   async revoke(sessionId: string): Promise<void> {
     await this.prisma.session.updateMany({
       where: { id: sessionId, revokedAt: null },

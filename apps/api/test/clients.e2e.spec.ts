@@ -374,17 +374,28 @@ describe("Phase 5 practice clients", () => {
       .set("Cookie", owner.cookie)
       .expect(201);
 
-    await connectClientPortal(ctx, owner.cookie, org.id, { id: client.body.id, email: client.body.email });
+    const portalCookie = await connectClientPortal(ctx, owner.cookie, org.id, {
+      id: client.body.id,
+      email: client.body.email,
+    });
+    const linked = await ctx.prisma.clientAccount.findUniqueOrThrow({ where: { clientId: client.body.id } });
+
     await request(ctx.app.getHttpServer())
       .post(`/api/v1/dietitian/${org.id}/clients/${client.body.id}/account/deactivate`)
       .set("Cookie", owner.cookie)
       .expect(201);
-    const deactivatedLogin = await request(ctx.app.getHttpServer())
-      .post("/api/v1/auth/login")
-      .send({ email: client.body.email, password: PASSWORD })
+
+    // Soft revoke: session remains; portal me is denied until rejoin.
+    await request(ctx.app.getHttpServer()).get("/api/v1/auth/me").set("Cookie", portalCookie).expect(200);
+    await request(ctx.app.getHttpServer()).get("/api/v1/portal/me").set("Cookie", portalCookie).expect(403);
+    const onboarding = await request(ctx.app.getHttpServer())
+      .get("/api/v1/portal/onboarding")
+      .set("Cookie", portalCookie)
       .expect(200);
-    const deactivatedCookie = `ns_session=${cookieValue(deactivatedLogin.headers["set-cookie"])}`;
-    await request(ctx.app.getHttpServer()).get("/api/v1/portal/me").set("Cookie", deactivatedCookie).expect(403);
+    expect(onboarding.body.status).toBe("needs_join");
+    expect(
+      await ctx.prisma.session.count({ where: { userId: linked.userId, revokedAt: null } }),
+    ).toBeGreaterThan(0);
   });
 
   it("preserves assessment template version and authorizes appointments and timeline", async () => {

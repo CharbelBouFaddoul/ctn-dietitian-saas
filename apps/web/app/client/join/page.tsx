@@ -49,8 +49,18 @@ export default function ClientJoinPage() {
           router.replace(loginPathFor("client"));
           return;
         }
-        const home = await resolveSessionHome();
-        router.replace(home.kind === "unauthenticated" ? loginPathFor("client") : home.path);
+        // Stay on join when authenticated but onboarding is unavailable for other reasons;
+        // only bounce dietitians / admins away via session-home.
+        const home = await resolveSessionHome("client");
+        if (home.kind === "unauthenticated") {
+          router.replace(loginPathFor("client"));
+          return;
+        }
+        if (home.path === "/client/join") {
+          setReady(true);
+          return;
+        }
+        router.replace(home.path);
       }
     })();
     return () => {
@@ -115,6 +125,8 @@ export default function ClientJoinPage() {
     return <LoadingState>Checking your account…</LoadingState>;
   }
 
+  const reconnectCopy = !hasConnections;
+
   return (
     <main className="ui-client-join" data-theme="client">
       <section className="ui-client-join__card">
@@ -131,9 +143,11 @@ export default function ClientJoinPage() {
             </Button>
           </div>
         </div>
-        <h1>Join a dietitian</h1>
+        <h1>{reconnectCopy ? "Reconnect to your dietitian" : "Join a dietitian"}</h1>
         <p className="ui-muted">
-          Enter the clinic code they shared. You’ll confirm the clinic before connecting.
+          {reconnectCopy
+            ? "Your portal access was revoked or you have no active practice. Enter a new code from your dietitian to reconnect. Your history with each practice is kept."
+            : "Enter the clinic code they shared. You’ll confirm the clinic before connecting."}
         </p>
 
         {step === "enter" ? (

@@ -1267,6 +1267,18 @@ export async function seedDemoWorld(
       },
     ],
   });
+  const emmaLast = await prisma.message.findFirstOrThrow({
+    where: { conversationId: emmaConvo.id },
+    orderBy: { createdAt: "desc" },
+  });
+  await prisma.conversation.update({
+    where: { id: emmaConvo.id },
+    data: {
+      lastMessageId: emmaLast.id,
+      lastMessageAt: emmaLast.createdAt,
+      lastMessagePreview: emmaLast.body.slice(0, 120),
+    },
+  });
   await prisma.conversationReadState.create({
     data: {
       conversationId: emmaConvo.id,
@@ -1279,7 +1291,7 @@ export async function seedDemoWorld(
   const noahConvo = await prisma.conversation.create({
     data: { dietitianAccountId: bobId, clientId: noah.client.id, status: "ACTIVE" },
   });
-  await prisma.message.create({
+  const noahMessage = await prisma.message.create({
     data: {
       conversationId: noahConvo.id,
       dietitianAccountId: bobId,
@@ -1287,6 +1299,14 @@ export async function seedDemoWorld(
       senderUserId: noah.user.id,
       body: "Bob — grocery list for the oat blend?",
       createdAt: daysAgo(0),
+    },
+  });
+  await prisma.conversation.update({
+    where: { id: noahConvo.id },
+    data: {
+      lastMessageId: noahMessage.id,
+      lastMessageAt: noahMessage.createdAt,
+      lastMessagePreview: noahMessage.body.slice(0, 120),
     },
   });
 

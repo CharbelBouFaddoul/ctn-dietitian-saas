@@ -172,7 +172,7 @@ Session + `TenantGuard`. Client-scoped routes also run `ClientAccessGuard` / `Cl
 | POST | `/clients/:clientId/archive` | OWNER/DIETITIAN assigned | Archive; close assignments; deactivate portal; revoke sessions |
 | POST | `/clients/:clientId/restore` | OWNER/DIETITIAN assigned | Restore to ACTIVE/INACTIVE without duplicating identity |
 | GET/POST | `/clients/:clientId/assignments` | Read / assign | History retained; reassignment closes the previous row |
-| GET/POST | `/clients/:clientId/account` `.../invite` `.../deactivate` | Read / invite | Portal link only; passwords never returned |
+| GET/POST | `/clients/:clientId/account` `.../invite` `.../deactivate` `.../disconnect-request/dismiss` | Read / invite | Portal link only; passwords never returned. Dismiss clears a patient leave request without deactivating |
 | GET/PATCH | `/clients/:clientId/profile` | Read / update | Extended practice profile |
 | GET/POST | `/clients/:clientId/goals` | Read / manageRecords | Lightweight care-plan goals |
 | POST | `/clients/:clientId/goals/:goalId/complete` or `/cancel` | manageRecords | Goal lifecycle |
@@ -266,10 +266,12 @@ Published versions reject content mutations (`400` “Published versions cannot 
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | GET | `/api/v1/portal/me` | Session + active client account | Portal identity |
-| POST | `/api/v1/portal/join-code/resolve` | Patient session | Preview practice join code: `{ status: "ok" \| "already_connected", practiceName, dietitianDisplayName, clientId? }`. Invalid/expired/non-practice codes reject like join |
+| POST | `/api/v1/portal/join-code/resolve` | Patient session | Preview practice **or per-client** join code: `{ status: "ok" \| "already_connected", practiceName, dietitianDisplayName, clientId? }`. Invalid/expired/used codes reject like join |
 | POST | `/api/v1/portal/join` | Patient session | Confirm join with the same code. Creates `Client` + `ClientAccount` when new; `{ status: "joined" \| "already_connected", … }`. Does not consume reusable practice invites |
 | GET | `/api/v1/portal/connections` | Patient session | List linked practices / client accounts |
 | POST | `/api/v1/portal/connections/active` | Patient session | Set `Session.activeClientId` for portal scoping |
+| POST | `/api/v1/portal/connections/disconnect-request` | Patient session | Request leave for active (or specified) connection. Sets `disconnectRequestedAt`; does **not** deactivate. Optional `{ note?, clientId? }` |
+| DELETE | `/api/v1/portal/connections/disconnect-request` | Patient session | Cancel a pending leave request |
 | GET | `/api/v1/portal/meal-plan` | Session + active client account | Current published plan snapshot only (composition + meal/day nutrition). Drafts and superseded versions are not returned. `{ plan: null }` when none exists |
 
 Portal cookies cannot call dietitian meal-plan routes.

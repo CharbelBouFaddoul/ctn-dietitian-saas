@@ -44,6 +44,7 @@ export function notificationTypeLabel(type: string): string {
     APPOINTMENT_CANCELLATION_ACCEPTED: "Appointment",
     APPOINTMENT_CANCELLATION_REJECTED: "Appointment",
     CLIENT_JOINED: "Client",
+    DISCONNECT_REQUESTED: "Client",
     SUBSCRIPTION_GRACE: "Subscription",
     SUBSCRIPTION_READ_ONLY: "Subscription",
     SUBSCRIPTION_LOCKED: "Subscription",

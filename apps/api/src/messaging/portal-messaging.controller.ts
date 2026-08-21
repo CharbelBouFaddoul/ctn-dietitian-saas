@@ -30,12 +30,9 @@ export class PortalMessagingController {
     const client = await this.access.assertPortalAccess(user.id, { activeClientId: session.activeClientId });
     const conversation = await this.conversations.getOrCreate(client);
     const unread = await this.conversations.unreadCount(conversation.id, user.id);
+    const summary = await this.conversations.summarizeForViewer(conversation, user.id);
     return {
-      id: conversation.id,
-      clientId: client.id,
-      status: conversation.status,
-      lastMessageAt: conversation.lastMessageAt?.toISOString() ?? null,
-      lastMessagePreview: conversation.lastMessagePreview,
+      ...summary,
       unreadCount: unread,
     };
   }

@@ -56,4 +56,14 @@ export class ClientAccountController {
   deactivate(@CurrentTenant() tenant: DietitianTenantContext, @Param("clientId", ParseUUIDPipe) clientId: string) {
     return this.accounts.deactivate(tenant, clientId);
   }
+
+  @Post("disconnect-request/dismiss")
+  @HttpCode(HttpStatus.OK)
+  @ClientActionRequired("invite")
+  dismissDisconnectRequest(
+    @CurrentTenant() tenant: DietitianTenantContext,
+    @Param("clientId", ParseUUIDPipe) clientId: string,
+  ) {
+    return this.accounts.dismissDisconnectRequest(tenant, clientId);
+  }
 }

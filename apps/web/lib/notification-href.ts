@@ -76,6 +76,9 @@ export function hrefForNotification(
         return clientId ? `${base}/messages?clientId=${clientId}` : `${base}/messages`;
       }
       if (item.type === "CLIENT_JOINED" && clientId) return `${base}/clients/${clientId}`;
+      if (item.type === "DISCONNECT_REQUESTED" && clientId) {
+        return `${base}/clients/${clientId}?tab=portal`;
+      }
       if (item.type === "TASK_ASSIGNED") return `${base}/tasks`;
       if (item.type.startsWith("APPOINTMENT_")) return `${base}/calendar`;
       if (item.type.startsWith("SUBSCRIPTION_")) return base;

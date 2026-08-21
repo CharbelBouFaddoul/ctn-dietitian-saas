@@ -2464,6 +2464,15 @@
   box-shadow: none;
 }
 
+.ui-portal-sidebar-foot {
+  display: grid;
+  gap: 0.65rem;
+}
+
+[data-theme="client"] .ui-app__sidebar.is-collapsed .ui-portal-sidebar-foot .ui-btn {
+  display: none;
+}
+
 [data-theme="client"] .ui-empty {
   text-align: left;
   padding: 0.85rem 0 0.25rem;

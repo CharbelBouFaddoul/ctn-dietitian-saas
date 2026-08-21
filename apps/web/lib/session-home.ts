@@ -78,15 +78,23 @@ export async function resolveSessionHome(audience?: SessionAudience): Promise<Se
   }
 
   let hasPortal = false;
+  let needsJoin = false;
   if (dietitianAccountIds.length === 0 && !me.user.platformRole) {
     try {
       const onboarding = await api<PortalOnboarding>("/api/v1/portal/onboarding");
       hasPortal = onboarding.status === "connected";
+      needsJoin = onboarding.status === "needs_join";
     } catch (err) {
       if (!(err instanceof ApiError && (err.status === 401 || err.status === 403 || err.status === 0))) {
         throw err;
       }
     }
+  }
+
+  // Authenticated patient with no ACTIVE ClientAccount → /client/join (not logout, not /practice).
+  // Dietitians hit JOIN_NOT_ALLOWED on onboarding (403) so needsJoin stays false.
+  if (needsJoin) {
+    return { kind: "client", path: "/client/join" };
   }
 
   return pickSessionHome({

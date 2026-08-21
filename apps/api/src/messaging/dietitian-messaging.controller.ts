@@ -47,6 +47,7 @@ export class DietitianMessagingController {
     const rows = await this.conversations.listInbox(
       tenant.dietitianAccountId,
       clients.map((row) => row.id),
+      tenant.userId,
     );
     const unread = await this.conversations.unreadCountsForReader(
       tenant.userId,
@@ -63,12 +64,9 @@ export class DietitianMessagingController {
     const client = await this.access.assertCanAccess(tenant, clientId, "read");
     const conversation = await this.conversations.getOrCreate(client);
     const unread = await this.conversations.unreadCount(conversation.id, tenant.userId);
+    const summary = await this.conversations.summarizeForViewer(conversation, tenant.userId);
     return {
-      id: conversation.id,
-      clientId: client.id,
-      status: conversation.status,
-      lastMessageAt: conversation.lastMessageAt?.toISOString() ?? null,
-      lastMessagePreview: conversation.lastMessagePreview,
+      ...summary,
       unreadCount: unread,
     };
   }

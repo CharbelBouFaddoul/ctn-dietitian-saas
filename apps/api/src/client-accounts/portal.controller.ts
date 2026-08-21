@@ -1,14 +1,14 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Patch, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Patch, Post, UseGuards } from "@nestjs/common";
 import { Throttle, ThrottlerGuard } from "@nestjs/throttler";
 import { THROTTLE_NAMES } from "@nutrition-saas/config";
-import { ApiCookieAuth, ApiTags } from "@nestjs/swagger";
+import { ApiCookieAuth, ApiProperty, ApiTags } from "@nestjs/swagger";
 import { IsUUID } from "class-validator";
-import { ApiProperty } from "@nestjs/swagger";
 import { CurrentSession, CurrentUser } from "../auth/decorators/current-user.decorator";
 import { SessionGuard } from "../auth/guards/session.guard";
 import type { AuthenticatedRequestUser, AuthenticatedSession } from "../auth/auth.types";
 import { ClientAccountService } from "../client-accounts/client-account.service";
 import { JoinCodeDto } from "./dto/join-code.dto";
+import { DisconnectRequestDto } from "./dto/disconnect-request.dto";
 import { UpdatePortalMeDto } from "./dto/update-portal-me.dto";
 
 class SetActiveConnectionDto {
@@ -59,6 +59,28 @@ export class PortalController {
     @Body() body: SetActiveConnectionDto,
   ) {
     return this.accounts.setActiveConnection(user.id, session.id, body.clientId);
+  }
+
+  @Post("connections/disconnect-request")
+  @HttpCode(HttpStatus.CREATED)
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ [THROTTLE_NAMES.AUTH]: {} })
+  requestDisconnect(
+    @CurrentUser() user: AuthenticatedRequestUser,
+    @CurrentSession() session: AuthenticatedSession,
+    @Body() body: DisconnectRequestDto,
+  ) {
+    return this.accounts.requestDisconnect(user.id, session.activeClientId, body);
+  }
+
+  @Delete("connections/disconnect-request")
+  @HttpCode(HttpStatus.OK)
+  cancelDisconnectRequest(
+    @CurrentUser() user: AuthenticatedRequestUser,
+    @CurrentSession() session: AuthenticatedSession,
+    @Body() body: DisconnectRequestDto,
+  ) {
+    return this.accounts.cancelDisconnectRequest(user.id, session.activeClientId, body.clientId);
   }
 
   @Post("join-code/resolve")

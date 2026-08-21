@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
+import { FormEvent, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -39,6 +39,15 @@ interface PortalMe {
     lifestyle: string | null;
   } | null;
   practiceName?: string | null;
+  dietitianDisplayName?: string | null;
+  disconnectRequestedAt?: string | null;
+  disconnectRequestNote?: string | null;
+}
+
+interface PortalConnection {
+  clientId: string;
+  practiceName: string;
+  dietitianDisplayName?: string | null;
 }
 
 type PersonalForm = {
@@ -101,22 +110,34 @@ function ClientProfilePageInner() {
   const tab: ProfileTab = isProfileTab(tabParam) ? tabParam : "personal";
 
   const [data, setData] = useState<PortalMe | null>(null);
+  const [connections, setConnections] = useState<PortalConnection[]>([]);
   const [form, setForm] = useState<PersonalForm | null>(null);
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [switching, setSwitching] = useState(false);
+  const [disconnectNote, setDisconnectNote] = useState("");
+  const [disconnectBusy, setDisconnectBusy] = useState(false);
+  const [confirmLeave, setConfirmLeave] = useState(false);
+
+  const loadProfile = useCallback(async () => {
+    const [me, links] = await Promise.all([
+      api<PortalMe>("/api/v1/portal/me"),
+      api<PortalConnection[]>("/api/v1/portal/connections").catch(() => [] as PortalConnection[]),
+    ]);
+    setData(me);
+    setForm(formFromData(me));
+    setConnections(links);
+    return me;
+  }, []);
 
   useEffect(() => {
-    void api<PortalMe>("/api/v1/portal/me")
-      .then((me) => {
-        setData(me);
-        setForm(formFromData(me));
-      })
+    void loadProfile()
       .catch((err) => setError(errorMessage(err, "Unable to load profile")))
       .finally(() => setLoading(false));
-  }, []);
+  }, [loadProfile]);
 
   useEffect(() => {
     setEditing(false);
@@ -191,6 +212,69 @@ function ClientProfilePageInner() {
       setError(errorMessage(err, "Unable to save profile"));
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function onSwitchClinic(clientId: string) {
+    if (!data || clientId === data.client.id || switching) return;
+    setSwitching(true);
+    setError(null);
+    setSaved(null);
+    try {
+      await api("/api/v1/portal/connections/active", {
+        method: "POST",
+        body: JSON.stringify({ clientId }),
+      });
+      await loadProfile();
+      window.dispatchEvent(new CustomEvent("portal-connection-changed"));
+      router.refresh();
+      setSaved("Active clinic updated.");
+    } catch (err) {
+      setError(errorMessage(err, "Unable to switch clinic"));
+    } finally {
+      setSwitching(false);
+    }
+  }
+
+  async function requestLeave() {
+    setDisconnectBusy(true);
+    setError(null);
+    setSaved(null);
+    try {
+      await api("/api/v1/portal/connections/disconnect-request", {
+        method: "POST",
+        body: JSON.stringify({
+          note: disconnectNote.trim() || undefined,
+        }),
+      });
+      const me = await api<PortalMe>("/api/v1/portal/me");
+      setData(me);
+      setConfirmLeave(false);
+      setDisconnectNote("");
+      setSaved("Request sent. Your dietitian still needs to confirm before you leave this clinic.");
+    } catch (err) {
+      setError(errorMessage(err, "Unable to send leave request"));
+    } finally {
+      setDisconnectBusy(false);
+    }
+  }
+
+  async function cancelLeaveRequest() {
+    setDisconnectBusy(true);
+    setError(null);
+    setSaved(null);
+    try {
+      await api("/api/v1/portal/connections/disconnect-request", {
+        method: "DELETE",
+        body: JSON.stringify({}),
+      });
+      const me = await api<PortalMe>("/api/v1/portal/me");
+      setData(me);
+      setSaved("Leave request cancelled. You remain connected.");
+    } catch (err) {
+      setError(errorMessage(err, "Unable to cancel leave request"));
+    } finally {
+      setDisconnectBusy(false);
     }
   }
 
@@ -351,18 +435,121 @@ function ClientProfilePageInner() {
 
       {!loading && data && tab === "account" ? (
         <div className="ui-client-stack">
-          <Section title="Your clinic" description="The dietitian clinic for this connection.">
+          <Section title="Your clinic" description="Care for this connection is private to this clinic.">
             <div className="ui-client-focus-row">
               <span>Clinic</span>
               <strong>{data.practiceName?.trim() || "Connected to your dietitian"}</strong>
             </div>
+            {data.dietitianDisplayName?.trim() ? (
+              <div className="ui-client-focus-row">
+                <span>Dietitian</span>
+                <strong>{data.dietitianDisplayName.trim()}</strong>
+              </div>
+            ) : null}
+
+            {connections.length > 1 ? (
+              <div style={{ marginTop: "0.85rem", maxWidth: "22rem" }}>
+                <Field label="Switch clinic" hint={switching ? "Updating…" : undefined}>
+                  <Select
+                    value={data.client.id}
+                    disabled={switching}
+                    aria-label="Switch active clinic"
+                    onChange={(event) => void onSwitchClinic(event.target.value)}
+                  >
+                    {connections.map((link) => (
+                      <option key={link.clientId} value={link.clientId}>
+                        {link.dietitianDisplayName
+                          ? `${link.practiceName} · ${link.dietitianDisplayName}`
+                          : link.practiceName}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+              </div>
+            ) : null}
+
             <p className="ui-muted" style={{ margin: "0.85rem 0 0", lineHeight: 1.55 }}>
-              To connect with another practice, use{" "}
+              Joining another clinic does not remove this one. To add another practice, use{" "}
               <Link href="/client/join" className="ui-link">
                 Join another clinic
               </Link>
               .
             </p>
+          </Section>
+
+          <Section
+            title="End this clinic connection"
+            description="Ask this clinic to disconnect you. Joining elsewhere will not end this link."
+          >
+            {data.disconnectRequestedAt ? (
+              <>
+                <Alert tone="neutral">
+                  Leave request sent
+                  {data.disconnectRequestedAt
+                    ? ` on ${new Date(data.disconnectRequestedAt).toLocaleString()}`
+                    : ""}
+                  . Your dietitian still needs to confirm. Portal access stays active until then.
+                  {data.disconnectRequestNote?.trim()
+                    ? ` Your note: “${data.disconnectRequestNote.trim()}”.`
+                    : null}
+                </Alert>
+                <div style={{ marginTop: 12 }}>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={disconnectBusy}
+                    onClick={() => void cancelLeaveRequest()}
+                  >
+                    {disconnectBusy ? "Cancelling…" : "Cancel request"}
+                  </Button>
+                </div>
+              </>
+            ) : confirmLeave ? (
+              <div className="ui-stack" style={{ gap: 12 }}>
+                <Alert tone="warning">
+                  This notifies your dietitian. You stay connected until they approve. Joining another
+                  clinic does not remove this one — your history with this practice stays with them.
+                </Alert>
+                <Field
+                  label="Optional note"
+                  hint={`${disconnectNote.trim() ? disconnectNote.trim().split(/\s+/).filter(Boolean).length : 0} / 50 words`}
+                >
+                  <Input
+                    value={disconnectNote}
+                    onChange={(event) => {
+                      const next = event.target.value;
+                      const words = next.trim() ? next.trim().split(/\s+/).filter(Boolean) : [];
+                      if (words.length <= 50) {
+                        setDisconnectNote(next);
+                        return;
+                      }
+                      setDisconnectNote(words.slice(0, 50).join(" "));
+                    }}
+                    placeholder="Reason (optional, up to 50 words)"
+                  />
+                </Field>
+                <div className="ui-row" style={{ gap: 8 }}>
+                  <Button size="sm" disabled={disconnectBusy} onClick={() => void requestLeave()}>
+                    {disconnectBusy ? "Sending…" : "Send request"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={disconnectBusy}
+                    onClick={() => {
+                      setConfirmLeave(false);
+                      setDisconnectNote("");
+                    }}
+                  >
+                    Never mind
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button size="sm" variant="secondary" onClick={() => setConfirmLeave(true)}>
+                Request to leave
+              </Button>
+            )}
           </Section>
 
           <Section title="Security" description="Password changes use the same account security flow as sign-in.">

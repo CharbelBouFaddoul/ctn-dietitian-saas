@@ -100,6 +100,7 @@ export class PracticeDashboardService {
     const inbox = await this.conversations.listInbox(
       tenant.dietitianAccountId,
       visibleClients.map((row) => row.id),
+      tenant.userId,
     );
     const unreadMap = await this.conversations.unreadCountsForReader(
       tenant.userId,

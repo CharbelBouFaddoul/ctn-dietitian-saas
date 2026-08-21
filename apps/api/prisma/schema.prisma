@@ -613,6 +613,7 @@ enum NotificationType {
   APPOINTMENT_CANCELLATION_ACCEPTED
   APPOINTMENT_CANCELLATION_REJECTED
   CLIENT_JOINED
+  DISCONNECT_REQUESTED
   SUBSCRIPTION_GRACE
   SUBSCRIPTION_READ_ONLY
   SUBSCRIPTION_LOCKED
@@ -740,14 +741,17 @@ model Client {
 }
 
 model ClientAccount {
-  id                 String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId             String              @map("user_id") @db.Uuid
-  clientId           String              @unique @map("client_id") @db.Uuid
-  dietitianAccountId String              @map("dietitian_account_id") @db.Uuid
-  status             ClientAccountStatus @default(PENDING)
-  createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamptz
-  activatedAt        DateTime?           @map("activated_at") @db.Timestamptz
-  deactivatedAt      DateTime?           @map("deactivated_at") @db.Timestamptz
+  id                     String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId                 String              @map("user_id") @db.Uuid
+  clientId               String              @unique @map("client_id") @db.Uuid
+  dietitianAccountId     String              @map("dietitian_account_id") @db.Uuid
+  status                 ClientAccountStatus @default(PENDING)
+  createdAt              DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  activatedAt            DateTime?           @map("activated_at") @db.Timestamptz
+  deactivatedAt          DateTime?           @map("deactivated_at") @db.Timestamptz
+  /// Patient requested leave; dietitian must still deactivate to approve.
+  disconnectRequestedAt  DateTime?           @map("disconnect_requested_at") @db.Timestamptz
+  disconnectRequestNote  String?             @map("disconnect_request_note") @db.VarChar(500)
 
   user             User             @relation(fields: [userId], references: [id], onDelete: Restrict)
   client           Client           @relation(fields: [clientId], references: [id], onDelete: Restrict)

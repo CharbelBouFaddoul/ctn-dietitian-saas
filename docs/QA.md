@@ -68,6 +68,24 @@ Automated coverage: `test/v1-acceptance/isolation.e2e.spec.ts`, `multi-dietitian
 2. Switch Active practice Harbor ↔ Cedar  
 3. Meal plan title and practice-scoped data change  
 
+### Revoke / rejoin (soft revoke)
+
+1. Dietitian deactivates a portal connection → patient **stays signed in** (no forced logout)  
+2. If another ACTIVE connection remains → portal stays on that practice (`activeClientId` switches)  
+3. If it was the last ACTIVE connection → `/client/join` with reconnect copy (`needs_join`); session still valid  
+4. New **per-client or practice** code → resolve preview works → join reactivates the **same** `ClientAccount` (same practice) or creates/activates the other practice connection  
+5. Historical data (meal plans, messages, documents, appointments, assessments, tracking, profile) remains under that connection’s authorization  
+6. Already ACTIVE for a practice → resolve/join returns `already_connected` (no duplicate `ClientAccount`)  
+
+### Patient leave request
+
+1. Portal **Profile → Account → Request to leave** (optional note)  
+2. Patient stays connected (`ACTIVE`); dietitian gets `DISCONNECT_REQUESTED` notification  
+3. Dietitian **Portal** tab: approve via **Deactivate**, or **Dismiss request** to keep them connected  
+4. Patient may cancel their own pending request  
+
+Automated coverage: `apps/api/test/revoke-rejoin.e2e.spec.ts`, `apps/api/test/disconnect-request.e2e.spec.ts`.
+
 ## Snapshot checks
 
 1. Open Emma published plan version  
