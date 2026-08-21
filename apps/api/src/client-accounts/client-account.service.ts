@@ -30,6 +30,7 @@ import {
   JOIN_PRACTICE_LOCKED,
 } from "../clients/client.messages";
 import { deriveConnectionStatus } from "../clients/portal-connection";
+import type { UpdatePortalMeDto } from "./dto/update-portal-me.dto";
 
 @Injectable()
 export class ClientAccountService {
@@ -315,6 +316,73 @@ export class ClientAccountService {
       practiceName: account?.displayName ?? null,
       activeClientId: client.id,
     };
+  }
+
+  async updatePortalMe(
+    userId: string,
+    activeClientId: string | null | undefined,
+    input: UpdatePortalMeDto,
+  ) {
+    const client = await this.access.assertPortalAccess(userId, {
+      activeClientId,
+      requireSelection: false,
+    });
+    const accountId = requireDietitianAccountId(client);
+
+    const firstName = input.firstName.trim();
+    const lastName = input.lastName.trim();
+    const displayName =
+      input.displayName === undefined
+        ? undefined
+        : input.displayName.trim() || `${firstName} ${lastName}`;
+    const email =
+      input.email === undefined ? undefined : input.email?.trim() ? input.email.trim() : null;
+    const phone =
+      input.phone === undefined ? undefined : input.phone?.trim() ? input.phone.trim() : null;
+    const dateOfBirth =
+      input.dateOfBirth === undefined
+        ? undefined
+        : input.dateOfBirth?.trim()
+          ? new Date(input.dateOfBirth)
+          : null;
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.client.update({
+        where: { id: client.id },
+        data: {
+          firstName,
+          lastName,
+          displayName,
+          email,
+          phone,
+          dateOfBirth,
+          sex: input.sex,
+        },
+      });
+      await tx.user.update({
+        where: { id: userId },
+        data: { firstName, lastName },
+      });
+    });
+
+    await this.timeline.record({
+      dietitianAccountId: accountId,
+      clientId: client.id,
+      type: "CLIENT_UPDATED",
+      actorUserId: userId,
+      targetType: "client",
+      targetId: client.id,
+    });
+    await this.security.record({
+      type: "client_updated",
+      outcome: "success",
+      userId,
+      dietitianAccountId: accountId,
+      targetType: "client",
+      targetId: client.id,
+    });
+
+    return this.portalMe(userId, client.id);
   }
 
   async listConnections(userId: string) {

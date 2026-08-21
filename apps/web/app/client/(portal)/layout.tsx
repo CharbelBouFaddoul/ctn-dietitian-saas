@@ -140,14 +140,13 @@ export default function ClientPortalLayout({ children }: { children: ReactNode }
       items: [
         { href: "/client/messages", label: "Messages", icon: PatientNavIcons.messages, badge: unreadMessages },
         { href: "/client/appointments", label: "Appointments", icon: PatientNavIcons.appointments },
-        { href: "/client/notifications", label: "Notifications", icon: PatientNavIcons.notifications },
       ],
     },
     {
       label: "Documents & billing",
       items: [
         { href: "/client/documents", label: "Documents", icon: PatientNavIcons.documents },
-        { href: "/client/invoices", label: "Invoices", icon: PatientNavIcons.invoices },
+        { href: "/client/invoices", label: "Billing", icon: PatientNavIcons.invoices },
       ],
     },
     {

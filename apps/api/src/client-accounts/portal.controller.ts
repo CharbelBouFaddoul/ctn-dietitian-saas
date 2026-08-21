@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, HttpCode, HttpStatus, Patch, Post, UseGuards } from "@nestjs/common";
 import { Throttle, ThrottlerGuard } from "@nestjs/throttler";
 import { THROTTLE_NAMES } from "@nutrition-saas/config";
 import { ApiCookieAuth, ApiTags } from "@nestjs/swagger";
@@ -9,6 +9,7 @@ import { SessionGuard } from "../auth/guards/session.guard";
 import type { AuthenticatedRequestUser, AuthenticatedSession } from "../auth/auth.types";
 import { ClientAccountService } from "../client-accounts/client-account.service";
 import { JoinCodeDto } from "./dto/join-code.dto";
+import { UpdatePortalMeDto } from "./dto/update-portal-me.dto";
 
 class SetActiveConnectionDto {
   @ApiProperty()
@@ -29,6 +30,15 @@ export class PortalController {
     @CurrentSession() session: AuthenticatedSession,
   ) {
     return this.accounts.portalMe(user.id, session.activeClientId);
+  }
+
+  @Patch("me")
+  updateMe(
+    @CurrentUser() user: AuthenticatedRequestUser,
+    @CurrentSession() session: AuthenticatedSession,
+    @Body() body: UpdatePortalMeDto,
+  ) {
+    return this.accounts.updatePortalMe(user.id, session.activeClientId, body);
   }
 
   @Get("onboarding")
