@@ -1,39 +1,135 @@
-import { FEATURE_KEYS } from "@nutrition-saas/config";
+import { FEATURE_KEYS, PLAN_FEATURE_DISPLAY_ORDER } from "@nutrition-saas/config";
 import type { PrismaClient } from "@prisma/client";
 
 export const SEEDED_PLAN_SLUGS = ["standard", "pro", "premium"] as const;
 
+const CORE_CAPABILITIES: Array<{ key: string; name: string; description: string }> = [
+  {
+    key: FEATURE_KEYS.DASHBOARD,
+    name: "Practice dashboard",
+    description: "Clinic overview with clients, tasks, appointments, and activity.",
+  },
+  {
+    key: FEATURE_KEYS.CLIENTS,
+    name: "Client roster & charts",
+    description: "Search, filter, and manage full client charts.",
+  },
+  {
+    key: FEATURE_KEYS.MESSAGING,
+    name: "Secure messaging",
+    description: "One conversation thread per client.",
+  },
+  {
+    key: FEATURE_KEYS.MEAL_PLANS,
+    name: "Meal plans",
+    description: "Draft and publish meal plans to the patient portal.",
+  },
+  {
+    key: FEATURE_KEYS.MEAL_LIBRARY,
+    name: "Meal library",
+    description: "Reusable meals and recipes for meal planning.",
+  },
+  {
+    key: FEATURE_KEYS.FOODS,
+    name: "Foods",
+    description: "Food catalog and custom foods for your practice.",
+  },
+  {
+    key: FEATURE_KEYS.HABITS,
+    name: "Habit library",
+    description: "Habits for assignment and portal tracking.",
+  },
+  {
+    key: FEATURE_KEYS.TRACKING,
+    name: "Tracking review",
+    description: "Review food, water, exercise, sleep, and habit logs.",
+  },
+  {
+    key: FEATURE_KEYS.APPOINTMENTS,
+    name: "Appointments & calendar",
+    description: "Schedule appointments and view the clinic calendar.",
+  },
+  {
+    key: FEATURE_KEYS.ASSESSMENTS,
+    name: "Assessments",
+    description: "Run nutrition assessments from templates on each chart.",
+  },
+  {
+    key: FEATURE_KEYS.DOCUMENTS,
+    name: "Documents",
+    description: "Upload and share documents on client charts.",
+  },
+  {
+    key: FEATURE_KEYS.INVOICES,
+    name: "Invoices",
+    description: "Create, issue, and mark invoices paid.",
+  },
+  {
+    key: FEATURE_KEYS.TASKS,
+    name: "Tasks",
+    description: "Practice follow-ups and due work.",
+  },
+  {
+    key: FEATURE_KEYS.ANALYTICS,
+    name: "Analytics",
+    description: "Practice overview and attention metrics.",
+  },
+];
+
 export async function seedEntitlementCatalog(prisma: PrismaClient): Promise<void> {
   const standard = await prisma.plan.upsert({
     where: { slug: "standard" },
-    update: {},
+    update: { durationDays: 30 },
     create: {
       name: "Standard",
       slug: "standard",
       description: "Standard practice plan. AI is disabled.",
       status: "ACTIVE",
+      durationDays: 30,
+      showPrice: true,
     },
   });
   const pro = await prisma.plan.upsert({
     where: { slug: "pro" },
-    update: {},
+    update: { durationDays: 30 },
     create: {
       name: "Pro",
       slug: "pro",
       description: "Pro practice plan. AI enabled with a monthly request quota.",
       status: "ACTIVE",
+      durationDays: 30,
+      showPrice: true,
     },
   });
   const premium = await prisma.plan.upsert({
     where: { slug: "premium" },
-    update: {},
+    update: { durationDays: 30 },
     create: {
       name: "Premium",
       slug: "premium",
       description: "Premium practice plan. AI enabled with a higher monthly request quota.",
       status: "ACTIVE",
+      durationDays: 30,
+      showPrice: true,
     },
   });
+
+  const capabilityFeatures = [];
+  for (const capability of CORE_CAPABILITIES) {
+    capabilityFeatures.push(
+      await prisma.feature.upsert({
+        where: { key: capability.key },
+        update: { name: capability.name, description: capability.description, status: "ACTIVE" },
+        create: {
+          key: capability.key,
+          name: capability.name,
+          description: capability.description,
+          valueType: "BOOLEAN",
+          status: "ACTIVE",
+        },
+      }),
+    );
+  }
 
   const ai = await prisma.feature.upsert({
     where: { key: FEATURE_KEYS.AI },
@@ -102,12 +198,21 @@ export async function seedEntitlementCatalog(prisma: PrismaClient): Promise<void
     },
   });
 
+  const planIds = [standard.id, pro.id, premium.id];
   const rows: Array<{
     planId: string;
     featureId: string;
     enabled: boolean;
     limitValue: number | null;
-  }> = [
+  }> = [];
+
+  for (const planId of planIds) {
+    for (const feature of capabilityFeatures) {
+      rows.push({ planId, featureId: feature.id, enabled: true, limitValue: null });
+    }
+  }
+
+  rows.push(
     { planId: standard.id, featureId: ai.id, enabled: false, limitValue: null },
     { planId: standard.id, featureId: aiLimit.id, enabled: false, limitValue: 0 },
     { planId: standard.id, featureId: clientLimit.id, enabled: true, limitValue: 25 },
@@ -126,7 +231,7 @@ export async function seedEntitlementCatalog(prisma: PrismaClient): Promise<void
     { planId: premium.id, featureId: automation.id, enabled: true, limitValue: null },
     { planId: premium.id, featureId: automationRuleLimit.id, enabled: true, limitValue: 100 },
     { planId: premium.id, featureId: automationExecutionLimit.id, enabled: true, limitValue: 10000 },
-  ];
+  );
 
   for (const row of rows) {
     await prisma.planFeature.upsert({
@@ -137,4 +242,15 @@ export async function seedEntitlementCatalog(prisma: PrismaClient): Promise<void
       create: row,
     });
   }
+}
+
+export function sortPlanFeaturesForDisplay<T extends { key: string }>(features: T[]): T[] {
+  return [...features].sort((a, b) => {
+    const ai = PLAN_FEATURE_DISPLAY_ORDER.indexOf(a.key);
+    const bi = PLAN_FEATURE_DISPLAY_ORDER.indexOf(b.key);
+    if (ai === -1 && bi === -1) return a.key.localeCompare(b.key);
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
+  });
 }

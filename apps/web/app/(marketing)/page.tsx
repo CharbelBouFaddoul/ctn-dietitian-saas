@@ -15,38 +15,43 @@ function ProductPreview() {
         </div>
         <div className="ui-mkt__preview-body">
           <aside className="ui-mkt__preview-side">
-            <span className="is-active">Clients</span>
-            <span>Meal plans</span>
-            <span>Calendar</span>
+            <span className="is-active">Dashboard</span>
+            <span>Clients</span>
             <span>Messages</span>
+            <span>Meal Plans</span>
+            <span>Meal library</span>
+            <span>Foods</span>
+            <span>Calendar</span>
             <span>Tasks</span>
+            <span>Invoices</span>
             <span>Analytics</span>
+            <span>Settings</span>
           </aside>
           <div className="ui-mkt__preview-main">
             <div className="ui-mkt__preview-line">
-              <span>Client chart</span>
-              <span className="ui-muted">Goals · measurements</span>
+              <span>Active clients</span>
+              <span className="ui-muted">42</span>
             </div>
             <div className="ui-mkt__preview-line">
-              <span>Published meal plan</span>
-              <span className="ui-muted">Draft → portal</span>
+              <span>Today’s appointments</span>
+              <span className="ui-muted">3 scheduled</span>
             </div>
             <div>
               <div className="ui-mkt__preview-line">
-                <span>Tracking review</span>
-                <span className="ui-muted">Food · water · habits</span>
+                <span>Tasks due</span>
+                <span className="ui-muted">2 overdue</span>
               </div>
               <div className="ui-mkt__preview-meter">
                 <span />
               </div>
             </div>
             <div className="ui-mkt__preview-line">
-              <span>Messages</span>
-              <span className="ui-muted">One thread per client</span>
+              <span>Recent messages</span>
+              <span className="ui-muted">4 unread</span>
             </div>
             <div className="ui-mkt__preview-line">
-              <span>Appointments</span>
-              <span className="ui-muted">Calendar + tasks</span>
+              <span>Invoices</span>
+              <span className="ui-muted">Open · paid</span>
             </div>
           </div>
         </div>
@@ -60,7 +65,7 @@ function ProductPreview() {
 }
 
 export default function HomePage() {
-  const [registrationEnabled, setRegistrationEnabled] = useState(false);
+  const [getStartedHref, setGetStartedHref] = useState("/plans");
   const dietitianHighlights = highlightedFeatures("dietitian").slice(0, 4);
   const patientHighlights = highlightedFeatures("patient").slice(0, 4);
 
@@ -68,8 +73,8 @@ export default function HomePage() {
     void fetch(`${API_URL}/api/v1/public/site-settings`)
       .then(async (res) => {
         if (!res.ok) return;
-        const data = (await res.json()) as { registrationEnabled?: boolean };
-        setRegistrationEnabled(data.registrationEnabled === true);
+        const data = (await res.json()) as { plansPageEnabled?: boolean };
+        setGetStartedHref(data.plansPageEnabled === false ? "/contact" : "/plans");
       })
       .catch(() => undefined);
   }, []);
@@ -87,17 +92,11 @@ export default function HomePage() {
                 workspace — while patients use a focused portal to follow their plan and stay connected.
               </p>
               <div className="ui-mkt__hero-ctas">
-                {registrationEnabled ? (
-                  <Link href={registrationEnabled ? "/auth/dietitian/register" : "/auth/dietitian/login"} className="ui-btn ui-btn--primary ui-btn--lg">
-                    Start your clinic
-                  </Link>
-                ) : (
-                  <Link href="/auth/dietitian/login" className="ui-btn ui-btn--primary ui-btn--lg">
-                    Sign in as Dietitian
-                  </Link>
-                )}
-                <Link href="/auth/client/login" className="ui-btn ui-btn--secondary ui-btn--lg">
-                  Sign in as Patient
+                <Link href={getStartedHref} className="ui-btn ui-btn--primary ui-btn--lg">
+                  Get Started
+                </Link>
+                <Link href="/auth/dietitian/login" className="ui-btn ui-btn--secondary ui-btn--lg">
+                  Sign in as Dietitian
                 </Link>
               </div>
             </div>
@@ -123,7 +122,7 @@ export default function HomePage() {
                 ))}
                 <li>Invoices, tasks, analytics, and optional AI &amp; automations</li>
               </ul>
-              <div style={{ marginTop: "0.75rem" }}>
+              <div className="ui-mkt__experience-cta">
                 <Link href="/features#dietitian" className="ui-link">
                   Explore the dietitian experience →
                 </Link>
@@ -137,7 +136,7 @@ export default function HomePage() {
                   <li key={feature.id}>{feature.title}</li>
                 ))}
               </ul>
-              <div style={{ marginTop: "0.75rem" }}>
+              <div className="ui-mkt__experience-cta">
                 <Link href="/auth/client/login" className="ui-link">
                   Patient sign in →
                 </Link>
@@ -157,8 +156,8 @@ export default function HomePage() {
           <div className="ui-mkt__steps">
             <article className="ui-mkt__step">
               <div className="ui-mkt__step-num">01</div>
-              <h3>Create your clinic</h3>
-              <p>Register as a dietitian, verify your email, and open your clinic workspace.</p>
+              <h3>Choose a plan</h3>
+              <p>Pick a plan that fits your clinic, contact us to get set up, then open your workspace.</p>
             </article>
             <article className="ui-mkt__step">
               <div className="ui-mkt__step-num">02</div>
@@ -207,7 +206,7 @@ export default function HomePage() {
           <h2>Ready to modernize your nutrition clinic?</h2>
           <p>Dietitians run the workspace. Patients use the portal. One connected platform for both.</p>
           <div className="ui-mkt__hero-ctas" style={{ justifyContent: "center" }}>
-            <Link href={registrationEnabled ? "/auth/dietitian/register" : "/auth/dietitian/login"} className="ui-btn ui-btn--primary ui-btn--lg">
+            <Link href={getStartedHref} className="ui-btn ui-btn--primary ui-btn--lg">
               Get Started
             </Link>
             <Link href="/auth/dietitian/login" className="ui-btn ui-btn--secondary ui-btn--lg">

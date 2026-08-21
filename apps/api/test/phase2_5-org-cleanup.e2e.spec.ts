@@ -33,7 +33,7 @@ describe("phase2.5 organization cleanup", () => {
     await resetAuthDatabase(ctx.prisma);
     await ctx.prisma.platformSettings.update({
       where: { id: PLATFORM_SETTINGS_SINGLETON_ID },
-      data: { registrationEnabled: true },
+      data: { dietitianRegistrationEnabled: true, patientRegistrationEnabled: true },
     });
   });
 

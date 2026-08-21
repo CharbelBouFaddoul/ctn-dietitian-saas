@@ -33,6 +33,10 @@ interface PlanDetail {
   slug: string;
   status: string;
   description: string | null;
+  priceCents: number | null;
+  currency: string;
+  showPrice: boolean;
+  durationDays: number;
   planFeatures: Array<{ featureId: string; enabled: boolean; limitValue: number | null; feature: Feature }>;
   _count?: { subscriptions: number };
 }
@@ -42,6 +46,12 @@ export default function AdminPlanDetailPage() {
   const [plan, setPlan] = useState<PlanDetail | null>(null);
   const [features, setFeatures] = useState<Feature[]>([]);
   const [rows, setRows] = useState<Record<string, { enabled: boolean; limitValue: string }>>({});
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [price, setPrice] = useState("");
+  const [currency, setCurrency] = useState("USD");
+  const [showPrice, setShowPrice] = useState(true);
+  const [durationDays, setDurationDays] = useState("30");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -52,6 +62,12 @@ export default function AdminPlanDetailPage() {
         api<Feature[]>("/api/v1/admin/features"),
       ]);
       setPlan(detail);
+      setName(detail.name);
+      setDescription(detail.description ?? "");
+      setPrice(detail.priceCents == null ? "" : (detail.priceCents / 100).toFixed(2));
+      setCurrency(detail.currency || "USD");
+      setShowPrice(detail.showPrice);
+      setDurationDays(String(detail.durationDays ?? 30));
       setFeatures(catalog);
       const next: Record<string, { enabled: boolean; limitValue: string }> = {};
       for (const feature of catalog) {
@@ -83,6 +99,34 @@ export default function AdminPlanDetailPage() {
       await load();
     } catch (err) {
       setError(errorMessage(err, "Unable to update plan"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveDetails(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const priceCents = price.trim() === "" ? null : Math.round(Number(price) * 100);
+      if (price.trim() !== "" && Number.isNaN(priceCents)) {
+        throw new Error("Enter a valid price");
+      }
+      await api(`/api/v1/admin/plans/${params.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          name,
+          description: description.trim() || null,
+          priceCents,
+          currency: currency.trim() || "USD",
+          showPrice,
+          durationDays: Number(durationDays) || 30,
+        }),
+      });
+      await load();
+    } catch (err) {
+      setError(errorMessage(err, "Unable to save plan details"));
     } finally {
       setBusy(false);
     }
@@ -132,7 +176,7 @@ export default function AdminPlanDetailPage() {
       <PageHeader
         eyebrow="Commerce"
         title={plan.name}
-        description={`${plan.slug} · ${plan._count?.subscriptions ?? 0} subscriptions${plan.description ? ` · ${plan.description}` : ""}`}
+        description={`${plan.slug} · ${plan._count?.subscriptions ?? 0} subscriptions · ${plan.durationDays} day period`}
         actions={
           <Link href="/admin/plans" className="ui-btn ui-btn--secondary ui-btn--sm">
             Back
@@ -156,6 +200,46 @@ export default function AdminPlanDetailPage() {
             Archive
           </Button>
         </div>
+      </Section>
+
+      <Section title="Plan details" description="Pricing and duration shown on the public Plans page (price optional).">
+        <form onSubmit={(event) => void saveDetails(event)} className="ui-stack" style={{ maxWidth: 480 }}>
+          <Field label="Name">
+            <Input value={name} onChange={(event) => setName(event.target.value)} required />
+          </Field>
+          <Field label="Description">
+            <Input value={description} onChange={(event) => setDescription(event.target.value)} />
+          </Field>
+          <Field label="Price">
+            <Input
+              type="number"
+              min={0}
+              step="0.01"
+              value={price}
+              onChange={(event) => setPrice(event.target.value)}
+              placeholder="e.g. 49.00"
+            />
+          </Field>
+          <Field label="Currency">
+            <Input value={currency} onChange={(event) => setCurrency(event.target.value)} />
+          </Field>
+          <Field label="Duration (days)">
+            <Input
+              type="number"
+              min={1}
+              value={durationDays}
+              onChange={(event) => setDurationDays(event.target.value)}
+              required
+            />
+          </Field>
+          <label className="ui-row" style={{ gap: 8, alignItems: "center" }}>
+            <input type="checkbox" checked={showPrice} onChange={(event) => setShowPrice(event.target.checked)} />
+            <span>Show price on public Plans page</span>
+          </label>
+          <Button type="submit" disabled={busy}>
+            {busy ? "Saving…" : "Save plan details"}
+          </Button>
+        </form>
       </Section>
 
       <Section title="Plan features" description="Enable features and set limits for this plan.">

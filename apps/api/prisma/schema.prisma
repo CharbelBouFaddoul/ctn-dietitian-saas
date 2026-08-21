@@ -330,13 +330,17 @@ enum AuditResult {
 }
 
 model Plan {
-  id          String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name        String
-  slug        String        @unique
-  description String?       @db.Text
-  status      CatalogStatus @default(ACTIVE)
-  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+  id           String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String
+  slug         String        @unique
+  description  String?       @db.Text
+  status       CatalogStatus @default(ACTIVE)
+  priceCents   Int?          @map("price_cents")
+  currency     String        @default("USD") @map("currency")
+  showPrice    Boolean       @default(true) @map("show_price")
+  durationDays Int           @default(30) @map("duration_days")
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz
 
   planFeatures  PlanFeature[]
   subscriptions Subscription[]
@@ -1825,7 +1829,9 @@ model PlatformSettings {
   contactPhone              String?          @map("contact_phone")
   contactAddress            String?          @map("contact_address") @db.Text
   contactHours              String?          @map("contact_hours")
-  registrationEnabled       Boolean          @default(false) @map("registration_enabled")
+  dietitianRegistrationEnabled Boolean       @default(false) @map("dietitian_registration_enabled")
+  patientRegistrationEnabled   Boolean       @default(false) @map("patient_registration_enabled")
+  plansPageEnabled          Boolean          @default(true) @map("plans_page_enabled")
   emailNotificationsEnabled Boolean          @default(false) @map("email_notifications_enabled")
   createdAt                 DateTime         @default(now()) @map("created_at") @db.Timestamptz
   updatedAt                 DateTime         @updatedAt @map("updated_at") @db.Timestamptz

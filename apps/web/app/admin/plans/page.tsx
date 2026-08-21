@@ -19,6 +19,10 @@ interface PlanRow {
   name: string;
   slug: string;
   status: string;
+  durationDays?: number;
+  showPrice?: boolean;
+  priceCents?: number | null;
+  currency?: string;
   _count?: { subscriptions: number };
 }
 
@@ -72,6 +76,12 @@ export default function AdminPlansPage() {
                 </div>
                 <p className="ui-muted" style={{ margin: "0 0 0.5rem", fontSize: 13 }}>
                   {row.slug}
+                  {row.durationDays ? ` · ${row.durationDays} days` : ""}
+                  {row.showPrice && row.priceCents != null
+                    ? ` · ${(row.priceCents / 100).toFixed(2)} ${row.currency || "USD"}`
+                    : row.showPrice === false
+                      ? " · price hidden"
+                      : ""}
                 </p>
                 <p style={{ margin: 0, fontWeight: 650 }}>
                   {row._count?.subscriptions ?? 0} subscription

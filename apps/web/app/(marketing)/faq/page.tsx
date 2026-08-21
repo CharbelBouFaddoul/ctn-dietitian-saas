@@ -16,6 +16,10 @@ const FAQ_CATEGORIES = [
         q: "Is there a separate admin product on the public website?",
         a: "No. The public website is for dietitians and patients only. Platform administration is not offered as a public sign-in option.",
       },
+      {
+        q: "Where can I see pricing?",
+        a: "Visit the Plans page for current plans and included features. Online checkout is not built in yet — use Choose on a plan to contact us and get set up.",
+      },
     ],
   },
   {
@@ -27,11 +31,11 @@ const FAQ_CATEGORIES = [
       },
       {
         q: "Can dietitians create meal plans and recipes?",
-        a: "Yes. You can draft and publish meal plans per client, create recipes, and use the food database (including organization overrides).",
+        a: "Yes. You can draft and publish meal plans per client, use a meal library (recipes), foods, and a habit library for tracking.",
       },
       {
         q: "What clinic operations are included?",
-        a: "Appointments and a clinic calendar, messaging, documents, invoices, tasks, analytics, and clinic settings. AI assistance and automations are available on plans that include those capabilities.",
+        a: "A practice dashboard, appointments and calendar, messaging, chart-scoped documents and assessments, invoices, tasks, analytics, and clinic settings. AI assistance and automations are available on plans that include those capabilities.",
       },
     ],
   },
@@ -44,7 +48,7 @@ const FAQ_CATEGORIES = [
       },
       {
         q: "What can patients track?",
-        a: "Food, water, exercise, sleep, and habits from the client portal tracking area.",
+        a: "Food, water, exercise, sleep, and habits from the client portal daily log.",
       },
       {
         q: "Can patients see invoices?",
@@ -100,7 +104,7 @@ const FAQ_CATEGORIES = [
     items: [
       {
         q: "How do I start as a dietitian?",
-        a: "Use Get Started / Create clinic account, verify your email, sign in, and open your clinic workspace.",
+        a: "Open the Plans page, choose a plan, and contact us so we can activate your clinic. When self-registration is enabled, you can also create an account directly — your plan is still assigned through our team.",
       },
       {
         q: "How do I start as a patient?",

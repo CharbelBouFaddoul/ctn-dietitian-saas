@@ -8,16 +8,63 @@ import { MarketingShell } from "@nutrition-saas/ui";
 import { API_URL } from "../lib/api";
 import { FALLBACK_SITE_SETTINGS, type SiteSettings } from "../lib/marketing/site-settings";
 
+function withMarketingDefaults(settings: SiteSettings): SiteSettings {
+  const plansPageEnabled = settings.plansPageEnabled !== false;
+
+  let navItems = settings.navItems;
+  const hasPlans = navItems.some((item) => item.href === "/plans");
+  if (plansPageEnabled && !hasPlans) {
+    navItems = [
+      ...navItems,
+      { href: "/plans", label: "Plans", visible: true, order: 2 },
+    ].map((item, index) => ({ ...item, order: item.order ?? index }));
+  }
+  if (!plansPageEnabled) {
+    navItems = navItems.filter((item) => item.href !== "/plans" && item.href !== "/pricing");
+  }
+
+  const footerGroups = settings.footerGroups.map((group) => {
+    let links = group.links;
+    if (!plansPageEnabled) {
+      links = links.filter((link) => link.href !== "/plans" && link.href !== "/pricing");
+    } else if (group.title === "Product" && !links.some((link) => link.href === "/plans")) {
+      links = [...links.slice(0, 2), { href: "/plans", label: "Plans" }, ...links.slice(2)];
+    }
+    return { ...group, links };
+  });
+
+  let ctaHref = settings.ctaHref || (plansPageEnabled ? "/plans" : "/contact");
+  const dietitianRegistrationEnabled =
+    settings.dietitianRegistrationEnabled ?? settings.registrationEnabled;
+  const patientRegistrationEnabled =
+    settings.patientRegistrationEnabled ?? settings.registrationEnabled;
+  if (
+    (ctaHref.includes("/auth/dietitian/register") || ctaHref === "/auth/register") &&
+    !dietitianRegistrationEnabled
+  ) {
+    ctaHref = plansPageEnabled ? "/plans" : "/contact";
+  } else if (ctaHref.includes("/auth/client/register") && !patientRegistrationEnabled) {
+    ctaHref = plansPageEnabled ? "/plans" : "/contact";
+  } else if (ctaHref.includes("/register") && !dietitianRegistrationEnabled && !patientRegistrationEnabled) {
+    ctaHref = plansPageEnabled ? "/plans" : "/contact";
+  }
+  if (!plansPageEnabled && (ctaHref.includes("/plans") || ctaHref.includes("/pricing"))) {
+    ctaHref = "/contact";
+  }
+
+  return { ...settings, plansPageEnabled, navItems, footerGroups, ctaHref };
+}
+
 export function SiteFrame({ children }: { children: ReactNode }) {
   const pathname = usePathname() ?? "";
-  const [settings, setSettings] = useState<SiteSettings>(FALLBACK_SITE_SETTINGS);
+  const [settings, setSettings] = useState<SiteSettings>(withMarketingDefaults(FALLBACK_SITE_SETTINGS));
 
   useEffect(() => {
     void fetch(`${API_URL}/api/v1/public/site-settings`)
       .then(async (res) => {
         if (!res.ok) return;
         const data = (await res.json()) as SiteSettings;
-        setSettings({ ...FALLBACK_SITE_SETTINGS, ...data });
+        setSettings(withMarketingDefaults({ ...FALLBACK_SITE_SETTINGS, ...data }));
       })
       .catch(() => {
         /* keep fallback */

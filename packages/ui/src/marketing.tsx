@@ -37,7 +37,10 @@ export interface MarketingSiteSettings {
   ctaText: string;
   ctaHref: string;
   ctaVisible: boolean;
+  dietitianRegistrationEnabled?: boolean;
+  patientRegistrationEnabled?: boolean;
   registrationEnabled?: boolean;
+  plansPageEnabled?: boolean;
   dietitianSignInLabel: string;
   patientSignInLabel: string;
   footerDescription: string;
@@ -50,6 +53,23 @@ export interface MarketingSiteSettings {
   contactHours: string | null;
 }
 
+function registrationLinkAllowed(
+  href: string,
+  dietitianRegistrationEnabled: boolean,
+  patientRegistrationEnabled: boolean,
+): boolean {
+  if (href.includes("/auth/dietitian/register") || href === "/auth/register") {
+    return dietitianRegistrationEnabled;
+  }
+  if (href.includes("/auth/client/register")) {
+    return patientRegistrationEnabled;
+  }
+  if (href.includes("/register")) {
+    return dietitianRegistrationEnabled || patientRegistrationEnabled;
+  }
+  return true;
+}
+
 const DEFAULT_SETTINGS: MarketingSiteSettings = {
   brandText: "Nutrition",
   logoUrl: null,
@@ -57,13 +77,17 @@ const DEFAULT_SETTINGS: MarketingSiteSettings = {
   navItems: [
     { href: "/how-it-works", label: "How it works", visible: true, order: 0 },
     { href: "/features", label: "Features", visible: true, order: 1 },
-    { href: "/faq", label: "FAQ", visible: true, order: 2 },
-    { href: "/contact", label: "Contact", visible: true, order: 3 },
+    { href: "/plans", label: "Plans", visible: true, order: 2 },
+    { href: "/faq", label: "FAQ", visible: true, order: 3 },
+    { href: "/contact", label: "Contact", visible: true, order: 4 },
   ],
   ctaText: "Get Started",
-  ctaHref: "/auth/dietitian/register",
+  ctaHref: "/plans",
   ctaVisible: true,
+  dietitianRegistrationEnabled: false,
+  patientRegistrationEnabled: false,
   registrationEnabled: false,
+  plansPageEnabled: true,
   dietitianSignInLabel: "Sign in as Dietitian",
   patientSignInLabel: "Sign in as Patient",
   footerDescription:
@@ -74,6 +98,7 @@ const DEFAULT_SETTINGS: MarketingSiteSettings = {
       links: [
         { href: "/how-it-works", label: "How it works" },
         { href: "/features", label: "Features" },
+        { href: "/plans", label: "Plans" },
         { href: "/faq", label: "FAQ" },
         { href: "/contact", label: "Contact" },
       ],
@@ -82,7 +107,7 @@ const DEFAULT_SETTINGS: MarketingSiteSettings = {
       title: "For Dietitians",
       links: [
         { href: "/auth/dietitian/login", label: "Dietitian sign in" },
-        { href: "/auth/dietitian/register", label: "Create clinic account" },
+        { href: "/plans", label: "View plans" },
       ],
     },
     {
@@ -148,15 +173,36 @@ export function MarketingShell({
 }) {
   const [open, setOpen] = useState(false);
   const navId = useId();
-  const registrationEnabled = settings.registrationEnabled !== false;
-  const ctaVisible = settings.ctaVisible && (registrationEnabled || !settings.ctaHref.includes("/register"));
+  const dietitianRegistrationEnabled =
+    settings.dietitianRegistrationEnabled ?? settings.registrationEnabled ?? false;
+  const patientRegistrationEnabled =
+    settings.patientRegistrationEnabled ?? settings.registrationEnabled ?? false;
+  const plansPageEnabled = settings.plansPageEnabled !== false;
+  let resolvedCtaHref = settings.ctaHref;
+  if (
+    (resolvedCtaHref.includes("/auth/dietitian/register") || resolvedCtaHref === "/auth/register") &&
+    !dietitianRegistrationEnabled
+  ) {
+    resolvedCtaHref = plansPageEnabled ? "/plans" : "/contact";
+  } else if (resolvedCtaHref.includes("/auth/client/register") && !patientRegistrationEnabled) {
+    resolvedCtaHref = plansPageEnabled ? "/plans" : "/contact";
+  } else if (resolvedCtaHref.includes("/register") && !dietitianRegistrationEnabled && !patientRegistrationEnabled) {
+    resolvedCtaHref = plansPageEnabled ? "/plans" : "/contact";
+  }
+  if (!plansPageEnabled && (resolvedCtaHref.includes("/plans") || resolvedCtaHref.includes("/pricing"))) {
+    resolvedCtaHref = "/contact";
+  }
+  const ctaVisible = settings.ctaVisible;
   const footerGroups = settings.footerGroups.map((group) => ({
     ...group,
-    links: group.links.filter((link) => registrationEnabled || !link.href.includes("/register")),
+    links: group.links
+      .filter((link) => registrationLinkAllowed(link.href, dietitianRegistrationEnabled, patientRegistrationEnabled))
+      .filter((link) => plansPageEnabled || (!link.href.includes("/plans") && !link.href.includes("/pricing"))),
   }));
   const navItems = [...settings.navItems]
     .filter((item) => item.visible !== false)
-    .filter((item) => registrationEnabled || !item.href.includes("/register"))
+    .filter((item) => registrationLinkAllowed(item.href, dietitianRegistrationEnabled, patientRegistrationEnabled))
+    .filter((item) => plansPageEnabled || (!item.href.includes("/plans") && !item.href.includes("/pricing")))
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
   function close() {
@@ -188,7 +234,7 @@ export function MarketingShell({
                 {settings.patientSignInLabel}
               </Link>
               {ctaVisible ? (
-                <Link href={settings.ctaHref} className="ui-btn ui-btn--primary ui-btn--sm" onClick={close}>
+                <Link href={resolvedCtaHref} className="ui-btn ui-btn--primary ui-btn--sm" onClick={close}>
                   {settings.ctaText}
                 </Link>
               ) : null}
@@ -203,7 +249,7 @@ export function MarketingShell({
               {settings.patientSignInLabel}
             </Link>
             {ctaVisible ? (
-              <Link href={settings.ctaHref} className="ui-btn ui-btn--primary ui-btn--sm ui-mkt__auth-desktop">
+              <Link href={resolvedCtaHref} className="ui-btn ui-btn--primary ui-btn--sm ui-mkt__auth-desktop">
                 {settings.ctaText}
               </Link>
             ) : null}
@@ -289,8 +335,6 @@ export function AuthLayout({
   footer,
   eyebrow = "Nutrition",
   audience = "dietitian",
-  backHref = "/",
-  backLabel = "Back to website",
 }: {
   title: string;
   description?: string;
@@ -301,55 +345,26 @@ export function AuthLayout({
   backHref?: string;
   backLabel?: string;
 }) {
-  if (audience === "admin") {
-    return (
-      <main className="ui-auth ui-auth--simple" data-theme="marketing">
-        <section className="ui-auth__panel">
-          <p className="ui-eyebrow">{eyebrow}</p>
-          <h1 className="ui-auth__title">{title}</h1>
-          {description ? <p className="ui-muted">{description}</p> : null}
-          {children}
-          {footer}
-        </section>
-      </main>
-    );
-  }
-
-  const panelTitle =
-    audience === "client" ? "Stay connected to your nutrition plan." : "Run your nutrition practice with confidence.";
-  const panelCopy =
-    audience === "client"
-      ? "View your meal plan, track daily habits, and message your dietitian in one simple portal."
-      : "Clients, meal plans, tracking, messaging, and practice tools — connected by a short join code.";
-
+  const framed = audience !== "admin";
   return (
-    <main className={cn("ui-auth", audience === "client" ? "ui-auth--client" : "ui-auth--dietitian")} data-theme="marketing">
-      <a href={backHref} className="ui-auth__back">
-        ← {backLabel}
-      </a>
-      <div className="ui-auth__split">
-        <aside className="ui-auth__brand" aria-hidden="false">
-          <p className="ui-eyebrow">{eyebrow}</p>
-          <h2 className="ui-auth__brand-title">{panelTitle}</h2>
-          <p className="ui-auth__brand-copy">{panelCopy}</p>
-          <div className="ui-auth__brand-preview">
-            <div className="ui-auth__brand-preview-row">
-              <span>{audience === "client" ? "My Plan" : "Clients"}</span>
-              <span>{audience === "client" ? "Tracking" : "Meal plans"}</span>
-            </div>
-            <div className="ui-auth__brand-preview-row">
-              <span>{audience === "client" ? "Messages" : "Messages"}</span>
-              <span>{audience === "client" ? "Documents" : "Calendar"}</span>
-            </div>
-          </div>
-        </aside>
-        <section className="ui-auth__panel">
-          <h1 className="ui-auth__title">{title}</h1>
-          {description ? <p className="ui-muted">{description}</p> : null}
-          {children}
-          {footer}
-        </section>
-      </div>
-    </main>
+    <div
+      className={cn(
+        "ui-auth",
+        "ui-auth--simple",
+        framed && "ui-auth--framed",
+        audience === "client" && "ui-auth--client",
+        audience === "dietitian" && "ui-auth--dietitian",
+        audience === "admin" && "ui-auth--admin",
+      )}
+      data-theme="marketing"
+    >
+      <section className="ui-auth__panel">
+        <p className="ui-eyebrow">{eyebrow}</p>
+        <h1 className="ui-auth__title">{title}</h1>
+        {description ? <p className="ui-muted">{description}</p> : null}
+        {children}
+        {footer}
+      </section>
+    </div>
   );
 }

@@ -67,15 +67,21 @@ export async function wipeApplicationData(prisma: PrismaClient): Promise<void> {
 
 export async function seedPlatformBootstrap(
   prisma: PrismaClient,
-  options?: { registrationEnabled?: boolean },
+  options?: {
+    registrationEnabled?: boolean;
+    dietitianRegistrationEnabled?: boolean;
+    patientRegistrationEnabled?: boolean;
+  },
 ): Promise<void> {
   await seedEntitlementCatalog(prisma);
   await seedPlatformAssessmentTemplate(prisma);
   await seedPlatformSettings(prisma);
   await seedGlobalHabits(prisma);
+  const both = options?.registrationEnabled ?? true;
   await prisma.platformSettings.updateMany({
     data: {
-      registrationEnabled: options?.registrationEnabled ?? true,
+      dietitianRegistrationEnabled: options?.dietitianRegistrationEnabled ?? both,
+      patientRegistrationEnabled: options?.patientRegistrationEnabled ?? both,
       emailNotificationsEnabled: false,
     },
   });

@@ -49,7 +49,10 @@ describe("phase3 registration + portal connections", () => {
   async function setRegistrationEnabled(enabled: boolean) {
     await ctx.prisma.platformSettings.update({
       where: { id: PLATFORM_SETTINGS_SINGLETON_ID },
-      data: { registrationEnabled: enabled },
+      data: {
+        dietitianRegistrationEnabled: enabled,
+        patientRegistrationEnabled: enabled,
+      },
     });
   }
 
@@ -253,11 +256,13 @@ describe("phase3 registration + portal connections", () => {
       .expect(403);
   });
 
-  it("exposes registrationEnabled on public and admin site settings", async () => {
+  it("exposes dietitian and patient registration flags on public and admin site settings", async () => {
     await setRegistrationEnabled(false);
     const publicSettings = await request(ctx.app.getHttpServer())
       .get("/api/v1/public/site-settings")
       .expect(200);
+    expect(publicSettings.body.dietitianRegistrationEnabled).toBe(false);
+    expect(publicSettings.body.patientRegistrationEnabled).toBe(false);
     expect(publicSettings.body.registrationEnabled).toBe(false);
 
     await setRegistrationEnabled(true);
@@ -265,8 +270,54 @@ describe("phase3 registration + portal connections", () => {
     const patched = await request(ctx.app.getHttpServer())
       .patch("/api/v1/admin/site-settings")
       .set("Cookie", admin.cookie)
-      .send({ registrationEnabled: false })
+      .send({ dietitianRegistrationEnabled: true, patientRegistrationEnabled: false })
       .expect(200);
-    expect(patched.body.registrationEnabled).toBe(false);
+    expect(patched.body.dietitianRegistrationEnabled).toBe(true);
+    expect(patched.body.patientRegistrationEnabled).toBe(false);
+    expect(patched.body.registrationEnabled).toBe(true);
+  });
+
+  it("gates dietitian and patient registration independently", async () => {
+    await ctx.prisma.platformSettings.update({
+      where: { id: PLATFORM_SETTINGS_SINGLETON_ID },
+      data: { dietitianRegistrationEnabled: false, patientRegistrationEnabled: true },
+    });
+
+    await request(ctx.app.getHttpServer())
+      .post("/api/v1/auth/register")
+      .send({ email: email("diet"), password: PASSWORD, audience: "dietitian" })
+      .expect(403);
+
+    await request(ctx.app.getHttpServer())
+      .post("/api/v1/auth/register")
+      .send({
+        email: email("pat"),
+        password: PASSWORD,
+        audience: "patient",
+        firstName: "Pat",
+        lastName: "Client",
+      })
+      .expect(200);
+
+    await ctx.prisma.platformSettings.update({
+      where: { id: PLATFORM_SETTINGS_SINGLETON_ID },
+      data: { dietitianRegistrationEnabled: true, patientRegistrationEnabled: false },
+    });
+
+    await request(ctx.app.getHttpServer())
+      .post("/api/v1/auth/register")
+      .send({
+        email: email("pat2"),
+        password: PASSWORD,
+        audience: "patient",
+        firstName: "Pat",
+        lastName: "Two",
+      })
+      .expect(403);
+
+    await request(ctx.app.getHttpServer())
+      .post("/api/v1/auth/register")
+      .send({ email: email("diet2"), password: PASSWORD, audience: "dietitian" })
+      .expect(200);
   });
 });

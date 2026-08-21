@@ -1,3 +1,4 @@
+import { PLAN_FEATURE_DISPLAY_ORDER } from "@nutrition-saas/config";
 import {
   BadRequestException,
   ConflictException,
@@ -41,7 +42,15 @@ export class AdminCatalogService {
   }
 
   async createPlan(
-    input: { name: string; slug: string; description?: string },
+    input: {
+      name: string;
+      slug: string;
+      description?: string;
+      priceCents?: number | null;
+      currency?: string;
+      showPrice?: boolean;
+      durationDays?: number;
+    },
     actor: AdminActor,
   ) {
     try {
@@ -51,6 +60,10 @@ export class AdminCatalogService {
           slug: input.slug,
           description: input.description?.trim() ?? null,
           status: "ACTIVE",
+          priceCents: input.priceCents ?? null,
+          currency: input.currency?.trim().toUpperCase() || "USD",
+          showPrice: input.showPrice ?? true,
+          durationDays: input.durationDays ?? 30,
         },
       });
       await this.security.record({
@@ -75,7 +88,15 @@ export class AdminCatalogService {
 
   async updatePlan(
     planId: string,
-    input: { name?: string; description?: string; status?: CatalogStatus },
+    input: {
+      name?: string;
+      description?: string;
+      status?: CatalogStatus;
+      priceCents?: number | null;
+      currency?: string;
+      showPrice?: boolean;
+      durationDays?: number;
+    },
     actor: AdminActor,
   ) {
     await this.getPlan(planId);
@@ -85,6 +106,10 @@ export class AdminCatalogService {
         name: input.name?.trim(),
         description: input.description === undefined ? undefined : input.description.trim(),
         status: input.status,
+        priceCents: input.priceCents === undefined ? undefined : input.priceCents,
+        currency: input.currency === undefined ? undefined : input.currency.trim().toUpperCase(),
+        showPrice: input.showPrice,
+        durationDays: input.durationDays,
       },
     });
     await this.security.record({
@@ -99,6 +124,66 @@ export class AdminCatalogService {
       metadata: { slug: plan.slug, status: plan.status },
     });
     return plan;
+  }
+
+  async listPublicFeatureKeys() {
+    const features = await this.prisma.feature.findMany({
+      where: { status: "ACTIVE" },
+      select: { key: true },
+      orderBy: { key: "asc" },
+    });
+    return features.map((feature) => feature.key);
+  }
+
+  async listPublicPlans() {
+    const plans = await this.prisma.plan.findMany({
+      where: { status: "ACTIVE" },
+      include: {
+        planFeatures: {
+          include: { feature: true },
+          orderBy: { feature: { name: "asc" } },
+        },
+      },
+    });
+
+    const slugOrder = ["standard", "pro", "premium"];
+
+    return plans
+      .map((plan) => ({
+        id: plan.id,
+        name: plan.name,
+        slug: plan.slug,
+        description: plan.description,
+        durationDays: plan.durationDays,
+        currency: plan.currency,
+        priceCents: plan.showPrice ? plan.priceCents : null,
+        showPrice: plan.showPrice,
+        // Only features enabled on this plan and still active in the catalog.
+        features: plan.planFeatures
+          .filter((row) => row.enabled && row.feature.status === "ACTIVE")
+          .map((row) => ({
+            key: row.feature.key,
+            name: row.feature.name,
+            valueType: row.feature.valueType,
+            limitValue: row.limitValue,
+          }))
+          .sort((a, b) => {
+            const ai = PLAN_FEATURE_DISPLAY_ORDER.indexOf(a.key);
+            const bi = PLAN_FEATURE_DISPLAY_ORDER.indexOf(b.key);
+            if (ai === -1 && bi === -1) return a.name.localeCompare(b.name);
+            if (ai === -1) return 1;
+            if (bi === -1) return -1;
+            return ai - bi;
+          }),
+      }))
+      .sort((a, b) => {
+        const ai = slugOrder.indexOf(a.slug);
+        const bi = slugOrder.indexOf(b.slug);
+        if (ai === -1 && bi === -1) return a.name.localeCompare(b.name);
+        if (ai === -1) return 1;
+        if (bi === -1) return -1;
+        return ai - bi;
+      });
   }
 
   async replacePlanFeatures(planId: string, features: PlanFeatureInputDto[], actor: AdminActor) {

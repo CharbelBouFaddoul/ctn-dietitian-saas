@@ -32,8 +32,14 @@ export default function DietitianRegisterPage() {
           setEnabled(false);
           return;
         }
-        const data = (await res.json()) as { registrationEnabled?: boolean };
-        setEnabled(data.registrationEnabled === true);
+        const data = (await res.json()) as {
+          dietitianRegistrationEnabled?: boolean;
+          registrationEnabled?: boolean;
+        };
+        setEnabled(
+          data.dietitianRegistrationEnabled === true ||
+            (data.dietitianRegistrationEnabled === undefined && data.registrationEnabled === true),
+        );
       })
       .catch(() => setEnabled(false));
   }, []);
@@ -47,6 +53,7 @@ export default function DietitianRegisterPage() {
         body: JSON.stringify({
           email,
           password,
+          audience: "dietitian",
           consents: [
             { type: "TERMS_OF_SERVICE", policyVersion: "1.0" },
             { type: "PRIVACY_POLICY", policyVersion: "1.0" },
@@ -72,12 +79,16 @@ export default function DietitianRegisterPage() {
       <AuthShell
         title="Registration is closed"
         audience="dietitian"
-        description="Self-serve clinic registration is currently disabled. Sign in if you already have an account, or contact the platform administrator."
+        description="Self-serve clinic registration is currently disabled. View plans and contact us to get set up, or sign in if you already have an account."
       >
-        <Link href="/auth/dietitian/login" className="ui-btn ui-btn--primary ui-btn--block">
-          Sign in as Dietitian
+        <Link href="/plans" className="ui-btn ui-btn--primary ui-btn--block">
+          View plans
         </Link>
         <p style={{ marginTop: 16 }}>
+          <Link href="/auth/dietitian/login" className="ui-link">
+            Sign in as Dietitian
+          </Link>
+          {" · "}
           <Link href="/contact" className="ui-link">
             Contact us
           </Link>

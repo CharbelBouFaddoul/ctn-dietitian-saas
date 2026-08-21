@@ -62,14 +62,14 @@ export class DietitianController {
   @ApiOperation({
     summary: "Create a dietitian practice account",
     description:
-      "Creates DietitianAccount + DietitianSettings only. Self-serve create requires registrationEnabled.",
+      "Creates DietitianAccount + DietitianSettings only. Self-serve create requires dietitianRegistrationEnabled.",
   })
   @ApiOkResponse({ type: DietitianAccountResponseDto })
   async create(
     @CurrentUser() user: AuthenticatedRequestUser,
     @Body() body: CreateDietitianDto,
   ): Promise<DietitianAccountResponseDto> {
-    await assertRegistrationEnabled(this.prisma);
+    await assertRegistrationEnabled(this.prisma, "dietitian");
     const created = await this.dietitians.create(user.id, body);
     if (!created) {
       throw new ForbiddenException(DIETITIAN_ACCESS_DENIED);

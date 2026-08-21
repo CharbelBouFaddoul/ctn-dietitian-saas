@@ -43,7 +43,17 @@ export class PlatformSettingsService {
     if (input.ctaText !== undefined) data.ctaText = input.ctaText;
     if (input.ctaHref !== undefined) data.ctaHref = input.ctaHref;
     if (input.ctaVisible !== undefined) data.ctaVisible = input.ctaVisible;
-    if (input.registrationEnabled !== undefined) data.registrationEnabled = input.registrationEnabled;
+    if (input.registrationEnabled !== undefined) {
+      data.dietitianRegistrationEnabled = input.registrationEnabled;
+      data.patientRegistrationEnabled = input.registrationEnabled;
+    }
+    if (input.dietitianRegistrationEnabled !== undefined) {
+      data.dietitianRegistrationEnabled = input.dietitianRegistrationEnabled;
+    }
+    if (input.patientRegistrationEnabled !== undefined) {
+      data.patientRegistrationEnabled = input.patientRegistrationEnabled;
+    }
+    if (input.plansPageEnabled !== undefined) data.plansPageEnabled = input.plansPageEnabled;
     if (input.emailNotificationsEnabled !== undefined) {
       data.emailNotificationsEnabled = input.emailNotificationsEnabled;
     }
@@ -89,7 +99,9 @@ export class PlatformSettingsService {
     ctaText: string;
     ctaHref: string;
     ctaVisible: boolean;
-    registrationEnabled: boolean;
+    dietitianRegistrationEnabled: boolean;
+    patientRegistrationEnabled: boolean;
+    plansPageEnabled: boolean;
     emailNotificationsEnabled: boolean;
     dietitianSignInLabel: string;
     patientSignInLabel: string;
@@ -102,6 +114,10 @@ export class PlatformSettingsService {
     contactAddress: string | null;
     contactHours: string | null;
   }): PlatformSettingsPayload {
+    const dietitianRegistrationEnabled =
+      row.dietitianRegistrationEnabled ?? DEFAULT_PLATFORM_SETTINGS.dietitianRegistrationEnabled;
+    const patientRegistrationEnabled =
+      row.patientRegistrationEnabled ?? DEFAULT_PLATFORM_SETTINGS.patientRegistrationEnabled;
     return {
       brandText: row.brandText || DEFAULT_PLATFORM_SETTINGS.brandText,
       logoUrl: row.logoUrl,
@@ -110,7 +126,10 @@ export class PlatformSettingsService {
       ctaText: row.ctaText || DEFAULT_PLATFORM_SETTINGS.ctaText,
       ctaHref: row.ctaHref || DEFAULT_PLATFORM_SETTINGS.ctaHref,
       ctaVisible: row.ctaVisible,
-      registrationEnabled: row.registrationEnabled ?? DEFAULT_PLATFORM_SETTINGS.registrationEnabled,
+      dietitianRegistrationEnabled,
+      patientRegistrationEnabled,
+      registrationEnabled: dietitianRegistrationEnabled || patientRegistrationEnabled,
+      plansPageEnabled: row.plansPageEnabled ?? DEFAULT_PLATFORM_SETTINGS.plansPageEnabled,
       emailNotificationsEnabled:
         row.emailNotificationsEnabled ?? DEFAULT_PLATFORM_SETTINGS.emailNotificationsEnabled,
       dietitianSignInLabel: row.dietitianSignInLabel || DEFAULT_PLATFORM_SETTINGS.dietitianSignInLabel,

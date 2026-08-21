@@ -346,6 +346,30 @@ export class CreatePlanDto {
   @IsString()
   @MaxLength(500)
   description?: string;
+
+  @ApiPropertyOptional({ description: "Display price in cents" })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  priceCents?: number | null;
+
+  @ApiPropertyOptional({ default: "USD" })
+  @IsOptional()
+  @IsString()
+  @MaxLength(8)
+  currency?: string;
+
+  @ApiPropertyOptional({ default: true })
+  @IsOptional()
+  @IsBoolean()
+  showPrice?: boolean;
+
+  @ApiPropertyOptional({ default: 30 })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(3650)
+  durationDays?: number;
 }
 
 export class UpdatePlanDto {
@@ -366,6 +390,31 @@ export class UpdatePlanDto {
   @IsOptional()
   @IsEnum(CATALOG_STATUSES)
   status?: (typeof CATALOG_STATUSES)[number];
+
+  @ApiPropertyOptional({ description: "Display price in cents; null clears price" })
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsInt()
+  @Min(0)
+  priceCents?: number | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(8)
+  currency?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  showPrice?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(3650)
+  durationDays?: number;
 }
 
 export class PlanFeatureInputDto {

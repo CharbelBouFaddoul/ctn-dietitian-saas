@@ -17,6 +17,7 @@ export interface RegisterInput {
   password: string;
   firstName?: string;
   lastName?: string;
+  audience?: "dietitian" | "patient";
   consents?: Array<{ type: "TERMS_OF_SERVICE" | "PRIVACY_POLICY"; policyVersion: string }>;
 }
 
@@ -33,7 +34,7 @@ export class AuthService {
   ) {}
 
   async register(input: RegisterInput, meta: RequestMeta = {}): Promise<void> {
-    await assertRegistrationEnabled(this.prisma);
+    await assertRegistrationEnabled(this.prisma, input.audience ?? "dietitian");
     this.passwords.assertPolicy(input.password);
     const emailNormalized = normalizeEmail(input.email);
     const passwordHash = await this.passwords.hash(input.password);

@@ -35,8 +35,14 @@ export default function ClientRegisterPage() {
           setEnabled(false);
           return;
         }
-        const data = (await res.json()) as { registrationEnabled?: boolean };
-        setEnabled(data.registrationEnabled === true);
+        const data = (await res.json()) as {
+          patientRegistrationEnabled?: boolean;
+          registrationEnabled?: boolean;
+        };
+        setEnabled(
+          data.patientRegistrationEnabled === true ||
+            (data.patientRegistrationEnabled === undefined && data.registrationEnabled === true),
+        );
       })
       .catch(() => setEnabled(false));
   }, []);
@@ -56,6 +62,7 @@ export default function ClientRegisterPage() {
           password,
           firstName,
           lastName,
+          audience: "patient",
           consents: [
             { type: "TERMS_OF_SERVICE", policyVersion: "1.0" },
             { type: "PRIVACY_POLICY", policyVersion: "1.0" },

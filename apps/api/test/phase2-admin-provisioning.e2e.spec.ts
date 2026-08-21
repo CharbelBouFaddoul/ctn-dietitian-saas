@@ -49,7 +49,10 @@ describe("phase2 admin provisioning", () => {
   async function setRegistrationEnabled(enabled: boolean) {
     await ctx.prisma.platformSettings.update({
       where: { id: PLATFORM_SETTINGS_SINGLETON_ID },
-      data: { registrationEnabled: enabled },
+      data: {
+        dietitianRegistrationEnabled: enabled,
+        patientRegistrationEnabled: enabled,
+      },
     });
   }
 

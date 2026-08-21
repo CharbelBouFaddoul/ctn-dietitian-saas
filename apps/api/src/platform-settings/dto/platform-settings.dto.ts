@@ -106,10 +106,30 @@ export class UpdatePlatformSettingsDto {
   @IsBoolean()
   ctaVisible?: boolean;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    description:
+      "Legacy shorthand: sets both dietitian and patient registration. Prefer the audience-specific flags.",
+  })
   @IsOptional()
   @IsBoolean()
   registrationEnabled?: boolean;
+
+  @ApiPropertyOptional({ description: "Allow self-serve dietitian (clinic) registration." })
+  @IsOptional()
+  @IsBoolean()
+  dietitianRegistrationEnabled?: boolean;
+
+  @ApiPropertyOptional({ description: "Allow self-serve patient registration." })
+  @IsOptional()
+  @IsBoolean()
+  patientRegistrationEnabled?: boolean;
+
+  @ApiPropertyOptional({
+    description: "When false, the public Plans page is hidden and Get Started goes to Contact.",
+  })
+  @IsOptional()
+  @IsBoolean()
+  plansPageEnabled?: boolean;
 
   @ApiPropertyOptional({
     description: "When false, product emails (invoice, automation) are skipped. Auth emails always send.",

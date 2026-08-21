@@ -77,8 +77,8 @@ function AuthFooter({ audience }: { audience: AuthAudience }) {
         Dietitian sign in
       </Link>
       {" · "}
-      <Link href="/auth/dietitian/register" className="ui-link">
-        Create clinic account
+      <Link href="/plans" className="ui-link">
+        View plans
       </Link>
       {" · "}
       <Link href="/auth/forgot-password" className="ui-link">

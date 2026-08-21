@@ -2,9 +2,9 @@ import Link from "next/link";
 
 const STEPS = [
   {
-    title: "Create your clinic",
-    body: "Register as a dietitian, verify your email, and open your clinic workspace.",
-    visual: { title: "Clinic account", detail: "Email verified · workspace ready" },
+    title: "Get your clinic set up",
+    body: "Choose a plan and contact us to get started, or self-register when registration is open. Your subscription and workspace are activated so you can begin seeing clients.",
+    visual: { title: "Clinic ready", detail: "Plan · workspace · sign in" },
   },
   {
     title: "Add your clients",
@@ -12,7 +12,7 @@ const STEPS = [
     visual: { title: "Client roster", detail: "Search · tags · status" },
   },
   {
-    title: "Create a client join code",
+    title: "Create a clinic join code",
     body: "Generate a short clinic code from your clients area and share it with the people you work with.",
     visual: { title: "Join code", detail: "Short · secure · shareable" },
   },
@@ -28,12 +28,12 @@ const STEPS = [
   },
   {
     title: "Dietitian and client are connected",
-    body: "They appear on your client list. You can manage their chart, plans, messages, and documents.",
+    body: "They appear on your client list. You can manage their chart, meal plans, messages, documents, and assessments.",
     visual: { title: "Linked chart", detail: "Portal + clinic in sync" },
   },
   {
     title: "Manage the nutrition journey together",
-    body: "Publish meal plans, review tracking, communicate, and keep care organized in one place.",
+    body: "Publish meal plans, review tracking, schedule appointments, message, invoice, and keep care organized — with optional AI and automations on eligible plans.",
     visual: { title: "Shared care", detail: "Plan · track · message" },
   },
 ] as const;
@@ -93,15 +93,15 @@ export default function HowItWorksPage() {
             <article className="ui-mkt__experience ui-mkt__experience--dietitian">
               <h3>Dietitian</h3>
               <ul>
-                <li>Create and manage the clinic</li>
-                <li>Add and organize clients</li>
-                <li>Build and publish meal plans</li>
-                <li>Review tracking and progress</li>
-                <li>Message and share documents</li>
-                <li>Run appointments, tasks, invoices, and analytics</li>
+                <li>Run the clinic dashboard and client charts</li>
+                <li>Build meal plans from foods, recipes, and habits</li>
+                <li>Publish plans and review portal tracking</li>
+                <li>Run assessments and share documents on each chart</li>
+                <li>Message, schedule appointments, and manage invoices</li>
+                <li>Use analytics — plus AI and automations when your plan includes them</li>
               </ul>
-              <Link href="/auth/dietitian/login" className="ui-link">
-                Create clinic account →
+              <Link href="/plans" className="ui-link">
+                View plans →
               </Link>
             </article>
             <article className="ui-mkt__experience ui-mkt__experience--patient">
@@ -109,10 +109,10 @@ export default function HowItWorksPage() {
               <ul>
                 <li>Create a personal account</li>
                 <li>Enter the clinic join code</li>
-                <li>Connect to the correct dietitian</li>
-                <li>Access the published meal plan</li>
-                <li>Track food, water, exercise, sleep, and habits</li>
-                <li>Message and view shared documents &amp; invoices</li>
+                <li>View the published meal plan</li>
+                <li>Log food, water, exercise, sleep, and habits</li>
+                <li>Complete assessments and message your dietitian</li>
+                <li>View appointments, documents, and invoices</li>
               </ul>
               <Link href="/auth/client/login" className="ui-link">
                 Patient sign in →

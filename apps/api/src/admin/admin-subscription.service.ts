@@ -104,8 +104,14 @@ export class AdminSubscriptionService {
       where: { dietitianAccountId },
     });
     const now = this.lifecycle.now();
-    const periodEnd = parseOptionalDate(input.currentPeriodEnd, "currentPeriodEnd");
     const periodStart = parseOptionalDate(input.currentPeriodStart, "currentPeriodStart");
+    const defaultPeriodEnd = addDays(now, plan.durationDays);
+    const periodEnd =
+      input.currentPeriodEnd !== undefined
+        ? parseOptionalDate(input.currentPeriodEnd, "currentPeriodEnd")
+        : status === "ACTIVE"
+          ? defaultPeriodEnd
+          : existing?.currentPeriodEnd ?? null;
 
     const subscription = existing
       ? await this.prisma.subscription.update({
@@ -117,7 +123,7 @@ export class AdminSubscriptionService {
             cancelledAt: status === "CANCELLED" ? now : null,
             currentPeriodStart:
               periodStart ?? (status === "ACTIVE" ? now : existing.currentPeriodStart),
-            currentPeriodEnd: input.currentPeriodEnd !== undefined ? periodEnd : existing.currentPeriodEnd,
+            currentPeriodEnd: periodEnd,
             billingCycle:
               input.billingCycle !== undefined ? input.billingCycle : existing.billingCycle,
           },
@@ -168,6 +174,7 @@ export class AdminSubscriptionService {
 
     let planId = existing.planId;
     let planSlug = existing.plan.slug;
+    let durationDays = existing.plan.durationDays;
     if (input.planId) {
       const plan = await this.prisma.plan.findUnique({ where: { id: input.planId } });
       if (!plan) {
@@ -178,13 +185,14 @@ export class AdminSubscriptionService {
       }
       planId = plan.id;
       planSlug = plan.slug;
+      durationDays = plan.durationDays;
     }
 
     const now = this.lifecycle.now();
     const periodEnd =
       input.currentPeriodEnd !== undefined
         ? parseOptionalDate(input.currentPeriodEnd, "currentPeriodEnd")
-        : existing.currentPeriodEnd;
+        : addDays(now, durationDays);
 
     const subscription = await this.prisma.subscription.update({
       where: { id: existing.id },
@@ -414,4 +422,10 @@ function parseOptionalDate(value: string | null | undefined, field: string): Dat
     throw new BadRequestException(`Invalid ${field}`);
   }
   return parsed;
+}
+
+function addDays(from: Date, days: number): Date {
+  const result = new Date(from.getTime());
+  result.setUTCDate(result.getUTCDate() + days);
+  return result;
 }

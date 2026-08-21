@@ -9,6 +9,7 @@ import { DietitianModule } from "../dietitian/dietitian.module";
 import { AdminAuditService } from "./admin-audit.service";
 import { AdminCatalogController } from "./admin-catalog.controller";
 import { AdminCatalogService } from "./admin-catalog.service";
+import { PublicPlansController } from "./public-plans.controller";
 import { AdminFoodsController } from "./admin-foods.controller";
 import { AdminListsController } from "./admin-lists.controller";
 import { AdminMeController } from "./admin-me.controller";
@@ -41,6 +42,7 @@ import { PlatformRolesGuard } from "./guards/platform-roles.guard";
     AdminDietitiansController,
     AdminPatientsController,
     AdminCatalogController,
+    PublicPlansController,
     AdminListsController,
     AdminFoodsController,
   ],

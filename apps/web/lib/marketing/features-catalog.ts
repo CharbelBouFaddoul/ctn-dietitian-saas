@@ -18,7 +18,17 @@ export interface MarketingFeature {
  * Not a CMS and not an entitlement system — update here when product capabilities change.
  */
 export const MARKETING_FEATURES: MarketingFeature[] = [
-  // Dietitian — Clinic & clients
+  // Dietitian — Overview
+  {
+    id: "d-dashboard",
+    audience: "dietitian",
+    category: "Overview",
+    title: "Practice dashboard",
+    summary: "See client counts, tasks, invoices, today’s appointments, recent messages, and activity at a glance.",
+    highlight: true,
+  },
+
+  // Clinic & clients
   {
     id: "d-clients",
     audience: "dietitian",
@@ -43,11 +53,18 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     highlight: true,
   },
   {
-    id: "d-tags-assign",
+    id: "d-tags",
     audience: "dietitian",
     category: "Clinic & clients",
-    title: "Tags & assignments",
-    summary: "Organize clients with tags and assign them across your clinic team.",
+    title: "Tags & organization",
+    summary: "Organize clients with tags and filters so your roster stays easy to navigate.",
+  },
+  {
+    id: "d-documents",
+    audience: "dietitian",
+    category: "Clinic & clients",
+    title: "Client documents",
+    summary: "Upload and share documents on each client chart — documents live on the chart, not as a separate top-level nav.",
   },
 
   // Meal planning
@@ -67,20 +84,27 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     summary: "Review published plan versions so care stays continuous as needs change.",
   },
 
-  // Recipes & foods
+  // Nutrition libraries
   {
     id: "d-recipes",
     audience: "dietitian",
-    category: "Recipes & foods",
-    title: "Recipes",
-    summary: "Create recipes with ingredients from the food database for reuse in meal plans.",
+    category: "Nutrition libraries",
+    title: "Meal library",
+    summary: "Create reusable meals and recipes with ingredients from the food database for meal plans.",
   },
   {
     id: "d-foods",
     audience: "dietitian",
-    category: "Recipes & foods",
-    title: "Food database",
-    summary: "Search the food catalog and apply organization overrides when needed.",
+    category: "Nutrition libraries",
+    title: "Foods",
+    summary: "Search the food catalog and add custom foods for your practice.",
+  },
+  {
+    id: "d-habits",
+    audience: "dietitian",
+    category: "Nutrition libraries",
+    title: "Habit library",
+    summary: "Maintain habits you assign for portal tracking and care focus.",
   },
 
   // Tracking
@@ -99,7 +123,7 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     audience: "dietitian",
     category: "Appointments",
     title: "Appointments",
-    summary: "Schedule and manage appointments on each client chart.",
+    summary: "Schedule and manage appointments on each client chart and the clinic calendar.",
   },
   {
     id: "d-calendar",
@@ -117,15 +141,6 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     title: "Secure messaging",
     summary: "Message clients from your clinic inbox with a thread per client.",
     highlight: true,
-  },
-
-  // Documents
-  {
-    id: "d-documents",
-    audience: "dietitian",
-    category: "Documents",
-    title: "Client documents",
-    summary: "Upload and share documents on each client chart for both sides of care.",
   },
 
   // Invoices
@@ -153,13 +168,6 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     category: "Analytics",
     title: "Practice analytics",
     summary: "Review overview metrics, financial summaries, clients needing attention, and activity.",
-  },
-  {
-    id: "d-dashboard",
-    audience: "dietitian",
-    category: "Analytics",
-    title: "Practice dashboard",
-    summary: "See clients, tasks, invoices, upcoming appointments, and recent activity at a glance.",
   },
 
   // AI
@@ -209,8 +217,8 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     id: "p-food",
     audience: "patient",
     category: "Tracking",
-    title: "Food logging",
-    summary: "Log meals by searching foods and recording quantity and unit.",
+    title: "Daily log",
+    summary: "Log food, water, exercise, sleep, and habits in one daily tracking area.",
     highlight: true,
   },
   {
@@ -247,8 +255,17 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     id: "p-progress",
     audience: "patient",
     category: "Progress",
-    title: "Today’s progress",
-    summary: "See a clear summary of today’s intake and tracking on your progress page.",
+    title: "Progress",
+    summary: "See a clear summary of intake and tracking over time on your progress page.",
+  },
+
+  // Assessments
+  {
+    id: "p-assessments",
+    audience: "patient",
+    category: "Assessments",
+    title: "Assessments",
+    summary: "Complete assessment forms your dietitian assigns from the portal.",
   },
 
   // Messages
@@ -261,6 +278,15 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     highlight: true,
   },
 
+  // Appointments
+  {
+    id: "p-appointments",
+    audience: "patient",
+    category: "Appointments",
+    title: "View appointments",
+    summary: "See upcoming appointments scheduled with your clinic.",
+  },
+
   // Documents
   {
     id: "p-documents",
@@ -270,11 +296,11 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     summary: "View shared files and upload documents your dietitian can review.",
   },
 
-  // Invoices
+  // Billing
   {
     id: "p-invoices",
     audience: "patient",
-    category: "Invoices",
+    category: "Billing",
     title: "View invoices",
     summary: "See invoices issued by your clinic (view-only; online payment is not built in).",
   },
@@ -285,7 +311,7 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     audience: "patient",
     category: "Profile",
     title: "Profile",
-    summary: "View your account name and the clinic you are connected to.",
+    summary: "View your account details and the clinic you are connected to.",
   },
 
   // Join-code onboarding
@@ -305,13 +331,13 @@ export interface MarketingFeatureCategory {
 }
 
 const DIETITIAN_CATEGORY_ORDER = [
+  "Overview",
   "Clinic & clients",
   "Meal planning",
-  "Recipes & foods",
+  "Nutrition libraries",
   "Tracking",
   "Appointments",
   "Messaging",
-  "Documents",
   "Invoices",
   "Tasks",
   "Analytics",
@@ -324,9 +350,11 @@ const PATIENT_CATEGORY_ORDER = [
   "My Plan",
   "Tracking",
   "Progress",
+  "Assessments",
   "Messages",
+  "Appointments",
   "Documents",
-  "Invoices",
+  "Billing",
   "Profile",
   "Join-code onboarding",
 ] as const;

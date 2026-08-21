@@ -56,4 +56,13 @@ export class RegisterDto {
   @MinLength(1)
   @MaxLength(80)
   lastName?: string;
+
+  @ApiPropertyOptional({
+    enum: ["dietitian", "patient"],
+    description: "Which self-serve registration gate to enforce. Defaults to dietitian.",
+    default: "dietitian",
+  })
+  @IsOptional()
+  @IsEnum(["dietitian", "patient"])
+  audience?: "dietitian" | "patient";
 }

@@ -30,7 +30,11 @@ export interface SiteSettings {
   ctaText: string;
   ctaHref: string;
   ctaVisible: boolean;
+  dietitianRegistrationEnabled: boolean;
+  patientRegistrationEnabled: boolean;
+  /** True when either audience can self-register. */
   registrationEnabled: boolean;
+  plansPageEnabled?: boolean;
   emailNotificationsEnabled?: boolean;
   dietitianSignInLabel: string;
   patientSignInLabel: string;
@@ -51,13 +55,17 @@ export const FALLBACK_SITE_SETTINGS: SiteSettings = {
   navItems: [
     { href: "/how-it-works", label: "How it works", visible: true, order: 0 },
     { href: "/features", label: "Features", visible: true, order: 1 },
-    { href: "/faq", label: "FAQ", visible: true, order: 2 },
-    { href: "/contact", label: "Contact", visible: true, order: 3 },
+    { href: "/plans", label: "Plans", visible: true, order: 2 },
+    { href: "/faq", label: "FAQ", visible: true, order: 3 },
+    { href: "/contact", label: "Contact", visible: true, order: 4 },
   ],
   ctaText: "Get Started",
-  ctaHref: "/auth/dietitian/register",
+  ctaHref: "/plans",
   ctaVisible: true,
+  dietitianRegistrationEnabled: false,
+  patientRegistrationEnabled: false,
   registrationEnabled: false,
+  plansPageEnabled: true,
   emailNotificationsEnabled: false,
   dietitianSignInLabel: "Sign in as Dietitian",
   patientSignInLabel: "Sign in as Patient",
@@ -69,6 +77,7 @@ export const FALLBACK_SITE_SETTINGS: SiteSettings = {
       links: [
         { href: "/how-it-works", label: "How it works" },
         { href: "/features", label: "Features" },
+        { href: "/plans", label: "Plans" },
         { href: "/faq", label: "FAQ" },
         { href: "/contact", label: "Contact" },
       ],
@@ -77,7 +86,7 @@ export const FALLBACK_SITE_SETTINGS: SiteSettings = {
       title: "For Dietitians",
       links: [
         { href: "/auth/dietitian/login", label: "Dietitian sign in" },
-        { href: "/auth/dietitian/register", label: "Create clinic account" },
+        { href: "/plans", label: "View plans" },
       ],
     },
     {

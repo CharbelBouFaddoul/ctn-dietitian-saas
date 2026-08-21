@@ -32,7 +32,17 @@ export interface PlatformSettingsPayload {
   ctaText: string;
   ctaHref: string;
   ctaVisible: boolean;
+  /** Self-serve dietitian (clinic) registration. */
+  dietitianRegistrationEnabled: boolean;
+  /** Self-serve patient registration. */
+  patientRegistrationEnabled: boolean;
+  /**
+   * True when either dietitian or patient self-registration is open.
+   * Computed for backward-compatible consumers.
+   */
   registrationEnabled: boolean;
+  /** When false, /plans redirects to contact and Get Started goes to /contact. */
+  plansPageEnabled: boolean;
   /** Product notification emails (invoice, automation). Auth emails always send. */
   emailNotificationsEnabled: boolean;
   dietitianSignInLabel: string;
@@ -54,13 +64,17 @@ export const DEFAULT_PLATFORM_SETTINGS: PlatformSettingsPayload = {
   navItems: [
     { href: "/how-it-works", label: "How it works", visible: true, order: 0 },
     { href: "/features", label: "Features", visible: true, order: 1 },
-    { href: "/faq", label: "FAQ", visible: true, order: 2 },
-    { href: "/contact", label: "Contact", visible: true, order: 3 },
+    { href: "/plans", label: "Plans", visible: true, order: 2 },
+    { href: "/faq", label: "FAQ", visible: true, order: 3 },
+    { href: "/contact", label: "Contact", visible: true, order: 4 },
   ],
   ctaText: "Get Started",
-  ctaHref: "/auth/dietitian/register",
+  ctaHref: "/plans",
   ctaVisible: true,
+  dietitianRegistrationEnabled: false,
+  patientRegistrationEnabled: false,
   registrationEnabled: false,
+  plansPageEnabled: true,
   emailNotificationsEnabled: false,
   dietitianSignInLabel: "Sign in as Dietitian",
   patientSignInLabel: "Sign in as Patient",
@@ -72,6 +86,7 @@ export const DEFAULT_PLATFORM_SETTINGS: PlatformSettingsPayload = {
       links: [
         { href: "/how-it-works", label: "How it works" },
         { href: "/features", label: "Features" },
+        { href: "/plans", label: "Plans" },
         { href: "/faq", label: "FAQ" },
         { href: "/contact", label: "Contact" },
       ],
@@ -80,7 +95,7 @@ export const DEFAULT_PLATFORM_SETTINGS: PlatformSettingsPayload = {
       title: "For Dietitians",
       links: [
         { href: "/auth/dietitian/login", label: "Dietitian sign in" },
-        { href: "/auth/dietitian/register", label: "Create practice account" },
+        { href: "/plans", label: "View plans" },
       ],
     },
     {

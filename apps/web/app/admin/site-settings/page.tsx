@@ -56,7 +56,9 @@ function AdminSiteSettingsForm() {
   const [ctaText, setCtaText] = useState("");
   const [ctaHref, setCtaHref] = useState("");
   const [ctaVisible, setCtaVisible] = useState(true);
-  const [registrationEnabled, setRegistrationEnabled] = useState(false);
+  const [dietitianRegistrationEnabled, setDietitianRegistrationEnabled] = useState(false);
+  const [patientRegistrationEnabled, setPatientRegistrationEnabled] = useState(false);
+  const [plansPageEnabled, setPlansPageEnabled] = useState(true);
   const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState(false);
   const [dietitianSignInLabel, setDietitianSignInLabel] = useState("");
   const [patientSignInLabel, setPatientSignInLabel] = useState("");
@@ -75,7 +77,11 @@ function AdminSiteSettingsForm() {
     setCtaText(data.ctaText);
     setCtaHref(data.ctaHref);
     setCtaVisible(data.ctaVisible);
-    setRegistrationEnabled(data.registrationEnabled);
+    setDietitianRegistrationEnabled(
+      data.dietitianRegistrationEnabled ?? data.registrationEnabled,
+    );
+    setPatientRegistrationEnabled(data.patientRegistrationEnabled ?? data.registrationEnabled);
+    setPlansPageEnabled(data.plansPageEnabled !== false);
     setEmailNotificationsEnabled(data.emailNotificationsEnabled === true);
     setDietitianSignInLabel(data.dietitianSignInLabel);
     setPatientSignInLabel(data.patientSignInLabel);
@@ -153,7 +159,9 @@ function AdminSiteSettingsForm() {
           ctaText,
           ctaHref,
           ctaVisible,
-          registrationEnabled,
+          dietitianRegistrationEnabled,
+          patientRegistrationEnabled,
+          plansPageEnabled,
           emailNotificationsEnabled,
           dietitianSignInLabel,
           patientSignInLabel,
@@ -210,13 +218,33 @@ function AdminSiteSettingsForm() {
                 <Input value={brandText} onChange={(event) => setBrandText(event.target.value)} required />
               </Field>
               <Field label="Self-serve registration">
+                <div className="ui-stack" style={{ gap: 10 }}>
+                  <label className="ui-check">
+                    <input
+                      type="checkbox"
+                      checked={dietitianRegistrationEnabled}
+                      onChange={(event) => setDietitianRegistrationEnabled(event.target.checked)}
+                    />
+                    <span>Allow dietitian (clinic) registration</span>
+                  </label>
+                  <label className="ui-check">
+                    <input
+                      type="checkbox"
+                      checked={patientRegistrationEnabled}
+                      onChange={(event) => setPatientRegistrationEnabled(event.target.checked)}
+                    />
+                    <span>Allow patient registration</span>
+                  </label>
+                </div>
+              </Field>
+              <Field label="Plans page">
                 <label className="ui-check">
                   <input
                     type="checkbox"
-                    checked={registrationEnabled}
-                    onChange={(event) => setRegistrationEnabled(event.target.checked)}
+                    checked={plansPageEnabled}
+                    onChange={(event) => setPlansPageEnabled(event.target.checked)}
                   />
-                  <span>Allow dietitian and patient self-registration</span>
+                  <span>Show the public Plans marketing page (when off, Get Started goes to Contact; admin plan entitlements are unchanged)</span>
                 </label>
               </Field>
               <Field label="Product email notifications">
