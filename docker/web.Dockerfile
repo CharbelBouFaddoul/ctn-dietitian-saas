@@ -6,15 +6,17 @@ RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
 WORKDIR /app
 
 FROM base AS build
-# Coolify may inject NODE_ENV=production as a build ARG; that skips
-# devDependencies (typescript) and breaks next.config.ts / next build.
-ENV NODE_ENV=development
+# Coolify may inject NODE_ENV=production as a build ARG. Install must still
+# include devDependencies (typescript). Next build must run as production.
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc turbo.json tsconfig.base.json ./
 COPY apps ./apps
 COPY packages ./packages
-RUN pnpm install --frozen-lockfile
+# --prod=false forces devDeps even if NODE_ENV=production is injected.
+# Filter to web (+ deps) to cut install size/RAM on small VPS.
+RUN pnpm install --frozen-lockfile --prod=false --filter=@nutrition-saas/web...
+ENV NODE_ENV=production
 RUN pnpm --filter @nutrition-saas/web build
 
 FROM node:22-bookworm-slim AS runtime
