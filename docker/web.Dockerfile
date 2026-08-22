@@ -6,6 +6,11 @@ RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
 WORKDIR /app
 
 FROM base AS build
+# Coolify may inject NODE_ENV=production as a build ARG; that skips
+# devDependencies (typescript) and breaks next.config.ts / next build.
+ENV NODE_ENV=development
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc turbo.json tsconfig.base.json ./
 COPY apps ./apps
 COPY packages ./packages
