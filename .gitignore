@@ -4,7 +4,9 @@ dist
 .next
 .turbo
 coverage
-storage
+# Uploaded files on disk. Do not ignore apps/api/src/storage (source code).
+/storage
+/apps/api/storage
 backups
 *.log
 .env
