@@ -13,9 +13,13 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc turbo.json tsconfig.base.json ./
 COPY apps ./apps
 COPY packages ./packages
-# --prod=false forces devDeps even if NODE_ENV=production is injected.
-# Filter to web (+ deps) to cut install size/RAM on small VPS.
-RUN pnpm install --frozen-lockfile --prod=false --filter=@nutrition-saas/web...
+# Web + its workspace deps (ui) + root (turbo/typescript).
+# --prod=false keeps devDeps even if Coolify injects NODE_ENV=production.
+RUN pnpm install --frozen-lockfile --prod=false \
+  --filter=@nutrition-saas/web... \
+  --filter=nutrition-saas
+# ui package.json points at dist/; build it before Next transpile/resolve.
+RUN pnpm --filter @nutrition-saas/ui build
 ENV NODE_ENV=production
 RUN pnpm --filter @nutrition-saas/web build
 
