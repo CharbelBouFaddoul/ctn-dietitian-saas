@@ -6,10 +6,12 @@ RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
 WORKDIR /app
 
 FROM base AS build
+# Coolify may inject NODE_ENV=production as a build ARG. Install must still
+# include devDependencies (prisma CLI, nest CLI, typescript).
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc turbo.json tsconfig.base.json ./
 COPY apps ./apps
 COPY packages ./packages
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile --prod=false
 RUN pnpm --filter @nutrition-saas/api exec prisma generate
 RUN pnpm turbo build --filter=@nutrition-saas/api
 

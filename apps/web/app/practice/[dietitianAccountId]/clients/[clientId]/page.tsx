@@ -559,7 +559,6 @@ function ClientWorkspacePage() {
     if (tab === "ai" && !practice.aiAvailable) {
       selectTab("overview");
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only react when AI availability flips
   }, [practice.aiAvailable, tab]);
 
   function applyPortfolio(data: Portfolio) {
@@ -1310,7 +1309,7 @@ function ClientWorkspacePage() {
                   </tbody>
                 </Table>
                 {measurements.length > MEASUREMENTS_PAGE_SIZE ? (
-                  <p className="ui-row" style={{ marginTop: 12, justify: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <p className="ui-row" style={{ marginTop: 12 }}>
                     <span className="ui-muted">
                       Page {measurementsPage} of{" "}
                       {Math.max(1, Math.ceil(measurements.length / MEASUREMENTS_PAGE_SIZE))}

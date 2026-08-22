@@ -174,7 +174,6 @@ export default function AutomationsPage() {
 
   useEffect(() => {
     void load().catch((err) => setError(errorMessage(err, "Unable to load automations")));
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- initial load only
   }, [dietitianAccountId]);
 
   function onActionChange(next: string) {
