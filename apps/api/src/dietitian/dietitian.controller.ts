@@ -60,7 +60,7 @@ export class DietitianController {
   ) {}
 
   private async withProductEmailFlag(
-    settings: DietitianSettingsResponseDto,
+    settings: Omit<DietitianSettingsResponseDto, "productEmailEnabled">,
   ): Promise<DietitianSettingsResponseDto> {
     const productEmailEnabled = await this.platformSettings.isEmailNotificationsEnabled();
     return { ...settings, productEmailEnabled };
