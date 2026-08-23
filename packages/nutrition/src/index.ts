@@ -143,6 +143,11 @@ export function isVolumeUnit(unit: string): unit is VolumeUnit {
   return unit === "ml" || unit === "l" || unit === "fl_oz";
 }
 
+/** Units allowed for a food given its reference basis (g vs ml). */
+export function unitsForReferenceUnit(referenceUnit: "g" | "ml"): FoodQuantityUnit[] {
+  return referenceUnit === "g" ? ["g", "kg", "oz", "lb"] : ["ml", "l", "fl_oz"];
+}
+
 export function quantityToGrams(quantity: number, unit: MassUnit): number {
   switch (unit) {
     case "g":
@@ -174,6 +179,21 @@ export class IncompatibleFoodUnitError extends Error {
   }
 }
 
+export function assertCompatibleFoodUnit(
+  referenceUnit: "g" | "ml",
+  unit: string,
+): asserts unit is FoodQuantityUnit {
+  if (referenceUnit === "g") {
+    if (!isMassUnit(unit)) {
+      throw new IncompatibleFoodUnitError("This food is mass-based; use g, kg, oz, or lb");
+    }
+    return;
+  }
+  if (!isVolumeUnit(unit)) {
+    throw new IncompatibleFoodUnitError("This food is volume-based; use ml, l, or fl_oz");
+  }
+}
+
 export interface FoodReference {
   referenceQuantity: number;
   referenceUnit: "g" | "ml";
@@ -196,18 +216,11 @@ export function foodQuantityScaleFactor(
     throw new RangeError("Reference quantity must be greater than zero");
   }
 
-  let quantityInReference: number;
-  if (food.referenceUnit === "g") {
-    if (!isMassUnit(unit)) {
-      throw new IncompatibleFoodUnitError("This food is mass-based; use g, kg, oz, or lb");
-    }
-    quantityInReference = quantityToGrams(quantity, unit);
-  } else {
-    if (!isVolumeUnit(unit)) {
-      throw new IncompatibleFoodUnitError("This food is volume-based; use ml, l, or fl_oz");
-    }
-    quantityInReference = quantityToMilliliters(quantity, unit);
-  }
+  assertCompatibleFoodUnit(food.referenceUnit, unit);
+  const quantityInReference =
+    food.referenceUnit === "g"
+      ? quantityToGrams(quantity, unit as MassUnit)
+      : quantityToMilliliters(quantity, unit as VolumeUnit);
 
   return quantityInReference / food.referenceQuantity;
 }

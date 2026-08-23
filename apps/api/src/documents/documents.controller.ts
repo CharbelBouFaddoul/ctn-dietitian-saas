@@ -98,8 +98,11 @@ export class PortalDocumentsController {
   @UseInterceptors(uploadInterceptor())
   @UseGuards(ThrottlerGuard)
   @Throttle({ [THROTTLE_NAMES.UPLOAD]: {} })
-  async upload(@CurrentUser() user: AuthenticatedRequestUser,
-    @CurrentSession() session: AuthenticatedSession, @UploadedFile() file: UploadedFilePayload) {
+  async upload(
+    @CurrentUser() user: AuthenticatedRequestUser,
+    @CurrentSession() session: AuthenticatedSession,
+    @UploadedFile() file: UploadedFilePayload,
+  ) {
     const client = await this.access.assertPortalAccess(user.id, { activeClientId: session.activeClientId });
     if (!file?.buffer?.length) {
       throw new NotFoundException("File is required");
@@ -112,6 +115,18 @@ export class PortalDocumentsController {
       declaredMime: file.mimetype,
       visibility: "SHARED",
     });
+  }
+
+  @Post(":documentId/archive")
+  @ApiOperation({ summary: "Archive (delete) a shared portal document" })
+  async archive(
+    @CurrentUser() user: AuthenticatedRequestUser,
+    @CurrentSession() session: AuthenticatedSession,
+    @Param("documentId", ParseUUIDPipe) documentId: string,
+  ) {
+    const client = await this.access.assertPortalAccess(user.id, { activeClientId: session.activeClientId });
+    const document = await this.documents.getMetadata(documentId, client, true);
+    return this.documents.archive(document.id, client, user.id);
   }
 }
 

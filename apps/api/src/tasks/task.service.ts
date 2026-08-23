@@ -12,7 +12,7 @@ import { TimelineService } from "../timeline/timeline.service";
 import { NotificationService } from "../notifications/notification.service";
 import { tenantWhere } from "../dietitian/tenant-scope";
 
-export type TaskView = "all" | "mine" | "due_today" | "upcoming" | "overdue" | "completed";
+export type TaskView = "all" | "due_today" | "upcoming" | "overdue" | "completed";
 
 @Injectable()
 export class TaskService {
@@ -27,12 +27,14 @@ export class TaskService {
   async list(
     tenant: DietitianTenantContext,
     query: {
-      view?: TaskView;
+      view?: TaskView | "mine";
       status?: TaskStatus;
       priority?: TaskPriority;
       clientId?: string;
       assignedUserId?: string;
       search?: string;
+      dueFrom?: string;
+      dueTo?: string;
       page?: number;
       limit?: number;
     },
@@ -46,19 +48,33 @@ export class TaskService {
     const endOfToday = new Date(now);
     endOfToday.setHours(23, 59, 59, 999);
 
+    // "mine" is accepted for backward compatibility but ignored — practice tasks
+    // are clinic-scoped; assignment filtering uses assignedUserId when needed.
+    const view = query.view === "mine" ? "all" : query.view;
+
     let dueFilter: Prisma.TaskWhereInput = {};
-    if (query.view === "due_today") {
+    if (view === "due_today") {
       dueFilter = { dueAt: { gte: startOfToday, lte: endOfToday }, status: { in: ["TODO", "IN_PROGRESS"] } };
-    } else if (query.view === "upcoming") {
+    } else if (view === "upcoming") {
       dueFilter = { dueAt: { gt: endOfToday }, status: { in: ["TODO", "IN_PROGRESS"] } };
-    } else if (query.view === "overdue") {
+    } else if (view === "overdue") {
       dueFilter = { dueAt: { lt: new Date() }, status: { in: ["TODO", "IN_PROGRESS"] } };
-    } else if (query.view === "completed") {
+    } else if (view === "completed") {
       dueFilter = { status: "COMPLETED" };
-    } else if (query.view === "mine") {
-      dueFilter = { assignedUserId: tenant.userId };
     }
 
+    if (query.dueFrom || query.dueTo) {
+      dueFilter = {
+        ...dueFilter,
+        dueAt: {
+          ...(typeof dueFilter.dueAt === "object" && dueFilter.dueAt !== null ? dueFilter.dueAt : {}),
+          ...(query.dueFrom ? { gte: new Date(query.dueFrom) } : {}),
+          ...(query.dueTo ? { lte: new Date(query.dueTo) } : {}),
+        },
+      };
+    }
+
+    const search = query.search?.trim();
     const where: Prisma.TaskWhereInput = {
       ...tenantWhere(tenant.dietitianAccountId),
       archivedAt: null,
@@ -72,11 +88,11 @@ export class TaskService {
       ...(query.priority ? { priority: query.priority } : {}),
       ...(query.clientId ? { clientId: query.clientId } : {}),
       ...(query.assignedUserId ? { assignedUserId: query.assignedUserId } : {}),
-      ...(query.search
+      ...(search
         ? {
             OR: [
-              { title: { contains: query.search, mode: "insensitive" } },
-              { description: { contains: query.search, mode: "insensitive" } },
+              { title: { contains: search, mode: "insensitive" } },
+              { description: { contains: search, mode: "insensitive" } },
             ],
           }
         : {}),

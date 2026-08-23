@@ -40,7 +40,7 @@ export class ClientPortfolioService {
         take: 40,
       }),
       this.prisma.assessment.findMany({
-        where: { clientId, ...tenantWhere(orgId) },
+        where: { clientId, ...tenantWhere(orgId), status: { not: "ARCHIVED" } },
         include: { template: { select: { id: true, name: true } } },
         orderBy: { createdAt: "desc" },
         take: 10,

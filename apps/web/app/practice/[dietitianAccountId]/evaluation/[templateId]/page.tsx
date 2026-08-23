@@ -70,12 +70,17 @@ export default function EvaluationFormEditorPage() {
     setError(null);
     setNotice(null);
     try {
-      await api(`${apiBase}/assessment-templates/${templateId}`, {
+      const updated = await api<EvaluationTemplate>(`${apiBase}/assessment-templates/${templateId}`, {
         method: "PATCH",
-        body: JSON.stringify({ name, description: description || undefined }),
+        body: JSON.stringify({
+          name: name.trim(),
+          description: description.trim() ? description.trim() : null,
+        }),
       });
+      setTemplate(updated);
+      setName(updated.name);
+      setDescription(updated.description ?? "");
       setNotice("Form details saved.");
-      await load();
     } catch (err) {
       setError(errorMessage(err, "Unable to save form"));
     } finally {

@@ -75,16 +75,11 @@ const TRIGGERS = [
 const ALL_ACTIONS = [
   {
     value: "SEND_IN_APP_NOTIFICATION",
-    label: "Clinic notification",
-    hint: "Bell notification for you or the client’s Notifications page.",
+    label: "Send notification",
+    hint: "Bell notification in the clinic, the client portal, or both.",
   },
   { value: "SEND_EMAIL", label: "Send email", hint: "Email subject and body to you or the client." },
   { value: "CREATE_TASK", label: "Create follow-up task", hint: "Adds a task on your clinic Tasks list." },
-  {
-    value: "CREATE_CLIENT_NOTIFICATION",
-    label: "Client portal notification",
-    hint: "Appears under Notifications for the client — not a chat message.",
-  },
   {
     value: "SEND_MESSAGE",
     label: "Send message",
@@ -129,7 +124,7 @@ export default function AutomationsPage() {
   const [triggerType, setTriggerType] = useState("CLIENT_INACTIVE");
   const [actionType, setActionType] = useState("CREATE_TASK");
   const [timingValue, setTimingValue] = useState(3);
-  const [recipient, setRecipient] = useState<"ASSIGNED_DIETITIAN" | "CLIENT">("ASSIGNED_DIETITIAN");
+  const [recipient, setRecipient] = useState<"ASSIGNED_DIETITIAN" | "CLIENT" | "BOTH">("ASSIGNED_DIETITIAN");
   const [clientScope, setClientScope] = useState<"ALL" | "SELECTED">("ALL");
   const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
   const [clientFilter, setClientFilter] = useState("");
@@ -181,8 +176,10 @@ export default function AutomationsPage() {
     const mode = recipientModeForAction(next);
     if (mode === "locked-client") setRecipient("CLIENT");
     else if (mode === "hidden") setRecipient("ASSIGNED_DIETITIAN");
-    else if (recipient !== "ASSIGNED_DIETITIAN" && recipient !== "CLIENT") {
+    else if (recipient !== "ASSIGNED_DIETITIAN" && recipient !== "CLIENT" && recipient !== "BOTH") {
       setRecipient(defaultRecipientForAction(next));
+    } else if (next === "SEND_EMAIL" && recipient === "BOTH") {
+      setRecipient("ASSIGNED_DIETITIAN");
     }
   }
 
@@ -454,9 +451,6 @@ export default function AutomationsPage() {
                   </Select>
                 </Field>
                 {selectedAction?.hint ? <p className="ui-muted ui-rule-step__hint">{selectedAction.hint}</p> : null}
-                {usage && !usage.productEmailEnabled ? (
-                  <p className="ui-muted ui-rule-step__hint">Product email is off for this platform.</p>
-                ) : null}
               </div>
 
               {whoMode !== "hidden" ? (
@@ -475,13 +469,23 @@ export default function AutomationsPage() {
                     <Field label="Recipient">
                       <Select
                         value={recipient}
-                        onChange={(e) => setRecipient(e.target.value as "ASSIGNED_DIETITIAN" | "CLIENT")}
+                        onChange={(e) =>
+                          setRecipient(e.target.value as "ASSIGNED_DIETITIAN" | "CLIENT" | "BOTH")
+                        }
                       >
                         <option value="ASSIGNED_DIETITIAN">You (clinic)</option>
                         <option value="CLIENT">Client (portal)</option>
+                        {actionType === "SEND_IN_APP_NOTIFICATION" ? (
+                          <option value="BOTH">Clinic and client</option>
+                        ) : null}
                       </Select>
                     </Field>
                   )}
+                  {actionType === "SEND_IN_APP_NOTIFICATION" && recipient === "BOTH" ? (
+                    <p className="ui-muted ui-rule-step__hint">
+                      Creates the same notification in your clinic bell and the client’s portal.
+                    </p>
+                  ) : null}
                 </div>
               ) : null}
             </div>

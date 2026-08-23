@@ -60,11 +60,11 @@ class UpdateTemplateDto {
   @MaxLength(120)
   name?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ nullable: true })
   @IsOptional()
   @IsString()
   @MaxLength(500)
-  description?: string;
+  description?: string | null;
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -297,5 +297,16 @@ export class AssessmentController {
       assessmentId,
       body.responses as Prisma.InputJsonValue | undefined,
     );
+  }
+
+  @Post("clients/:clientId/assessments/:assessmentId/archive")
+  @UseGuards(ClientAccessGuard)
+  @ClientActionRequired("manageRecords")
+  archive(
+    @CurrentTenant() tenant: DietitianTenantContext,
+    @Param("clientId", ParseUUIDPipe) clientId: string,
+    @Param("assessmentId", ParseUUIDPipe) assessmentId: string,
+  ) {
+    return this.assessments.archive(tenant, clientId, assessmentId);
   }
 }

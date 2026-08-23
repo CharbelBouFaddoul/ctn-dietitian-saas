@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { Alert, Breadcrumbs, PageHeader, StatusBadge } from "@nutrition-saas/ui";
+import { useParams, useRouter } from "next/navigation";
+import { Alert, Breadcrumbs, Button, ConfirmDialog, PageHeader, StatusBadge } from "@nutrition-saas/ui";
 import { AssessmentForm } from "../../../../../../../components/assessment-form";
 import { api } from "../../../../../../../lib/api";
 import {
@@ -16,6 +16,7 @@ import { canManageClients } from "../../../../../../../lib/practice-access";
 import { usePractice } from "../../../../practice-shell";
 
 export default function ClientEvaluationDetailPage() {
+  const router = useRouter();
   const { dietitianAccountId, role } = usePractice();
   const params = useParams<{ clientId: string; assessmentId: string }>();
   const clientId = params.clientId;
@@ -28,6 +29,8 @@ export default function ClientEvaluationDetailPage() {
   const [responses, setResponses] = useState<Record<string, unknown>>({});
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [clientName, setClientName] = useState("Client");
 
   useEffect(() => {
@@ -73,6 +76,11 @@ export default function ClientEvaluationDetailPage() {
         actions={
           <div className="ui-eval__header-actions">
             <StatusBadge status={selected.status} label={evaluationStatusLabel(selected.status)} />
+            {allowManage ? (
+              <Button type="button" size="sm" variant="secondary" onClick={() => setConfirmDelete(true)}>
+                Delete
+              </Button>
+            ) : null}
             <Link href={chartHref} className="ui-btn ui-btn--secondary ui-btn--sm">
               Back to evaluations
             </Link>
@@ -130,6 +138,30 @@ export default function ClientEvaluationDetailPage() {
           }
         />
       </div>
+
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Delete this evaluation?"
+        description="It will be removed from this client chart and from the patient’s portal. This cannot be undone."
+        confirmLabel="Delete evaluation"
+        pending={deleting}
+        onCancel={() => {
+          if (deleting) return;
+          setConfirmDelete(false);
+        }}
+        onConfirm={() => {
+          setDeleting(true);
+          void api(`${apiBase}/archive`, { method: "POST" })
+            .then(() => {
+              router.push(chartHref);
+            })
+            .catch((err) => {
+              setError(errorMessage(err, "Unable to delete evaluation"));
+              setConfirmDelete(false);
+            })
+            .finally(() => setDeleting(false));
+        }}
+      />
     </section>
   );
 }

@@ -19,7 +19,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import type { DietitianTenantContext } from "../dietitian/dietitian.types";
 import { tenantWhere } from "../dietitian/tenant-scope";
 import { validateRulePayload } from "./automation.schemas";
-import { ACTION_LABELS, TRIGGER_LABELS } from "./automation-catalog";
+import { ACTION_LABELS, RECIPIENT_LABELS, TRIGGER_LABELS } from "./automation-catalog";
 import { AutomationUsageService } from "./automation-usage.service";
 
 @Injectable()
@@ -348,7 +348,9 @@ export class AutomationService {
       `When: ${TRIGGER_LABELS[rule.triggerType]}`,
       Object.keys(timing).length ? `Timing: ${JSON.stringify(timing)}` : null,
       `Then: ${ACTION_LABELS[rule.actionType]}`,
-      config.recipient ? `To: ${config.recipient}` : null,
+      config.recipient
+        ? `To: ${RECIPIENT_LABELS[config.recipient as keyof typeof RECIPIENT_LABELS] ?? config.recipient}`
+        : null,
       scopeLabel,
     ].filter(Boolean);
     return `${rule.name} — ${parts.join(". ")}`;

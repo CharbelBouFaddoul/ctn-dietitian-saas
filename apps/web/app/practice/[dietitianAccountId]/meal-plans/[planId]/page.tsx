@@ -185,6 +185,24 @@ export default function MealPlanEditorPage() {
       `/api/v1/dietitian/${dietitianAccountId}/meal-plans/${planId}/versions/${selected}`,
     );
     setVersion(loaded);
+    setError(null);
+    const first = loaded.snapshot.days[0];
+    if (!activeDayId && first) {
+      setActiveDayId(first.id);
+      setActiveWeek(weekOfDay(first.dayNumber));
+    } else if (activeDayId) {
+      const still = loaded.snapshot.days.find((d) => d.id === activeDayId);
+      if (still) setActiveWeek(weekOfDay(still.dayNumber));
+      else if (first) {
+        setActiveDayId(first.id);
+        setActiveWeek(weekOfDay(first.dayNumber));
+      }
+    }
+  }
+
+  function applyVersion(loaded: VersionDetail) {
+    setVersion(loaded);
+    setError(null);
     const first = loaded.snapshot.days[0];
     if (!activeDayId && first) {
       setActiveDayId(first.id);
@@ -401,7 +419,7 @@ export default function MealPlanEditorPage() {
     const qty = hit.referenceQuantity ?? Number(quantity);
     const u = hit.referenceUnit ?? unit;
     try {
-      await api(
+      const loaded = await api<VersionDetail>(
         `/api/v1/dietitian/${dietitianAccountId}/meal-plans/${planId}/versions/${version.id}/meals/${mealId}/items`,
         {
           method: "POST",
@@ -411,7 +429,7 @@ export default function MealPlanEditorPage() {
       setFoodHits([]);
       setFoodQuery("");
       setServingHint(null);
-      await load(version.id);
+      applyVersion(loaded);
     } catch (err) {
       setError(errorMessage(err, "Could not add food"));
     }
@@ -421,7 +439,7 @@ export default function MealPlanEditorPage() {
     if (!version) return;
     setError(null);
     try {
-      await api(
+      const loaded = await api<VersionDetail>(
         `/api/v1/dietitian/${dietitianAccountId}/meal-plans/${planId}/versions/${version.id}/meals/${mealId}/items`,
         {
           method: "POST",
@@ -435,7 +453,7 @@ export default function MealPlanEditorPage() {
       );
       setRecipeHits([]);
       setRecipeQuery("");
-      await load(version.id);
+      applyVersion(loaded);
     } catch (err) {
       setError(errorMessage(err, "Could not add recipe"));
     }

@@ -3,6 +3,7 @@ import type { AutomationActionType, AutomationTriggerType } from "@prisma/client
 export const AUTOMATION_RECIPIENTS = [
   "ASSIGNED_DIETITIAN",
   "CLIENT",
+  "BOTH",
   "RULE_CREATOR",
   "SPECIFIC_MEMBER",
 ] as const;
@@ -37,11 +38,19 @@ export const TRIGGER_LABELS: Record<AutomationTriggerType, string> = {
 };
 
 export const ACTION_LABELS: Record<AutomationActionType, string> = {
-  SEND_IN_APP_NOTIFICATION: "Clinic notification",
+  SEND_IN_APP_NOTIFICATION: "Send notification",
   SEND_EMAIL: "Send email",
   CREATE_TASK: "Create follow-up task",
-  CREATE_CLIENT_NOTIFICATION: "Client portal notification",
+  CREATE_CLIENT_NOTIFICATION: "Send notification",
   SEND_MESSAGE: "Send message",
+};
+
+export const RECIPIENT_LABELS: Record<AutomationRecipient, string> = {
+  ASSIGNED_DIETITIAN: "You (clinic)",
+  CLIENT: "Client (portal)",
+  BOTH: "Clinic and client",
+  RULE_CREATOR: "Rule creator",
+  SPECIFIC_MEMBER: "Specific member",
 };
 
 export const TEMPLATE_VAR_PATTERN = /\{\{([a-zA-Z0-9_.]+)\}\}/g;

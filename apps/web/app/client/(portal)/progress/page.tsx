@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Alert, Button, EmptyState, LineChart, PageHeader, Section, Skeleton } from "@nutrition-saas/ui";
+import { Alert, EmptyState, PageHeader, Section, Skeleton } from "@nutrition-saas/ui";
+import { ClientEvolutionPanel } from "../../../../components/client-evolution-panel";
 import { api } from "../../../../lib/api";
 import { errorMessage } from "../../../../lib/humanize-error";
 import { nutritionLabel } from "../../../../lib/format";
-import { addLocalDays, localDateKey } from "../../../../lib/local-date";
 import { PatientAccents } from "../patient-accents";
 
 interface Summary {
@@ -19,46 +19,25 @@ interface Summary {
   habits: { completed: number; total: number };
 }
 
-type EvolutionResponse = {
-  series: Record<string, Array<{ at: string; value: number; unit: string }>>;
-  bmiSeries: Array<{ at: string; value: number; unit: string }>;
-  comparison: { available: boolean; weight: { absolute: number; percent: number | null } | null };
-};
-
-type RangePreset = "7" | "30" | "90" | "all";
-
-function rangeQuery(preset: RangePreset): string {
-  if (preset === "all") return "";
-  const days = Number(preset);
-  const to = localDateKey();
-  const from = addLocalDays(to, -(days - 1));
-  return `?from=${from}T00:00:00.000Z&to=${to}T23:59:59.999Z`;
-}
-
 export default function ClientProgressPage() {
   const [summary, setSummary] = useState<Summary | null>(null);
-  const [evolution, setEvolution] = useState<EvolutionResponse | null>(null);
-  const [range, setRange] = useState<RangePreset>("30");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [connectionKey, setConnectionKey] = useState(0);
 
-  async function load(preset: RangePreset = range) {
-    const [s, evo] = await Promise.all([
-      api<Summary>("/api/v1/portal/tracking/summary"),
-      api<EvolutionResponse>(`/api/v1/portal/evolution${rangeQuery(preset)}`).catch(() => null),
-    ]);
-    setSummary(s);
-    setEvolution(evo);
+  async function loadSummary() {
+    setSummary(await api<Summary>("/api/v1/portal/tracking/summary"));
   }
 
   useEffect(() => {
-    void load()
+    void loadSummary()
       .catch((err) => setError(errorMessage(err, "Unable to load progress")))
       .finally(() => setLoading(false));
 
     function onSwitch() {
       setLoading(true);
-      void load()
+      setConnectionKey((key) => key + 1);
+      void loadSummary()
         .then(() => setError(null))
         .catch((err) => setError(errorMessage(err, "Unable to load progress")))
         .finally(() => setLoading(false));
@@ -67,19 +46,6 @@ export default function ClientProgressPage() {
     return () => window.removeEventListener("portal-connection-changed", onSwitch);
   }, []);
 
-  async function selectRange(preset: RangePreset) {
-    setRange(preset);
-    setLoading(true);
-    try {
-      await load(preset);
-      setError(null);
-    } catch (err) {
-      setError(errorMessage(err, "Unable to load progress"));
-    } finally {
-      setLoading(false);
-    }
-  }
-
   const hasAny =
     summary &&
     (summary.food.presented.energyKcal != null ||
@@ -87,9 +53,6 @@ export default function ClientProgressPage() {
       summary.exercise.totalDurationMinutes > 0 ||
       summary.sleep?.durationMinutes ||
       summary.habits.completed > 0);
-
-  const weightPoints = (evolution?.series.WEIGHT ?? []).map((p) => ({ at: p.at, value: p.value }));
-  const weightUnit = evolution?.series.WEIGHT?.[0]?.unit ?? "kg";
 
   const metrics = [
     {
@@ -182,38 +145,16 @@ export default function ClientProgressPage() {
       )}
 
       <Section
-        title="Weight evolution"
+        title="Measurement evolution"
+        description="Weight, height, BMI, body composition, and other readings recorded for this clinic."
         tone="muted"
-        actions={
-          <div className="ui-row" style={{ gap: 6, flexWrap: "wrap" }}>
-            {(["7", "30", "90", "all"] as const).map((preset) => (
-              <Button
-                key={preset}
-                type="button"
-                size="sm"
-                variant={range === preset ? "primary" : "secondary"}
-                onClick={() => void selectRange(preset)}
-              >
-                {preset === "all" ? "All" : `${preset}d`}
-              </Button>
-            ))}
-          </div>
-        }
       >
-        <LineChart
-          points={weightPoints}
-          unit={weightUnit}
-          emptyTitle="No weight measurements yet for this clinic connection."
+        <ClientEvolutionPanel
+          key={connectionKey}
+          base="/api/v1/portal"
+          allowManage={false}
+          onError={(message) => setError(message)}
         />
-        {evolution?.comparison.weight ? (
-          <p className="ui-muted" style={{ marginTop: 8 }}>
-            Change since first reading: {evolution.comparison.weight.absolute >= 0 ? "+" : ""}
-            {evolution.comparison.weight.absolute} {weightUnit}
-            {evolution.comparison.weight.percent != null
-              ? ` (${evolution.comparison.weight.percent >= 0 ? "+" : ""}${evolution.comparison.weight.percent}%)`
-              : ""}
-          </p>
-        ) : null}
       </Section>
     </section>
   );

@@ -2,7 +2,7 @@
 
 import { FormEvent, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import {
   Alert,
   Button,
@@ -69,7 +69,6 @@ function todayLocal(): string {
 }
 
 function ClientAddFoodPageInner() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const dateParam = searchParams.get("date");
   const date = dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : todayLocal();
@@ -206,10 +205,12 @@ function ClientAddFoodPageInner() {
       {error ? <Alert tone="danger">{error}</Alert> : null}
       {notice ? (
         <Alert tone="success">
-          {notice}{" "}
-          <button type="button" className="ui-link" onClick={() => router.push(backHref)}>
-            Return to Daily log
-          </button>
+          <span className="ui-alert__body">
+            <span>{notice}</span>
+            <Link href={backHref} className="ui-btn ui-btn--secondary ui-btn--sm">
+              Return to Daily log
+            </Link>
+          </span>
         </Alert>
       ) : null}
 

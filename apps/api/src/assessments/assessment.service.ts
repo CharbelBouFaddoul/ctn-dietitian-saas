@@ -74,7 +74,7 @@ export class AssessmentService {
     templateId: string,
     input: {
       name?: string;
-      description?: string;
+      description?: string | null;
       schema?: Prisma.InputJsonValue;
       status?: "ACTIVE" | "INACTIVE" | "ARCHIVED";
     },
@@ -90,10 +90,10 @@ export class AssessmentService {
     return this.prisma.assessmentTemplate.update({
       where: { id: templateId },
       data: {
-        name: input.name?.trim(),
-        description: input.description,
-        schema,
-        status: input.status,
+        ...(input.name !== undefined ? { name: input.name.trim() } : {}),
+        ...(input.description !== undefined ? { description: input.description?.trim() || null } : {}),
+        ...(schema !== undefined ? { schema } : {}),
+        ...(input.status !== undefined ? { status: input.status } : {}),
         version: bumpVersion ? template.version + 1 : template.version,
       },
     });
@@ -187,10 +187,19 @@ export class AssessmentService {
     );
   }
 
+  async archive(tenant: DietitianTenantContext, clientId: string, assessmentId: string) {
+    await this.access.assertCanAccess(tenant, clientId, "manageRecords");
+    return this.archiveForClient(tenant.dietitianAccountId, clientId, assessmentId, tenant.userId);
+  }
+
   /** Portal / scoped helpers (ownership already asserted). */
   async listForClient(dietitianAccountId: string, clientId: string) {
     const rows = await this.prisma.assessment.findMany({
-      where: { clientId, ...tenantWhere(dietitianAccountId) },
+      where: {
+        clientId,
+        ...tenantWhere(dietitianAccountId),
+        status: { not: "ARCHIVED" },
+      },
       include: { template: true },
       orderBy: { createdAt: "desc" },
     });
@@ -199,7 +208,12 @@ export class AssessmentService {
 
   async getForClient(dietitianAccountId: string, clientId: string, assessmentId: string) {
     const row = await this.prisma.assessment.findFirst({
-      where: { id: assessmentId, clientId, ...tenantWhere(dietitianAccountId) },
+      where: {
+        id: assessmentId,
+        clientId,
+        ...tenantWhere(dietitianAccountId),
+        status: { not: "ARCHIVED" },
+      },
       include: { template: true },
     });
     if (!row) {
@@ -320,6 +334,34 @@ export class AssessmentService {
         targetType: "assessment",
         targetId: assessment.id,
         metadata: { templateVersion: assessment.templateVersion },
+      });
+    }
+    return this.toResponse(assessment);
+  }
+
+  async archiveForClient(
+    dietitianAccountId: string,
+    clientId: string,
+    assessmentId: string,
+    actorUserId: string | null,
+  ) {
+    const existing = await this.requireAssessment(dietitianAccountId, clientId, assessmentId);
+    if (existing.status === "ARCHIVED") {
+      return this.toResponse(existing);
+    }
+    const assessment = await this.prisma.assessment.update({
+      where: { id: assessmentId },
+      data: { status: "ARCHIVED" },
+      include: { template: true },
+    });
+    if (actorUserId) {
+      await this.security.record({
+        type: "assessment_archived",
+        outcome: "success",
+        userId: actorUserId,
+        dietitianAccountId,
+        targetType: "assessment",
+        targetId: assessment.id,
       });
     }
     return this.toResponse(assessment);

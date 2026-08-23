@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
@@ -8,8 +8,10 @@ import {
   Button,
   EmptyState,
   Field,
+  FilterBar,
   Input,
   PageHeader,
+  SearchInput,
   Section,
   Select,
   StatusBadge,
@@ -32,6 +34,7 @@ interface PlanRow {
 
 interface ListResponse {
   items: PlanRow[];
+  total: number;
 }
 
 interface ClientRow {
@@ -39,6 +42,10 @@ interface ClientRow {
   firstName: string;
   lastName: string;
   displayName?: string | null;
+}
+
+function clientLabel(client: ClientRow): string {
+  return client.displayName ?? `${client.firstName} ${client.lastName}`;
 }
 
 export default function MealPlansPage() {
@@ -51,15 +58,21 @@ export default function MealPlansPage() {
   const [dayLabelMode, setDayLabelMode] = useState<"NUMBERED" | "WEEKDAY">("NUMBERED");
   const [clientId, setClientId] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [filterClientId, setFilterClientId] = useState("");
+  const [nameQuery, setNameQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
 
   async function load() {
-    const qs = statusFilter ? `?status=${encodeURIComponent(statusFilter)}` : "";
+    const qs = new URLSearchParams();
+    if (statusFilter) qs.set("status", statusFilter);
+    if (filterClientId) qs.set("clientId", filterClientId);
+    if (nameQuery.trim()) qs.set("q", nameQuery.trim());
+    const query = qs.toString() ? `?${qs.toString()}` : "";
     const [plans, clientList] = await Promise.all([
-      api<ListResponse>(`/api/v1/dietitian/${dietitianAccountId}/meal-plans${qs}`),
+      api<ListResponse>(`/api/v1/dietitian/${dietitianAccountId}/meal-plans${query}`),
       api<{ items: ClientRow[] }>(`/api/v1/dietitian/${dietitianAccountId}/clients?pageSize=50`),
     ]);
     setData(plans);
@@ -68,8 +81,11 @@ export default function MealPlansPage() {
   }
 
   useEffect(() => {
-    void load().catch((err) => setError(errorMessage(err, "Unable to load meal plans")));
-  }, [dietitianAccountId, statusFilter]);
+    const handle = window.setTimeout(() => {
+      void load().catch((err) => setError(errorMessage(err, "Unable to load meal plans")));
+    }, nameQuery.trim() ? 250 : 0);
+    return () => window.clearTimeout(handle);
+  }, [dietitianAccountId, statusFilter, filterClientId, nameQuery]);
 
   async function create(event: FormEvent) {
     event.preventDefault();
@@ -113,6 +129,12 @@ export default function MealPlansPage() {
   }
 
   const items = data?.items ?? [];
+  const hasFilters = Boolean(statusFilter || filterClientId || nameQuery.trim());
+  const filterDescription = useMemo(() => {
+    if (!data) return "Loading…";
+    const count = `${data.total} plan${data.total !== 1 ? "s" : ""}`;
+    return hasFilters ? `${count} matching filters` : count;
+  }, [data, hasFilters]);
 
   return (
     <section className="ui-stack" style={{ gap: 24 }}>
@@ -149,7 +171,7 @@ export default function MealPlansPage() {
                 {clients.length === 0 ? <option value="">No clients yet</option> : null}
                 {clients.map((client) => (
                   <option key={client.id} value={client.id}>
-                    {client.displayName ?? `${client.firstName} ${client.lastName}`}
+                    {clientLabel(client)}
                   </option>
                 ))}
               </Select>
@@ -186,28 +208,78 @@ export default function MealPlansPage() {
         </Section>
       ) : null}
 
-      <Section
-        title="All plans"
-        description="Open a plan to edit meals, publish, or create a new draft version."
-        actions={
-          <Field label="Status">
-            <Select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+      <Section title="Find plans" description="Narrow by name, client, or status." tone="muted">
+        <FilterBar>
+          <div className="ui-filter-bar__field ui-filter-bar__field--grow">
+            <p className="ui-filter-bar__label">Plan name</p>
+            <SearchInput
+              value={nameQuery}
+              onChange={setNameQuery}
+              placeholder="Search plans…"
+              aria-label="Search meal plans by name"
+            />
+          </div>
+          <div className="ui-filter-bar__field">
+            <p className="ui-filter-bar__label">Client</p>
+            <Select
+              value={filterClientId}
+              onChange={(event) => setFilterClientId(event.target.value)}
+              aria-label="Filter by client"
+              className="ui-filter-bar__select"
+            >
+              <option value="">All clients</option>
+              {clients.map((client) => (
+                <option key={client.id} value={client.id}>
+                  {clientLabel(client)}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div className="ui-filter-bar__field">
+            <p className="ui-filter-bar__label">Status</p>
+            <Select
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+              aria-label="Filter by status"
+              className="ui-filter-bar__select"
+            >
               <option value="">Active & drafts</option>
               <option value="DRAFT">Draft plans</option>
               <option value="ACTIVE">Active (published)</option>
               <option value="ARCHIVED">Archived</option>
             </Select>
-          </Field>
-        }
-      >
+          </div>
+          {hasFilters ? (
+            <div className="ui-filter-bar__actions">
+              <button
+                type="button"
+                className="ui-filter-bar__clear"
+                onClick={() => {
+                  setNameQuery("");
+                  setFilterClientId("");
+                  setStatusFilter("");
+                }}
+              >
+                Clear filters
+              </button>
+            </div>
+          ) : null}
+        </FilterBar>
+      </Section>
+
+      <Section title="All plans" description={filterDescription}>
         {items.length === 0 ? (
           <EmptyState
-            title="No meal plans yet"
+            title={hasFilters ? "No meal plans match" : "No meal plans yet"}
             action={
-              <Button onClick={() => setShowCreate(true)}>Create first plan</Button>
+              !hasFilters ? (
+                <Button onClick={() => setShowCreate(true)}>Create first plan</Button>
+              ) : undefined
             }
           >
-            Create a draft, add foods and reusable meals to each day, then publish for the client.
+            {hasFilters
+              ? "Try a different name, client, or status."
+              : "Create a draft, add foods and reusable meals to each day, then publish for the client."}
           </EmptyState>
         ) : (
           <Table>

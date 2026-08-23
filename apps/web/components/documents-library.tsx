@@ -4,6 +4,7 @@ import { FormEvent, useId, useRef, useState, type DragEvent, type ReactNode } fr
 import {
   Badge,
   Button,
+  ConfirmDialog,
   EmptyState,
   humanizeLabel,
   LoadingState,
@@ -35,8 +36,10 @@ type DocumentsLibraryProps = {
   documents: DocumentsLibraryItem[] | null;
   uploading?: boolean;
   downloadingId?: string | null;
+  deletingId?: string | null;
   onUpload: (file: File, visibility: Visibility) => Promise<void>;
   onDownload: (doc: DocumentsLibraryItem) => Promise<void>;
+  onDelete?: (doc: DocumentsLibraryItem) => Promise<void>;
   /** Portal uses a page header; clinic embeds under chart tabs. */
   pageHeader?: boolean;
 };
@@ -179,11 +182,14 @@ export function DocumentsLibrary({
   documents,
   uploading = false,
   downloadingId = null,
+  deletingId = null,
   onUpload,
   onDownload,
+  onDelete,
   pageHeader = false,
 }: DocumentsLibraryProps) {
   const [showUpload, setShowUpload] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<DocumentsLibraryItem | null>(null);
 
   async function handleUpload(file: File, visibility: Visibility) {
     try {
@@ -285,11 +291,22 @@ export function DocumentsLibrary({
                     type="button"
                     variant="secondary"
                     size="sm"
-                    disabled={downloadingId === doc.id}
+                    disabled={downloadingId === doc.id || deletingId === doc.id}
                     onClick={() => void onDownload(doc)}
                   >
                     {downloadingId === doc.id ? "Downloading…" : "Download"}
                   </Button>
+                  {onDelete ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      disabled={downloadingId === doc.id || deletingId === doc.id}
+                      onClick={() => setPendingDelete(doc)}
+                    >
+                      {deletingId === doc.id ? "Deleting…" : "Delete"}
+                    </Button>
+                  ) : null}
                 </div>
               </li>
             );
@@ -304,6 +321,22 @@ export function DocumentsLibrary({
       {header}
       {uploadBlock}
       {body}
+      <ConfirmDialog
+        open={pendingDelete != null}
+        title="Delete this document?"
+        description={
+          pendingDelete
+            ? `“${pendingDelete.filename}” will be removed. This cannot be undone.`
+            : undefined
+        }
+        confirmLabel="Delete"
+        pending={deletingId != null && pendingDelete != null && deletingId === pendingDelete.id}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => {
+          if (!pendingDelete || !onDelete) return;
+          void onDelete(pendingDelete).finally(() => setPendingDelete(null));
+        }}
+      />
     </div>
   );
 }

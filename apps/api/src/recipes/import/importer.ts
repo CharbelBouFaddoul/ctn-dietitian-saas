@@ -42,9 +42,9 @@ export async function importRecipeDataset(
 
   const foods = await prisma.food.findMany({
     where: { foodSourceId: foodSource.id, dietitianAccountId: null },
-    select: { id: true, sourceFoodId: true },
+    select: { id: true, sourceFoodId: true, referenceUnit: true },
   });
-  const foodBySourceId = new Map(foods.map((f) => [f.sourceFoodId, f.id]));
+  const foodBySourceId = new Map(foods.map((f) => [f.sourceFoodId, f]));
 
   for (const record of dataset.recipes) {
     report.processed += 1;
@@ -63,15 +63,22 @@ export async function importRecipeDataset(
       sortOrder: number;
     }> = [];
     let missingFood: string | null = null;
+    let unitMismatch: string | null = null;
     for (let i = 0; i < record.ingredients.length; i += 1) {
       const item = record.ingredients[i]!;
-      const foodId = foodBySourceId.get(item.sourceFoodId);
-      if (!foodId) {
+      const food = foodBySourceId.get(item.sourceFoodId);
+      if (!food) {
         missingFood = item.sourceFoodId;
         break;
       }
+      const massUnits = item.unit === "g" || item.unit === "kg" || item.unit === "oz" || item.unit === "lb";
+      const volumeUnits = item.unit === "ml" || item.unit === "l" || item.unit === "fl_oz";
+      if ((food.referenceUnit === "g" && !massUnits) || (food.referenceUnit === "ml" && !volumeUnits)) {
+        unitMismatch = `${item.sourceFoodId} uses ${item.unit} but food is ${food.referenceUnit}-based`;
+        break;
+      }
       resolved.push({
-        foodId,
+        foodId: food.id,
         quantity: item.quantity,
         unit: item.unit as QuantityUnit,
         displayNote: item.displayNote ?? null,
@@ -82,6 +89,14 @@ export async function importRecipeDataset(
       report.errors.push({
         sourceRecipeId: record.sourceRecipeId,
         message: `Food sourceFoodId not found in catalog: ${missingFood}`,
+      });
+      report.skipped += 1;
+      continue;
+    }
+    if (unitMismatch) {
+      report.errors.push({
+        sourceRecipeId: record.sourceRecipeId,
+        message: `Incompatible ingredient unit: ${unitMismatch}`,
       });
       report.skipped += 1;
       continue;

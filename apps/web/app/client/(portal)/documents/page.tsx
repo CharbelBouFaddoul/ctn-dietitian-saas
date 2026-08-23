@@ -12,6 +12,7 @@ export default function ClientDocumentsPage() {
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   async function load() {
     setDocuments(await api<DocumentsLibraryItem[]>("/api/v1/portal/documents"));
@@ -30,6 +31,7 @@ export default function ClientDocumentsPage() {
         documents={documents}
         uploading={uploading}
         downloadingId={downloadingId}
+        deletingId={deletingId}
         onUpload={async (file) => {
           setUploading(true);
           setError(null);
@@ -64,6 +66,18 @@ export default function ClientDocumentsPage() {
             setError(errorMessage(err, "Unable to download document"));
           } finally {
             setDownloadingId(null);
+          }
+        }}
+        onDelete={async (doc) => {
+          setDeletingId(doc.id);
+          setError(null);
+          try {
+            await api(`/api/v1/portal/documents/${doc.id}/archive`, { method: "POST" });
+            await load();
+          } catch (err) {
+            setError(errorMessage(err, "Unable to delete document"));
+          } finally {
+            setDeletingId(null);
           }
         }}
       />

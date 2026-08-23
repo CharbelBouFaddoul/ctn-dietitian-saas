@@ -1,9 +1,9 @@
 {
   "source": {
     "key": "usda-myplate-kitchen-starter",
-    "name": "MyPlate Kitchen\u2013style starter recipes (platform catalog)",
+    "name": "MyPlate Kitchen–style starter recipes (platform catalog)",
     "provider": "Curated for Nutrition SaaS from USDA MyPlate Kitchen public-domain patterns",
-    "datasetVersion": "2026-08-21-starter-v1",
+    "datasetVersion": "2026-08-23-starter-v2",
     "license": "United States government work / public domain in the U.S. Commercial use permitted. No USDA endorsement claimed.",
     "attribution": "Recipe structures inspired by USDA MyPlate Kitchen public-domain recipes. Ingredient nutrient values come from USDA FoodData Central Foundation Foods already imported into this product.",
     "homepage": "https://www.myplate.gov/myplate-kitchen"
@@ -26,7 +26,7 @@
         {
           "sourceFoodId": "170880",
           "quantity": 120,
-          "unit": "ml",
+          "unit": "g",
           "displayNote": "nonfat milk"
         },
         {
@@ -128,7 +128,7 @@
         {
           "sourceFoodId": "170879",
           "quantity": 150,
-          "unit": "ml",
+          "unit": "g",
           "displayNote": "2% milk"
         },
         {
@@ -632,7 +632,7 @@
         {
           "sourceFoodId": "172339",
           "quantity": 10,
-          "unit": "ml",
+          "unit": "g",
           "displayNote": "balsamic vinegar"
         }
       ]

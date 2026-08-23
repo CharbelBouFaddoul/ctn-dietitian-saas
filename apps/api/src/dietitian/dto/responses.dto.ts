@@ -72,6 +72,12 @@ export class DietitianSettingsResponseDto {
 
   @ApiPropertyOptional({ nullable: true, type: String })
   emailReplyTo!: string | null;
+
+  @ApiProperty({
+    description:
+      "Platform product-email flag. When false, clinic UI should hide reminder/email sender settings.",
+  })
+  productEmailEnabled!: boolean;
 }
 
 export class DietitianAccountResponseDto {

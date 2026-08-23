@@ -40,6 +40,7 @@ import { DietitianService } from "./dietitian.service";
 import { EntitlementService, publicEntitlement } from "../entitlements/entitlement.service";
 import { SubscriptionLifecycleService } from "../entitlements/subscription-lifecycle.service";
 import { NotificationService } from "../notifications/notification.service";
+import { PlatformSettingsService } from "../platform-settings/platform-settings.service";
 import type { DietitianTenantContext } from "./dietitian.types";
 import { DIETITIAN_ACCESS_DENIED } from "./dietitian.types";
 
@@ -54,8 +55,16 @@ export class DietitianController {
     private readonly entitlements: EntitlementService,
     private readonly subscriptionLifecycle: SubscriptionLifecycleService,
     private readonly notifications: NotificationService,
+    private readonly platformSettings: PlatformSettingsService,
     private readonly prisma: PrismaService,
   ) {}
+
+  private async withProductEmailFlag(
+    settings: DietitianSettingsResponseDto,
+  ): Promise<DietitianSettingsResponseDto> {
+    const productEmailEnabled = await this.platformSettings.isEmailNotificationsEnabled();
+    return { ...settings, productEmailEnabled };
+  }
 
   @Post()
   @HttpCode(201)
@@ -136,7 +145,7 @@ export class DietitianController {
     if (!settings) {
       throw new NotFoundException("Settings not found");
     }
-    return this.dietitians.toSettingsResponse(settings);
+    return this.withProductEmailFlag(this.dietitians.toSettingsResponse(settings));
   }
 
   @Patch(":dietitianAccountId/settings")
@@ -147,7 +156,7 @@ export class DietitianController {
     @Body() body: UpdateDietitianSettingsDto,
   ): Promise<DietitianSettingsResponseDto> {
     const settings = await this.dietitians.updateSettings(dietitianAccountId, body);
-    return this.dietitians.toSettingsResponse(settings);
+    return this.withProductEmailFlag(this.dietitians.toSettingsResponse(settings));
   }
 
   @Get(":dietitianAccountId/entitlements")

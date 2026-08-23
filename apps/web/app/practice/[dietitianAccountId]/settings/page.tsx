@@ -41,6 +41,7 @@ interface Settings {
   invoiceFooter: string | null;
   emailFromName: string | null;
   emailReplyTo: string | null;
+  productEmailEnabled: boolean;
 }
 
 export default function PracticeSettingsPage() {
@@ -65,9 +66,10 @@ export default function PracticeSettingsPage() {
     setSaveError(null);
     setSaved(false);
     try {
+      const { productEmailEnabled: _productEmailEnabled, ...payload } = settings;
       const updated = await api<Settings>(`/api/v1/dietitian/${dietitianAccountId}/settings`, {
         method: "PATCH",
-        body: JSON.stringify(settings),
+        body: JSON.stringify(payload),
       });
       setSettings(updated);
       setSaved(true);
@@ -99,7 +101,11 @@ export default function PracticeSettingsPage() {
     <section>
       <PageHeader
         title="Clinic settings"
-        description="Clinic details, preferences, reminders, and invoice defaults used across this clinic."
+        description={
+          settings.productEmailEnabled
+            ? "Clinic details, preferences, reminders, and invoice defaults used across this clinic."
+            : "Clinic details, preferences, and invoice defaults used across this clinic."
+        }
       />
 
       <form onSubmit={(e) => void onSave(e)}>
@@ -186,33 +192,35 @@ export default function PracticeSettingsPage() {
           </div>
         </Section>
 
-        {/* ── Reminders ────────────────────────────────────────────── */}
-        <Section title="Reminders" description="Appointment reminder emails sent to clients.">
-          <div style={{ display: "grid", gap: 16 }}>
-            <Checkbox
-              label="Email reminders enabled"
-              checked={settings.reminderEmailEnabled}
-              onChange={(e) => set("reminderEmailEnabled", e.target.checked)}
-            />
-            <Field label="Send reminder (hours before appointment)">
-              <Input
-                type="number"
-                min={1}
-                value={settings.reminderHoursBefore}
-                onChange={(e) => set("reminderHoursBefore", Number(e.target.value))}
-                disabled={!settings.reminderEmailEnabled}
+        {/* ── Reminders (hidden when platform product email is off) ─ */}
+        {settings.productEmailEnabled ? (
+          <Section title="Reminders" description="Appointment reminder emails sent to clients.">
+            <div style={{ display: "grid", gap: 16 }}>
+              <Checkbox
+                label="Email reminders enabled"
+                checked={settings.reminderEmailEnabled}
+                onChange={(e) => set("reminderEmailEnabled", e.target.checked)}
               />
-            </Field>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-              <Field label="Email from name">
-                <Input value={str("emailFromName")} onChange={(e) => set("emailFromName", e.target.value || null)} placeholder="Your Clinic Name" />
+              <Field label="Send reminder (hours before appointment)">
+                <Input
+                  type="number"
+                  min={1}
+                  value={settings.reminderHoursBefore}
+                  onChange={(e) => set("reminderHoursBefore", Number(e.target.value))}
+                  disabled={!settings.reminderEmailEnabled}
+                />
               </Field>
-              <Field label="Reply-to email">
-                <Input type="email" value={str("emailReplyTo")} onChange={(e) => set("emailReplyTo", e.target.value || null)} placeholder="noreply@clinic.com" />
-              </Field>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                <Field label="Email from name">
+                  <Input value={str("emailFromName")} onChange={(e) => set("emailFromName", e.target.value || null)} placeholder="Your Clinic Name" />
+                </Field>
+                <Field label="Reply-to email">
+                  <Input type="email" value={str("emailReplyTo")} onChange={(e) => set("emailReplyTo", e.target.value || null)} placeholder="noreply@clinic.com" />
+                </Field>
+              </div>
             </div>
-          </div>
-        </Section>
+          </Section>
+        ) : null}
 
         {/* ── Invoices ─────────────────────────────────────────────── */}
         <Section title="Invoices" description="Defaults applied when creating new invoices.">

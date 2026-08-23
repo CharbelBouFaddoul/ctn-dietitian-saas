@@ -426,4 +426,65 @@ describe("assessment evaluation hardening", () => {
       .set("Cookie", portalCookie)
       .expect(404);
   });
+
+  it("archives an evaluation so it disappears from clinic and portal lists", async () => {
+    const owner = await registerVerifyLogin();
+    const org = await createOrg(owner.cookie, "Archive Eval Org");
+    const client = await createClient(owner.cookie, org.id);
+    const template = await request(ctx.app.getHttpServer())
+      .post(`/api/v1/dietitian/${org.id}/assessment-templates`)
+      .set("Cookie", owner.cookie)
+      .send({
+        name: "To delete",
+        schema: {
+          sections: [
+            {
+              id: "main",
+              title: "Questions",
+              questions: [{ id: "q1", type: "TEXT", label: "Q", required: true, active: true }],
+            },
+          ],
+        },
+      })
+      .expect(201);
+    const started = await request(ctx.app.getHttpServer())
+      .post(`/api/v1/dietitian/${org.id}/clients/${client.id}/assessments`)
+      .set("Cookie", owner.cookie)
+      .send({ templateId: template.body.id })
+      .expect(201);
+
+    const portalCookie = await connectClientPortal(ctx, owner.cookie, org.id, client);
+    const before = await request(ctx.app.getHttpServer())
+      .get("/api/v1/portal/assessments")
+      .set("Cookie", portalCookie)
+      .expect(200);
+    expect(before.body.map((r: { id: string }) => r.id)).toContain(started.body.id);
+
+    await request(ctx.app.getHttpServer())
+      .post(`/api/v1/dietitian/${org.id}/clients/${client.id}/assessments/${started.body.id}/archive`)
+      .set("Cookie", owner.cookie)
+      .expect(201);
+
+    const clinicList = await request(ctx.app.getHttpServer())
+      .get(`/api/v1/dietitian/${org.id}/clients/${client.id}/assessments`)
+      .set("Cookie", owner.cookie)
+      .expect(200);
+    expect(clinicList.body.map((r: { id: string }) => r.id)).not.toContain(started.body.id);
+
+    const portalList = await request(ctx.app.getHttpServer())
+      .get("/api/v1/portal/assessments")
+      .set("Cookie", portalCookie)
+      .expect(200);
+    expect(portalList.body.map((r: { id: string }) => r.id)).not.toContain(started.body.id);
+
+    await request(ctx.app.getHttpServer())
+      .get(`/api/v1/portal/assessments/${started.body.id}`)
+      .set("Cookie", portalCookie)
+      .expect(404);
+
+    await request(ctx.app.getHttpServer())
+      .get(`/api/v1/dietitian/${org.id}/clients/${client.id}/assessments/${started.body.id}`)
+      .set("Cookie", owner.cookie)
+      .expect(404);
+  });
 });

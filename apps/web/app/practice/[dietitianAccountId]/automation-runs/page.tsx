@@ -45,10 +45,11 @@ const TRIGGERS: Record<string, string> = {
 };
 
 const ACTIONS: Record<string, string> = {
-  SEND_IN_APP_NOTIFICATION: "In-app notification",
+  SEND_IN_APP_NOTIFICATION: "Notification",
   SEND_EMAIL: "Email",
   CREATE_TASK: "Task created",
-  CREATE_CLIENT_NOTIFICATION: "Client notified",
+  CREATE_CLIENT_NOTIFICATION: "Notification",
+  SEND_MESSAGE: "Message",
 };
 
 function triggerLabel(value: string): string {

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Button,
+  ConfirmDialog,
   EmptyState,
   LoadingState,
   PageHeader,
@@ -89,6 +90,7 @@ export default function ClientPlanPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyMealId, setBusyMealId] = useState<string | null>(null);
+  const [relogMealId, setRelogMealId] = useState<string | null>(null);
 
   async function refreshLoggedToday() {
     const summary = await api<TrackingSummaryLite>("/api/v1/portal/tracking/summary");
@@ -114,11 +116,13 @@ export default function ClientPlanPage() {
 
   async function logMeal(mealId: string, alreadyLogged: boolean) {
     if (alreadyLogged) {
-      const ok = window.confirm(
-        "You already logged this meal today. Log it again anyway? It will add another entry to your Daily log.",
-      );
-      if (!ok) return;
+      setRelogMealId(mealId);
+      return;
     }
+    await submitLogMeal(mealId, false);
+  }
+
+  async function submitLogMeal(mealId: string, alreadyLogged: boolean) {
     setError(null);
     setNotice(null);
     setBusyMealId(mealId);
@@ -139,6 +143,7 @@ export default function ClientPlanPage() {
       setError(errorMessage(err, "Unable to log meal"));
     } finally {
       setBusyMealId(null);
+      setRelogMealId(null);
     }
   }
 
@@ -302,6 +307,22 @@ export default function ClientPlanPage() {
           ) : null}
         </div>
       ) : null}
+
+      <ConfirmDialog
+        open={relogMealId != null}
+        title="Log this meal again?"
+        description="You already logged this meal today. Logging again will add another entry to your Daily log."
+        confirmLabel="Log again"
+        pending={busyMealId != null && busyMealId === relogMealId}
+        onCancel={() => {
+          if (busyMealId) return;
+          setRelogMealId(null);
+        }}
+        onConfirm={() => {
+          if (!relogMealId) return;
+          void submitLogMeal(relogMealId, true);
+        }}
+      />
     </section>
   );
 }

@@ -168,31 +168,30 @@ export class AutomationExecutorService {
   ): Promise<void> {
     switch (rule.actionType) {
       case "SEND_IN_APP_NOTIFICATION":
-        await this.notifications.create({
-          dietitianAccountId,
-          userId: context.recipientUserId,
-          clientId: candidate.clientId,
-          type: "AUTOMATION",
-          title: this.templates.render(configuration.notificationTitle!, context),
-          body: this.templates.render(configuration.notificationBody!, context),
-          targetType: "automation_run",
-          targetId: runId,
-          metadata: { ruleId: rule.id, ruleName: rule.name, source: "automation" },
-        });
+      case "CREATE_CLIENT_NOTIFICATION": {
+        const title = this.templates.render(configuration.notificationTitle!, context);
+        const body = this.templates.render(configuration.notificationBody!, context);
+        const userIds = await this.resolveNotificationUserIds(
+          configuration,
+          candidate,
+          context.assignedUserId ?? context.recipientUserId,
+          context.recipientUserId,
+        );
+        for (const userId of userIds) {
+          await this.notifications.create({
+            dietitianAccountId,
+            userId,
+            clientId: candidate.clientId,
+            type: "AUTOMATION",
+            title,
+            body,
+            targetType: "automation_run",
+            targetId: runId,
+            metadata: { ruleId: rule.id, ruleName: rule.name, source: "automation" },
+          });
+        }
         break;
-      case "CREATE_CLIENT_NOTIFICATION":
-        await this.notifications.create({
-          dietitianAccountId,
-          userId: context.recipientUserId,
-          clientId: candidate.clientId,
-          type: "AUTOMATION",
-          title: this.templates.render(configuration.notificationTitle!, context),
-          body: this.templates.render(configuration.notificationBody!, context),
-          targetType: "automation_run",
-          targetId: runId,
-          metadata: { ruleId: rule.id, ruleName: rule.name, source: "automation" },
-        });
-        break;
+      }
       case "SEND_EMAIL": {
         const to = context.recipientEmail;
         if (!to) {
@@ -310,6 +309,27 @@ export class AutomationExecutorService {
     return { ...context, ...recipient, assignedUserId };
   }
 
+  /** User IDs that should receive an in-app / portal notification for this run. */
+  private async resolveNotificationUserIds(
+    configuration: AutomationConfiguration,
+    candidate: AutomationCandidate,
+    clinicUserId: string,
+    primaryRecipientUserId: string,
+  ): Promise<string[]> {
+    if (configuration.recipient === "BOTH") {
+      const ids = new Set<string>([clinicUserId]);
+      if (candidate.clientId) {
+        const account = await this.prisma.clientAccount.findFirst({
+          where: { clientId: candidate.clientId, status: "ACTIVE" },
+          select: { userId: true },
+        });
+        if (account) ids.add(account.userId);
+      }
+      return [...ids];
+    }
+    return [primaryRecipientUserId];
+  }
+
   private async resolveRecipient(
     rule: AutomationRule,
     configuration: AutomationConfiguration,
@@ -335,6 +355,8 @@ export class AutomationExecutorService {
         if (!account) throw new Error("client_account_missing");
         return { recipientUserId: account.userId, recipientEmail: account.user.email };
       }
+      case "BOTH":
+        return { recipientUserId: assignedUserId, recipientEmail: owner.email };
       default:
         throw new Error("invalid_recipient");
     }

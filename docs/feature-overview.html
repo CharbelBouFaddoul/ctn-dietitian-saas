@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>CTN Solution Dietitian System - Feature Overview</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 18mm 16mm 18mm 16mm;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+      color: #0f172a;
+      font-size: 10.5pt;
+      line-height: 1.45;
+      background: #fff;
+    }
+
+    .cover {
+      border-bottom: 3px solid #0d9488;
+      padding-bottom: 18px;
+      margin-bottom: 22px;
+    }
+
+    .letterhead {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 24px;
+      margin-bottom: 18px;
+    }
+
+    .brand-mark {
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      background: linear-gradient(145deg, #0d9488 0%, #0f766e 100%);
+      color: #fff;
+      font-weight: 800;
+      font-size: 12pt;
+      letter-spacing: -0.04em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .brand-block {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .company-name {
+      margin: 0;
+      font-size: 14pt;
+      font-weight: 750;
+      letter-spacing: -0.02em;
+      color: #0f172a;
+    }
+
+    .product-name {
+      margin: 2px 0 0;
+      font-size: 10pt;
+      color: #0d9488;
+      font-weight: 650;
+    }
+
+    .tagline {
+      margin: 4px 0 0;
+      font-size: 9pt;
+      color: #64748b;
+    }
+
+    .contact-block {
+      text-align: right;
+      font-size: 8.5pt;
+      color: #475569;
+      line-height: 1.55;
+      flex-shrink: 0;
+    }
+
+    .contact-block a {
+      color: #0f766e;
+      text-decoration: none;
+    }
+
+    .eyebrow {
+      font-size: 9pt;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #0d9488;
+      font-weight: 700;
+      margin: 0 0 8px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 22pt;
+      line-height: 1.15;
+      letter-spacing: -0.02em;
+    }
+
+    .subtitle {
+      margin: 0;
+      color: #475569;
+      font-size: 11pt;
+      max-width: 38em;
+    }
+
+    .meta {
+      margin-top: 14px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 18px;
+      font-size: 9pt;
+      color: #64748b;
+    }
+
+    .meta span strong {
+      color: #334155;
+      font-weight: 650;
+    }
+
+    h2 {
+      margin: 26px 0 10px;
+      font-size: 14pt;
+      color: #0f172a;
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 6px;
+      page-break-after: avoid;
+    }
+
+    h3 {
+      margin: 16px 0 6px;
+      font-size: 11pt;
+      color: #0d9488;
+      page-break-after: avoid;
+    }
+
+    h4 {
+      margin: 12px 0 4px;
+      font-size: 10pt;
+      color: #334155;
+      page-break-after: avoid;
+    }
+
+    ul {
+      margin: 0 0 8px;
+      padding-left: 1.15em;
+    }
+
+    li {
+      margin: 0 0 3px;
+    }
+
+    .section-intro {
+      color: #475569;
+      margin: 0 0 10px;
+      font-size: 10pt;
+    }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px 24px;
+    }
+
+    .card {
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 12px 14px;
+      background: #f8fafc;
+      page-break-inside: avoid;
+    }
+
+    .card h3 {
+      margin-top: 0;
+    }
+
+    .footer-note {
+      margin-top: 28px;
+      padding: 14px 16px;
+      border: 1px solid #99f6e4;
+      background: #f0fdfa;
+      border-radius: 10px;
+      page-break-inside: avoid;
+    }
+
+    .footer-note strong {
+      display: block;
+      color: #0f766e;
+      margin-bottom: 4px;
+      font-size: 11pt;
+    }
+
+    .footer-note p {
+      margin: 0;
+      color: #334155;
+    }
+
+    .doc-footer {
+      margin-top: 22px;
+      padding-top: 12px;
+      border-top: 1px solid #e2e8f0;
+      font-size: 8.5pt;
+      color: #64748b;
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .doc-footer a {
+      color: #0f766e;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <header class="cover">
+    <div class="letterhead">
+      <div class="brand-block">
+        <div class="brand-mark" aria-hidden="true">CTN</div>
+        <div>
+          <p class="company-name">CTN Solution</p>
+          <p class="product-name">Dietitian System</p>
+          <p class="tagline">Nutrition practice software for modern clinics</p>
+        </div>
+      </div>
+      <div class="contact-block">
+        Jounieh, Lebanon<br />
+        Phone: 70 657 943<br />
+        <a href="mailto:contact@ctnsolution.com">contact@ctnsolution.com</a><br />
+        <a href="https://ctnsolution.com/">ctnsolution.com</a>
+      </div>
+    </div>
+
+    <p class="eyebrow">Product overview</p>
+    <h1>Feature Overview</h1>
+    <p class="subtitle">
+      A complete overview of the CTN Solution Dietitian System capabilities for dietitians
+      and their patients, plus the next features planned for delivery.
+    </p>
+    <div class="meta">
+      <span><strong>Document date:</strong> 23 August 2026</span>
+      <span><strong>Version:</strong> v1</span>
+      <span><strong>Prepared for:</strong> Client review</span>
+    </div>
+  </header>
+
+  <section>
+    <h2>1. Current features</h2>
+    <p class="section-intro">Capabilities available today for clinic teams and patients.</p>
+
+    <h3>1.1 Dietitian / Clinic</h3>
+
+    <div class="two-col">
+      <div class="card">
+        <h4>Practice overview</h4>
+        <ul>
+          <li>Dashboard with clients, tasks, appointments, invoices, messages, and clients needing attention</li>
+          <li>Recent activity overview</li>
+        </ul>
+
+        <h4>Client management</h4>
+        <ul>
+          <li>Client roster with search, filters, tags, create, and archive</li>
+          <li>Join codes so patients can connect themselves</li>
+          <li>Full client chart: profile, goals, preferences, allergies, notes</li>
+          <li>Measurement tracking and evolution (weight, height, BMI, waist, hips, body fat, muscle mass)</li>
+          <li>Review patient daily tracking (food, water, exercise, sleep, habits)</li>
+          <li>Care timeline</li>
+          <li>Portal connection status, invites, and disconnect handling</li>
+        </ul>
+
+        <h4>Meal planning &amp; nutrition</h4>
+        <ul>
+          <li>Multi-day / multi-week meal plans with publish to the patient portal</li>
+          <li>Meal / recipe library</li>
+          <li>Food database (catalog + clinic custom foods)</li>
+          <li>Automatic nutrition calculations</li>
+          <li>Habit library and habit assignment</li>
+        </ul>
+
+        <h4>Patient evaluations</h4>
+        <ul>
+          <li>Custom evaluation / assessment form builder</li>
+          <li>Assign forms to patients</li>
+          <li>Review in-progress and submitted answers</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h4>Calendar &amp; appointments</h4>
+        <ul>
+          <li>Day / week / month calendar</li>
+          <li>Schedule, cancel, and reschedule workflows</li>
+          <li>Patient reschedule and cancellation requests from the portal</li>
+        </ul>
+
+        <h4>Messaging &amp; notifications</h4>
+        <ul>
+          <li>Secure 1:1 realtime messaging with patients</li>
+          <li>In-app notifications with unread badges</li>
+        </ul>
+
+        <h4>Documents</h4>
+        <ul>
+          <li>Upload and manage client files</li>
+          <li>Share with patient or keep internal to the clinic</li>
+        </ul>
+
+        <h4>Billing &amp; tasks</h4>
+        <ul>
+          <li>Invoices: draft, issue, send, mark paid, overdue, cancel</li>
+          <li>Printable invoice PDF</li>
+          <li>Clinic task list with priorities and due dates</li>
+        </ul>
+
+        <h4>Analytics</h4>
+        <ul>
+          <li>Practice analytics: activity, financial summary, clients needing attention</li>
+        </ul>
+
+        <h4>Clinic settings</h4>
+        <ul>
+          <li>Practice profile, timezone, locale, currency, units</li>
+          <li>Appointment defaults and invoice defaults</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>1.2 Patient / Client portal</h3>
+
+    <div class="two-col">
+      <div class="card">
+        <h4>Home</h4>
+        <ul>
+          <li>Personal dashboard with next appointment, today’s tracking, meal plan snapshot, messages, and notifications</li>
+        </ul>
+
+        <h4>My Plan</h4>
+        <ul>
+          <li>View published meal plan by week and day</li>
+          <li>See meals, foods/recipes, and nutrition totals</li>
+          <li>One-tap log of planned meals into the daily log</li>
+        </ul>
+
+        <h4>Daily log</h4>
+        <ul>
+          <li>Log food (search catalog + clinic foods, portions, meals)</li>
+          <li>Water, exercise, sleep, and habits tracking</li>
+          <li>Quick weight log</li>
+          <li>Browse any past date</li>
+        </ul>
+
+        <h4>Progress</h4>
+        <ul>
+          <li>Today’s tracking overview</li>
+          <li>Measurement evolution charts (weight, height, BMI, body composition, and more)</li>
+        </ul>
+
+        <h4>Assessments</h4>
+        <ul>
+          <li>Complete evaluations assigned by the dietitian</li>
+          <li>Save progress and submit when ready</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h4>Messages</h4>
+        <ul>
+          <li>Chat with the dietitian in realtime</li>
+        </ul>
+
+        <h4>Appointments</h4>
+        <ul>
+          <li>View upcoming and past appointments</li>
+          <li>Request reschedule or cancellation</li>
+        </ul>
+
+        <h4>Documents</h4>
+        <ul>
+          <li>View files shared by the clinic</li>
+          <li>Upload files, download, and delete own uploads</li>
+        </ul>
+
+        <h4>Billing</h4>
+        <ul>
+          <li>View invoices and open printable PDF</li>
+        </ul>
+
+        <h4>Profile &amp; access</h4>
+        <ul>
+          <li>Edit personal details</li>
+          <li>View clinic notes (allergies, preferences, lifestyle)</li>
+          <li>Connect to multiple clinics and switch between them</li>
+          <li>Join another clinic with a code</li>
+          <li>Request to leave a clinic</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>2. Future features</h2>
+    <p class="section-intro">Planned enhancements to strengthen clinical workflows, nutrition insight, and day-to-day productivity.</p>
+
+    <div class="card" style="margin-bottom: 12px;">
+      <h3>Templates library</h3>
+      <ul>
+        <li>Meal plan templates to save and reuse full plan structures across clients</li>
+        <li>Recommendations templates for reusable guidance (for example healthy lifestyle or condition-specific advice)</li>
+        <li>Foods to avoid templates by condition (for example diabetes, hypertension, high cholesterol, obesity)</li>
+        <li>Clinic-owned templates plus system starter templates</li>
+        <li>Search and filter templates for faster plan building</li>
+      </ul>
+    </div>
+
+    <div class="card" style="margin-bottom: 12px;">
+      <h3>Richer nutrition facts &amp; charts</h3>
+      <ul>
+        <li>More detailed nutrition charts beyond basic macros (for example fiber, sugars, sodium, and micronutrients when available)</li>
+        <li>Visual breakdowns by meal, day, and plan period</li>
+        <li>Clearer comparison views for foods, recipes, and meal plans</li>
+        <li>Stronger progress charts and trend insights for dietitians and patients</li>
+      </ul>
+    </div>
+
+    <div class="card" style="margin-bottom: 12px;">
+      <h3>AI assistant</h3>
+      <ul>
+        <li>Always-available in-product AI assistant in the dietitian workspace</li>
+        <li>Context-aware help while reviewing clients, building plans, and writing notes or messages</li>
+        <li>Suggestions for recommendations, foods to avoid, and plan adjustments based on client profile and goals</li>
+        <li>Draft support for summaries, meal-plan ideas, consultation notes, and message replies (reviewed by the dietitian before sharing)</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>Product improvements</h3>
+      <ul>
+        <li>Faster meal-plan building with templates</li>
+        <li>Stronger clinical recommendations workflow (apply template, then customize per client)</li>
+        <li>Better reporting and visual analytics across nutrition and progress data</li>
+        <li>UX polish on charts, templates, and assistant for daily clinic use</li>
+        <li>Continuous workflow and usability improvements based on clinic feedback</li>
+      </ul>
+    </div>
+  </section>
+
+  <aside class="footer-note">
+    <strong>Feature requests</strong>
+    <p>
+      We welcome new feature requests that are realistic for a nutrition practice platform.
+      Please share your priorities and use cases. We will review feasibility, clinical value,
+      and delivery timeline with you.
+    </p>
+  </aside>
+
+  <div class="doc-footer">
+    <span>CTN Solution · Dietitian System · Feature Overview v1 · Confidential</span>
+    <span>
+      70 657 943 ·
+      <a href="mailto:contact@ctnsolution.com">contact@ctnsolution.com</a> ·
+      <a href="https://ctnsolution.com/">ctnsolution.com</a>
+    </span>
+  </div>
+</body>
+</html>

@@ -111,12 +111,14 @@ export class TasksController {
   @Get()
   list(
     @CurrentTenant() tenant: DietitianTenantContext,
-    @Query("view") view?: TaskView,
+    @Query("view") view?: TaskView | "mine",
     @Query("status") status?: TaskStatus,
     @Query("priority") priority?: TaskPriority,
     @Query("clientId") clientId?: string,
     @Query("assignedUserId") assignedUserId?: string,
     @Query("search") search?: string,
+    @Query("dueFrom") dueFrom?: string,
+    @Query("dueTo") dueTo?: string,
     @Query("page") page?: string,
     @Query("limit") limit?: string,
   ) {
@@ -127,6 +129,8 @@ export class TasksController {
       clientId,
       assignedUserId,
       search,
+      dueFrom,
+      dueTo,
       page: page ? Number(page) : undefined,
       limit: limit ? Number(limit) : undefined,
     });

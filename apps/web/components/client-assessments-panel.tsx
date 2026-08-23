@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Button,
+  ConfirmDialog,
   EmptyState,
   Field,
   Section,
@@ -48,6 +49,8 @@ export function ClientAssessmentsPanel({
   const [templateId, setTemplateId] = useState("");
   const [assessments, setAssessments] = useState<EvaluationAssessment[]>([]);
   const [busy, setBusy] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<EvaluationAssessment | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const formsHref = `/practice/${dietitianAccountId}/evaluation?fromClient=${encodeURIComponent(clientId)}`;
   const detailBase = `/practice/${dietitianAccountId}/clients/${clientId}/evaluations`;
 
@@ -68,12 +71,37 @@ export function ClientAssessmentsPanel({
   const selectedTemplate = templates.find((t) => t.id === templateId) ?? null;
   const questionCount = countActiveQuestions(selectedTemplate?.schema);
   const openRows = assessments.filter((r) => r.status === "IN_PROGRESS" || r.status === "DRAFT");
-  const doneRows = assessments.filter((r) => r.status === "COMPLETED" || r.status === "ARCHIVED");
+  const doneRows = assessments.filter((r) => r.status === "COMPLETED");
 
   const templateOptions = useMemo(
     () => templates.filter((t) => !t.status || t.status === "ACTIVE"),
     [templates],
   );
+
+  function renderRow(row: EvaluationAssessment, meta: string) {
+    return (
+      <div key={row.id} className="ui-eval__list-card">
+        <Link href={`${detailBase}/${row.id}`} className="ui-eval__list-card-main">
+          <strong>{row.templateName}</strong>
+          <p className="ui-eval__card-meta">{meta}</p>
+        </Link>
+        <div className="ui-eval__list-card-side">
+          <StatusBadge status={row.status} label={evaluationStatusLabel(row.status)} />
+          {allowManage ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              disabled={busy || deleting}
+              onClick={() => setPendingDelete(row)}
+            >
+              Delete
+            </Button>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="ui-eval ui-eval--client">
@@ -140,15 +168,9 @@ export function ClientAssessmentsPanel({
             <EmptyState title="Nothing in progress">Assign a form above to begin.</EmptyState>
           ) : (
             <div className="ui-eval__list-cards">
-              {openRows.map((row) => (
-                <Link key={row.id} href={`${detailBase}/${row.id}`} className="ui-eval__list-card">
-                  <div>
-                    <strong>{row.templateName}</strong>
-                    <p className="ui-eval__card-meta">Started {formatDate(row.startedAt ?? row.createdAt)}</p>
-                  </div>
-                  <StatusBadge status={row.status} label={evaluationStatusLabel(row.status)} />
-                </Link>
-              ))}
+              {openRows.map((row) =>
+                renderRow(row, `Started ${formatDate(row.startedAt ?? row.createdAt)}`),
+              )}
             </div>
           )}
         </Section>
@@ -158,21 +180,39 @@ export function ClientAssessmentsPanel({
             <EmptyState title="No submissions yet" />
           ) : (
             <div className="ui-eval__list-cards">
-              {doneRows.map((row) => (
-                <Link key={row.id} href={`${detailBase}/${row.id}`} className="ui-eval__list-card">
-                  <div>
-                    <strong>{row.templateName}</strong>
-                    <p className="ui-eval__card-meta">
-                      {row.completedAt ? `Submitted ${formatDate(row.completedAt)}` : formatDate(row.createdAt)}
-                    </p>
-                  </div>
-                  <StatusBadge status={row.status} label={evaluationStatusLabel(row.status)} />
-                </Link>
-              ))}
+              {doneRows.map((row) =>
+                renderRow(
+                  row,
+                  row.completedAt ? `Submitted ${formatDate(row.completedAt)}` : formatDate(row.createdAt),
+                ),
+              )}
             </div>
           )}
         </Section>
       </div>
+
+      <ConfirmDialog
+        open={pendingDelete != null}
+        title="Delete this evaluation?"
+        description="It will be removed from this client chart and from the patient’s portal. This cannot be undone."
+        confirmLabel="Delete evaluation"
+        pending={deleting}
+        onCancel={() => {
+          if (deleting) return;
+          setPendingDelete(null);
+        }}
+        onConfirm={() => {
+          if (!pendingDelete) return;
+          setDeleting(true);
+          void api(`${base}/assessments/${pendingDelete.id}/archive`, { method: "POST" })
+            .then(async () => {
+              setPendingDelete(null);
+              await Promise.all([load(), onPortfolioRefresh()]);
+            })
+            .catch((err) => onError(errorMessage(err, "Unable to delete evaluation")))
+            .finally(() => setDeleting(false));
+        }}
+      />
     </div>
   );
 }

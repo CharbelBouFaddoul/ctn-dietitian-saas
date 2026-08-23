@@ -113,37 +113,61 @@ export default function InvoicesPage() {
         tone="muted"
       >
         <FilterBar className="ui-invoice-list__filters">
-          <SearchInput
-            value={search}
-            onChange={setSearch}
-            placeholder="Invoice # or client…"
-            aria-label="Search invoices"
-          />
-          <Select
-            value={filterClientId}
-            onChange={(e) => setFilterClientId(e.target.value)}
-            aria-label="Filter by client"
-            className="ui-invoice-list__filter-select"
-          >
-            <option value="">All clients</option>
-            {clients.map((client) => (
-              <option key={client.id} value={client.id}>
-                {client.firstName} {client.lastName}
-              </option>
-            ))}
-          </Select>
-          <Select
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            aria-label="Filter by status"
-            className="ui-invoice-list__filter-select"
-          >
-            {STATUSES.map((value) => (
-              <option key={value || "all"} value={value}>
-                {value ? humanizeLabel(value) : "All statuses"}
-              </option>
-            ))}
-          </Select>
+          <div className="ui-filter-bar__field ui-filter-bar__field--grow">
+            <p className="ui-filter-bar__label">Search</p>
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder="Invoice # or client…"
+              aria-label="Search invoices"
+            />
+          </div>
+          <div className="ui-filter-bar__field">
+            <p className="ui-filter-bar__label">Client</p>
+            <Select
+              value={filterClientId}
+              onChange={(e) => setFilterClientId(e.target.value)}
+              aria-label="Filter by client"
+              className="ui-invoice-list__filter-select"
+            >
+              <option value="">All clients</option>
+              {clients.map((client) => (
+                <option key={client.id} value={client.id}>
+                  {client.firstName} {client.lastName}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div className="ui-filter-bar__field">
+            <p className="ui-filter-bar__label">Status</p>
+            <Select
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              aria-label="Filter by status"
+              className="ui-invoice-list__filter-select"
+            >
+              {STATUSES.map((value) => (
+                <option key={value || "all"} value={value}>
+                  {value ? humanizeLabel(value) : "All statuses"}
+                </option>
+              ))}
+            </Select>
+          </div>
+          {hasFilters ? (
+            <div className="ui-filter-bar__actions">
+              <button
+                type="button"
+                className="ui-filter-bar__clear"
+                onClick={() => {
+                  setSearch("");
+                  setFilterClientId("");
+                  setStatus("");
+                }}
+              >
+                Clear filters
+              </button>
+            </div>
+          ) : null}
         </FilterBar>
       </Section>
 

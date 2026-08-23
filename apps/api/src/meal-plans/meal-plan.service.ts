@@ -117,15 +117,23 @@ export class MealPlanService {
 
   async list(
     tenant: DietitianTenantContext,
-    query: { clientId?: string; status?: "DRAFT" | "ACTIVE" | "ARCHIVED"; page?: number; pageSize?: number },
+    query: {
+      clientId?: string;
+      q?: string;
+      status?: "DRAFT" | "ACTIVE" | "ARCHIVED";
+      page?: number;
+      pageSize?: number;
+    },
   ) {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 20;
+    const nameQuery = query.q?.trim();
     const where: Prisma.MealPlanWhereInput = {
       ...tenantWhere(tenant.dietitianAccountId),
       client: this.access.visibleWhere(tenant),
       ...(query.clientId ? { clientId: query.clientId } : {}),
       ...(query.status ? { status: query.status } : { status: { not: "ARCHIVED" } }),
+      ...(nameQuery ? { name: { contains: nameQuery, mode: "insensitive" } } : {}),
     };
     if (query.clientId) {
       await this.access.assertCanAccess(tenant, query.clientId, "read");
@@ -743,11 +751,30 @@ export class MealPlanService {
       }
     }
     const foodMap = await this.recipeNutrition.loadFoods(dietitianAccountId, [...foodIds]);
-    const recipeMap = new Map(
-      await Promise.all(
-        recipes.map(async (recipe) => [recipe.id, await this.recipeNutrition.calculate(dietitianAccountId, recipe, recipe.ingredients, foodMap)] as const),
-      ),
-    );
+    const recipeMap = new Map<string, Awaited<ReturnType<RecipeNutritionService["calculate"]>>>();
+    const recipeErrors = new Map<string, string>();
+    const recipeMeta = new Map(recipes.map((recipe) => [recipe.id, { name: recipe.name, servings: Number(recipe.servings) }] as const));
+    for (const recipe of recipes) {
+      try {
+        recipeMap.set(
+          recipe.id,
+          await this.recipeNutrition.calculate(dietitianAccountId, recipe, recipe.ingredients, foodMap),
+        );
+      } catch (error) {
+        let message = "Recipe nutrition could not be calculated";
+        if (error instanceof BadRequestException) {
+          const response = error.getResponse();
+          if (typeof response === "string") message = response;
+          else if (response && typeof response === "object" && "message" in response) {
+            const raw = (response as { message?: string | string[] }).message;
+            message = Array.isArray(raw) ? raw.join(", ") : (raw ?? message);
+          }
+        } else if (error instanceof Error) {
+          message = error.message;
+        }
+        recipeErrors.set(recipe.id, message);
+      }
+    }
 
     const days = version.days
       .slice()
@@ -760,7 +787,7 @@ export class MealPlanService {
             const items = meal.items
               .slice()
               .sort((a, b) => a.sortOrder - b.sortOrder)
-              .map((item) => this.itemNutrition(item, foodMap, recipeMap));
+              .map((item) => this.itemNutrition(item, foodMap, recipeMap, recipeErrors, recipeMeta));
             const nutrition = sumNutrition(items.map((row) => row.nutrition));
             const extraNutrients = sumExtraNutrients(items.map((row) => row.extraNutrients));
             return {
@@ -806,11 +833,13 @@ export class MealPlanService {
     item: VersionGraph["days"][number]["meals"][number]["items"][number],
     foodMap: Map<string, EffectiveFood>,
     recipeMap: Map<string, Awaited<ReturnType<RecipeNutritionService["calculate"]>>>,
+    recipeErrors: Map<string, string>,
+    recipeMeta: Map<string, { name: string; servings: number }>,
   ) {
     if (item.itemType === "FOOD") {
       const food = item.foodId ? foodMap.get(item.foodId) : undefined;
       if (!food || !isFoodQuantityUnit(item.unit)) {
-        throw new BadRequestException("Meal item food is not available");
+        return this.unresolvedItem(item, "Meal item food is not available");
       }
       try {
         const ref = {
@@ -841,29 +870,73 @@ export class MealPlanService {
         };
       } catch (error) {
         if (error instanceof IncompatibleFoodUnitError || error instanceof RangeError) {
-          throw new BadRequestException(error.message);
+          return this.unresolvedItem(item, error.message, {
+            id: food.id,
+            name: food.name,
+            origin: food.origin === "custom" ? ("custom" as const) : ("catalog" as const),
+            servingDescription: food.servingDescription ?? null,
+          });
         }
         throw error;
       }
     }
     const recipe = item.recipeId ? recipeMap.get(item.recipeId) : undefined;
-    if (!recipe || item.unit !== "serving") {
-      throw new BadRequestException("Meal item recipe is not available");
+    if (recipe && item.unit === "serving") {
+      const nutrition = scaleNutrition(recipe.perServing, Number(item.quantity));
+      const extraNutrients = scaleExtraNutrients(recipe.extraNutrientsPerServing, Number(item.quantity));
+      return {
+        id: item.id,
+        itemType: item.itemType,
+        quantity: Number(item.quantity),
+        unit: item.unit,
+        notes: item.notes,
+        food: null,
+        recipe: { id: recipe.recipeId, name: recipe.name, servings: recipe.servings },
+        nutrition,
+        presented: roundNutrition(nutrition),
+        extraNutrients,
+        presentedExtraNutrients: roundExtraNutrients(extraNutrients),
+      };
     }
-    const nutrition = scaleNutrition(recipe.perServing, Number(item.quantity));
-    const extraNutrients = scaleExtraNutrients(recipe.extraNutrientsPerServing, Number(item.quantity));
+    const meta = item.recipeId ? recipeMeta.get(item.recipeId) : undefined;
+    const recipeError = item.recipeId ? recipeErrors.get(item.recipeId) : undefined;
+    return this.unresolvedItem(
+      item,
+      recipeError ?? "Meal item recipe is not available",
+      null,
+      item.recipeId && meta
+        ? { id: item.recipeId, name: meta.name, servings: meta.servings }
+        : null,
+    );
+  }
+
+  private unresolvedItem(
+    item: VersionGraph["days"][number]["meals"][number]["items"][number],
+    message: string,
+    food: MealPlanSnapshot["days"][number]["meals"][number]["items"][number]["food"] = null,
+    recipe: MealPlanSnapshot["days"][number]["meals"][number]["items"][number]["recipe"] = null,
+  ) {
+    const nutrition: NutritionValues = {
+      energyKcal: null,
+      proteinG: null,
+      carbohydrateG: null,
+      fatG: null,
+      fiberG: null,
+      sugarG: null,
+      sodiumMg: null,
+    };
     return {
       id: item.id,
       itemType: item.itemType,
       quantity: Number(item.quantity),
       unit: item.unit,
-      notes: item.notes,
-      food: null,
-      recipe: { id: recipe.recipeId, name: recipe.name, servings: recipe.servings },
+      notes: item.notes ? `${item.notes}\n${message}` : message,
+      food,
+      recipe,
       nutrition,
       presented: roundNutrition(nutrition),
-      extraNutrients,
-      presentedExtraNutrients: roundExtraNutrients(extraNutrients),
+      extraNutrients: {},
+      presentedExtraNutrients: {},
     };
   }
 
@@ -891,7 +964,26 @@ export class MealPlanService {
       if (!isFoodQuantityUnit(input.unit)) {
         throw new BadRequestException("Food items must use a mass or volume unit");
       }
-      await this.recipeNutrition.loadFoods(dietitianAccountId, [input.foodId]);
+      const foodMap = await this.recipeNutrition.loadFoods(dietitianAccountId, [input.foodId]);
+      const food = foodMap.get(input.foodId);
+      if (!food) {
+        throw new BadRequestException("Food is not available");
+      }
+      try {
+        foodQuantityScaleFactor(
+          {
+            referenceQuantity: food.referenceQuantity,
+            referenceUnit: food.referenceUnit as "g" | "ml",
+          },
+          input.quantity,
+          input.unit,
+        );
+      } catch (error) {
+        if (error instanceof IncompatibleFoodUnitError || error instanceof RangeError) {
+          throw new BadRequestException(error.message);
+        }
+        throw error;
+      }
       return;
     }
     if (!input.recipeId || input.foodId) {
@@ -900,7 +992,19 @@ export class MealPlanService {
     if (input.unit !== "serving") {
       throw new BadRequestException("Recipe quantities are servings");
     }
-    await this.recipes.requireActive(dietitianAccountId, input.recipeId);
+    const recipe = await this.recipes.requireActive(dietitianAccountId, input.recipeId);
+    const ingredients = await this.prisma.recipeIngredient.findMany({
+      where: { recipeId: recipe.id },
+      orderBy: { sortOrder: "asc" },
+    });
+    try {
+      await this.recipeNutrition.calculate(dietitianAccountId, recipe, ingredients);
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw error;
+    }
   }
 
   private async requirePlan(tenant: DietitianTenantContext, planId: string, action: "read" | "manageRecords") {

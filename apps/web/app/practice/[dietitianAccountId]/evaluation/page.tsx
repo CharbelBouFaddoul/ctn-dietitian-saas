@@ -1,17 +1,21 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Alert,
   Button,
+  Dialog,
   EmptyState,
+  Field,
   FilterBar,
+  Input,
   PageHeader,
   SearchInput,
   Select,
   StatusBadge,
+  Textarea,
 } from "@nutrition-saas/ui";
 import { api } from "../../../../lib/api";
 import {
@@ -38,6 +42,10 @@ export default function EvaluationFormsPage() {
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<"ACTIVE" | "INACTIVE" | "ALL">("ACTIVE");
   const [busy, setBusy] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newDescription, setNewDescription] = useState("");
+  const [createError, setCreateError] = useState<string | null>(null);
 
   async function load() {
     const rows = await api<EvaluationTemplate[]>(`${apiBase}/assessment-templates?includeInactive=true`);
@@ -59,20 +67,36 @@ export default function EvaluationFormsPage() {
     });
   }, [templates, q, status]);
 
-  async function createForm() {
+  function openCreate() {
+    setNewName("");
+    setNewDescription("");
+    setCreateError(null);
+    setShowCreate(true);
+  }
+
+  async function createForm(event: FormEvent) {
+    event.preventDefault();
+    const name = newName.trim();
+    if (name.length < 2) {
+      setCreateError("Enter a form name (at least 2 characters).");
+      return;
+    }
     setBusy(true);
     setError(null);
+    setCreateError(null);
     try {
       const row = await api<EvaluationTemplate>(`${apiBase}/assessment-templates`, {
         method: "POST",
         body: JSON.stringify({
-          name: "Patient Evaluation",
+          name,
+          description: newDescription.trim() || undefined,
           schema: emptyEvaluationSchema(),
         }),
       });
+      setShowCreate(false);
       router.push(`${base}/${row.id}${fromClientQs}`);
     } catch (err) {
-      setError(errorMessage(err, "Unable to create form"));
+      setCreateError(errorMessage(err, "Unable to create form"));
       setBusy(false);
     }
   }
@@ -106,7 +130,7 @@ export default function EvaluationFormsPage() {
                 Back to client
               </Link>
             ) : null}
-            <Button type="button" disabled={busy} onClick={() => void createForm()}>
+            <Button type="button" disabled={busy} onClick={openCreate}>
               New form
             </Button>
           </div>
@@ -134,7 +158,7 @@ export default function EvaluationFormsPage() {
           title={templates.length === 0 ? "No forms in the library yet" : "No forms match these filters"}
           action={
             templates.length === 0 ? (
-              <Button type="button" disabled={busy} onClick={() => void createForm()}>
+              <Button type="button" disabled={busy} onClick={openCreate}>
                 Create your first form
               </Button>
             ) : undefined
@@ -196,6 +220,40 @@ export default function EvaluationFormsPage() {
           })}
         </div>
       )}
+
+      <Dialog open={showCreate} title="New evaluation form" onClose={() => !busy && setShowCreate(false)}>
+        <form className="ui-stack" style={{ gap: 14 }} onSubmit={(event) => void createForm(event)}>
+          {createError ? <Alert tone="danger">{createError}</Alert> : null}
+          <Field label="Form name" hint="Shown in the library and when assigning to a client.">
+            <Input
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="e.g. Initial intake, Follow-up check-in"
+              required
+              minLength={2}
+              maxLength={120}
+              autoFocus
+            />
+          </Field>
+          <Field label="Description" hint="Optional">
+            <Textarea
+              value={newDescription}
+              onChange={(e) => setNewDescription(e.target.value)}
+              placeholder="What this form is for…"
+              rows={3}
+              maxLength={500}
+            />
+          </Field>
+          <div className="ui-row" style={{ gap: 10, justifyContent: "flex-end" }}>
+            <Button type="button" variant="secondary" disabled={busy} onClick={() => setShowCreate(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={busy || newName.trim().length < 2}>
+              {busy ? "Creating…" : "Create form"}
+            </Button>
+          </div>
+        </form>
+      </Dialog>
     </section>
   );
 }

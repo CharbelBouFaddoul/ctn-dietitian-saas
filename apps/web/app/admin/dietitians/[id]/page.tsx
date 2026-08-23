@@ -278,7 +278,38 @@ export default function AdminDietitianDetailPage() {
                 <Td label="Source">{humanizeLabel(row.source)}</Td>
                 <Td label="Actions">
                   <div className="ui-admin-actions" style={{ margin: 0 }}>
-                    <Button size="sm" disabled={busy} onClick={() => void run(() => api(`/api/v1/admin/dietitians/${dietitianAccountId}/overrides/${row.key}`, { method: "PUT", body: JSON.stringify({ enabled: true, limitValue: row.valueType === "LIMIT" ? row.limit ?? 0 : null, reason }) }).then(() => undefined), "Unable to enable")}>
+                    <Button
+                      size="sm"
+                      disabled={busy}
+                      onClick={() => {
+                        let limitValue: number | null = null;
+                        if (row.valueType === "LIMIT") {
+                          // Plan-disabled limits are often 0; copying that on Enable locks the clinic at zero slots.
+                          const suggested =
+                            row.limit != null && row.limit > 0
+                              ? row.limit
+                              : row.planLimit != null && row.planLimit > 0
+                                ? row.planLimit
+                                : 10;
+                          const next = window.prompt(`Set limit for ${row.name || featureLabel(row.key)}`, String(suggested));
+                          if (next === null) return;
+                          const parsed = Number(next);
+                          if (!Number.isFinite(parsed) || parsed < 1) {
+                            setError("Limit must be a positive number");
+                            return;
+                          }
+                          limitValue = parsed;
+                        }
+                        void run(
+                          () =>
+                            api(`/api/v1/admin/dietitians/${dietitianAccountId}/overrides/${row.key}`, {
+                              method: "PUT",
+                              body: JSON.stringify({ enabled: true, limitValue, reason }),
+                            }).then(() => undefined),
+                          "Unable to enable",
+                        );
+                      }}
+                    >
                       Enable
                     </Button>
                     <Button size="sm" variant="secondary" disabled={busy} onClick={() => void run(() => api(`/api/v1/admin/dietitians/${dietitianAccountId}/overrides/${row.key}`, { method: "PUT", body: JSON.stringify({ enabled: false, limitValue: row.limit, reason }) }).then(() => undefined), "Unable to disable")}>

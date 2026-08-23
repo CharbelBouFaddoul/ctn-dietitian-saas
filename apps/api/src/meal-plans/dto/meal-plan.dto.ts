@@ -8,6 +8,12 @@ export class ListMealPlansQueryDto {
   @IsUUID()
   clientId?: string;
 
+  @ApiPropertyOptional({ description: "Filter by plan name (case-insensitive contains)" })
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  q?: string;
+
   @ApiPropertyOptional({ enum: ["DRAFT", "ACTIVE", "ARCHIVED"] })
   @IsOptional()
   @IsEnum(["DRAFT", "ACTIVE", "ARCHIVED"])

@@ -1,11 +1,12 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import {
   Alert,
   Button,
+  ConfirmDialog,
   Dialog,
   EmptyState,
   Field,
@@ -31,7 +32,7 @@ import {
   toDateInputValue,
   toTimeInputValue,
 } from "../../../../lib/calendar-range";
-import { clientIdentityLine } from "../../../../lib/client-identity";
+import { clientDisplayName, clientIdentityLine } from "../../../../lib/client-identity";
 import { errorMessage } from "../../../../lib/humanize-error";
 import { formatMessageTime } from "../../../../lib/chat-format";
 import { statusLabel } from "../../../../lib/practice-labels";
@@ -59,14 +60,133 @@ interface AppointmentRow {
   client?: ClientOption;
 }
 
+interface TaskRow {
+  id: string;
+  title: string;
+  status: string;
+  dueAt: string | null;
+  clientName: string | null;
+  clientId: string | null;
+}
+
+/** Unified calendar item for rendering appointments and due tasks. */
+interface CalendarItem {
+  id: string;
+  kind: "appointment" | "task";
+  title: string;
+  startAt: string;
+  endAt: string;
+  status: string;
+  category: string;
+  clientId?: string | null;
+  clientName?: string | null;
+  client?: ClientOption;
+  appointment?: AppointmentRow;
+  task?: TaskRow;
+}
+
 type FormMode = "create" | "edit" | null;
 
-const DAY_HOURS = Array.from({ length: 14 }, (_, i) => i + 7); // 7:00–20:00
+/** Full day: midnight → 11 PM (24 hour rows). */
+const DAY_START_HOUR = 0;
+const DAY_HOURS = Array.from({ length: 24 }, (_, i) => DAY_START_HOUR + i);
+const HOUR_ROW_REM = 3.75;
 const CATEGORIES = Object.keys(CATEGORY_LABELS);
 
 function clientLabel(c?: ClientOption | null, fallbackId?: string): string {
   if (!c) return fallbackId ? "Client" : "—";
-  return clientIdentityLine(c);
+  return clientDisplayName(c);
+}
+
+function eventLayout(startAt: string, endAt: string): { top: number; height: number; visible: boolean; startMin: number; endMin: number } {
+  const start = new Date(startAt);
+  const end = new Date(endAt);
+  let startMin = (start.getHours() - DAY_START_HOUR) * 60 + start.getMinutes();
+  let endMin = (end.getHours() - DAY_START_HOUR) * 60 + end.getMinutes();
+  if (endMin <= startMin) {
+    endMin = Math.min(24 * 60, startMin + Math.max(30, (end.getTime() - start.getTime()) / 60000));
+  }
+  const gridStart = 0;
+  const gridEnd = 24 * 60;
+  const clippedStart = Math.max(gridStart, Math.min(gridEnd, startMin));
+  const clippedEnd = Math.max(gridStart, Math.min(gridEnd, Math.max(endMin, startMin + 30)));
+  if (clippedEnd <= gridStart || clippedStart >= gridEnd) {
+    return { top: 0, height: 0, visible: false, startMin: clippedStart, endMin: clippedEnd };
+  }
+  const top = (clippedStart / 60) * HOUR_ROW_REM;
+  // Keep blocks tall enough for title + time so text does not crush together.
+  const height = Math.max(2.85, ((clippedEnd - clippedStart) / 60) * HOUR_ROW_REM);
+  return { top, height, visible: true, startMin: clippedStart, endMin: clippedEnd };
+}
+
+type PositionedItem = CalendarItem & {
+  top: number;
+  height: number;
+  col: number;
+  colCount: number;
+};
+
+/** Place overlapping events side-by-side instead of stacking on top of each other. */
+function positionDayItems(items: CalendarItem[]): PositionedItem[] {
+  const prepared = items
+    .map((item) => {
+      const layout = eventLayout(item.startAt, item.endAt);
+      if (!layout.visible) return null;
+      // Pack by on-screen height so min-height blocks do not paint over each other.
+      const visualEndMin = layout.startMin + (layout.height / HOUR_ROW_REM) * 60;
+      return { item, ...layout, packEnd: visualEndMin };
+    })
+    .filter((row): row is NonNullable<typeof row> => row !== null)
+    .sort((a, b) => a.startMin - b.startMin || b.packEnd - a.packEnd);
+
+  const colEnds: number[] = [];
+  const placed: Array<(typeof prepared)[number] & { col: number }> = [];
+  for (const row of prepared) {
+    let col = colEnds.findIndex((end) => end <= row.startMin);
+    if (col === -1) {
+      col = colEnds.length;
+      colEnds.push(row.packEnd);
+    } else {
+      colEnds[col] = row.packEnd;
+    }
+    placed.push({ ...row, col });
+  }
+
+  // Cluster-wide column count so siblings share the same width.
+  const clusterId = new Array(placed.length).fill(-1);
+  let nextCluster = 0;
+  for (let i = 0; i < placed.length; i++) {
+    if (clusterId[i] !== -1) continue;
+    const queue = [i];
+    clusterId[i] = nextCluster;
+    for (let q = 0; q < queue.length; q++) {
+      const cur = queue[q]!;
+      const a = placed[cur]!;
+      for (let j = 0; j < placed.length; j++) {
+        if (clusterId[j] !== -1) continue;
+        const b = placed[j]!;
+        if (a.startMin < b.packEnd && a.packEnd > b.startMin) {
+          clusterId[j] = nextCluster;
+          queue.push(j);
+        }
+      }
+    }
+    nextCluster += 1;
+  }
+
+  const clusterCols = new Array(nextCluster).fill(1);
+  for (let i = 0; i < placed.length; i++) {
+    const c = clusterId[i]!;
+    clusterCols[c] = Math.max(clusterCols[c]!, placed[i]!.col + 1);
+  }
+
+  return placed.map((row, i) => ({
+    ...row.item,
+    top: row.top,
+    height: row.height,
+    col: row.col,
+    colCount: clusterCols[clusterId[i]!] ?? 1,
+  }));
 }
 
 function roundToHour(d: Date): Date {
@@ -92,12 +212,15 @@ export default function CalendarPage() {
   const [view, setView] = useState<CalendarView>("week");
   const [anchor, setAnchor] = useState(() => startOfDay(new Date()));
   const [rows, setRows] = useState<AppointmentRow[] | null>(null);
+  const [tasks, setTasks] = useState<TaskRow[]>([]);
   const [clients, setClients] = useState<ClientOption[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [meId, setMeId] = useState<string | null>(null);
   const [mode, setMode] = useState<FormMode>(null);
   const [selected, setSelected] = useState<AppointmentRow | null>(null);
+  const [selectedTask, setSelectedTask] = useState<TaskRow | null>(null);
+  const [confirmDeleteTask, setConfirmDeleteTask] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const [form, setForm] = useState({
@@ -113,11 +236,59 @@ export default function CalendarPage() {
   const range = useMemo(() => rangeForView(anchor, view), [anchor, view]);
 
   const load = useCallback(async () => {
-    const data = await api<AppointmentRow[]>(
-      `/api/v1/dietitian/${dietitianAccountId}/appointments?from=${range.from.toISOString()}&to=${range.to.toISOString()}`,
+    const from = range.from.toISOString();
+    const to = range.to.toISOString();
+    const [appointments, taskList] = await Promise.all([
+      api<AppointmentRow[]>(
+        `/api/v1/dietitian/${dietitianAccountId}/appointments?from=${from}&to=${to}`,
+      ),
+      api<{ items: TaskRow[] }>(
+        `/api/v1/dietitian/${dietitianAccountId}/tasks?dueFrom=${from}&dueTo=${to}&limit=100`,
+      ),
+    ]);
+    setRows(appointments);
+    setTasks(
+      (taskList.items ?? []).filter(
+        (task) =>
+          Boolean(task.dueAt) &&
+          task.status !== "CANCELLED",
+      ),
     );
-    setRows(data);
   }, [dietitianAccountId, range.from, range.to]);
+
+  const calendarItems = useMemo<CalendarItem[]>(() => {
+    const appointmentItems: CalendarItem[] = (rows ?? []).map((row) => ({
+      id: `appt-${row.id}`,
+      kind: "appointment",
+      title: row.title,
+      startAt: row.startAt,
+      endAt: row.endAt,
+      status: row.status,
+      category: row.category || "CONSULTATION",
+      clientId: row.clientId,
+      client: row.client,
+      appointment: row,
+    }));
+    const taskItems: CalendarItem[] = tasks
+      .filter((task) => task.dueAt)
+      .map((task) => {
+        const start = new Date(task.dueAt!);
+        const end = new Date(start.getTime() + 60 * 60 * 1000);
+        return {
+          id: `task-${task.id}`,
+          kind: "task" as const,
+          title: task.title,
+          startAt: start.toISOString(),
+          endAt: end.toISOString(),
+          status: task.status,
+          category: "TASK",
+          clientId: task.clientId,
+          clientName: task.clientName,
+          task,
+        };
+      });
+    return [...appointmentItems, ...taskItems];
+  }, [rows, tasks]);
 
   useEffect(() => {
     void api<{ user: { id: string } }>("/api/v1/auth/me")
@@ -202,6 +373,49 @@ export default function CalendarPage() {
     setMode(null);
     setSelected(null);
     setFormError(null);
+  }
+
+  function closeTaskDialog() {
+    setSelectedTask(null);
+    setConfirmDeleteTask(false);
+    setFormError(null);
+  }
+
+  async function deleteSelectedTask() {
+    if (!selectedTask) return;
+    setSaving(true);
+    setFormError(null);
+    try {
+      await api(`/api/v1/dietitian/${dietitianAccountId}/tasks/${selectedTask.id}/archive`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      closeTaskDialog();
+      await load();
+    } catch (err) {
+      setConfirmDeleteTask(false);
+      setFormError(errorMessage(err, "Unable to delete task"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function completeSelectedTask() {
+    if (!selectedTask) return;
+    setSaving(true);
+    setFormError(null);
+    try {
+      await api(`/api/v1/dietitian/${dietitianAccountId}/tasks/${selectedTask.id}/complete`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      closeTaskDialog();
+      await load();
+    } catch (err) {
+      setFormError(errorMessage(err, "Unable to complete task"));
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function onSave(event: FormEvent) {
@@ -389,7 +603,7 @@ export default function CalendarPage() {
     <section className="ui-cal-page">
       <PageHeader
         title="Calendar"
-        description="Manage appointments by day, week, or month."
+        description="Appointments and due tasks by day, week, or month."
         actions={
           <Button type="button" onClick={() => openCreate(new Date())}>
             New appointment
@@ -431,20 +645,82 @@ export default function CalendarPage() {
         <MonthGrid
           anchor={anchor}
           today={today}
-          rows={rows ?? []}
+          items={calendarItems}
           onDayClick={(d) => openCreate(new Date(d.getFullYear(), d.getMonth(), d.getDate(), 9))}
-          onSelect={openEdit}
+          onSelectAppointment={openEdit}
+          onSelectTask={setSelectedTask}
         />
       ) : (
         <TimeGrid
           view={view}
           anchor={anchor}
           today={today}
-          rows={rows ?? []}
+          items={calendarItems}
           onSlotClick={openCreate}
-          onSelect={openEdit}
+          onSelectAppointment={openEdit}
+          onSelectTask={setSelectedTask}
         />
       )}
+
+      <Dialog
+        open={selectedTask !== null && !confirmDeleteTask}
+        title="Task"
+        onClose={closeTaskDialog}
+        className="ui-cal-dialog"
+      >
+        {formError ? <Alert tone="danger">{formError}</Alert> : null}
+        {selectedTask ? (
+          <div className="ui-stack" style={{ gap: 14 }}>
+            <div>
+              <strong style={{ fontSize: "1.05rem" }}>{selectedTask.title}</strong>
+              <p className="ui-muted" style={{ margin: "6px 0 0" }}>
+                {selectedTask.clientName ?? "Clinic task"}
+                {selectedTask.dueAt ? ` · ${new Date(selectedTask.dueAt).toLocaleString()}` : ""}
+              </p>
+              <p style={{ margin: "8px 0 0" }}>
+                <StatusBadge status={selectedTask.status} label={statusLabel(selectedTask.status)} />
+              </p>
+            </div>
+            <div className="ui-cal-dialog__footer">
+              <div className="ui-cal-dialog__footer-secondary">
+                <Button
+                  type="button"
+                  variant="danger"
+                  disabled={saving}
+                  onClick={() => setConfirmDeleteTask(true)}
+                >
+                  Delete task
+                </Button>
+              </div>
+              <div className="ui-cal-dialog__footer-primary">
+                <Button type="button" variant="secondary" onClick={closeTaskDialog}>
+                  Close
+                </Button>
+                {selectedTask.status !== "COMPLETED" && selectedTask.status !== "CANCELLED" ? (
+                  <Button type="button" disabled={saving} onClick={() => void completeSelectedTask()}>
+                    Mark done
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </Dialog>
+
+      <ConfirmDialog
+        open={confirmDeleteTask && selectedTask !== null}
+        title="Delete this task?"
+        description={
+          selectedTask
+            ? `“${selectedTask.title}” will be removed from your task list and calendar. This cannot be undone.`
+            : undefined
+        }
+        confirmLabel="Delete task"
+        danger
+        pending={saving}
+        onConfirm={() => void deleteSelectedTask()}
+        onCancel={() => setConfirmDeleteTask(false)}
+      />
 
       <Dialog
         open={mode !== null}
@@ -522,7 +798,7 @@ export default function CalendarPage() {
                 </option>
                 {clients.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {clientLabel(c)}
+                    {clientIdentityLine(c)}
                   </option>
                 ))}
               </Select>
@@ -642,15 +918,17 @@ export default function CalendarPage() {
 function MonthGrid({
   anchor,
   today,
-  rows,
+  items,
   onDayClick,
-  onSelect,
+  onSelectAppointment,
+  onSelectTask,
 }: {
   anchor: Date;
   today: Date;
-  rows: AppointmentRow[];
+  items: CalendarItem[];
   onDayClick: (d: Date) => void;
-  onSelect: (row: AppointmentRow) => void;
+  onSelectAppointment: (row: AppointmentRow) => void;
+  onSelectTask: (task: TaskRow) => void;
 }) {
   const start = startOfWeek(new Date(anchor.getFullYear(), anchor.getMonth(), 1));
   const cells = Array.from({ length: 42 }, (_, i) => addDays(start, i));
@@ -664,7 +942,7 @@ function MonthGrid({
       <div className="ui-cal-month__grid">
         {cells.map((day) => {
           const inMonth = day.getMonth() === anchor.getMonth();
-          const dayRows = rows.filter((r) => isSameDay(new Date(r.startAt), day));
+          const dayItems = items.filter((r) => isSameDay(new Date(r.startAt), day));
           return (
             <button
               key={day.toISOString()}
@@ -674,21 +952,35 @@ function MonthGrid({
             >
               <span className="ui-cal-month__date">{day.getDate()}</span>
               <span className="ui-cal-month__events">
-                {dayRows.slice(0, 3).map((row) => (
-                  <span
-                    key={row.id}
-                    className={`ui-cal-chip cat-${row.category}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onSelect(row);
-                    }}
-                    role="link"
-                  >
-                    {formatMessageTime(row.startAt)} {row.title}
-                  </span>
-                ))}
-                {dayRows.length > 3 ? (
-                  <span className="ui-muted">+{dayRows.length - 3} more</span>
+                {dayItems.slice(0, 3).map((item) =>
+                  item.kind === "appointment" && item.appointment ? (
+                    <span
+                      key={item.id}
+                      className={`ui-cal-chip cat-${item.category}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelectAppointment(item.appointment!);
+                      }}
+                      role="link"
+                    >
+                      {formatMessageTime(item.startAt)} {item.title}
+                    </span>
+                  ) : item.task ? (
+                    <span
+                      key={item.id}
+                      className={`ui-cal-chip cat-TASK${item.status === "COMPLETED" ? " is-done" : ""}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelectTask(item.task!);
+                      }}
+                      role="link"
+                    >
+                      {item.title}
+                    </span>
+                  ) : null,
+                )}
+                {dayItems.length > 3 ? (
+                  <span className="ui-muted">+{dayItems.length - 3} more</span>
                 ) : null}
               </span>
             </button>
@@ -703,21 +995,36 @@ function TimeGrid({
   view,
   anchor,
   today,
-  rows,
+  items,
   onSlotClick,
-  onSelect,
+  onSelectAppointment,
+  onSelectTask,
 }: {
   view: "week" | "day";
   anchor: Date;
   today: Date;
-  rows: AppointmentRow[];
+  items: CalendarItem[];
   onSlotClick: (d: Date) => void;
-  onSelect: (row: AppointmentRow) => void;
+  onSelectAppointment: (row: AppointmentRow) => void;
+  onSelectTask: (task: TaskRow) => void;
 }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
   const days =
     view === "day"
       ? [startOfDay(anchor)]
       : Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(anchor), i));
+
+  useEffect(() => {
+    const root = scrollRef.current;
+    if (!root) return;
+    const frame = window.requestAnimationFrame(() => {
+      const hourPx =
+        root.querySelector<HTMLElement>(".ui-cal-time__hourlabel")?.getBoundingClientRect().height ??
+        HOUR_ROW_REM * 16;
+      root.scrollTop = 8 * hourPx;
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [view, anchor]);
 
   return (
     <div className={`ui-cal-time${view === "day" ? " is-day" : ""}`}>
@@ -730,60 +1037,80 @@ function TimeGrid({
           </div>
         ))}
       </div>
-      <div className="ui-cal-time__body">
-        <div className="ui-cal-time__hours">
-          {DAY_HOURS.map((h) => (
-            <div key={h} className="ui-cal-time__hourlabel">
-              {formatHourLabel(h)}
-            </div>
-          ))}
-        </div>
-        {days.map((day) => (
-          <div key={day.toISOString()} className="ui-cal-time__col">
+      <div className="ui-cal-time__scroll" ref={scrollRef}>
+        <div className="ui-cal-time__body">
+          <div className="ui-cal-time__hours">
             {DAY_HOURS.map((h) => (
-              <button
-                key={h}
-                type="button"
-                className="ui-cal-time__slot"
-                aria-label={`Create at ${formatHourLabel(h)}`}
-                onClick={() => {
-                  const at = new Date(day);
-                  at.setHours(h, 0, 0, 0);
-                  onSlotClick(at);
-                }}
-              />
+              <div key={h} className="ui-cal-time__hourlabel" data-hour={h}>
+                {formatHourLabel(h)}
+              </div>
             ))}
-            {rows
-              .filter((r) => isSameDay(new Date(r.startAt), day))
-              .map((row) => {
-                const start = new Date(row.startAt);
-                const end = new Date(row.endAt);
-                const hourH = 4.5; // keep in sync with .ui-cal-time__* row height
-                const startMin = (start.getHours() - 7) * 60 + start.getMinutes();
-                const endMin = (end.getHours() - 7) * 60 + end.getMinutes();
-                const top = Math.max(0, (startMin / 60) * hourH);
-                const height = Math.max(3.2, ((endMin - startMin) / 60) * hourH);
-                return (
-                  <button
-                    key={row.id}
-                    type="button"
-                    className={`ui-cal-block cat-${row.category}${row.status === "RESCHEDULE_PENDING" ? " is-pending" : ""}`}
-                    style={{ top: `${top}rem`, height: `${height}rem` }}
-                    onClick={() => onSelect(row)}
-                  >
-                    <strong>{row.title}</strong>
-                    <span>{clientLabel(row.client, row.clientId)}</span>
-                    <span>
-                      {formatMessageTime(row.startAt)}–{formatMessageTime(row.endAt)}
-                    </span>
-                  </button>
-                );
-              })}
           </div>
-        ))}
+          {days.map((day) => {
+            const dayItems = positionDayItems(items.filter((r) => isSameDay(new Date(r.startAt), day)));
+            return (
+              <div key={day.toISOString()} className="ui-cal-time__col">
+                {DAY_HOURS.map((h) => (
+                  <button
+                    key={h}
+                    type="button"
+                    className="ui-cal-time__slot"
+                    aria-label={`Create at ${formatHourLabel(h)}`}
+                    onClick={() => {
+                      const at = new Date(day);
+                      at.setHours(h, 0, 0, 0);
+                      onSlotClick(at);
+                    }}
+                  />
+                ))}
+                {dayItems.map((item) => {
+                  const width = `calc((100% - 0.4rem) / ${item.colCount})`;
+                  const left = `calc(0.2rem + ${item.col} * ((100% - 0.4rem) / ${item.colCount}))`;
+                  const compact = item.height < 3.4;
+                  if (item.kind === "task" && item.task) {
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        className={`ui-cal-block cat-TASK${item.status === "COMPLETED" ? " is-done" : ""}${compact ? " is-compact" : ""}`}
+                        style={{ top: `${item.top}rem`, height: `${item.height}rem`, left, width }}
+                        onClick={() => onSelectTask(item.task!)}
+                        title={`${item.title}${item.clientName ? ` · ${item.clientName}` : ""} · ${formatMessageTime(item.startAt)}`}
+                      >
+                        <strong>{item.title}</strong>
+                        {!compact ? <span>{item.clientName ?? "Clinic task"}</span> : null}
+                        <span>{formatMessageTime(item.startAt)}</span>
+                      </button>
+                    );
+                  }
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className={`ui-cal-block cat-${item.category}${item.status === "RESCHEDULE_PENDING" ? " is-pending" : ""}${compact ? " is-compact" : ""}`}
+                      style={{ top: `${item.top}rem`, height: `${item.height}rem`, left, width }}
+                      onClick={() => item.appointment && onSelectAppointment(item.appointment)}
+                      title={`${item.title} · ${clientLabel(item.client, item.clientId ?? undefined)} · ${formatMessageTime(item.startAt)}–${formatMessageTime(item.endAt)}`}
+                    >
+                      <strong>{item.title}</strong>
+                      {!compact ? <span>{clientLabel(item.client, item.clientId ?? undefined)}</span> : null}
+                      <span>
+                        {formatMessageTime(item.startAt)}–{formatMessageTime(item.endAt)}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
       </div>
-      {(rows ?? []).length === 0 ? (
-        <EmptyState title="No appointments in this range">Click an empty slot to schedule.</EmptyState>
+      {items.length === 0 ? (
+        <div className="ui-cal-time__empty">
+          <EmptyState title="No appointments or tasks in this range">
+            Click an empty slot to schedule, or add a task with a due date.
+          </EmptyState>
+        </div>
       ) : null}
     </div>
   );

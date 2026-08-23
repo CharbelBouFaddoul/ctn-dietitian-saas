@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import type { Prisma, QuantityUnit } from "@prisma/client";
+import { foodQuantityScaleFactor, IncompatibleFoodUnitError } from "@nutrition-saas/nutrition";
 import { PrismaService } from "../prisma/prisma.service";
 import { SecurityEventLogger } from "../auth/security-event.logger";
 import type { DietitianTenantContext } from "../dietitian/dietitian.types";
@@ -246,7 +247,28 @@ export class RecipeService {
       }
     }
     const foodIds = [...new Set(items.map((item) => item.foodId))];
-    await this.nutrition.loadFoods(tenant.dietitianAccountId, foodIds);
+    const foodMap = await this.nutrition.loadFoods(tenant.dietitianAccountId, foodIds);
+    for (const item of items) {
+      const food = foodMap.get(item.foodId);
+      if (!food || !isFoodQuantityUnit(item.unit)) {
+        throw new BadRequestException("Recipe ingredient food is not available");
+      }
+      try {
+        foodQuantityScaleFactor(
+          {
+            referenceQuantity: food.referenceQuantity,
+            referenceUnit: food.referenceUnit as "g" | "ml",
+          },
+          item.quantity,
+          item.unit,
+        );
+      } catch (error) {
+        if (error instanceof IncompatibleFoodUnitError || error instanceof RangeError) {
+          throw new BadRequestException(error.message);
+        }
+        throw error;
+      }
+    }
 
     await this.prisma.$transaction(async (tx) => {
       await tx.recipeIngredient.deleteMany({

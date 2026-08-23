@@ -121,6 +121,9 @@ function validateTriggerActionPair(
       if (!configuration.emailSubject || !configuration.emailBody) {
         throw new Error("emailSubject and emailBody are required");
       }
+      if (configuration.recipient === "BOTH") {
+        throw new Error("SEND_EMAIL does not support BOTH recipient");
+      }
       break;
     case "CREATE_TASK":
       if (!configuration.taskTitle) {
