@@ -29,7 +29,6 @@ import { JoinCodePanel } from "../../../../../components/join-code-panel";
 import { ClientAssessmentsPanel } from "../../../../../components/client-assessments-panel";
 import { ClientClinicalProfilePanel } from "../../../../../components/client-clinical-profile-panel";
 import { ClientEvolutionPanel } from "../../../../../components/client-evolution-panel";
-import { ClientTimelinePanel } from "../../../../../components/client-timeline-panel";
 import { ClientTrackingPanel } from "../../../../../components/client-tracking-panel";
 import { api } from "../../../../../lib/api";
 import {
@@ -53,7 +52,6 @@ type Tab =
   | "messages"
   | "invoices"
   | "appointments"
-  | "timeline"
   | "ai"
   | "portal";
 
@@ -70,6 +68,7 @@ const LEGACY_TABS: Record<string, Tab> = {
   goals: "clinical",
   documents: "clinical",
   evolution: "measurement",
+  timeline: "tracking",
 };
 
 const chartSections: ChartSection[] = [
@@ -92,7 +91,6 @@ const chartSections: ChartSection[] = [
     tabs: [
       { id: "measurement", label: "Measurement" },
       { id: "tracking", label: "Tracking" },
-      { id: "timeline", label: "Timeline" },
     ],
   },
   {
@@ -493,11 +491,13 @@ function ClientWorkspacePage() {
     setAppointments(rows);
   }
 
-  async function loadTimelinePage(before?: string, replace = true) {
+  async function loadTimelinePage(before?: string, replace = true, date?: string) {
     setTimelineLoading(true);
     try {
       const query = new URLSearchParams({ limit: String(TIMELINE_PAGE_SIZE) });
       if (before) query.set("before", before);
+      const day = date ?? trackingDate;
+      if (day) query.set("date", day);
       const rows = await api<TimelineRow[]>(`${base}/timeline?${query.toString()}`);
       if (replace) {
         setTimelinePages([rows]);
@@ -507,7 +507,8 @@ function ClientWorkspacePage() {
         setTimelinePageIndex((index) => index + 1);
       }
       setTimeline(rows);
-      setTimelineHasOlder(rows.length >= TIMELINE_PAGE_SIZE);
+      // Day-scoped feeds are usually short; only page when not filtered to a day.
+      setTimelineHasOlder(!day && rows.length >= TIMELINE_PAGE_SIZE);
     } finally {
       setTimelineLoading(false);
     }
@@ -546,13 +547,16 @@ function ClientWorkspacePage() {
   }, [searchParams]);
 
   useEffect(() => {
-    if (tab !== "timeline") return;
+    if (tab !== "tracking") return;
     setTimeline([]);
     setTimelinePages([]);
     setTimelinePageIndex(0);
     setTimelineHasOlder(false);
-    void loadTimelinePage().catch((err) => setError(errorMessage(err, "Unable to load timeline")));
-  }, [tab, base]);
+    if (!trackingDate) return;
+    void loadTimelinePage(undefined, true, trackingDate).catch((err) =>
+      setError(errorMessage(err, "Unable to load timeline")),
+    );
+  }, [tab, base, trackingDate]);
 
   useEffect(() => {
     if (tab !== "appointments") return;
@@ -879,8 +883,8 @@ function ClientWorkspacePage() {
           <Section
             title="Recent activity"
             actions={
-              <Button variant="secondary" size="sm" onClick={() => selectTab("timeline")}>
-                View full timeline
+              <Button variant="secondary" size="sm" onClick={() => selectTab("tracking")}>
+                View timeline
               </Button>
             }
           >
@@ -1003,10 +1007,7 @@ function ClientWorkspacePage() {
 
       {/* ── TRACKING ── */}
       {tab === "tracking" ? (
-        <div className="ui-client-chart__panel ui-stack">
-          <p className="ui-hint" style={{ margin: "0 0 0.75rem", padding: "0.35rem 0 0.15rem", lineHeight: 1.45 }}>
-            Food, water, exercise, sleep, and habits are logged by the patient in the portal. Assign habits here; you don’t need to enter everyday tracking for them.
-          </p>
+        <div className="ui-client-chart__panel">
           <ClientTrackingPanel
             dietitianAccountId={dietitianAccountId}
             clientId={clientId}
@@ -1046,6 +1047,23 @@ function ClientWorkspacePage() {
                 })
                 .then(setTrackingSummary)
                 .catch((err) => setError(errorMessage(err, "Unable to unassign habit")));
+            }}
+            activities={timeline}
+            activitiesLoading={timelineLoading}
+            activitiesPage={timelinePageIndex + 1}
+            activitiesHasNewer={timelinePageIndex > 0}
+            activitiesHasOlder={timelinePageIndex < timelinePages.length - 1 || timelineHasOlder}
+            onActivitiesNewer={goTimelineNewer}
+            onActivitiesOlder={goTimelineOlder}
+            notes={timelineNotes}
+            onNotesChange={setTimelineNotes}
+            onSaveNotes={() => {
+              void api(`${base}/profile`, {
+                method: "PATCH",
+                body: JSON.stringify({ notes: timelineNotes }),
+              })
+                .then(() => loadPortfolio())
+                .catch((err) => setError(errorMessage(err, "Unable to save notes")));
             }}
           />
         </div>
@@ -1285,32 +1303,6 @@ function ClientWorkspacePage() {
               </ul>
             )}
           </Section>
-        </div>
-      ) : null}
-
-      {/* ── TIMELINE ── */}
-      {tab === "timeline" ? (
-        <div className="ui-client-chart__panel">
-          <ClientTimelinePanel
-            notes={timelineNotes}
-            onNotesChange={setTimelineNotes}
-            onSaveNotes={() => {
-              void api(`${base}/profile`, {
-                method: "PATCH",
-                body: JSON.stringify({ notes: timelineNotes }),
-              })
-                .then(() => loadPortfolio())
-                .catch((err) => setError(errorMessage(err, "Unable to save notes")));
-            }}
-            allowManage={allowManage}
-            events={timeline}
-            loading={timelineLoading}
-            page={timelinePageIndex + 1}
-            hasNewer={timelinePageIndex > 0}
-            hasOlder={timelinePageIndex < timelinePages.length - 1 || timelineHasOlder}
-            onNewer={goTimelineNewer}
-            onOlder={goTimelineOlder}
-          />
         </div>
       ) : null}
 

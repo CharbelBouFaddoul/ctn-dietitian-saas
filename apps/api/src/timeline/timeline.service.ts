@@ -33,14 +33,25 @@ export class TimelineService {
   async list(
     dietitianAccountId: string,
     clientId: string,
-    options?: { before?: string; limit?: number },
+    options?: { before?: string; date?: string; limit?: number },
   ) {
     const take = Math.min(Math.max(options?.limit ?? 50, 1), 100);
+    const day = options?.date?.trim();
+    const dayMatch = day && /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : null;
+    const occurredAt = dayMatch
+      ? {
+          gte: new Date(`${dayMatch}T00:00:00.000Z`),
+          lte: new Date(`${dayMatch}T23:59:59.999Z`),
+        }
+      : options?.before
+        ? { lt: new Date(options.before) }
+        : undefined;
+
     const events = await this.prisma.timelineEvent.findMany({
       where: {
         ...tenantWhere(dietitianAccountId),
         clientId,
-        ...(options?.before ? { occurredAt: { lt: new Date(options.before) } } : {}),
+        ...(occurredAt ? { occurredAt } : {}),
       },
       orderBy: { occurredAt: "desc" },
       take,

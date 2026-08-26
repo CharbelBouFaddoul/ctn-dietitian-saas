@@ -15,6 +15,11 @@ class TimelineQueryDto {
   @IsDateString()
   before?: string;
 
+  @ApiPropertyOptional({ description: "YYYY-MM-DD — return events on this UTC calendar day" })
+  @IsOptional()
+  @IsDateString()
+  date?: string;
+
   @ApiPropertyOptional({ default: 50 })
   @IsOptional()
   @Type(() => Number)
@@ -39,6 +44,7 @@ export class TimelineController {
   ) {
     return this.timeline.list(tenant.dietitianAccountId, clientId, {
       before: query.before,
+      date: query.date,
       limit: query.limit,
     });
   }
