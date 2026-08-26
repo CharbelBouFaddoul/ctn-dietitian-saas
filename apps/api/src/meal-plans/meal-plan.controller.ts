@@ -79,6 +79,16 @@ export class MealPlanController {
     return this.plans.getVersion(tenant, planId, versionId);
   }
 
+  @Delete(":planId/versions/:versionId")
+  @ApiOperation({ summary: "Delete a draft or published meal-plan version" })
+  deleteVersion(
+    @CurrentTenant() tenant: DietitianTenantContext,
+    @Param("planId", ParseUUIDPipe) planId: string,
+    @Param("versionId", ParseUUIDPipe) versionId: string,
+  ) {
+    return this.plans.deleteVersion(tenant, planId, versionId);
+  }
+
   @Post(":planId/versions/:versionId/publish")
   publish(
     @CurrentTenant() tenant: DietitianTenantContext,

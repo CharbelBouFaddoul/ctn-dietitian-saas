@@ -48,11 +48,23 @@ export class FoodController {
     return this.foods.createCustom(tenant.dietitianAccountId, tenant.userId, body);
   }
 
+  @Post(":foodId/duplicate")
+  @ApiOperation({
+    summary: "Duplicate a catalog or custom food as a practice-private custom food",
+    description: "Copies all macros and extra nutrients. The original catalog row is never mutated.",
+  })
+  duplicate(
+    @CurrentTenant() tenant: DietitianTenantContext,
+    @Param("foodId", ParseUUIDPipe) foodId: string,
+  ) {
+    return this.foods.duplicate(tenant.dietitianAccountId, tenant.userId, foodId);
+  }
+
   @Get(":foodId")
   @ApiOperation({
     summary: "Get effective food for this practice",
     description:
-      "Catalog foods merge FoodOverride. Custom foods return own nutrients. Other practices' customs are not visible.",
+      "Catalog foods are read-only (USDA values). Custom foods return own nutrients. Other practices' customs are not visible.",
   })
   getEffective(@CurrentTenant() tenant: DietitianTenantContext, @Param("foodId", ParseUUIDPipe) foodId: string) {
     return this.foods.getEffective(tenant.dietitianAccountId, foodId);

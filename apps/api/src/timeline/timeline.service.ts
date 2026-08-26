@@ -3,6 +3,27 @@ import type { Prisma, TimelineEventType } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { tenantWhere } from "../dietitian/tenant-scope";
 
+/** Tracking / care events — excludes portal admin, billing, tasks, messaging. */
+export const CARE_TIMELINE_TYPES: TimelineEventType[] = [
+  "MEASUREMENT_ADDED",
+  "FOOD_LOGGED",
+  "WATER_LOGGED",
+  "EXERCISE_LOGGED",
+  "SLEEP_LOGGED",
+  "HABIT_COMPLETED",
+  "GOAL_CREATED",
+  "GOAL_COMPLETED",
+  "GOAL_CANCELLED",
+  "ASSESSMENT_STARTED",
+  "ASSESSMENT_COMPLETED",
+  "APPOINTMENT_CREATED",
+  "APPOINTMENT_UPDATED",
+  "APPOINTMENT_COMPLETED",
+  "APPOINTMENT_CANCELLED",
+  "MEAL_PLAN_CREATED",
+  "MEAL_PLAN_PUBLISHED",
+];
+
 @Injectable()
 export class TimelineService {
   constructor(private readonly prisma: PrismaService) {}
@@ -33,7 +54,7 @@ export class TimelineService {
   async list(
     dietitianAccountId: string,
     clientId: string,
-    options?: { before?: string; date?: string; limit?: number },
+    options?: { before?: string; date?: string; scope?: "care" | "all"; limit?: number },
   ) {
     const take = Math.min(Math.max(options?.limit ?? 50, 1), 100);
     const day = options?.date?.trim();
@@ -52,6 +73,7 @@ export class TimelineService {
         ...tenantWhere(dietitianAccountId),
         clientId,
         ...(occurredAt ? { occurredAt } : {}),
+        ...(options?.scope === "care" ? { type: { in: CARE_TIMELINE_TYPES } } : {}),
       },
       orderBy: { occurredAt: "desc" },
       take,

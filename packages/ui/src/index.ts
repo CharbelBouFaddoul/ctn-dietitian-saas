@@ -39,3 +39,9 @@ export type {
 } from "./marketing";
 export { LineChart } from "./line-chart";
 export type { LineChartPoint, LineChartProps } from "./line-chart";
+export { DonutChart } from "./donut-chart";
+export type { DonutSlice, DonutChartProps } from "./donut-chart";
+export { TargetBar } from "./target-bar";
+export type { TargetBarProps } from "./target-bar";
+export { RdaBarList } from "./rda-bar-list";
+export type { RdaBarRow, RdaBarListProps } from "./rda-bar-list";

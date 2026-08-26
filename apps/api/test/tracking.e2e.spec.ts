@@ -129,7 +129,7 @@ describe("Phase 8 client tracking", () => {
       .put(`/api/v1/dietitian/${orgA.id}/foods/${food.id}/override`)
       .set("Cookie", ownerA.cookie)
       .send({ energyKcal: 180 })
-      .expect(200);
+      .expect(403);
 
     const stored = await request(ctx.app.getHttpServer())
       .get(`/api/v1/portal/tracking/food-logs?date=${created.body.trackingDate}`)
@@ -142,7 +142,7 @@ describe("Phase 8 client tracking", () => {
       .set("Cookie", portalA)
       .send({ quantity: 100 })
       .expect(200);
-    expect(edited.body.nutrition.energyKcal).toBe(180);
+    expect(edited.body.nutrition.energyKcal).toBe(165);
 
     await request(ctx.app.getHttpServer())
       .get(`/api/v1/dietitian/${orgB.id}/clients/${clientB.body.id}/tracking/summary`)

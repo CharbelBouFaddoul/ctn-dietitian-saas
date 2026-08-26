@@ -19,7 +19,7 @@ export class FoodOverrideController {
   ) {}
 
   @Get()
-  @ApiOperation({ summary: "Inspect this organization's override for a food" })
+  @ApiOperation({ summary: "Overrides are retired; catalog foods are read-only" })
   async get(@CurrentTenant() tenant: DietitianTenantContext, @Param("foodId", ParseUUIDPipe) foodId: string) {
     const effective = await this.foods.getEffective(tenant.dietitianAccountId, foodId);
     if (!effective.override) {
@@ -30,8 +30,8 @@ export class FoodOverrideController {
 
   @Put()
   @ApiOperation({
-    summary: "Create or update an organization food override",
-    description: "Never mutates the global foods row. Null fields clear that nutrient override.",
+    summary: "Rejected: catalog foods are read-only",
+    description: "Duplicate the food to create a clinic copy you can edit.",
   })
   upsert(
     @CurrentTenant() tenant: DietitianTenantContext,
@@ -42,7 +42,7 @@ export class FoodOverrideController {
   }
 
   @Delete()
-  @ApiOperation({ summary: "Deactivate this organization's override and restore global effective values" })
+  @ApiOperation({ summary: "Rejected: catalog foods are read-only" })
   remove(@CurrentTenant() tenant: DietitianTenantContext, @Param("foodId", ParseUUIDPipe) foodId: string) {
     return this.overrides.remove(tenant, foodId);
   }

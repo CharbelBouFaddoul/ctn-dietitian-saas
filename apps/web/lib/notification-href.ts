@@ -65,7 +65,7 @@ export function hrefForNotification(
     case "meal_plan":
     case "meal_plan_version":
       return clientId
-        ? `${base}/clients/${clientId}?tab=meal-plans`
+        ? `${base}/clients/${clientId}?tab=meal-plan${item.targetId ? `&planId=${item.targetId}` : ""}`
         : item.targetId
           ? `${base}/meal-plans/${item.targetId}`
           : `${base}/meal-plans`;

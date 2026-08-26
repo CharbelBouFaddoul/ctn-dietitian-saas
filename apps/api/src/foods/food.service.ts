@@ -6,7 +6,7 @@ import {
 import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import type { FoodOverride, Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import { Prisma as PrismaNamespace } from "@prisma/client";
 import {
   calculateFoodNutrition,
@@ -14,7 +14,6 @@ import {
   IncompatibleFoodUnitError,
   normalizeFoodName,
   roundNutrition,
-  mergeNutrition,
   sanitizeExtraNutrients,
   scaleExtraNutrients,
   roundExtraNutrients,
@@ -23,11 +22,10 @@ import {
 } from "@nutrition-saas/nutrition";
 import { PrismaService } from "../prisma/prisma.service";
 import {
+  extraNutrientsFromRow,
   foodIdentity,
   nutritionFromRow,
   nutritionPayloadExtras,
-  overrideNutrition,
-  overriddenFields,
   sourcePayload,
 } from "./food.mapper";
 import { importFoodDataset } from "./import/importer";
@@ -118,20 +116,6 @@ export class FoodService {
         })
       : rows;
 
-    const catalogIds = sorted.filter((row) => !row.dietitianAccountId).map((row) => row.id);
-    const overrideRows =
-      catalogIds.length === 0
-        ? []
-        : await this.prisma.foodOverride.findMany({
-            where: {
-              dietitianAccountId,
-              status: "ACTIVE",
-              foodId: { in: catalogIds },
-            },
-            select: { foodId: true },
-          });
-    const overridden = new Set(overrideRows.map((row) => row.foodId));
-
     return {
       page,
       pageSize,
@@ -147,8 +131,13 @@ export class FoodService {
           nutrition,
           presentedNutrition: roundNutrition(nutrition),
           ...extras,
-          hasOverride: !isCustom && overridden.has(row.id),
-          source: { id: row.source.id, name: row.source.name, datasetVersion: row.source.datasetVersion },
+          hasOverride: false,
+          source: {
+            id: row.source.id,
+            key: row.source.key,
+            name: row.source.name,
+            datasetVersion: row.source.datasetVersion,
+          },
         };
       }),
     };
@@ -173,10 +162,7 @@ export class FoodService {
         ...extras,
       };
     }
-    const override = await this.prisma.foodOverride.findUnique({
-      where: { dietitianAccountId_foodId: { dietitianAccountId, foodId } },
-    });
-    return { ...this.toEffective(food, override), origin: "catalog" as const, dietitianAccountId: null };
+    return { ...this.toCatalog(food), origin: "catalog" as const, dietitianAccountId: null };
   }
 
   async getEffectiveMany(dietitianAccountId: string, foodIds: string[]) {
@@ -197,14 +183,6 @@ export class FoodService {
       throw new NotFoundException("Food not found");
     }
     const result = new Map<string, Awaited<ReturnType<FoodService["getEffective"]>>>();
-    const catalogIds = foods.filter((f) => !f.dietitianAccountId).map((f) => f.id);
-    const overrides =
-      catalogIds.length === 0
-        ? []
-        : await this.prisma.foodOverride.findMany({
-            where: { dietitianAccountId, foodId: { in: catalogIds } },
-          });
-    const overrideByFood = new Map(overrides.map((row) => [row.foodId, row]));
     for (const food of foods) {
       if (food.dietitianAccountId) {
         const nutrition = nutritionFromRow(food);
@@ -223,7 +201,7 @@ export class FoodService {
         });
       } else {
         result.set(food.id, {
-          ...this.toEffective(food, overrideByFood.get(food.id) ?? null),
+          ...this.toCatalog(food),
           origin: "catalog",
           dietitianAccountId: null,
         });
@@ -282,6 +260,30 @@ export class FoodService {
       include: { source: true },
     });
     return this.getEffective(dietitianAccountId, row.id);
+  }
+
+  async duplicate(
+    dietitianAccountId: string,
+    createdById: string | undefined,
+    foodId: string,
+  ) {
+    const food = await this.loadAccessibleFood(dietitianAccountId, foodId);
+    const nutrition = nutritionFromRow(food);
+    return this.createCustom(dietitianAccountId, createdById, {
+      name: food.name,
+      category: food.category ?? undefined,
+      servingDescription: food.servingDescription ?? undefined,
+      referenceQuantity: Number(food.referenceQuantity),
+      referenceUnit: food.referenceUnit,
+      energyKcal: nutrition.energyKcal,
+      proteinG: nutrition.proteinG,
+      carbohydrateG: nutrition.carbohydrateG,
+      fatG: nutrition.fatG,
+      fiberG: nutrition.fiberG,
+      sugarG: nutrition.sugarG,
+      sodiumMg: nutrition.sodiumMg,
+      extraNutrients: extraNutrientsFromRow(food),
+    });
   }
 
   async updateCustom(
@@ -359,30 +361,18 @@ export class FoodService {
     return food;
   }
 
-  private toEffective(food: Awaited<ReturnType<FoodService["loadAccessibleFood"]>>, override: FoodOverride | null) {
-    const activeOverride = override?.status === "ACTIVE" ? override : null;
-    const globalNutrition = nutritionFromRow(food);
-    const overrideValues = overrideNutrition(activeOverride);
-    const effectiveNutrition = mergeNutrition(globalNutrition, overrideValues);
-    const extras = nutritionPayloadExtras(food);
-
+  private toCatalog(food: Awaited<ReturnType<FoodService["loadAccessibleFood"]>>) {
+    const nutrition = nutritionFromRow(food);
     return {
       ...foodIdentity(food),
       source: sourcePayload(food.source),
-      globalNutrition,
-      override: activeOverride
-        ? {
-            id: activeOverride.id,
-            status: activeOverride.status,
-            nutrition: overrideValues,
-            updatedAt: activeOverride.updatedAt.toISOString(),
-          }
-        : null,
-      effectiveNutrition,
-      presentedEffectiveNutrition: roundNutrition(effectiveNutrition),
-      presentedGlobalNutrition: roundNutrition(globalNutrition),
-      overriddenFields: overriddenFields(overrideValues),
-      ...extras,
+      globalNutrition: nutrition,
+      override: null,
+      effectiveNutrition: nutrition,
+      presentedEffectiveNutrition: roundNutrition(nutrition),
+      presentedGlobalNutrition: roundNutrition(nutrition),
+      overriddenFields: [] as string[],
+      ...nutritionPayloadExtras(food),
     };
   }
 

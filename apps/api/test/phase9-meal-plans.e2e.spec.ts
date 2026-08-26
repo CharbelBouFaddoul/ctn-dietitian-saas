@@ -352,7 +352,7 @@ describe("phase9 meal plans composition nutrition", () => {
       .put(`/api/v1/dietitian/${practice.id}/foods/${food.id}/override`)
       .set("Cookie", owner.cookie)
       .send({ energyKcal: 999 })
-      .expect(200);
+      .expect(403);
 
     const frozen = await request(ctx.app.getHttpServer())
       .get(`/api/v1/dietitian/${practice.id}/meal-plans/${plan.body.id}/versions/${versionId}`)

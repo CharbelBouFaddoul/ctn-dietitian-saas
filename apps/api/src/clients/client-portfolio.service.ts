@@ -4,6 +4,7 @@ import type { DietitianTenantContext } from "../dietitian/dietitian.types";
 import { tenantWhere } from "../dietitian/tenant-scope";
 import { ClientService } from "./client.service";
 import { computeBmi } from "../client-measurements/client-measurement.service";
+import { CARE_TIMELINE_TYPES } from "../timeline/timeline.service";
 
 const RECENT_TIMELINE_LIMIT = 6;
 const MESSAGE_PREVIEW_LIMIT = 5;
@@ -67,7 +68,7 @@ export class ClientPortfolioService {
         },
       }),
       this.prisma.timelineEvent.findMany({
-        where: { clientId, ...tenantWhere(orgId) },
+        where: { clientId, ...tenantWhere(orgId), type: { in: CARE_TIMELINE_TYPES } },
         orderBy: { occurredAt: "desc" },
         take: RECENT_TIMELINE_LIMIT,
       }),

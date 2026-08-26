@@ -1,8 +1,8 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import {
   Alert,
   Button,
@@ -48,8 +48,25 @@ function clientLabel(client: ClientRow): string {
   return client.displayName ?? `${client.firstName} ${client.lastName}`;
 }
 
-export default function MealPlansPage() {
+export default function MealPlansRoute() {
+  return (
+    <Suspense fallback={<LoadingMealPlans />}>
+      <MealPlansPage />
+    </Suspense>
+  );
+}
+
+function LoadingMealPlans() {
+  return (
+    <section className="ui-stack" style={{ gap: 24 }}>
+      <PageHeader eyebrow="Nutrition" title="Meal plans" description="Loading…" />
+    </section>
+  );
+}
+
+function MealPlansPage() {
   const params = useParams<{ dietitianAccountId: string }>();
+  const search = useSearchParams();
   const dietitianAccountId = params.dietitianAccountId;
   const [data, setData] = useState<ListResponse | null>(null);
   const [clients, setClients] = useState<ClientRow[]>([]);
@@ -58,7 +75,7 @@ export default function MealPlansPage() {
   const [dayLabelMode, setDayLabelMode] = useState<"NUMBERED" | "WEEKDAY">("NUMBERED");
   const [clientId, setClientId] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const [filterClientId, setFilterClientId] = useState("");
+  const [filterClientId, setFilterClientId] = useState(() => search.get("clientId") ?? "");
   const [nameQuery, setNameQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -77,7 +94,10 @@ export default function MealPlansPage() {
     ]);
     setData(plans);
     setClients(clientList.items);
-    if (!clientId && clientList.items[0]) setClientId(clientList.items[0].id);
+    if (!clientId) {
+      const fromFilter = filterClientId && clientList.items.some((row) => row.id === filterClientId);
+      setClientId(fromFilter ? filterClientId : (clientList.items[0]?.id ?? ""));
+    }
   }
 
   useEffect(() => {
@@ -104,8 +124,7 @@ export default function MealPlansPage() {
           }),
         },
       );
-      const draft = created.versions.find((row) => row.status === "DRAFT") ?? created.versions[0];
-      window.location.href = `/practice/${dietitianAccountId}/meal-plans/${created.id}?versionId=${draft?.id ?? ""}`;
+      window.location.href = `/practice/${dietitianAccountId}/clients/${clientId}?tab=meal-plan&planId=${created.id}`;
     } catch (err) {
       setError(errorMessage(err, "Could not create meal plan"));
       setBusy(false);

@@ -13,7 +13,12 @@ import {
   humanizeLabel,
 } from "@nutrition-saas/ui";
 import { formatDate, nutritionLabel } from "../lib/format";
-import { activityLabel } from "../lib/practice-labels";
+import {
+  careActivityLabel,
+  TIMELINE_CATEGORIES,
+  typesForTimelineCategory,
+  type TimelineCategoryId,
+} from "../lib/timeline-care";
 
 export type TrackingSummaryView = {
   date: string;
@@ -200,7 +205,7 @@ export function ClientTrackingPanel({
   onSaveNotes,
 }: Props) {
   const [openMeals, setOpenMeals] = useState<Record<string, boolean>>({});
-  const [activityFilter, setActivityFilter] = useState("all");
+  const [activityFilter, setActivityFilter] = useState<TimelineCategoryId>("all");
   const [habitsOpen, setHabitsOpen] = useState(false);
 
   const habitsDone = summary?.habits.completed ?? 0;
@@ -230,13 +235,10 @@ export function ClientTrackingPanel({
         ? 55
         : 0;
 
-  const activityTypes = useMemo(() => {
-    const set = new Set(activities.map((a) => a.type));
-    return Array.from(set).sort();
-  }, [activities]);
-
-  const filteredActivities =
-    activityFilter === "all" ? activities : activities.filter((a) => a.type === activityFilter);
+  const filteredActivities = useMemo(() => {
+    const allowed = new Set(typesForTimelineCategory(activityFilter));
+    return activities.filter((a) => allowed.has(a.type));
+  }, [activities, activityFilter]);
 
   function mealOpen(category: string) {
     if (openMeals[category] != null) return openMeals[category]!;
@@ -551,13 +553,12 @@ export function ClientTrackingPanel({
             <h3>Timeline</h3>
             <Select
               value={activityFilter}
-              onChange={(e) => setActivityFilter(e.target.value)}
+              onChange={(e) => setActivityFilter(e.target.value as TimelineCategoryId)}
               aria-label="Filter timeline"
             >
-              <option value="all">All events</option>
-              {activityTypes.map((type) => (
-                <option key={type} value={type}>
-                  {activityLabel(type)}
+              {TIMELINE_CATEGORIES.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.label}
                 </option>
               ))}
             </Select>
@@ -574,7 +575,7 @@ export function ClientTrackingPanel({
                   <li key={row.id} className="ui-track__activity">
                     <span className="ui-track__activity-date">{formatActivityDate(row.occurredAt)}</span>
                     <div className="ui-track__activity-body">
-                      <p>{activityLabel(row.type)}</p>
+                      <p>{careActivityLabel(row.type)}</p>
                       <time dateTime={row.occurredAt}>
                         {formatActivityTime(row.occurredAt)}
                         <span aria-hidden="true"> · </span>

@@ -46,6 +46,8 @@ const NUTRIENT_NUMBER_TO_KEY = {
   312: "copperMg",
   315: "manganeseMg",
   317: "seleniumMcg",
+  313: "fluorideMcg",
+  314: "iodineMcg",
   320: "vitaminAMcg",
   401: "vitaminCMg",
   328: "vitaminDMcg",
@@ -54,7 +56,9 @@ const NUTRIENT_NUMBER_TO_KEY = {
   404: "thiaminMg",
   405: "riboflavinMg",
   406: "niacinMg",
+  410: "pantothenicAcidMg",
   415: "vitaminB6Mg",
+  416: "biotinMcg",
   417: "folateMcg",
   418: "vitaminB12Mcg",
   421: "cholineMg",
@@ -509,7 +513,6 @@ function applyEnrichment(dataset, ctx) {
             ? "non-numeric sourceFoodId and no name match"
             : apiFail || "FDC food not found (invalid/placeholder id or no name match)",
       });
-      if (force) delete food.extraNutrients;
       continue;
     }
 
@@ -520,7 +523,6 @@ function applyEnrichment(dataset, ctx) {
         name: food.name,
         reason: `no mapped micronutrients (${how}, fdcId=${fdcIdOf(fdcFood)})`,
       });
-      if (force) delete food.extraNutrients;
       continue;
     }
 

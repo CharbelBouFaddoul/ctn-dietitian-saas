@@ -171,11 +171,19 @@ export class MealPlanService {
   async create(
     tenant: DietitianTenantContext,
     clientId: string,
-    input: { name: string; description?: string | null; dayLabelMode?: DayLabelMode },
+    input: {
+      name: string;
+      description?: string | null;
+      dayLabelMode?: DayLabelMode;
+      weekCount?: number;
+      daysPerWeek?: number;
+    },
   ) {
     await this.access.assertCanAccess(tenant, clientId, "manageRecords");
     const dayLabelMode: DayLabelMode = input.dayLabelMode === "WEEKDAY" ? "WEEKDAY" : "NUMBERED";
-    const firstDay = dayLabels(1, dayLabelMode);
+    const weekCount = Math.min(12, Math.max(1, Math.trunc(input.weekCount ?? 1)));
+    const daysPerWeek = Math.min(7, Math.max(1, Math.trunc(input.daysPerWeek ?? 1)));
+    const totalDays = weekCount * daysPerWeek;
     const created = await this.prisma.$transaction(async (tx) => {
       const plan = await tx.mealPlan.create({
         data: {
@@ -195,23 +203,26 @@ export class MealPlanService {
           createdById: tenant.userId,
         },
       });
-      const day = await tx.mealPlanDay.create({
-        data: {
-          dietitianAccountId: tenant.dietitianAccountId,
-          mealPlanVersionId: version.id,
-          dayNumber: 1,
-          title: firstDay.title,
-          weekday: firstDay.weekday,
-        },
-      });
-      await tx.meal.createMany({
-        data: DEFAULT_MEALS.map((name, index) => ({
-          dietitianAccountId: tenant.dietitianAccountId,
-          mealPlanDayId: day.id,
-          name,
-          sortOrder: index,
-        })),
-      });
+      for (let dayNumber = 1; dayNumber <= totalDays; dayNumber += 1) {
+        const labels = dayLabels(dayNumber, dayLabelMode);
+        const day = await tx.mealPlanDay.create({
+          data: {
+            dietitianAccountId: tenant.dietitianAccountId,
+            mealPlanVersionId: version.id,
+            dayNumber,
+            title: labels.title,
+            weekday: labels.weekday,
+          },
+        });
+        await tx.meal.createMany({
+          data: DEFAULT_MEALS.map((name, index) => ({
+            dietitianAccountId: tenant.dietitianAccountId,
+            mealPlanDayId: day.id,
+            name,
+            sortOrder: index,
+          })),
+        });
+      }
       return { plan, version };
     });
     await this.security.record({
@@ -328,25 +339,54 @@ export class MealPlanService {
     return this.get(tenant, plan.id);
   }
 
+  async deleteVersion(tenant: DietitianTenantContext, planId: string, versionId: string) {
+    const version = await this.requireVersion(tenant, planId, versionId, "manageRecords");
+    if (version.mealPlan.status === "ARCHIVED") {
+      throw new BadRequestException("Archived meal plans cannot be edited");
+    }
+
+    const siblings = await this.prisma.mealPlanVersion.findMany({
+      where: { mealPlanId: planId, ...tenantWhere(tenant.dietitianAccountId) },
+      select: { id: true },
+    });
+    if (siblings.length <= 1) {
+      return this.archive(tenant, planId);
+    }
+
+    await this.prisma.mealPlanVersion.delete({ where: { id: version.id } });
+
+    const remaining = await this.prisma.mealPlanVersion.findMany({
+      where: { mealPlanId: planId, ...tenantWhere(tenant.dietitianAccountId) },
+      select: { status: true },
+    });
+    const hasPublished = remaining.some((row) => row.status === "PUBLISHED");
+    await this.prisma.mealPlan.update({
+      where: { id: planId },
+      data: { status: hasPublished ? "ACTIVE" : "DRAFT" },
+    });
+
+    await this.security.record({
+      type: "meal_plan_version_deleted",
+      outcome: "success",
+      userId: tenant.userId,
+      dietitianAccountId: tenant.dietitianAccountId,
+      targetType: "meal_plan_version",
+      targetId: version.id,
+      metadata: { mealPlanId: planId, versionNumber: version.versionNumber, status: version.status },
+    });
+    return this.get(tenant, planId);
+  }
+
   async getVersion(tenant: DietitianTenantContext, planId: string, versionId: string) {
     const version = await this.requireVersion(tenant, planId, versionId, "read");
-    if (version.status !== "DRAFT") {
-      return {
-        id: version.id,
-        versionNumber: version.versionNumber,
-        status: version.status,
-        publishedAt: version.publishedAt?.toISOString() ?? null,
-        immutable: true,
-        snapshot: version.snapshot,
-      };
-    }
     const live = await this.calculateLive(tenant.dietitianAccountId, version);
+    const published = version.status !== "DRAFT";
     return {
       id: version.id,
       versionNumber: version.versionNumber,
       status: version.status,
-      publishedAt: null,
-      immutable: false,
+      publishedAt: version.publishedAt?.toISOString() ?? null,
+      immutable: published,
       snapshot: live,
     };
   }

@@ -8,6 +8,7 @@ import { EntitlementService } from "../entitlements/entitlement.service";
 import { ConversationService } from "../messaging/conversation.service";
 import { NotificationService } from "../notifications/notification.service";
 import { tenantWhere } from "../dietitian/tenant-scope";
+import { CARE_TIMELINE_TYPES } from "../timeline/timeline.service";
 
 @Injectable()
 export class PracticeDashboardService {
@@ -68,7 +69,11 @@ export class PracticeDashboardService {
         take: 8,
       }),
       this.prisma.timelineEvent.findMany({
-        where: { ...tenantWhere(tenant.dietitianAccountId), client: visible },
+        where: {
+          ...tenantWhere(tenant.dietitianAccountId),
+          client: visible,
+          type: { in: CARE_TIMELINE_TYPES },
+        },
         include: { client: true },
         orderBy: { occurredAt: "desc" },
         take: 5,

@@ -146,11 +146,6 @@ describe("§87 end-to-end acceptance workflow", () => {
       .expect(201);
 
     const food = await seedFood();
-    await request(ctx.app.getHttpServer())
-      .put(`/api/v1/dietitian/${org.body.id}/foods/${food.id}/override`)
-      .set("Cookie", dietitian.cookie)
-      .send({ energyKcal: 170 })
-      .expect(200);
 
     const plan = await request(ctx.app.getHttpServer())
       .post(`/api/v1/dietitian/${org.body.id}/meal-plans`)

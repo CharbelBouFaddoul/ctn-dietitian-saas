@@ -25,7 +25,11 @@ export type MicronutrientKey =
   | "vitaminB6Mg"
   | "folateMcg"
   | "vitaminB12Mcg"
-  | "cholineMg";
+  | "cholineMg"
+  | "pantothenicAcidMg"
+  | "biotinMcg"
+  | "fluorideMcg"
+  | "iodineMcg";
 
 export type ExtraNutrients = Partial<Record<MicronutrientKey, number | null>>;
 
@@ -52,6 +56,8 @@ export const MICRONUTRIENT_DEFS: readonly MicronutrientDef[] = [
   { key: "copperMg", label: "Copper", unit: "mg", group: "minerals", decimals: 2 },
   { key: "manganeseMg", label: "Manganese", unit: "mg", group: "minerals", decimals: 2 },
   { key: "seleniumMcg", label: "Selenium", unit: "µg", group: "minerals", decimals: 1 },
+  { key: "fluorideMcg", label: "Fluoride", unit: "µg", group: "minerals", decimals: 0 },
+  { key: "iodineMcg", label: "Iodine", unit: "µg", group: "minerals", decimals: 0 },
   { key: "vitaminAMcg", label: "Vitamin A (RAE)", unit: "µg", group: "vitamins", decimals: 0 },
   { key: "vitaminCMg", label: "Vitamin C", unit: "mg", group: "vitamins", decimals: 1 },
   { key: "vitaminDMcg", label: "Vitamin D", unit: "µg", group: "vitamins", decimals: 1 },
@@ -60,7 +66,9 @@ export const MICRONUTRIENT_DEFS: readonly MicronutrientDef[] = [
   { key: "thiaminMg", label: "Thiamin (B1)", unit: "mg", group: "vitamins", decimals: 2 },
   { key: "riboflavinMg", label: "Riboflavin (B2)", unit: "mg", group: "vitamins", decimals: 2 },
   { key: "niacinMg", label: "Niacin (B3)", unit: "mg", group: "vitamins", decimals: 1 },
+  { key: "pantothenicAcidMg", label: "Pantothenic acid (B5)", unit: "mg", group: "vitamins", decimals: 2 },
   { key: "vitaminB6Mg", label: "Vitamin B6", unit: "mg", group: "vitamins", decimals: 2 },
+  { key: "biotinMcg", label: "Biotin (B7)", unit: "µg", group: "vitamins", decimals: 1 },
   { key: "folateMcg", label: "Folate", unit: "µg", group: "vitamins", decimals: 0 },
   { key: "vitaminB12Mcg", label: "Vitamin B12", unit: "µg", group: "vitamins", decimals: 2 },
   { key: "cholineMg", label: "Choline", unit: "mg", group: "vitamins", decimals: 0 },

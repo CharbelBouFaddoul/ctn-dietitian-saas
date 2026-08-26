@@ -35,6 +35,8 @@ function shortLabel(label: string): string {
     .replace("Thiamin (B1)", "B1")
     .replace("Riboflavin (B2)", "B2")
     .replace("Niacin (B3)", "B3")
+    .replace("Pantothenic acid (B5)", "B5")
+    .replace("Biotin (B7)", "B7")
     .replace("Vitamin ", "Vit ");
 }
 
@@ -50,13 +52,17 @@ export function ExtraNutrientTables({
   values,
   emptyMessage = "No vitamin, mineral, or lipid data yet.",
   caption,
+  showAll = false,
 }: {
   values: ExtraNutrients;
   emptyMessage?: string;
   caption?: string;
+  showAll?: boolean;
 }) {
   const { items, highlights, byGroup, availableGroups } = useMemo(() => {
-    const present = MICRONUTRIENT_DEFS.filter((d) => values[d.key] !== undefined);
+    const present = showAll
+      ? [...MICRONUTRIENT_DEFS]
+      : MICRONUTRIENT_DEFS.filter((d) => values[d.key] !== undefined);
     const highlightList = HIGHLIGHT_KEYS.map((key) => {
       const def = MICRONUTRIENT_DEFS.find((d) => d.key === key);
       const value = values[key];
@@ -82,7 +88,7 @@ export function ExtraNutrientTables({
       byGroup: grouped,
       availableGroups: available,
     };
-  }, [values]);
+  }, [values, showAll]);
 
   const [tab, setTab] = useState<MicroGroup>(availableGroups[0] ?? "minerals");
   const activeTab = availableGroups.includes(tab) ? tab : (availableGroups[0] ?? "minerals");

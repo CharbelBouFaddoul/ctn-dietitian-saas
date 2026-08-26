@@ -113,6 +113,13 @@ export async function importFoodDataset(prisma: PrismaClient, dataset: FoodDatas
   });
 
   const seen = new Set<string>();
+  const existingRows = await prisma.food.findMany({
+    where: { foodSourceId: source.id },
+    select: { id: true, sourceFoodId: true },
+  });
+  const existingBySourceFoodId = new Map(existingRows.map((row) => [row.sourceFoodId, row.id]));
+  const toCreate: Array<{ sourceFoodId: string; data: Prisma.FoodCreateManyInput }> = [];
+  const toUpdate: Array<{ id: string; data: Prisma.FoodUpdateInput }> = [];
 
   for (const record of dataset.foods) {
     report.processed += 1;
@@ -122,7 +129,9 @@ export async function importFoodDataset(prisma: PrismaClient, dataset: FoodDatas
       if (reason.startsWith("Invalid numeric")) {
         report.invalidNumericValues += 1;
       }
-      report.rejections.push({ sourceFoodId: record.sourceFoodId, reason });
+      if (report.rejections.length < 50) {
+        report.rejections.push({ sourceFoodId: record.sourceFoodId, reason });
+      }
       continue;
     }
 
@@ -140,7 +149,7 @@ export async function importFoodDataset(prisma: PrismaClient, dataset: FoodDatas
     if (isSuspiciousCalorieGap(nutrition.energyKcal, nutrition)) {
       const gap = calorieDiscrepancy(nutrition.energyKcal, nutrition);
       report.suspiciousCalorieGaps += 1;
-      if (gap && nutrition.energyKcal !== null) {
+      if (gap && nutrition.energyKcal !== null && report.suspicious.length < 50) {
         report.suspicious.push({
           sourceFoodId,
           labeledKcal: nutrition.energyKcal,
@@ -149,6 +158,7 @@ export async function importFoodDataset(prisma: PrismaClient, dataset: FoodDatas
       }
     }
 
+    const extras = (sanitizeExtraNutrients(record.extraNutrients) as Prisma.InputJsonValue | null) ?? undefined;
     const data = {
       name: record.name.trim(),
       nameNormalized: normalizeFoodName(record.name),
@@ -163,30 +173,32 @@ export async function importFoodDataset(prisma: PrismaClient, dataset: FoodDatas
       fiberG: nutrition.fiberG,
       sugarG: nutrition.sugarG,
       sodiumMg: nutrition.sodiumMg,
-      extraNutrients: (sanitizeExtraNutrients(record.extraNutrients) as Prisma.InputJsonValue | null) ?? undefined,
+      extraNutrients: extras,
       status: "ACTIVE" as const,
       importedAt: now,
     };
 
-    const existing = await prisma.food.findUnique({
-      where: {
-        foodSourceId_sourceFoodId: { foodSourceId: source.id, sourceFoodId },
-      },
-    });
-
-    if (existing) {
-      await prisma.food.update({ where: { id: existing.id }, data });
-      report.updated += 1;
+    const existingId = existingBySourceFoodId.get(sourceFoodId);
+    if (existingId) {
+      toUpdate.push({ id: existingId, data });
     } else {
-      await prisma.food.create({
-        data: {
-          foodSourceId: source.id,
-          sourceFoodId,
-          ...data,
-        },
+      toCreate.push({
+        sourceFoodId,
+        data: { foodSourceId: source.id, sourceFoodId, ...data },
       });
-      report.imported += 1;
     }
+  }
+
+  const CREATE_BATCH = 200;
+  for (let i = 0; i < toCreate.length; i += CREATE_BATCH) {
+    const chunk = toCreate.slice(i, i + CREATE_BATCH);
+    await prisma.food.createMany({ data: chunk.map((row) => row.data) });
+    report.imported += chunk.length;
+  }
+
+  for (const row of toUpdate) {
+    await prisma.food.update({ where: { id: row.id }, data: row.data });
+    report.updated += 1;
   }
 
   await prisma.foodSource.update({

@@ -85,6 +85,34 @@ describe("meal weeks and starter recipes", () => {
     expect(dayLabels(14, "NUMBERED").title).toBe("Week 2 · Day 7");
   });
 
+  it("seeds weeks and weekdays when creating a plan", async () => {
+    const owner = await registerVerifyLogin();
+    const org = await createPractice(owner.cookie, "Seed Clinic");
+    const client = await createClient(owner.cookie, org.id);
+
+    const plan = await request(ctx.app.getHttpServer())
+      .post(`/api/v1/dietitian/${org.id}/meal-plans`)
+      .set("Cookie", owner.cookie)
+      .send({
+        clientId: client.id,
+        name: "Two weeks",
+        dayLabelMode: "WEEKDAY",
+        weekCount: 2,
+        daysPerWeek: 7,
+      })
+      .expect(201);
+
+    const versionId = plan.body.versions[0].id as string;
+    const version = await request(ctx.app.getHttpServer())
+      .get(`/api/v1/dietitian/${org.id}/meal-plans/${plan.body.id}/versions/${versionId}`)
+      .set("Cookie", owner.cookie)
+      .expect(200);
+    expect(version.body.snapshot.days).toHaveLength(14);
+    expect(version.body.snapshot.days[0].weekday).toBe("Monday");
+    expect(version.body.snapshot.days[6].weekday).toBe("Sunday");
+    expect(version.body.snapshot.days[7].weekday).toBe("Monday");
+  });
+
   it("add week appends 7 sequential days and rejects published mutation", async () => {
     const owner = await registerVerifyLogin();
     const outsider = await registerVerifyLogin();

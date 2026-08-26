@@ -56,6 +56,22 @@ export class CreateMealPlanDto {
   @IsOptional()
   @IsEnum(["NUMBERED", "WEEKDAY"])
   dayLabelMode?: "NUMBERED" | "WEEKDAY";
+
+  @ApiPropertyOptional({ description: "How many weeks to seed (1–12). Default 1." })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(12)
+  weekCount?: number;
+
+  @ApiPropertyOptional({ description: "Days in each seeded week (1–7). Default 1." })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(7)
+  daysPerWeek?: number;
 }
 
 export class UpdateMealPlanDto {

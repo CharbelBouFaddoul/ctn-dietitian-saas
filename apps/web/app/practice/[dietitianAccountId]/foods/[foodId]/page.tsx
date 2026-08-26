@@ -1,7 +1,7 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import {
   Alert,
   Badge,
@@ -16,7 +16,7 @@ import {
   Table,
   Td,
 } from "@nutrition-saas/ui";
-import { type ExtraNutrients } from "../../../../../lib/micronutrients";
+import { MICRONUTRIENT_DEFS, type ExtraNutrients, type MicronutrientKey } from "../../../../../lib/micronutrients";
 import { ExtraNutrientTables } from "../../../../../lib/extra-nutrient-tables";
 import { api } from "../../../../../lib/api";
 import { errorMessage } from "../../../../../lib/humanize-error";
@@ -62,8 +62,6 @@ interface EffectiveFood {
   globalNutrition: NutritionValues;
   effectiveNutrition: NutritionValues;
   presentedEffectiveNutrition: NutritionValues;
-  overriddenFields: NutrientKey[];
-  override: { id: string; status: string } | null;
   extraNutrients?: ExtraNutrients;
   presentedExtraNutrients?: ExtraNutrients;
 }
@@ -88,12 +86,30 @@ function fmtVal(value: number | null | undefined): string {
   return value === null || value === undefined ? "—" : String(value);
 }
 
+function numOrNull(raw: string): number | null {
+  const t = raw.trim();
+  if (t === "") return null;
+  return Number(t);
+}
+
+function emptyExtras(): Record<MicronutrientKey, string> {
+  const init = {} as Record<MicronutrientKey, string>;
+  for (const def of MICRONUTRIENT_DEFS) init[def.key] = "";
+  return init;
+}
+
 export default function FoodDetailPage() {
   const params = useParams<{ dietitianAccountId: string; foodId: string }>();
   const { dietitianAccountId, foodId } = params;
+  const router = useRouter();
   const practice = usePractice();
   const [food, setFood] = useState<EffectiveFood | null>(null);
-  const [draft, setDraft] = useState<Record<NutrientKey, string>>({
+  const [name, setName] = useState("");
+  const [category, setCategory] = useState("");
+  const [servingDescription, setServingDescription] = useState("");
+  const [referenceQuantity, setReferenceQuantity] = useState("100");
+  const [referenceUnit, setReferenceUnit] = useState("g");
+  const [macros, setMacros] = useState<Record<NutrientKey, string>>({
     energyKcal: "",
     proteinG: "",
     carbohydrateG: "",
@@ -102,74 +118,118 @@ export default function FoodDetailPage() {
     sugarG: "",
     sodiumMg: "",
   });
+  const [extras, setExtras] = useState<Record<MicronutrientKey, string>>(emptyExtras);
   const [quantity, setQuantity] = useState("100");
   const [unit, setUnit] = useState("g");
   const [calculated, setCalculated] = useState<CalculateResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [saveBusy, setSaveBusy] = useState(false);
+  const [duplicateBusy, setDuplicateBusy] = useState(false);
 
-  const canOverride = practice.role === "OWNER" || practice.role === "DIETITIAN";
+  const canMutate = practice.role === "OWNER" || practice.role === "DIETITIAN";
+
+  const groups = useMemo(
+    () =>
+      (["lipids", "minerals", "vitamins"] as const).map((group) => ({
+        group,
+        label: group === "lipids" ? "Lipids" : group === "minerals" ? "Minerals" : "Vitamins",
+        items: MICRONUTRIENT_DEFS.filter((d) => d.group === group),
+      })),
+    [],
+  );
 
   async function load() {
     setError(null);
     const detail = await api<EffectiveFood>(`/api/v1/dietitian/${dietitianAccountId}/foods/${foodId}`);
     setFood(detail);
+    setName(detail.name);
+    setCategory(detail.category ?? "");
+    setServingDescription(detail.servingDescription ?? "");
+    setReferenceQuantity(String(detail.referenceQuantity));
+    setReferenceUnit(detail.referenceUnit);
     setQuantity(String(detail.referenceQuantity));
     setUnit(detail.referenceUnit);
-    const next = { ...draft };
+    const nextMacros = { ...macros };
     for (const item of NUTRIENTS) {
-      const overridden = detail.overriddenFields.includes(item.key);
-      next[item.key] = overridden ? String(detail.effectiveNutrition[item.key] ?? "") : "";
+      const value = detail.presentedEffectiveNutrition[item.key];
+      nextMacros[item.key] = value == null ? "" : String(value);
     }
-    setDraft(next);
+    setMacros(nextMacros);
+    const nextExtras = emptyExtras();
+    const extraValues = detail.presentedExtraNutrients ?? detail.extraNutrients ?? {};
+    for (const def of MICRONUTRIENT_DEFS) {
+      const value = extraValues[def.key];
+      nextExtras[def.key] = value == null ? "" : String(value);
+    }
+    setExtras(nextExtras);
   }
 
   useEffect(() => {
     void load().catch((err) => setError(errorMessage(err, "Unable to load food")));
   }, [dietitianAccountId, foodId]);
 
-  async function saveOverride(event: FormEvent) {
+  async function saveCustom(event: FormEvent) {
     event.preventDefault();
     setSaveBusy(true);
     setError(null);
     setNotice(null);
     try {
-      const body: Partial<Record<NutrientKey, number | null>> = {};
-      for (const item of NUTRIENTS) {
-        const raw = draft[item.key].trim();
-        if (raw === "") {
-          if (food?.overriddenFields.includes(item.key)) {
-            body[item.key] = null;
-          }
-        } else {
-          body[item.key] = Number(raw);
-        }
+      const extraNutrients: Record<string, number | null> = {};
+      for (const def of MICRONUTRIENT_DEFS) {
+        const v = numOrNull(extras[def.key]);
+        if (v !== null) extraNutrients[def.key] = v;
       }
-      await api(`/api/v1/dietitian/${dietitianAccountId}/foods/${foodId}/override`, {
-        method: "PUT",
-        body: JSON.stringify(body),
+      await api(`/api/v1/dietitian/${dietitianAccountId}/foods/${foodId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          name,
+          category: category || null,
+          servingDescription: servingDescription || null,
+          referenceQuantity: Number(referenceQuantity),
+          referenceUnit,
+          energyKcal: numOrNull(macros.energyKcal),
+          proteinG: numOrNull(macros.proteinG),
+          carbohydrateG: numOrNull(macros.carbohydrateG),
+          fatG: numOrNull(macros.fatG),
+          fiberG: numOrNull(macros.fiberG),
+          sugarG: numOrNull(macros.sugarG),
+          sodiumMg: numOrNull(macros.sodiumMg),
+          extraNutrients,
+        }),
       });
-      setNotice("Clinic override saved. The global food record was not changed.");
+      setNotice("Custom food saved.");
       await load();
     } catch (err) {
-      setError(errorMessage(err, "Could not save override"));
+      setError(errorMessage(err, "Could not save food"));
     } finally {
       setSaveBusy(false);
     }
   }
 
-  async function resetOverride() {
+  async function duplicateFood() {
+    setDuplicateBusy(true);
     setError(null);
     setNotice(null);
     try {
-      await api(`/api/v1/dietitian/${dietitianAccountId}/foods/${foodId}/override`, {
-        method: "DELETE",
+      const copy = await api<{ id: string }>(`/api/v1/dietitian/${dietitianAccountId}/foods/${foodId}/duplicate`, {
+        method: "POST",
       });
-      setNotice("Override removed. Effective values are now sourced from the global catalog.");
-      await load();
+      router.push(`/practice/${dietitianAccountId}/foods/${copy.id}`);
     } catch (err) {
-      setError(errorMessage(err, "Could not remove override"));
+      setError(errorMessage(err, "Could not duplicate food"));
+      setDuplicateBusy(false);
+    }
+  }
+
+  async function archiveCustom() {
+    setError(null);
+    setNotice(null);
+    try {
+      await api(`/api/v1/dietitian/${dietitianAccountId}/foods/${foodId}/archive`, { method: "POST" });
+      router.push(`/practice/${dietitianAccountId}/foods`);
+    } catch (err) {
+      setError(errorMessage(err, "Unable to archive"));
     }
   }
 
@@ -206,6 +266,7 @@ export default function FoodDetailPage() {
   if (food.category) metaParts.push(food.category);
 
   const isCustom = food.origin === "custom";
+  const canEdit = isCustom && canMutate;
   const presentedExtras = food.presentedExtraNutrients ?? food.extraNutrients ?? {};
 
   return (
@@ -221,31 +282,104 @@ export default function FoodDetailPage() {
         title={food.name}
         description={metaParts.join(" · ")}
         actions={
-          isCustom ? (
-            <Badge tone="accent">Custom</Badge>
-          ) : food.override ? (
-            <Badge tone="warning">Overridden</Badge>
-          ) : (
-            <Badge tone="neutral">Catalog</Badge>
-          )
+          <div className="ui-row">
+            {isCustom ? <Badge tone="accent">Custom</Badge> : <Badge tone="neutral">Catalog</Badge>}
+            {!isCustom && canMutate ? (
+              <Button size="sm" disabled={duplicateBusy} onClick={() => void duplicateFood()}>
+                {duplicateBusy ? "Duplicating…" : "Duplicate to clinic"}
+              </Button>
+            ) : null}
+          </div>
         }
       />
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
       {notice ? <Alert tone="success">{notice}</Alert> : null}
 
-      <Section
-        title="Macros"
-        description={
-          isCustom
-            ? "Clinic-private custom food. Nutrients live on the food row (no FoodOverride merge)."
-            : canOverride
-              ? "Clinic overrides replace catalog macros for this food in recipes and meal plans in your clinic."
-              : "Effective values are sourced from the catalog. Staff cannot create overrides."
-        }
-      >
-        {isCustom ? (
-          <div className="ui-stack">
+      {canEdit ? (
+        <form className="ui-stack" onSubmit={(e) => void saveCustom(e)} style={{ width: "100%", gap: 20 }}>
+          <Section title="Basics" description="Clinic-private food. Edits never change the shared catalog.">
+            <div className="ui-stack" style={{ gap: 16 }}>
+              <Field label="Name">
+                <Input value={name} onChange={(e) => setName(e.target.value)} required />
+              </Field>
+              <Field label="Category">
+                <Input value={category} onChange={(e) => setCategory(e.target.value)} />
+              </Field>
+              <Field label="Serving description">
+                <Input value={servingDescription} onChange={(e) => setServingDescription(e.target.value)} />
+              </Field>
+              <div className="ui-grid">
+                <Field label="Reference quantity">
+                  <Input
+                    type="number"
+                    step="any"
+                    value={referenceQuantity}
+                    onChange={(e) => setReferenceQuantity(e.target.value)}
+                    required
+                  />
+                </Field>
+                <Field label="Unit">
+                  <Select value={referenceUnit} onChange={(e) => setReferenceUnit(e.target.value)}>
+                    <option value="g">g</option>
+                    <option value="ml">ml</option>
+                  </Select>
+                </Field>
+              </div>
+            </div>
+          </Section>
+
+          <Section title="Macros" description="Per reference amount above.">
+            <div className="ui-grid">
+              {NUTRIENTS.map((item) => (
+                <Field key={item.key} label={`${item.label} (${item.unit})`}>
+                  <Input
+                    type="number"
+                    step="any"
+                    value={macros[item.key]}
+                    onChange={(e) => setMacros((curr) => ({ ...curr, [item.key]: e.target.value }))}
+                  />
+                </Field>
+              ))}
+            </div>
+          </Section>
+
+          {groups.map(({ group, label, items }) => (
+            <Section key={group} title={label} description="Optional. Leave blank when unknown." tone="muted">
+              <div className="ui-grid">
+                {items.map((item) => (
+                  <Field key={item.key} label={`${item.label} (${item.unit})`}>
+                    <Input
+                      type="number"
+                      step="any"
+                      value={extras[item.key]}
+                      onChange={(e) => setExtras((prev) => ({ ...prev, [item.key]: e.target.value }))}
+                    />
+                  </Field>
+                ))}
+              </div>
+            </Section>
+          ))}
+
+          <div className="ui-row">
+            <Button type="submit" disabled={saveBusy}>
+              {saveBusy ? "Saving…" : "Save custom food"}
+            </Button>
+            <Button type="button" variant="danger" onClick={() => void archiveCustom()}>
+              Archive custom food
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <>
+          <Section
+            title="Nutrition"
+            description={
+              isCustom
+                ? "Clinic-private custom food. Staff can view values but cannot edit."
+                : "Catalog values are read-only. Duplicate the food to your clinic to edit a copy."
+            }
+          >
             <Table>
               <thead>
                 <tr>
@@ -275,112 +409,16 @@ export default function FoodDetailPage() {
                 values={presentedExtras}
                 caption={`per ${food.referenceQuantity} ${unitLabel(food.referenceUnit)}`}
                 emptyMessage="No vitamin, mineral, or lipid extras on file for this food."
+                showAll
               />
             </div>
-
-            {canOverride ? (
-              <Button
-                variant="danger"
-                onClick={() => {
-                  void api(`/api/v1/dietitian/${dietitianAccountId}/foods/${foodId}/archive`, {
-                    method: "POST",
-                  })
-                    .then(() => {
-                      setNotice("Custom food archived.");
-                    })
-                    .catch((err) => setError(errorMessage(err, "Unable to archive")));
-                }}
-              >
-                Archive custom food
-              </Button>
-            ) : null}
-          </div>
-        ) : (
-          <form onSubmit={(event) => void saveOverride(event)}>
-            <Table>
-              <thead>
-                <tr>
-                  <th>Nutrient</th>
-                  <th>Effective</th>
-                  <th>Global catalog</th>
-                  <th>Origin</th>
-                  {canOverride ? <th>Override value</th> : null}
-                </tr>
-              </thead>
-              <tbody>
-                {NUTRIENTS.map((item) => {
-                  const isOverridden = food.overriddenFields.includes(item.key);
-                  return (
-                    <tr key={item.key}>
-                      <Td label="Nutrient">
-                        {item.label}{" "}
-                        <span className="ui-muted" style={{ fontSize: 12 }}>
-                          ({item.unit})
-                        </span>
-                      </Td>
-                      <Td label="Effective">
-                        <strong>{fmtVal(food.presentedEffectiveNutrition[item.key])}</strong>
-                      </Td>
-                      <Td label="Global catalog">{fmtVal(food.globalNutrition[item.key])}</Td>
-                      <Td label="Origin">
-                        {isOverridden ? (
-                          <Badge tone="accent">Clinic</Badge>
-                        ) : (
-                          <Badge tone="neutral">Catalog</Badge>
-                        )}
-                      </Td>
-                      {canOverride ? (
-                        <Td label="Override value">
-                          <input
-                            className="ui-input"
-                            style={{ width: 100 }}
-                            value={draft[item.key]}
-                            placeholder={
-                              isOverridden ? String(food.effectiveNutrition[item.key] ?? "") : "global"
-                            }
-                            onChange={(event) =>
-                              setDraft((curr) => ({ ...curr, [item.key]: event.target.value }))
-                            }
-                          />
-                        </Td>
-                      ) : null}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </Table>
-
-            <div style={{ marginTop: 12 }}>
-              <ExtraNutrientTables
-                values={presentedExtras}
-                caption={`per ${food.referenceQuantity} ${unitLabel(food.referenceUnit)}`}
-                emptyMessage="No vitamin, mineral, or lipid extras on file for this food."
-              />
-            </div>
-
-            {canOverride ? (
-              <div className="ui-row" style={{ marginTop: 12 }}>
-                <Button type="submit" disabled={saveBusy}>
-                  {saveBusy ? "Saving…" : "Save clinic override"}
-                </Button>
-                {food.override ? (
-                  <Button type="button" variant="danger" onClick={() => void resetOverride()}>
-                    Remove override
-                  </Button>
-                ) : null}
-              </div>
-            ) : (
-              <p className="ui-muted" style={{ marginTop: 8, fontSize: 13 }}>
-                Staff members can view effective nutrition but cannot create overrides.
-              </p>
-            )}
-          </form>
-        )}
-      </Section>
+          </Section>
+        </>
+      )}
 
       <Section
         title="Quantity calculator"
-        description="Calculate nutrition for any amount using effective values (g/ml via the nutrition package)."
+        description="Calculate nutrition for any amount using this food’s values (g/ml via the nutrition package)."
       >
         <form onSubmit={(event) => void calculate(event)} className="ui-inline-form">
           <Field label="Quantity">
@@ -431,10 +469,7 @@ export default function FoodDetailPage() {
               )}
             </div>
             {calculated.presentedExtraNutrients ? (
-              <ExtraNutrientTables
-                values={calculated.presentedExtraNutrients}
-                caption="for this amount"
-              />
+              <ExtraNutrientTables values={calculated.presentedExtraNutrients} caption="for this amount" showAll />
             ) : null}
           </div>
         ) : null}

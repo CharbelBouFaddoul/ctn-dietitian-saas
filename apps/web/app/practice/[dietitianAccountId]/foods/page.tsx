@@ -16,6 +16,7 @@ import {
 } from "@nutrition-saas/ui";
 import { api } from "../../../../lib/api";
 import { errorMessage } from "../../../../lib/humanize-error";
+import { foodSourceShortLabel } from "../../../../lib/food-source-label";
 import { unitLabel } from "../../../../lib/practice-labels";
 
 interface NutritionValues {
@@ -34,9 +35,8 @@ interface FoodRow {
   referenceQuantity: number;
   referenceUnit: string;
   origin: "catalog" | "custom";
-  hasOverride: boolean;
   presentedNutrition: NutritionValues;
-  source: { name: string };
+  source: { id: string; key?: string; name: string };
 }
 
 interface ListResponse {
@@ -48,7 +48,9 @@ interface ListResponse {
 
 interface FoodSource {
   id: string;
+  key?: string;
   name: string;
+  foodCount?: number;
 }
 
 function fmtNutrient(value: number | null): string {
@@ -66,18 +68,24 @@ export default function FoodsPage() {
   const [data, setData] = useState<ListResponse | null>(null);
   const [categories, setCategories] = useState<string[]>([]);
   const [sources, setSources] = useState<FoodSource[]>([]);
+  const [sourcesReady, setSourcesReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const showCatalogOrigin = !sourcesReady || sources.length > 0;
+  const originFilter = origin === "catalog" && !showCatalogOrigin ? "all" : origin;
+  const showSourceFilter = showCatalogOrigin && originFilter !== "custom";
+  const activeSourceId = showSourceFilter ? sourceId : "";
 
   const query = useMemo(() => {
     const p = new URLSearchParams();
     if (q) p.set("q", q);
     if (category) p.set("category", category);
-    if (sourceId) p.set("sourceId", sourceId);
-    if (origin && origin !== "all") p.set("origin", origin);
+    if (activeSourceId) p.set("sourceId", activeSourceId);
+    if (originFilter && originFilter !== "all") p.set("origin", originFilter);
     p.set("page", String(page));
     p.set("pageSize", "25");
     return p.toString();
-  }, [q, category, sourceId, origin, page]);
+  }, [q, category, activeSourceId, originFilter, page]);
 
   async function load() {
     setError(null);
@@ -90,6 +98,7 @@ export default function FoodsPage() {
       setData(list);
       setCategories(categoryRows);
       setSources(sourceRows);
+      setSourcesReady(true);
     } catch (err) {
       setError(errorMessage(err, "Unable to load foods"));
     }
@@ -112,7 +121,7 @@ export default function FoodsPage() {
     <section>
       <PageHeader
         title="Food database"
-        description="Search the global catalog and your clinic custom foods. Catalog overrides never change the shared dataset."
+        description="Search catalog sources separately (USDA Foundation, USDA SR Legacy, and later CNF) or your clinic custom foods. Catalog foods are read-only; duplicate one to edit a clinic copy."
         actions={
           <Link href={`/practice/${dietitianAccountId}/foods/new`} className="ui-btn ui-btn--primary ui-btn--sm">
             New custom food
@@ -133,14 +142,16 @@ export default function FoodsPage() {
         </Field>
         <Field label="Origin">
           <Select
-            value={origin}
+            value={originFilter}
             onChange={(event) => {
-              setOrigin(event.target.value);
+              const next = event.target.value;
+              setOrigin(next);
+              if (next === "custom") setSourceId("");
               setPage(1);
             }}
           >
             <option value="all">All</option>
-            <option value="catalog">Catalog</option>
+            {showCatalogOrigin ? <option value="catalog">Catalog</option> : null}
             <option value="custom">Custom</option>
           </Select>
         </Field>
@@ -160,22 +171,25 @@ export default function FoodsPage() {
             ))}
           </Select>
         </Field>
-        <Field label="Source">
-          <Select
-            value={sourceId}
-            onChange={(event) => {
-              setSourceId(event.target.value);
-              setPage(1);
-            }}
-          >
-            <option value="">All sources</option>
-            {sources.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
+        {showSourceFilter ? (
+          <Field label="Source">
+            <Select
+              value={sourceId}
+              onChange={(event) => {
+                setSourceId(event.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="">All sources</option>
+              {sources.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {foodSourceShortLabel(item)}
+                  {item.foodCount != null ? ` (${item.foodCount})` : ""}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        ) : null}
         <div className="ui-inline-form__action">
           <Button type="submit">Apply filters</Button>
         </div>
@@ -190,6 +204,7 @@ export default function FoodsPage() {
           <thead>
             <tr>
               <th>Food</th>
+              <th>Source</th>
               <th>Category</th>
               <th>Reference</th>
               <th>Calories</th>
@@ -210,6 +225,7 @@ export default function FoodsPage() {
                     </div>
                   ) : null}
                 </Td>
+                <Td label="Source">{row.origin === "custom" ? "Custom" : foodSourceShortLabel(row.source)}</Td>
                 <Td label="Category">{row.category ?? "—"}</Td>
                 <Td label="Reference">
                   {row.referenceQuantity} {unitLabel(row.referenceUnit)}
@@ -219,8 +235,6 @@ export default function FoodsPage() {
                 <Td label="Type">
                   {row.origin === "custom" ? (
                     <Badge tone="accent">Custom</Badge>
-                  ) : row.hasOverride ? (
-                    <Badge tone="warning">Overridden</Badge>
                   ) : (
                     <Badge tone="neutral">Catalog</Badge>
                   )}

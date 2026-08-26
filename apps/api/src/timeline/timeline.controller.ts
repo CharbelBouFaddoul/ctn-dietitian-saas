@@ -1,7 +1,7 @@
 import { Controller, Get, Param, ParseUUIDPipe, Query, UseGuards } from "@nestjs/common";
 import { ApiCookieAuth, ApiPropertyOptional, ApiTags } from "@nestjs/swagger";
 import { Type } from "class-transformer";
-import { IsDateString, IsInt, IsOptional, Max, Min } from "class-validator";
+import { IsDateString, IsIn, IsInt, IsOptional, Max, Min } from "class-validator";
 import { SessionGuard } from "../auth/guards/session.guard";
 import { CurrentTenant } from "../dietitian/decorators/current-tenant.decorator";
 import { DietitianGuard } from "../dietitian/guards/dietitian.guard";
@@ -19,6 +19,14 @@ class TimelineQueryDto {
   @IsOptional()
   @IsDateString()
   date?: string;
+
+  @ApiPropertyOptional({
+    description: "care = tracking/clinical activity only (excludes portal/admin account events)",
+    enum: ["care", "all"],
+  })
+  @IsOptional()
+  @IsIn(["care", "all"])
+  scope?: "care" | "all";
 
   @ApiPropertyOptional({ default: 50 })
   @IsOptional()
@@ -45,6 +53,7 @@ export class TimelineController {
     return this.timeline.list(tenant.dietitianAccountId, clientId, {
       before: query.before,
       date: query.date,
+      scope: query.scope,
       limit: query.limit,
     });
   }

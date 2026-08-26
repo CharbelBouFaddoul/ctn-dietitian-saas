@@ -30,6 +30,8 @@ import { ClientAssessmentsPanel } from "../../../../../components/client-assessm
 import { ClientClinicalProfilePanel } from "../../../../../components/client-clinical-profile-panel";
 import { ClientEvolutionPanel } from "../../../../../components/client-evolution-panel";
 import { ClientTrackingPanel } from "../../../../../components/client-tracking-panel";
+import { ClientNutritionPanel } from "../../../../../components/client-nutrition-panel";
+import type { MealPlanView } from "../../../../../components/client-meal-plan-workspace";
 import { api } from "../../../../../lib/api";
 import {
   combineLocalDateTime,
@@ -39,7 +41,8 @@ import {
 import { ageInYears, formatDate, formatFullDate, formatMoney } from "../../../../../lib/format";
 import { errorMessage } from "../../../../../lib/humanize-error";
 import { canManageClients } from "../../../../../lib/practice-access";
-import { portalStatusLabel, statusLabel, activityLabel } from "../../../../../lib/practice-labels";
+import { portalStatusLabel, statusLabel } from "../../../../../lib/practice-labels";
+import { careActivityLabel } from "../../../../../lib/timeline-care";
 import { usePractice } from "../../practice-shell";
 
 type Tab =
@@ -53,7 +56,7 @@ type Tab =
   | "invoices"
   | "appointments"
   | "ai"
-  | "portal";
+  | "settings";
 
 type ChartSection = {
   id: string;
@@ -69,6 +72,8 @@ const LEGACY_TABS: Record<string, Tab> = {
   documents: "clinical",
   evolution: "measurement",
   timeline: "tracking",
+  portal: "settings",
+  "meal-plans": "meal-plan",
 };
 
 const chartSections: ChartSection[] = [
@@ -96,7 +101,7 @@ const chartSections: ChartSection[] = [
   {
     id: "nutrition",
     label: "Nutrition",
-    tabs: [{ id: "meal-plan", label: "Meal plans" }],
+    tabs: [{ id: "meal-plan", label: "Nutrition" }],
   },
   {
     id: "care",
@@ -107,17 +112,17 @@ const chartSections: ChartSection[] = [
     ],
   },
   {
-    id: "portal",
-    label: "Portal",
-    tabs: [{ id: "portal", label: "Connection" }],
-  },
-  {
     id: "practice",
     label: "Clinic tools",
     tabs: [
       { id: "invoices", label: "Invoices" },
       { id: "ai", label: "AI" },
     ],
+  },
+  {
+    id: "settings",
+    label: "Settings",
+    tabs: [{ id: "settings", label: "Settings" }],
   },
 ];
 
@@ -302,8 +307,6 @@ function ClientWorkspacePage() {
   const [orgTags, setOrgTags] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
 
-  const [plans, setPlans] = useState<Array<{ id: string; name: string; status: string; client: { id: string } }>>([]);
-
   const [trackingSummary, setTrackingSummary] = useState<{
     date: string;
     food: {
@@ -407,10 +410,11 @@ function ClientWorkspacePage() {
   const [plainJoinCode, setPlainJoinCode] = useState<string | null>(null);
   const [portalBusy, setPortalBusy] = useState(false);
   const [confirmArchive, setConfirmArchive] = useState(false);
+  const [confirmRestore, setConfirmRestore] = useState(false);
   const [confirmRevoke, setConfirmRevoke] = useState(false);
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
 
-  function selectTab(next: string, extras?: { metric?: string }) {
+  function selectTab(next: string, extras?: { metric?: string; planId?: string; view?: MealPlanView }) {
     const value = resolveTab(next, visibleSections);
     if (next === "ai" && !practice.aiAvailable) {
       setTab("overview");
@@ -426,6 +430,20 @@ function ClientWorkspacePage() {
     if (value === "measurement" && extras?.metric) {
       params.set("metric", extras.metric);
     }
+    if (value === "meal-plan") {
+      const planId = extras?.planId ?? searchParams.get("planId");
+      const view = extras?.view ?? searchParams.get("view");
+      if (planId) params.set("planId", planId);
+      if (view === "plan" || view === "analysis") params.set("view", view);
+    }
+    router.replace(`/practice/${dietitianAccountId}/clients/${clientId}?${params.toString()}`, { scroll: false });
+  }
+
+  function setMealPlanQuery(next: { planId?: string; view?: MealPlanView }) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", "meal-plan");
+    if (next.planId) params.set("planId", next.planId);
+    if (next.view) params.set("view", next.view);
     router.replace(`/practice/${dietitianAccountId}/clients/${clientId}?${params.toString()}`, { scroll: false });
   }
 
@@ -471,16 +489,14 @@ function ClientWorkspacePage() {
   async function load() {
     setError(null);
     try {
-      const [portfolioData, account, tagRows, planRows] = await Promise.all([
+      const [portfolioData, account, tagRows] = await Promise.all([
         api<Portfolio>(`${base}/portfolio`),
         api<NonNullable<typeof portalAccount>>(`${base}/account`),
         api<Array<{ id: string; name: string }>>(`${orgBase}/tags`),
-        api<{ items: typeof plans }>(`${orgBase}/meal-plans`),
       ]);
       applyPortfolio(portfolioData);
       setPortalAccount(account);
       setOrgTags(tagRows);
-      setPlans(planRows.items.filter((plan) => plan.client.id === clientId));
     } catch (err) {
       setError(errorMessage(err, "Unable to load client"));
     }
@@ -494,7 +510,7 @@ function ClientWorkspacePage() {
   async function loadTimelinePage(before?: string, replace = true, date?: string) {
     setTimelineLoading(true);
     try {
-      const query = new URLSearchParams({ limit: String(TIMELINE_PAGE_SIZE) });
+      const query = new URLSearchParams({ limit: String(TIMELINE_PAGE_SIZE), scope: "care" });
       if (before) query.set("before", before);
       const day = date ?? trackingDate;
       if (day) query.set("date", day);
@@ -675,7 +691,7 @@ function ClientWorkspacePage() {
         <div style={{ margin: "0 0 12px" }}>
           <Alert tone="neutral">
             Client chart created. Manage profile, measurements, meal plans, and appointments from this
-            workspace — portal login is optional. Invite them later from the Portal tab when ready.{" "}
+            workspace — portal login is optional. Invite them later from Settings when ready.{" "}
             <button type="button" className="ui-link" onClick={dismissCreatedTip}>
               Dismiss
             </button>
@@ -789,7 +805,7 @@ function ClientWorkspacePage() {
             </div>
 
             <div className="ui-client-chart__care-grid" role="group" aria-label="Care snapshot">
-              <button type="button" className="ui-client-chart__care-card" onClick={() => selectTab("portal")}>
+              <button type="button" className="ui-client-chart__care-card" onClick={() => selectTab("settings")}>
                 <span className="ui-client-chart__metric-label">Portal status</span>
                 <span className="ui-client-chart__care-value">
                   {portalStatusLabel(connectionStatus)}
@@ -818,7 +834,11 @@ function ClientWorkspacePage() {
                   </span>
                 ) : null}
               </button>
-              <button type="button" className="ui-client-chart__care-card" onClick={() => selectTab("meal-plan")}>
+              <button
+                type="button"
+                className="ui-client-chart__care-card"
+                onClick={() => selectTab("meal-plan", { planId: portfolio.activeMealPlan?.id })}
+              >
                 <span className="ui-client-chart__metric-label">Meal plan</span>
                 <span className="ui-client-chart__care-value">
                   {portfolio.activeMealPlan?.name ?? "No active plan"}
@@ -894,23 +914,13 @@ function ClientWorkspacePage() {
               <ul className="ui-client-chart__list">
                 {portfolio.recentTimeline.map((row) => (
                   <li key={row.id}>
-                    <span>{activityLabel(row.type)}</span>
+                    <span>{careActivityLabel(row.type)}</span>
                     <span className="ui-muted">{formatDate(row.occurredAt)}</span>
                   </li>
                 ))}
               </ul>
             )}
           </Section>
-
-          {allowManage && client?.status === "ACTIVE" ? (
-            <Section title="Chart management">
-              <div className="ui-client-chart__toolbar">
-                <Button variant="secondary" size="sm" onClick={() => setConfirmArchive(true)}>
-                  Archive client
-                </Button>
-              </div>
-            </Section>
-          ) : null}
         </div>
       ) : null}
 
@@ -967,42 +977,19 @@ function ClientWorkspacePage() {
         />
       ) : null}
 
-      {/* ── MEAL PLAN ── */}
-      {tab === "meal-plan" ? (
-        <Section
-          title="Meal plans"
-          actions={
-            <Link href={`/practice/${dietitianAccountId}/meal-plans`} className="ui-btn ui-btn--secondary ui-btn--sm">
-              All meal plans
-            </Link>
-          }
-        >
-          {plans.length === 0 ? (
-            <EmptyState
-              title="No meal plans for this client"
-              action={
-                <Link href={`/practice/${dietitianAccountId}/meal-plans`} className="ui-btn ui-btn--secondary ui-btn--sm">
-                  Open meal plans
-                </Link>
-              }
-            />
-          ) : (
-            <ul className="ui-client-chart__list">
-              {plans.map((plan) => (
-                <li key={plan.id}>
-                  <Link
-                    href={`/practice/${dietitianAccountId}/meal-plans/${plan.id}`}
-                    className="ui-link"
-                    style={{ fontWeight: 500 }}
-                  >
-                    {plan.name}
-                  </Link>
-                  <StatusBadge status={plan.status} label={humanizeLabel(plan.status)} />
-                </li>
-              ))}
-            </ul>
-          )}
-        </Section>
+      {/* ── NUTRITION ── */}
+      {tab === "meal-plan" && portfolio ? (
+        <ClientNutritionPanel
+          dietitianAccountId={dietitianAccountId}
+          clientId={clientId}
+          clientName={portfolio.client.displayName ?? `${portfolio.client.firstName} ${portfolio.client.lastName}`}
+          allowManage={allowManage}
+          initialPlanId={searchParams.get("planId") ?? portfolio.activeMealPlan?.id ?? null}
+          initialView={searchParams.get("view") === "analysis" ? "analysis" : "plan"}
+          onPlanChange={(planId) => setMealPlanQuery({ planId })}
+          onViewChange={(view) => setMealPlanQuery({ view })}
+          onError={setError}
+        />
       ) : null}
 
       {/* ── TRACKING ── */}
@@ -1348,46 +1335,74 @@ function ClientWorkspacePage() {
         </div>
       ) : null}
 
-      {/* ── PORTAL ── */}
-      {tab === "portal" ? (
-        <JoinCodePanel
-          title="Portal connection"
-          description="Portal login is optional. Manage this patient from the chart without them signing in. Generate a join code when they are ready to use the patient app — they create their own account and connect with the code."
-          connectionStatus={connectionStatus}
-          plainJoinCode={plainJoinCode}
-          hint={portalAccount?.joinCode?.hint ?? null}
-          expiresAt={portalAccount?.joinCode?.expiresAt ?? null}
-          allowManage={allowManage}
-          portalBusy={portalBusy}
-          disconnectRequestedAt={portalAccount?.disconnectRequestedAt}
-          disconnectRequestNote={portalAccount?.disconnectRequestNote}
-          onGenerate={() => {
-            setPortalBusy(true);
-            void api<{ code: string }>(`${base}/account/join-code`, { method: "POST" })
-              .then((result) => {
-                setPlainJoinCode(result.code);
-                return load();
-              })
-              .catch((err) => setError(errorMessage(err, "Could not generate join code")))
-              .finally(() => setPortalBusy(false));
-          }}
-          onCopy={() => plainJoinCode && void navigator.clipboard.writeText(plainJoinCode)}
-          onRevoke={() => setConfirmRevoke(true)}
-          onDeactivate={
-            allowManage && connectionStatus === "connected" ? () => setConfirmDeactivate(true) : undefined
-          }
-          onDismissDisconnectRequest={
-            allowManage && portalAccount?.disconnectRequestedAt
-              ? () => {
-                  setPortalBusy(true);
-                  void api(`${base}/account/disconnect-request/dismiss`, { method: "POST" })
-                    .then(() => load())
-                    .catch((err) => setError(errorMessage(err, "Could not dismiss request")))
-                    .finally(() => setPortalBusy(false));
-                }
-              : undefined
-          }
-        />
+      {/* ── SETTINGS ── */}
+      {tab === "settings" ? (
+        <div className="ui-client-chart__panel ui-stack">
+          <JoinCodePanel
+            title="Portal connection"
+            description="Portal login is optional. Manage this patient from the chart without them signing in. Generate a join code when they are ready to use the patient app — they create their own account and connect with the code."
+            connectionStatus={connectionStatus}
+            plainJoinCode={plainJoinCode}
+            hint={portalAccount?.joinCode?.hint ?? null}
+            expiresAt={portalAccount?.joinCode?.expiresAt ?? null}
+            allowManage={allowManage}
+            portalBusy={portalBusy}
+            disconnectRequestedAt={portalAccount?.disconnectRequestedAt}
+            disconnectRequestNote={portalAccount?.disconnectRequestNote}
+            onGenerate={() => {
+              setPortalBusy(true);
+              void api<{ code: string }>(`${base}/account/join-code`, { method: "POST" })
+                .then((result) => {
+                  setPlainJoinCode(result.code);
+                  return load();
+                })
+                .catch((err) => setError(errorMessage(err, "Could not generate join code")))
+                .finally(() => setPortalBusy(false));
+            }}
+            onCopy={() => plainJoinCode && void navigator.clipboard.writeText(plainJoinCode)}
+            onRevoke={() => setConfirmRevoke(true)}
+            onDeactivate={
+              allowManage && connectionStatus === "connected" ? () => setConfirmDeactivate(true) : undefined
+            }
+            onDismissDisconnectRequest={
+              allowManage && portalAccount?.disconnectRequestedAt
+                ? () => {
+                    setPortalBusy(true);
+                    void api(`${base}/account/disconnect-request/dismiss`, { method: "POST" })
+                      .then(() => load())
+                      .catch((err) => setError(errorMessage(err, "Could not dismiss request")))
+                      .finally(() => setPortalBusy(false));
+                  }
+                : undefined
+            }
+          />
+
+          {allowManage ? (
+            <Section
+              title="Chart status"
+              description={
+                client?.status === "ARCHIVED"
+                  ? "This client is archived. Unarchive to make the chart active again."
+                  : "Archive hides the client from the active list. The chart stays in the clinic."
+              }
+            >
+              <div className="ui-client-chart__toolbar">
+                {client?.status === "ARCHIVED" ? (
+                  <Button variant="secondary" size="sm" onClick={() => setConfirmRestore(true)}>
+                    Unarchive client
+                  </Button>
+                ) : (
+                  <Button variant="secondary" size="sm" onClick={() => setConfirmArchive(true)}>
+                    Archive client
+                  </Button>
+                )}
+                <span className="ui-muted" style={{ fontSize: "0.8rem" }}>
+                  Status: {statusLabel(client?.status)}
+                </span>
+              </div>
+            </Section>
+          ) : null}
+        </div>
       ) : null}
 
       <Dialog
@@ -1471,6 +1486,24 @@ function ClientWorkspacePage() {
             .catch((err) => setError(errorMessage(err, "Unable to archive client")));
         }}
         onCancel={() => setConfirmArchive(false)}
+      />
+      <ConfirmDialog
+        open={confirmRestore}
+        title="Unarchive this client?"
+        description="The chart will become active again. Portal access stays off until you reconnect them."
+        confirmLabel="Unarchive"
+        onConfirm={() => {
+          void api(`${base}/restore`, {
+            method: "POST",
+            body: JSON.stringify({ status: "ACTIVE" }),
+          })
+            .then(() => {
+              setConfirmRestore(false);
+              return load();
+            })
+            .catch((err) => setError(errorMessage(err, "Unable to unarchive client")));
+        }}
+        onCancel={() => setConfirmRestore(false)}
       />
       <ConfirmDialog
         open={confirmRevoke}

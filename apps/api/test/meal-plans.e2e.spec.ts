@@ -137,16 +137,20 @@ describe("Phase 7 recipes and meal plans", () => {
       });
 
     await request(ctx.app.getHttpServer())
+      .post(`/api/v1/dietitian/${orgA.id}/foods/${food.id}/duplicate`)
+      .set("Cookie", alice.cookie)
+      .expect(201);
+    await request(ctx.app.getHttpServer())
       .put(`/api/v1/dietitian/${orgA.id}/foods/${food.id}/override`)
       .set("Cookie", alice.cookie)
       .send({ energyKcal: 180 })
-      .expect(200);
+      .expect(403);
 
     const recalculated = await request(ctx.app.getHttpServer())
       .get(`/api/v1/dietitian/${orgA.id}/recipes/${recipe.body.id}`)
       .set("Cookie", alice.cookie)
       .expect(200);
-    expect(recalculated.body.nutrition.total.energyKcal).toBe(360);
+    expect(recalculated.body.nutrition.total.energyKcal).toBe(330);
 
     await request(ctx.app.getHttpServer())
       .get(`/api/v1/dietitian/${orgA.id}/recipes/${recipe.body.id}`)
@@ -245,7 +249,7 @@ describe("Phase 7 recipes and meal plans", () => {
       .put(`/api/v1/dietitian/${org.id}/foods/${food.id}/override`)
       .set("Cookie", owner.cookie)
       .send({ energyKcal: 180 })
-      .expect(200);
+      .expect(403);
     await request(ctx.app.getHttpServer())
       .put(`/api/v1/dietitian/${org.id}/recipes/${recipe.body.id}/ingredients`)
       .set("Cookie", owner.cookie)
@@ -261,7 +265,7 @@ describe("Phase 7 recipes and meal plans", () => {
     const publishedFood = published.body.snapshot.days[0].meals[0].items.find((row: { itemType: string }) => row.itemType === "FOOD");
     const publishedRecipe = published.body.snapshot.days[0].meals[0].items.find((row: { itemType: string }) => row.itemType === "RECIPE");
     expect(publishedFood.nutrition.energyKcal).toBeCloseTo(247.5, 5);
-    expect(publishedRecipe.nutrition.energyKcal).toBe(165);
+    expect(publishedRecipe.nutrition.energyKcal).toBe(495);
 
     await request(ctx.app.getHttpServer())
       .post(`/api/v1/dietitian/${org.id}/meal-plans/${plan.body.id}/versions/${draftId}/meals/${breakfast.id}/items`)
@@ -276,8 +280,8 @@ describe("Phase 7 recipes and meal plans", () => {
     expect(v2.body.status).toBe("DRAFT");
     const v2Food = v2.body.snapshot.days[0].meals[0].items.find((row: { itemType: string }) => row.itemType === "FOOD");
     const v2Recipe = v2.body.snapshot.days[0].meals[0].items.find((row: { itemType: string }) => row.itemType === "RECIPE");
-    expect(v2Food.nutrition.energyKcal).toBe(270);
-    expect(v2Recipe.nutrition.energyKcal).toBe(540);
+    expect(v2Food.nutrition.energyKcal).toBeCloseTo(247.5, 5);
+    expect(v2Recipe.nutrition.energyKcal).toBe(495);
 
     await request(ctx.app.getHttpServer())
       .post(`/api/v1/dietitian/${org.id}/meal-plans/${plan.body.id}/versions/${v2.body.id}/publish`)
@@ -289,6 +293,37 @@ describe("Phase 7 recipes and meal plans", () => {
       .expect(200);
     expect(v1.body.status).toBe("SUPERSEDED");
     expect(v1.body.snapshot.days[0].meals[0].items.find((row: { itemType: string }) => row.itemType === "FOOD").nutrition.energyKcal).toBeCloseTo(247.5, 5);
+
+    await request(ctx.app.getHttpServer())
+      .delete(`/api/v1/dietitian/${org.id}/meal-plans/${plan.body.id}/versions/${draftId}`)
+      .set("Cookie", outsider.cookie)
+      .expect(403);
+
+    const afterSupersededDelete = await request(ctx.app.getHttpServer())
+      .delete(`/api/v1/dietitian/${org.id}/meal-plans/${plan.body.id}/versions/${draftId}`)
+      .set("Cookie", owner.cookie)
+      .expect(200);
+    expect(afterSupersededDelete.body.versions.map((row: { id: string }) => row.id)).toEqual([v2.body.id]);
+    expect(afterSupersededDelete.body.status).toBe("ACTIVE");
+
+    const draftV3 = await request(ctx.app.getHttpServer())
+      .post(`/api/v1/dietitian/${org.id}/meal-plans/${plan.body.id}/versions`)
+      .set("Cookie", owner.cookie)
+      .expect(201);
+    expect(draftV3.body.status).toBe("DRAFT");
+
+    const afterDraftDelete = await request(ctx.app.getHttpServer())
+      .delete(`/api/v1/dietitian/${org.id}/meal-plans/${plan.body.id}/versions/${draftV3.body.id}`)
+      .set("Cookie", owner.cookie)
+      .expect(200);
+    expect(afterDraftDelete.body.versions.map((row: { id: string }) => row.id)).toEqual([v2.body.id]);
+    expect(afterDraftDelete.body.status).toBe("ACTIVE");
+
+    const afterPublishedDelete = await request(ctx.app.getHttpServer())
+      .delete(`/api/v1/dietitian/${org.id}/meal-plans/${plan.body.id}/versions/${v2.body.id}`)
+      .set("Cookie", owner.cookie)
+      .expect(200);
+    expect(afterPublishedDelete.body.status).toBe("ARCHIVED");
 
     await request(ctx.app.getHttpServer())
       .get(`/api/v1/dietitian/${org.id}/meal-plans/${plan.body.id}`)

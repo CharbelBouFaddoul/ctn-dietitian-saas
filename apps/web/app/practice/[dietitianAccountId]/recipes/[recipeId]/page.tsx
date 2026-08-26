@@ -551,7 +551,6 @@ export default function RecipeDetailPage() {
                     ) : (
                       <Badge tone="neutral">Catalog</Badge>
                     )}
-                    {hit.hasOverride ? <Badge tone="warning">Overridden</Badge> : null}
                     {hit.servingDescription ? (
                       <span className="ui-muted" style={{ fontSize: 12 }}>
                         {hit.servingDescription}

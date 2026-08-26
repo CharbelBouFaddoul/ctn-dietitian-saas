@@ -205,7 +205,7 @@ describe("release-blocking security isolation", () => {
       .put(`/api/v1/dietitian/${org.id}/foods/${food.id}/override`)
       .set("Cookie", owner.cookie)
       .send({ energyKcal: 99 })
-      .expect(200);
+      .expect(403);
 
     const global = await ctx.prisma.food.findUniqueOrThrow({ where: { id: food.id } });
     expect(Number(global.energyKcal)).toBe(52);
