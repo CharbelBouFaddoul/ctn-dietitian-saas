@@ -1,6 +1,6 @@
 FROM node:22-bookworm-slim AS base
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends openssl ca-certificates \
+  && apt-get install -y --no-install-recommends openssl ca-certificates postgresql-client \
   && rm -rf /var/lib/apt/lists/*
 RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
 WORKDIR /app
@@ -22,6 +22,7 @@ WORKDIR /app
 COPY --from=build /app /app
 COPY docker/api-entrypoint.sh /app/docker/api-entrypoint.sh
 COPY docker/worker-entrypoint.sh /app/docker/worker-entrypoint.sh
+COPY deploy/bootstrap /app/deploy/bootstrap
 RUN chmod +x /app/docker/api-entrypoint.sh /app/docker/worker-entrypoint.sh
 WORKDIR /app/apps/api
 EXPOSE 3001

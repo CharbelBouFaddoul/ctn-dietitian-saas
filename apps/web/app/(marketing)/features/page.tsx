@@ -37,12 +37,29 @@ const DIETITIAN_GROUPS: FeatureGroup[] = [
   {
     id: "clients",
     title: "Clients & care",
-    featureIds: ["d-clients", "d-join-codes", "d-assessments", "d-documents", "d-tags"],
+    featureIds: [
+      "d-clients",
+      "d-measurements",
+      "d-timeline",
+      "d-join-codes",
+      "d-portal",
+      "d-assessments",
+      "d-documents",
+      "d-tags",
+    ],
   },
   {
     id: "nutrition",
     title: "Nutrition tools",
-    featureIds: ["d-meal-plans", "d-meal-history", "d-recipes", "d-foods", "d-habits", "d-tracking"],
+    featureIds: [
+      "d-meal-plans",
+      "d-meal-history",
+      "d-nutrition",
+      "d-recipes",
+      "d-foods",
+      "d-habits",
+      "d-tracking",
+    ],
   },
   {
     id: "ops",
@@ -50,6 +67,7 @@ const DIETITIAN_GROUPS: FeatureGroup[] = [
     featureIds: [
       "d-dashboard",
       "d-messaging",
+      "d-notifications",
       "d-appointments",
       "d-calendar",
       "d-invoices",
@@ -69,7 +87,17 @@ const PATIENT_GROUPS: FeatureGroup[] = [
   {
     id: "plan",
     title: "Plan & tracking",
-    featureIds: ["p-plan", "p-food", "p-water", "p-exercise", "p-sleep", "p-habits", "p-progress"],
+    featureIds: [
+      "p-home",
+      "p-plan",
+      "p-food",
+      "p-water",
+      "p-exercise",
+      "p-sleep",
+      "p-habits",
+      "p-weight",
+      "p-progress",
+    ],
   },
   {
     id: "connect",

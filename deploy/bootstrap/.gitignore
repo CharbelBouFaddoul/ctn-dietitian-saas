@@ -1,0 +1,8 @@
+# One-shot Coolify bootstrap dump (local DB snapshot).
+# Imported only when production has zero users — never overwrites later.
+*
+!.gitignore
+!database.dump
+!storage.tar.gz
+!manifest.txt
+!README.md

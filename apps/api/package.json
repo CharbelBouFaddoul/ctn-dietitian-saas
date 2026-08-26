@@ -18,7 +18,8 @@
     "food:import": "tsx src/foods/import/cli.ts",
     "recipe:import": "tsx src/recipes/import/cli.ts",
     "demo:reset": "tsx src/demo/cli.ts",
-    "demo:seed": "tsx src/demo/cli.ts --seed-only"
+    "demo:seed": "tsx src/demo/cli.ts --seed-only",
+    "bootstrap:prod": "tsx src/bootstrap/create-admin.cli.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.10",

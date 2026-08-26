@@ -1,0 +1,3 @@
+source=local-docker dietitian-postgres-1
+purpose=coolify-one-shot-bootstrap
+note=Imported only when production DB has zero users. Safe on later deploys.

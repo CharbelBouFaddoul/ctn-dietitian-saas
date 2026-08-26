@@ -17,6 +17,12 @@ async function main(): Promise<void> {
       ? "none"
       : "full";
 
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "Refusing demo reset/seed: NODE_ENV=production. Use pg dump/restore + bootstrap:admin for production setup.",
+    );
+  }
+
   if (!process.env.FILE_STORAGE_PATH) {
     process.env.FILE_STORAGE_PATH = resolve(process.cwd(), "storage");
   }

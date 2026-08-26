@@ -24,7 +24,7 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     audience: "dietitian",
     category: "Overview",
     title: "Practice dashboard",
-    summary: "See client counts, tasks, invoices, today’s appointments, recent messages, and activity at a glance.",
+    summary: "Clients, tasks, appointments, invoices, messages, and clients needing attention at a glance.",
     highlight: true,
   },
 
@@ -34,15 +34,29 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     audience: "dietitian",
     category: "Clinic & clients",
     title: "Client roster & charts",
-    summary: "Search, filter, and open full client charts with profile, goals, measurements, and timeline.",
+    summary: "Search, filter, tag, create, and archive clients with full charts: profile, goals, preferences, allergies, and notes.",
     highlight: true,
+  },
+  {
+    id: "d-measurements",
+    audience: "dietitian",
+    category: "Clinic & clients",
+    title: "Measurement tracking",
+    summary: "Track weight, height, BMI, waist, hips, body fat, muscle mass, and evolution over time.",
+  },
+  {
+    id: "d-timeline",
+    audience: "dietitian",
+    category: "Clinic & clients",
+    title: "Care timeline",
+    summary: "Follow the client care timeline across visits, plans, and key updates.",
   },
   {
     id: "d-assessments",
     audience: "dietitian",
     category: "Clinic & clients",
-    title: "Assessments",
-    summary: "Run structured nutrition assessments from templates inside each client chart.",
+    title: "Custom assessment forms",
+    summary: "Build evaluation forms, assign them to patients, and review in-progress or submitted answers.",
   },
   {
     id: "d-join-codes",
@@ -51,6 +65,13 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     title: "Clinic join codes",
     summary: "Share a short clinic code so patients create their own account and connect to your roster.",
     highlight: true,
+  },
+  {
+    id: "d-portal",
+    audience: "dietitian",
+    category: "Clinic & clients",
+    title: "Portal invites & status",
+    summary: "Manage portal connection status, invites, and disconnect handling.",
   },
   {
     id: "d-tags",
@@ -63,8 +84,8 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     id: "d-documents",
     audience: "dietitian",
     category: "Clinic & clients",
-    title: "Client documents",
-    summary: "Upload and share documents on each client chart — documents live on the chart, not as a separate top-level nav.",
+    title: "Documents share or internal",
+    summary: "Upload client files and share with the patient or keep them internal to the clinic.",
   },
 
   // Meal planning
@@ -72,8 +93,8 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     id: "d-meal-plans",
     audience: "dietitian",
     category: "Meal planning",
-    title: "Draft & publish meal plans",
-    summary: "Build meal plans per client, keep draft versions, and publish when ready for the portal.",
+    title: "Multi-week meal plans",
+    summary: "Build multi-day and multi-week meal plans, keep drafts, and publish to the patient portal.",
     highlight: true,
   },
   {
@@ -83,20 +104,27 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     title: "Plan history",
     summary: "Review published plan versions so care stays continuous as needs change.",
   },
+  {
+    id: "d-nutrition",
+    audience: "dietitian",
+    category: "Meal planning",
+    title: "Auto nutrition totals",
+    summary: "Automatic nutrition calculations across meals, recipes, and plans.",
+  },
 
   // Nutrition libraries
   {
     id: "d-recipes",
     audience: "dietitian",
     category: "Nutrition libraries",
-    title: "Meal library",
+    title: "Meal & recipe library",
     summary: "Create reusable meals and recipes with ingredients from the food database for meal plans.",
   },
   {
     id: "d-foods",
     audience: "dietitian",
     category: "Nutrition libraries",
-    title: "Foods",
+    title: "Food catalog & custom foods",
     summary: "Search the food catalog and add custom foods for your practice.",
   },
   {
@@ -122,15 +150,15 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     id: "d-appointments",
     audience: "dietitian",
     category: "Appointments",
-    title: "Appointments",
-    summary: "Schedule and manage appointments on each client chart and the clinic calendar.",
+    title: "Schedule & reschedule",
+    summary: "Schedule, cancel, and reschedule appointments, including patient portal requests.",
   },
   {
     id: "d-calendar",
     audience: "dietitian",
     category: "Appointments",
-    title: "Practice calendar",
-    summary: "View appointments and due tasks together on a clinic calendar.",
+    title: "Day, week & month calendar",
+    summary: "View appointments and due tasks on a day, week, or month clinic calendar.",
   },
 
   // Messaging
@@ -138,9 +166,16 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     id: "d-messaging",
     audience: "dietitian",
     category: "Messaging",
-    title: "Secure messaging",
-    summary: "Message clients from your clinic inbox with a thread per client.",
+    title: "Realtime messaging",
+    summary: "Secure 1:1 realtime messaging with patients from your clinic inbox.",
     highlight: true,
+  },
+  {
+    id: "d-notifications",
+    audience: "dietitian",
+    category: "Messaging",
+    title: "In-app notifications",
+    summary: "In-app notifications with unread badges so nothing important is missed.",
   },
 
   // Invoices
@@ -148,8 +183,8 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     id: "d-invoices",
     audience: "dietitian",
     category: "Invoices",
-    title: "Invoicing",
-    summary: "Create, issue, send, and mark invoices paid — without a built-in payment gateway.",
+    title: "Invoices & printable PDF",
+    summary: "Draft, issue, send, mark paid, overdue, or cancel — plus printable invoice PDFs. No built-in payment gateway.",
   },
 
   // Tasks
@@ -157,8 +192,8 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     id: "d-tasks",
     audience: "dietitian",
     category: "Tasks",
-    title: "Practice tasks",
-    summary: "Track follow-ups with views for yours, due today, and overdue.",
+    title: "Tasks with priorities",
+    summary: "Clinic task list with priorities, due dates, and views for yours, due today, and overdue.",
   },
 
   // Analytics
@@ -199,16 +234,26 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     audience: "dietitian",
     category: "Settings",
     title: "Clinic settings",
-    summary: "Configure timezone, units, practice contact details, appointment defaults, and invoice defaults.",
+    summary: "Practice profile, timezone, locale, currency, units, appointment defaults, and invoice defaults.",
   },
 
-  // Patient — My Plan
+  // Patient — Home
+  {
+    id: "p-home",
+    audience: "patient",
+    category: "Home",
+    title: "Personal dashboard",
+    summary: "Next appointment, today’s tracking, meal plan snapshot, messages, and notifications.",
+    highlight: true,
+  },
+
+  // My Plan
   {
     id: "p-plan",
     audience: "patient",
     category: "My Plan",
-    title: "Published meal plan",
-    summary: "View the meal plan your dietitian published, with days, meals, and nutrition details.",
+    title: "Meal plan & one-tap log",
+    summary: "View published plans by week and day, see nutrition totals, and one-tap log planned meals.",
     highlight: true,
   },
 
@@ -217,8 +262,8 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     id: "p-food",
     audience: "patient",
     category: "Tracking",
-    title: "Daily log",
-    summary: "Log food, water, exercise, sleep, and habits in one daily tracking area.",
+    title: "Daily food log",
+    summary: "Log food from the catalog and clinic foods with portions and meals; browse any past date.",
     highlight: true,
   },
   {
@@ -249,14 +294,21 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     title: "Habit tracking",
     summary: "Track habits your care plan focuses on.",
   },
+  {
+    id: "p-weight",
+    audience: "patient",
+    category: "Tracking",
+    title: "Quick weight log",
+    summary: "Log weight quickly as part of daily tracking.",
+  },
 
   // Progress
   {
     id: "p-progress",
     audience: "patient",
     category: "Progress",
-    title: "Progress",
-    summary: "See a clear summary of intake and tracking over time on your progress page.",
+    title: "Progress & measurement charts",
+    summary: "Today’s tracking overview plus measurement evolution charts for weight, BMI, body composition, and more.",
   },
 
   // Assessments
@@ -264,8 +316,8 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     id: "p-assessments",
     audience: "patient",
     category: "Assessments",
-    title: "Assessments",
-    summary: "Complete assessment forms your dietitian assigns from the portal.",
+    title: "Complete & submit forms",
+    summary: "Complete evaluations assigned by your dietitian; save progress and submit when ready.",
   },
 
   // Messages
@@ -273,8 +325,8 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     id: "p-messages",
     audience: "patient",
     category: "Messages",
-    title: "Message your dietitian",
-    summary: "Stay in a one-to-one conversation with your dietitian from the portal.",
+    title: "Realtime chat",
+    summary: "Chat with your dietitian in realtime from the portal.",
     highlight: true,
   },
 
@@ -283,8 +335,8 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     id: "p-appointments",
     audience: "patient",
     category: "Appointments",
-    title: "View appointments",
-    summary: "See upcoming appointments scheduled with your clinic.",
+    title: "Appointments & requests",
+    summary: "View upcoming and past appointments; request reschedule or cancellation.",
   },
 
   // Documents
@@ -292,8 +344,8 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     id: "p-documents",
     audience: "patient",
     category: "Documents",
-    title: "Documents",
-    summary: "View shared files and upload documents your dietitian can review.",
+    title: "View, upload & manage files",
+    summary: "View clinic-shared files; upload, download, and delete your own uploads.",
   },
 
   // Billing
@@ -301,8 +353,8 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     id: "p-invoices",
     audience: "patient",
     category: "Billing",
-    title: "View invoices",
-    summary: "See invoices issued by your clinic (view-only; online payment is not built in).",
+    title: "Invoices & printable PDF",
+    summary: "View invoices issued by your clinic and open printable PDFs. Online payment is not built in.",
   },
 
   // Profile
@@ -310,8 +362,8 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     id: "p-profile",
     audience: "patient",
     category: "Profile",
-    title: "Profile",
-    summary: "View your account details and the clinic you are connected to.",
+    title: "Profile, notes & multi-clinic",
+    summary: "Edit personal details, view clinic notes, connect to multiple clinics, switch between them, or leave a clinic.",
   },
 
   // Join-code onboarding
@@ -347,6 +399,7 @@ const DIETITIAN_CATEGORY_ORDER = [
 ] as const;
 
 const PATIENT_CATEGORY_ORDER = [
+  "Home",
   "My Plan",
   "Tracking",
   "Progress",
