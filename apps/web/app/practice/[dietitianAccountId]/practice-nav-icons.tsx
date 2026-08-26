@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 function Icon({ children }: { children: ReactNode }) {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
       {children}
     </svg>
   );
@@ -59,6 +59,12 @@ export const PracticeNavIcons = {
     <Icon>
       <path d="M12 22c4 0 7-3.5 7-8V7H5v7c0 4.5 3 8 7 8z" />
       <path d="M8 7V4M12 7V2M16 7V5" />
+    </Icon>
+  ),
+  habits: (
+    <Icon>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M8.5 12.2l2.3 2.3 4.7-5" />
     </Icon>
   ),
   tasks: (

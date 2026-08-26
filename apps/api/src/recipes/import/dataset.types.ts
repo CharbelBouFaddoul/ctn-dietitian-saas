@@ -10,6 +10,8 @@ export interface RecipeDatasetSource {
 
 export interface RecipeDatasetIngredient {
   sourceFoodId: string;
+  /** Catalog source key. Defaults to USDA Foundation. Required when the id is from SR Legacy (FDC ids overlap across datasets). */
+  foodSourceKey?: string;
   quantity: number;
   unit: "g" | "kg" | "oz" | "lb" | "ml" | "l" | "fl_oz";
   displayNote?: string;

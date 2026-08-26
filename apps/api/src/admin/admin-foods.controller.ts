@@ -26,7 +26,7 @@ export class AdminFoodsController {
 
   @Post("import")
   @ApiOperation({
-    summary: "Import the bundled curated USDA Foundation-style dataset via the existing importer",
+    summary: "Replace the USDA Foundation catalog from the cached April 2026 dump",
   })
   importCurated() {
     return this.foods.adminImportCuratedDataset();

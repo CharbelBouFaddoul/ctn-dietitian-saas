@@ -85,7 +85,15 @@ export interface MealPlanSnapshot {
         quantity: number;
         unit: QuantityUnit;
         notes: string | null;
-        food: { id: string; name: string; origin: "catalog" | "custom"; servingDescription: string | null } | null;
+        food: {
+          id: string;
+          name: string;
+          origin: "catalog" | "custom";
+          servingDescription: string | null;
+          referenceQuantity?: number;
+          referenceUnit?: string;
+          source?: { key?: string | null; name: string; datasetVersion?: string | null } | null;
+        } | null;
         recipe: { id: string; name: string; servings: number } | null;
         nutrition: NutritionValues;
         presented: NutritionValues;
@@ -704,6 +712,31 @@ export class MealPlanService {
     return this.getVersion(tenant, planId, versionId);
   }
 
+  async reorderItems(
+    tenant: DietitianTenantContext,
+    planId: string,
+    versionId: string,
+    mealId: string,
+    itemIds: string[],
+  ) {
+    await this.assertDraft(tenant, planId, versionId);
+    const meal = await this.prisma.meal.findFirst({
+      where: { id: mealId, dietitianAccountId: tenant.dietitianAccountId, day: { mealPlanVersionId: versionId } },
+      include: { items: { select: { id: true } } },
+    });
+    if (!meal) {
+      throw new NotFoundException("Meal not found");
+    }
+    const existing = new Set(meal.items.map((row) => row.id));
+    if (itemIds.length !== existing.size || itemIds.some((id) => !existing.has(id))) {
+      throw new BadRequestException("Item list does not match this meal");
+    }
+    await this.prisma.$transaction(
+      itemIds.map((id, index) => this.prisma.mealItem.update({ where: { id }, data: { sortOrder: index } })),
+    );
+    return this.getVersion(tenant, planId, versionId);
+  }
+
   async updateItem(
     tenant: DietitianTenantContext,
     planId: string,
@@ -901,6 +934,15 @@ export class MealPlanService {
             name: food.name,
             origin: food.origin === "custom" ? ("custom" as const) : ("catalog" as const),
             servingDescription: food.servingDescription ?? null,
+            referenceQuantity: food.referenceQuantity,
+            referenceUnit: food.referenceUnit,
+            source: food.source
+              ? {
+                  key: food.source.key,
+                  name: food.source.name,
+                  datasetVersion: food.source.datasetVersion,
+                }
+              : null,
           },
           recipe: null,
           nutrition,
@@ -915,6 +957,15 @@ export class MealPlanService {
             name: food.name,
             origin: food.origin === "custom" ? ("custom" as const) : ("catalog" as const),
             servingDescription: food.servingDescription ?? null,
+            referenceQuantity: food.referenceQuantity,
+            referenceUnit: food.referenceUnit,
+            source: food.source
+              ? {
+                  key: food.source.key,
+                  name: food.source.name,
+                  datasetVersion: food.source.datasetVersion,
+                }
+              : null,
           });
         }
         throw error;

@@ -146,7 +146,7 @@ export default function PracticeHabitsPage() {
   return (
     <section className="ui-habit-lib">
       <PageHeader
-        eyebrow="Nutrition"
+        eyebrow="Patients"
         title="Habit library"
         description="Browse and create reusable habits, then assign them on each client’s Tracking tab."
         actions={

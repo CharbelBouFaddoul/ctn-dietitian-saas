@@ -121,7 +121,7 @@ export default function FoodsPage() {
     <section>
       <PageHeader
         title="Food database"
-        description="Search catalog sources separately (USDA Foundation, USDA SR Legacy, and later CNF) or your clinic custom foods. Catalog foods are read-only; duplicate one to edit a clinic copy."
+        description="Search catalog sources separately (USDA Foundation, USDA SR Legacy, CNF, McCance and Widdowson) or your clinic custom foods. Catalog foods are read-only; duplicate one to edit a clinic copy."
         actions={
           <Link href={`/practice/${dietitianAccountId}/foods/new`} className="ui-btn ui-btn--primary ui-btn--sm">
             New custom food

@@ -16,6 +16,8 @@ import {
 const FOOD_QUANTITY_UNITS = ["g", "kg", "oz", "lb", "ml", "l", "fl_oz"] as const;
 const FOOD_REFERENCE_UNITS = ["g", "ml"] as const;
 const FOOD_ORIGINS = ["catalog", "custom", "all"] as const;
+const FOOD_SORTS = ["name", "energy", "fat", "carbohydrate", "protein"] as const;
+const FOOD_SORT_DIRS = ["asc", "desc"] as const;
 
 export class ListFoodsQueryDto {
   @ApiPropertyOptional()
@@ -54,6 +56,16 @@ export class ListFoodsQueryDto {
   @Min(1)
   @Max(50)
   pageSize?: number;
+
+  @ApiPropertyOptional({ enum: FOOD_SORTS })
+  @IsOptional()
+  @IsEnum(FOOD_SORTS)
+  sort?: (typeof FOOD_SORTS)[number];
+
+  @ApiPropertyOptional({ enum: FOOD_SORT_DIRS })
+  @IsOptional()
+  @IsEnum(FOOD_SORT_DIRS)
+  sortDir?: (typeof FOOD_SORT_DIRS)[number];
 }
 
 export class CalculateFoodDto {

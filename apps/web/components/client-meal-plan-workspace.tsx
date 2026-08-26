@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   Alert,
   Button,
+  ConfirmDialog,
   Dialog,
   DonutChart,
   EmptyState,
@@ -13,7 +14,6 @@ import {
   LoadingState,
   RdaBarList,
   Select,
-  StatusBadge,
   Table,
   TargetBar,
   Td,
@@ -33,8 +33,9 @@ import {
   type RdaProfileId,
 } from "../lib/nutrition-targets";
 import { statusLabel, unitLabel } from "../lib/practice-labels";
-import { foodSourceShortLabel } from "../lib/food-source-label";
 import { ClientMealNotesRail } from "./client-meal-notes-rail";
+import { MealFoodPicker } from "./meal-food-picker";
+import { MealItemNutritionDialog } from "./meal-item-nutrition-dialog";
 import { MealMacroDonuts } from "./meal-macro-donuts";
 
 export type MealPlanView = "plan" | "analysis";
@@ -49,19 +50,6 @@ type Nutrition = {
   sodiumMg?: number | null;
 };
 
-type FoodHit = {
-  id: string;
-  name: string;
-  origin?: "catalog" | "custom";
-  servingDescription?: string | null;
-  referenceQuantity?: number;
-  referenceUnit?: string;
-  hasOverride?: boolean;
-  source?: { key?: string; name: string };
-};
-
-type RecipeHit = { id: string; name: string; servings?: number };
-
 type MealItem = {
   id: string;
   itemType: string;
@@ -73,9 +61,13 @@ type MealItem = {
     name: string;
     origin?: "catalog" | "custom";
     servingDescription?: string | null;
+    referenceQuantity?: number;
+    referenceUnit?: string;
+    source?: { key?: string | null; name: string; datasetVersion?: string | null } | null;
   } | null;
   recipe: { id: string; name: string; servings?: number } | null;
   presented: Nutrition;
+  presentedExtraNutrients?: ExtraNutrients;
 };
 
 type Meal = {
@@ -130,7 +122,6 @@ const MEAL_NAME_PRESETS = [
   "Evening Snack",
 ] as const;
 
-const UNITS = ["g", "kg", "oz", "lb", "ml", "l", "fl_oz"] as const;
 const FOODS_PAGE_SIZE = 8;
 const MEAL_DONUT_COLORS = ["#0f766e", "#14b8a6", "#5eead4", "#f59e0b", "#3b82f6", "#8b5cf6"];
 
@@ -185,6 +176,75 @@ function dayFullLabel(day: PlanDay) {
 
 function itemName(item: MealItem) {
   return item.food?.name ?? item.recipe?.name ?? "Item";
+}
+
+const MASS_TO_G: Record<string, number> = { g: 1, kg: 1000, oz: 28.349523125, lb: 453.59237 };
+const VOL_TO_ML: Record<string, number> = { ml: 1, l: 1000, fl_oz: 29.5735295625 };
+const MASS_UNITS = ["g", "kg", "oz", "lb"] as const;
+const VOLUME_UNITS = ["ml", "l", "fl_oz"] as const;
+
+function trimQty(value: number) {
+  if (!Number.isFinite(value)) return "—";
+  const rounded = Math.round(value * 10) / 10;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+}
+
+function itemGramsLabel(item: MealItem): string | null {
+  if (item.unit === "serving") {
+    const qty = item.food?.referenceQuantity;
+    const unit = item.food?.referenceUnit;
+    if (qty && unit) return `${trimQty(item.quantity * qty)} ${unit}`;
+    return null;
+  }
+  if (MASS_TO_G[item.unit]) return `${trimQty(item.quantity * MASS_TO_G[item.unit]!)} g`;
+  if (VOL_TO_ML[item.unit]) return `${trimQty(item.quantity * VOL_TO_ML[item.unit]!)} ml`;
+  return null;
+}
+
+function itemLine(item: MealItem): string {
+  const name = item.food?.servingDescription?.trim() || itemName(item);
+  const amount = `${trimQty(item.quantity)} ${unitLabel(item.unit)}`;
+  const grams = itemGramsLabel(item);
+  if (grams && item.unit !== "g" && item.unit !== "ml") return `${amount} ${name} (${grams})`;
+  if (grams && (item.unit === "g" || item.unit === "ml")) return `${amount} ${name}`;
+  return `${amount} ${name}`;
+}
+
+function itemUnits(item: MealItem): string[] {
+  const base =
+    item.itemType === "RECIPE" || item.unit === "serving"
+      ? ["serving"]
+      : (VOLUME_UNITS as readonly string[]).includes(item.unit)
+        ? [...VOLUME_UNITS]
+        : [...MASS_UNITS];
+  return base.includes(item.unit) ? base : [item.unit, ...base];
+}
+
+function DragHandleIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+      <circle cx="5" cy="3.5" r="1.15" />
+      <circle cx="11" cy="3.5" r="1.15" />
+      <circle cx="5" cy="8" r="1.15" />
+      <circle cx="11" cy="8" r="1.15" />
+      <circle cx="5" cy="12.5" r="1.15" />
+      <circle cx="11" cy="12.5" r="1.15" />
+    </svg>
+  );
+}
+
+function EditIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+      <path d="M13.5 7.5l3 3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
 }
 
 function TrashIcon() {
@@ -324,19 +384,12 @@ export function ClientMealPlanWorkspace({
   const [activeDayId, setActiveDayId] = useState("");
   const [activeWeek, setActiveWeek] = useState(1);
   const [editingMealId, setEditingMealId] = useState<string | null>(null);
-  const [foodQuery, setFoodQuery] = useState("");
-  const [recipeQuery, setRecipeQuery] = useState("");
-  const [foodHits, setFoodHits] = useState<FoodHit[]>([]);
-  const [recipeHits, setRecipeHits] = useState<RecipeHit[]>([]);
-  const [quantity, setQuantity] = useState("100");
-  const [recipeServings, setRecipeServings] = useState("1");
-  const [unit, setUnit] = useState("g");
-  const [servingHint, setServingHint] = useState<string | null>(null);
   const [newMealName, setNewMealName] = useState("Breakfast");
   const [customMealName, setCustomMealName] = useState("");
   const [renameMealId, setRenameMealId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [qtyDrafts, setQtyDrafts] = useState<Record<string, string>>({});
+  const [unitDrafts, setUnitDrafts] = useState<Record<string, string>>({});
   const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -347,7 +400,20 @@ export function ClientMealPlanWorkspace({
   const [rdaProfileId, setRdaProfileId] = useState<RdaProfileId>(DEFAULT_RDA_PROFILE_ID);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [switcherOpen, setSwitcherOpen] = useState(false);
+  const [versionOpen, setVersionOpen] = useState(false);
+  const [pendingDeleteVersion, setPendingDeleteVersion] = useState<{
+    id: string;
+    versionNumber: number;
+    status: string;
+  } | null>(null);
+  const [inspectingItem, setInspectingItem] = useState<MealItem | null>(null);
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [dragItem, setDragItem] = useState<{ mealId: string; itemId: string } | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
   const switcherRef = useRef<HTMLDivElement>(null);
+  const versionRef = useRef<HTMLDivElement>(null);
+  const pendingDraftRef = useRef<{ dayNumber: number } | null>(null);
+  const skipItemClickRef = useRef(false);
 
   const apiBase = `/api/v1/dietitian/${dietitianAccountId}/meal-plans/${planId}`;
 
@@ -361,6 +427,17 @@ export function ClientMealPlanWorkspace({
   function applyVersion(loaded: VersionDetail) {
     setVersion(loaded);
     setError(null);
+    const pending = pendingDraftRef.current;
+    if (pending) {
+      pendingDraftRef.current = null;
+      const day =
+        loaded.snapshot.days.find((row) => row.dayNumber === pending.dayNumber) ?? loaded.snapshot.days[0];
+      if (day) {
+        setActiveDayId(day.id);
+        setActiveWeek(weekOfDay(day.dayNumber));
+      }
+      return;
+    }
     const first = loaded.snapshot.days[0];
     if (!activeDayId && first) {
       setActiveDayId(first.id);
@@ -413,17 +490,22 @@ export function ClientMealPlanWorkspace({
   }, [dietitianAccountId, trackingClientId]);
 
   useEffect(() => {
-    if (!switcherOpen) return;
+    if (!switcherOpen && !versionOpen) return;
     function onPointer(event: MouseEvent) {
-      if (switcherRef.current && !switcherRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (switcherOpen && switcherRef.current && !switcherRef.current.contains(target)) {
         setSwitcherOpen(false);
+      }
+      if (versionOpen && versionRef.current && !versionRef.current.contains(target)) {
+        setVersionOpen(false);
       }
     }
     window.addEventListener("mousedown", onPointer);
     return () => window.removeEventListener("mousedown", onPointer);
-  }, [switcherOpen]);
+  }, [switcherOpen, versionOpen]);
 
   const canEdit = version?.status === "DRAFT" && !version.immutable;
+  const canStartDraft = Boolean(allowManage && plan && plan.status !== "ARCHIVED" && !canEdit);
   const weekGroups = version ? groupDaysByWeek(version.snapshot.days) : [];
   const currentWeek = weekGroups.some((g) => g.week === activeWeek)
     ? activeWeek
@@ -453,20 +535,41 @@ export function ClientMealPlanWorkspace({
     }
   }
 
-  async function newDraft() {
+  async function newVersion() {
+    const existingDraft = plan?.versions.find((row) => row.status === "DRAFT");
+    if (existingDraft) {
+      setVersionOpen(false);
+      try {
+        await load(existingDraft.id);
+      } catch (err) {
+        pendingDraftRef.current = null;
+        setError(errorMessage(err, "Could not open draft"));
+      }
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
       const created = await api<VersionDetail>(`${apiBase}/versions`, { method: "POST" });
+      setVersionOpen(false);
       await load(created.id);
       if (!compact) {
         router.replace(`/practice/${dietitianAccountId}/meal-plans/${planId}?versionId=${created.id}`);
       }
     } catch (err) {
-      setError(errorMessage(err, "Could not create draft"));
+      pendingDraftRef.current = null;
+      setError(errorMessage(err, "Could not create version"));
     } finally {
       setBusy(false);
     }
+  }
+
+  async function enterDraft() {
+    if (!canStartDraft) return;
+    if (focusedDay) {
+      pendingDraftRef.current = { dayNumber: focusedDay.dayNumber };
+    }
+    await newVersion();
   }
 
   async function addDay() {
@@ -589,53 +692,80 @@ export function ClientMealPlanWorkspace({
         delete next[itemId];
         return next;
       });
+      setUnitDrafts((curr) => {
+        const next = { ...curr };
+        delete next[itemId];
+        return next;
+      });
+      setEditingItemId(null);
       await load(version.id);
     } catch (err) {
       setError(errorMessage(err, "Could not update quantity"));
     }
   }
 
-  async function searchFoods() {
-    try {
-      const result = await api<{ items: FoodHit[] }>(
-        `/api/v1/dietitian/${dietitianAccountId}/foods?q=${encodeURIComponent(foodQuery)}&pageSize=8`,
-      );
-      setFoodHits(result.items);
-    } catch (err) {
-      setError(errorMessage(err, "Food search failed"));
-    }
-  }
-
-  async function searchRecipes() {
-    try {
-      const result = await api<{ items: RecipeHit[] }>(
-        `/api/v1/dietitian/${dietitianAccountId}/recipes?q=${encodeURIComponent(recipeQuery)}&pageSize=8`,
-      );
-      setRecipeHits(result.items);
-    } catch (err) {
-      setError(errorMessage(err, "Recipe search failed"));
-    }
-  }
-
-  async function addFood(mealId: string, hit: FoodHit) {
+  async function reorderMealItems(mealId: string, itemIds: string[]) {
     if (!version) return;
-    const qty = hit.referenceQuantity ?? Number(quantity);
-    const u = hit.referenceUnit ?? unit;
+    setVersion((curr) => {
+      if (!curr) return curr;
+      return {
+        ...curr,
+        snapshot: {
+          ...curr.snapshot,
+          days: curr.snapshot.days.map((day) => ({
+            ...day,
+            meals: day.meals.map((meal) => {
+              if (meal.id !== mealId) return meal;
+              const byId = new Map(meal.items.map((item) => [item.id, item]));
+              return { ...meal, items: itemIds.map((id) => byId.get(id)).filter((row): row is MealItem => Boolean(row)) };
+            }),
+          })),
+        },
+      };
+    });
+    try {
+      const loaded = await api<VersionDetail>(`${apiBase}/versions/${version.id}/meals/${mealId}/items/reorder`, {
+        method: "PATCH",
+        body: JSON.stringify({ itemIds }),
+      });
+      applyVersion(loaded);
+    } catch (err) {
+      setError(errorMessage(err, "Could not reorder foods"));
+      await load(version.id);
+    }
+  }
+
+  function moveItem(meal: Meal, fromId: string, toId: string) {
+    if (fromId === toId) return;
+    const ids = meal.items.map((item) => item.id);
+    const from = ids.indexOf(fromId);
+    const to = ids.indexOf(toId);
+    if (from < 0 || to < 0) return;
+    const next = [...ids];
+    next.splice(from, 1);
+    next.splice(to, 0, fromId);
+    void reorderMealItems(meal.id, next);
+  }
+
+  async function addFood(mealId: string, input: { foodId: string; quantity: number; unit: string }) {
+    if (!version) return;
     try {
       const loaded = await api<VersionDetail>(`${apiBase}/versions/${version.id}/meals/${mealId}/items`, {
         method: "POST",
-        body: JSON.stringify({ itemType: "FOOD", foodId: hit.id, quantity: qty, unit: u }),
+        body: JSON.stringify({
+          itemType: "FOOD",
+          foodId: input.foodId,
+          quantity: input.quantity,
+          unit: input.unit,
+        }),
       });
-      setFoodHits([]);
-      setFoodQuery("");
-      setServingHint(null);
       applyVersion(loaded);
     } catch (err) {
       setError(errorMessage(err, "Could not add food"));
     }
   }
 
-  async function addRecipe(mealId: string, recipeId: string) {
+  async function addRecipe(mealId: string, recipeId: string, servings = 1) {
     if (!version) return;
     try {
       const loaded = await api<VersionDetail>(`${apiBase}/versions/${version.id}/meals/${mealId}/items`, {
@@ -643,12 +773,10 @@ export function ClientMealPlanWorkspace({
         body: JSON.stringify({
           itemType: "RECIPE",
           recipeId,
-          quantity: Number(recipeServings),
+          quantity: servings,
           unit: "serving",
         }),
       });
-      setRecipeHits([]);
-      setRecipeQuery("");
       applyVersion(loaded);
     } catch (err) {
       setError(errorMessage(err, "Could not add recipe"));
@@ -679,23 +807,20 @@ export function ClientMealPlanWorkspace({
     await archivePlanById(plan.id, plan.name);
   }
 
-  async function deleteVersion(row: { id: string; versionNumber: number; status: string }) {
-    const last = (plan?.versions.length ?? 0) <= 1;
-    const confirmed = window.confirm(
-      last
-        ? `This is the only version. Delete meal plan “${plan?.name}”?`
-        : `Delete ${statusLabel(row.status).toLowerCase()} version ${row.versionNumber}?`,
-    );
-    if (!confirmed) return;
+  async function confirmDeleteVersion() {
+    const row = pendingDeleteVersion;
+    if (!row) return;
     setBusy(true);
     try {
       const updated = await api<PlanDetail>(`${apiBase}/versions/${row.id}`, { method: "DELETE" });
+      setPendingDeleteVersion(null);
       if (updated.status === "ARCHIVED") {
         setSettingsOpen(false);
         if (onArchived) onArchived();
         else router.push(`/practice/${dietitianAccountId}/meal-plans`);
         return;
       }
+      setVersionOpen(false);
       setPlan(updated);
       const keepCurrent = updated.versions.some((item) => item.id === version?.id);
       const nextId =
@@ -713,7 +838,7 @@ export function ClientMealPlanWorkspace({
 
   async function deleteDay() {
     if (!version || !focusedDay) return;
-    if (!window.confirm(`Remove ${dayFullLabel(focusedDay)} from this draft?`)) return;
+    if (!window.confirm(`Remove ${dayFullLabel(focusedDay)} from this version?`)) return;
     try {
       await api(`${apiBase}/versions/${version.id}/days/${focusedDay.id}`, { method: "DELETE" });
       setActiveDayId("");
@@ -784,7 +909,7 @@ export function ClientMealPlanWorkspace({
 
   return (
     <>
-    <div className={`ui-mp${compact ? " ui-mp--compact" : ""}`}>
+    <div className={`ui-mp${compact ? " ui-mp--compact" : ""}${editingMealId ? " ui-mp--picking" : ""}`}>
       <header className="ui-mp__top">
         <div className="ui-mp__identity">
           {planOptions && planOptions.length > 0 && onSelectPlan ? (
@@ -794,7 +919,10 @@ export function ClientMealPlanWorkspace({
                 className="ui-mp__switcher-btn"
                 aria-expanded={switcherOpen}
                 aria-haspopup="listbox"
-                onClick={() => setSwitcherOpen((open) => !open)}
+                onClick={() => {
+                  setVersionOpen(false);
+                  setSwitcherOpen((open) => !open);
+                }}
               >
                 <span>{plan.name}</span>
                 <span className="ui-mp__switcher-caret" aria-hidden>
@@ -848,10 +976,77 @@ export function ClientMealPlanWorkspace({
           ) : (
             <h2 className="ui-mp__title">{plan.name}</h2>
           )}
-          <p className="ui-mp__meta">
-            v{version.versionNumber} · {version.immutable ? "Published" : "Draft"}
-            <StatusBadge status={plan.status} label={statusLabel(plan.status)} />
-          </p>
+          <div className="ui-mp__version-switcher" ref={versionRef}>
+            <button
+              type="button"
+              className="ui-mp__version-switcher-btn"
+              aria-expanded={versionOpen}
+              aria-haspopup="listbox"
+              aria-label="Plan versions"
+              onClick={() => {
+                setSwitcherOpen(false);
+                setVersionOpen((open) => !open);
+              }}
+            >
+              <span>
+                Version {version.versionNumber} · {version.immutable ? "Published" : "Draft"}
+              </span>
+              <span className="ui-mp__switcher-caret" aria-hidden>
+                ▾
+              </span>
+            </button>
+            {versionOpen ? (
+              <div className="ui-mp__switcher-menu ui-mp__version-menu" role="listbox" aria-label="Plan versions">
+                {[...plan.versions]
+                  .sort((a, b) => b.versionNumber - a.versionNumber)
+                  .map((row) => (
+                    <div
+                      key={row.id}
+                      className={`ui-mp__version-row${row.id === version.id ? " is-active" : ""}`}
+                    >
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={row.id === version.id}
+                        className="ui-mp__version-item"
+                        onClick={() => {
+                          setVersionOpen(false);
+                          void load(row.id);
+                        }}
+                      >
+                        <span>Version {row.versionNumber}</span>
+                        <span>{statusLabel(row.status)}</span>
+                      </button>
+                      {allowManage && plan.status !== "ARCHIVED" ? (
+                        <button
+                          type="button"
+                          className="ui-mp__switcher-delete"
+                          aria-label={`Delete version ${row.versionNumber}`}
+                          disabled={busy}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setVersionOpen(false);
+                            setPendingDeleteVersion(row);
+                          }}
+                        >
+                          <TrashIcon />
+                        </button>
+                      ) : null}
+                    </div>
+                  ))}
+                {allowManage && plan.status !== "ARCHIVED" && !plan.versions.some((row) => row.status === "DRAFT") ? (
+                  <button
+                    type="button"
+                    className="ui-mp__switcher-all"
+                    disabled={busy}
+                    onClick={() => void newVersion()}
+                  >
+                    New version
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
         </div>
         <div className="ui-mp__toolbar">
           {onCreateRequest ? (
@@ -894,11 +1089,11 @@ export function ClientMealPlanWorkspace({
             <Button size="sm" onClick={() => void publish()} disabled={busy}>
               Publish
             </Button>
-          ) : (
-            <Button size="sm" onClick={() => void newDraft()} disabled={busy}>
-              New draft
+          ) : canStartDraft ? (
+            <Button size="sm" onClick={() => void enterDraft()} disabled={busy}>
+              Edit
             </Button>
-          )}
+          ) : null}
         </div>
       </header>
 
@@ -945,8 +1140,6 @@ export function ClientMealPlanWorkspace({
                 setActiveDayId(day.id);
                 setActiveWeek(weekOfDay(day.dayNumber));
                 setEditingMealId(null);
-                setFoodHits([]);
-                setRecipeHits([]);
                 setRenameMealId(null);
               }}
             >
@@ -968,9 +1161,18 @@ export function ClientMealPlanWorkspace({
       </div>
 
       {!focusedDay ? (
-        <EmptyState title="No days yet">
-          {canEdit ? <Button onClick={() => void addDay()}>Add first day</Button> : "This version has no days."}
-        </EmptyState>
+        <EmptyState
+          title="No days yet"
+          action={
+            canEdit ? (
+              <Button onClick={() => void addDay()}>Add first day</Button>
+            ) : canStartDraft ? (
+              <Button onClick={() => void enterDraft()} disabled={busy}>
+                Edit
+              </Button>
+            ) : undefined
+          }
+        />
       ) : view === "plan" ? (
         <div className="ui-mp__plan">
           <div className="ui-mp__meals">
@@ -1025,9 +1227,16 @@ export function ClientMealPlanWorkspace({
             ) : null}
 
             {focusedDay.meals.length === 0 ? (
-              <EmptyState title="No meals yet">
-                {canEdit ? "Add a meal, then add foods or recipes." : "This day has no meals."}
-              </EmptyState>
+              <EmptyState
+                title="No meals yet"
+                action={
+                  canStartDraft ? (
+                    <Button size="sm" onClick={() => void enterDraft()} disabled={busy}>
+                      Edit
+                    </Button>
+                  ) : undefined
+                }
+              />
             ) : (
               focusedDay.meals.map((meal) => (
                 <article key={meal.id} className="ui-mp__meal">
@@ -1052,8 +1261,6 @@ export function ClientMealPlanWorkspace({
                           size="sm"
                           onClick={() => {
                             setEditingMealId(editingMealId === meal.id ? null : meal.id);
-                            setFoodHits([]);
-                            setRecipeHits([]);
                           }}
                         >
                           {editingMealId === meal.id ? "Done" : "Add foods"}
@@ -1072,6 +1279,17 @@ export function ClientMealPlanWorkspace({
                           Remove
                         </button>
                       </div>
+                    ) : canStartDraft ? (
+                      <div className="ui-mp__meal-actions">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={busy}
+                          onClick={() => void enterDraft()}
+                        >
+                          Edit
+                        </Button>
+                      </div>
                     ) : null}
                   </header>
 
@@ -1079,40 +1297,139 @@ export function ClientMealPlanWorkspace({
                     <ul className="ui-mp__items">
                       {meal.items.map((item) => {
                         const draftQty = qtyDrafts[item.id] ?? String(item.quantity);
+                        const draftUnit = unitDrafts[item.id] ?? item.unit;
+                        const editing = editingItemId === item.id;
                         return (
-                          <li key={item.id}>
-                            <span className="ui-mp__item-name">
-                              {itemName(item)}
-                              <span className="ui-muted"> · {n(item.presented.energyKcal)} kcal</span>
-                            </span>
-                            {canEdit ? (
-                              <span className="ui-mp__item-qty">
-                                <Input
-                                  value={draftQty}
-                                  onChange={(e) =>
-                                    setQtyDrafts((curr) => ({ ...curr, [item.id]: e.target.value }))
+                          <li
+                            key={item.id}
+                            className={`ui-mp__item${dragOverId === item.id ? " is-over" : ""}${dragItem?.itemId === item.id ? " is-dragging" : ""}`}
+                            onDragOver={
+                              canEdit
+                                ? (event) => {
+                                    event.preventDefault();
+                                    setDragOverId(item.id);
                                   }
-                                />
-                                <span className="ui-muted">{unitLabel(item.unit)}</span>
-                                {draftQty !== String(item.quantity) ? (
-                                  <Button
-                                    size="sm"
-                                    variant="secondary"
-                                    onClick={() => void updateItemQuantity(item.id, Number(draftQty), item.unit)}
-                                  >
-                                    Update
-                                  </Button>
-                                ) : null}
-                              </span>
-                            ) : (
-                              <span className="ui-muted">
-                                {item.quantity} {unitLabel(item.unit)}
-                              </span>
-                            )}
+                                : undefined
+                            }
+                            onDrop={
+                              canEdit
+                                ? (event) => {
+                                    event.preventDefault();
+                                    skipItemClickRef.current = true;
+                                    if (dragItem?.mealId === meal.id) moveItem(meal, dragItem.itemId, item.id);
+                                    setDragItem(null);
+                                    setDragOverId(null);
+                                  }
+                                : undefined
+                            }
+                            onDragLeave={() => {
+                              if (dragOverId === item.id) setDragOverId(null);
+                            }}
+                          >
                             {canEdit ? (
-                              <button type="button" className="ui-mp__danger" onClick={() => void removeItem(item.id)}>
-                                Remove
-                              </button>
+                              <span
+                                className="ui-mp__item-handle"
+                                draggable
+                                role="button"
+                                tabIndex={0}
+                                aria-label={`Reorder ${itemName(item)}`}
+                                onDragStart={(event) => {
+                                  event.dataTransfer.effectAllowed = "move";
+                                  event.dataTransfer.setData("text/plain", item.id);
+                                  setDragItem({ mealId: meal.id, itemId: item.id });
+                                }}
+                                onDragEnd={() => {
+                                  setDragItem(null);
+                                  setDragOverId(null);
+                                }}
+                              >
+                                <DragHandleIcon />
+                              </span>
+                            ) : null}
+                            <button
+                              type="button"
+                              className="ui-mp__item-body"
+                              onClick={() => {
+                                if (skipItemClickRef.current) {
+                                  skipItemClickRef.current = false;
+                                  return;
+                                }
+                                setInspectingItem(item);
+                              }}
+                            >
+                              {itemLine(item)}
+                            </button>
+                            {canEdit ? (
+                              <div className="ui-mp__item-tools">
+                                {editing ? (
+                                  <div className="ui-mp__item-edit">
+                                    <input
+                                      className="ui-mp__item-qty"
+                                      value={draftQty}
+                                      inputMode="decimal"
+                                      aria-label={`Amount for ${itemName(item)}`}
+                                      onChange={(e) =>
+                                        setQtyDrafts((curr) => ({ ...curr, [item.id]: e.target.value }))
+                                      }
+                                    />
+                                    <select
+                                      className="ui-mp__item-unit"
+                                      value={draftUnit}
+                                      aria-label={`Unit for ${itemName(item)}`}
+                                      onChange={(event) =>
+                                        setUnitDrafts((curr) => ({ ...curr, [item.id]: event.target.value }))
+                                      }
+                                    >
+                                      {itemUnits(item).map((unit) => (
+                                        <option key={unit} value={unit}>
+                                          {unitLabel(unit) || unit}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    <Button
+                                      size="sm"
+                                      className="ui-mp__item-save"
+                                      variant={
+                                        draftQty !== String(item.quantity) || draftUnit !== item.unit
+                                          ? "primary"
+                                          : "secondary"
+                                      }
+                                      onClick={() => {
+                                        if (draftQty !== String(item.quantity) || draftUnit !== item.unit) {
+                                          void updateItemQuantity(item.id, Number(draftQty), draftUnit);
+                                        } else {
+                                          setEditingItemId(null);
+                                        }
+                                      }}
+                                    >
+                                      {draftQty !== String(item.quantity) || draftUnit !== item.unit
+                                        ? "Save"
+                                        : "Done"}
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    className="ui-mp__item-icon"
+                                    aria-label={`Edit ${itemName(item)}`}
+                                    onClick={() => {
+                                      setQtyDrafts((curr) => ({ ...curr, [item.id]: String(item.quantity) }));
+                                      setUnitDrafts((curr) => ({ ...curr, [item.id]: item.unit }));
+                                      setEditingItemId(item.id);
+                                    }}
+                                  >
+                                    <EditIcon />
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  className="ui-mp__item-icon ui-mp__item-icon--danger"
+                                  aria-label={`Remove ${itemName(item)}`}
+                                  onClick={() => void removeItem(item.id)}
+                                >
+                                  <TrashIcon />
+                                </button>
+                              </div>
                             ) : null}
                           </li>
                         );
@@ -1121,6 +1438,16 @@ export function ClientMealPlanWorkspace({
                   ) : (
                     <p className="ui-muted ui-mp__empty-line">No items yet.</p>
                   )}
+
+                  {canEdit && editingMealId === meal.id ? (
+                    <MealFoodPicker
+                      dietitianAccountId={dietitianAccountId}
+                      onAddFood={(input) => addFood(meal.id, input)}
+                      onAddRecipe={(input) => addRecipe(meal.id, input.recipeId, input.servings)}
+                      onClose={() => setEditingMealId(null)}
+                      onError={setError}
+                    />
+                  ) : null}
 
                   {canEdit ? (
                     <label className="ui-mp__notes">
@@ -1147,81 +1474,6 @@ export function ClientMealPlanWorkspace({
                     <span>Protein {n(meal.presented.proteinG)} g</span>
                     <span>Fiber {n(meal.presented.fiberG)} g</span>
                   </footer>
-
-                  {canEdit && editingMealId === meal.id ? (
-                    <div className="ui-mp__picker">
-                      <div>
-                        <p className="ui-mp__picker-label">Food</p>
-                        <div className="ui-mp__picker-row">
-                          <Input
-                            value={foodQuery}
-                            onChange={(e) => setFoodQuery(e.target.value)}
-                            placeholder="Search catalog…"
-                          />
-                          <Input value={quantity} onChange={(e) => setQuantity(e.target.value)} aria-label="Amount" />
-                          <Select value={unit} onChange={(e) => setUnit(e.target.value)}>
-                            {UNITS.map((u) => (
-                              <option key={u} value={u}>
-                                {unitLabel(u)}
-                              </option>
-                            ))}
-                          </Select>
-                          <Button variant="secondary" size="sm" onClick={() => void searchFoods()}>
-                            Search
-                          </Button>
-                        </div>
-                        {servingHint ? <p className="ui-muted">{servingHint}</p> : null}
-                        {foodHits.map((hit) => (
-                          <Button
-                            key={hit.id}
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => {
-                              if (hit.referenceQuantity != null) setQuantity(String(hit.referenceQuantity));
-                              if (hit.referenceUnit) setUnit(hit.referenceUnit);
-                              setServingHint(hit.servingDescription ?? null);
-                              void addFood(meal.id, hit);
-                            }}
-                          >
-                            + {hit.name}
-                            {hit.origin === "custom"
-                              ? " (custom)"
-                              : hit.source
-                                ? ` · ${foodSourceShortLabel(hit.source)}`
-                                : ""}
-                          </Button>
-                        ))}
-                      </div>
-                      <div>
-                        <p className="ui-mp__picker-label">Recipe</p>
-                        <div className="ui-mp__picker-row">
-                          <Input
-                            value={recipeQuery}
-                            onChange={(e) => setRecipeQuery(e.target.value)}
-                            placeholder="Meal library…"
-                          />
-                          <Input
-                            value={recipeServings}
-                            onChange={(e) => setRecipeServings(e.target.value)}
-                            aria-label="Servings"
-                          />
-                          <Button variant="secondary" size="sm" onClick={() => void searchRecipes()}>
-                            Search
-                          </Button>
-                        </div>
-                        {recipeHits.map((hit) => (
-                          <Button
-                            key={hit.id}
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => void addRecipe(meal.id, hit.id)}
-                          >
-                            + {hit.name}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
                 </article>
               ))
             )}
@@ -1487,6 +1739,47 @@ export function ClientMealPlanWorkspace({
         </p>
       ) : null}
     </div>
+    <MealItemNutritionDialog
+      item={
+        inspectingItem
+          ? {
+              name: itemName(inspectingItem),
+              quantity: inspectingItem.quantity,
+              unit: inspectingItem.unit,
+              servingDescription: inspectingItem.food?.servingDescription,
+              amountCaption:
+                itemGramsLabel(inspectingItem) ??
+                `${trimQty(inspectingItem.quantity)} ${unitLabel(inspectingItem.unit)}`,
+              presented: inspectingItem.presented,
+              presentedExtraNutrients: inspectingItem.presentedExtraNutrients,
+              origin: inspectingItem.food?.origin,
+              source: inspectingItem.food?.source ?? (inspectingItem.recipe ? { name: "Recipe" } : null),
+            }
+          : null
+      }
+      onClose={() => setInspectingItem(null)}
+    />
+    <ConfirmDialog
+      open={pendingDeleteVersion !== null}
+      title={
+        (plan.versions.length ?? 0) <= 1
+          ? "Delete this meal plan?"
+          : `Delete version ${pendingDeleteVersion?.versionNumber}?`
+      }
+      description={
+        (plan.versions.length ?? 0) <= 1
+          ? `This is the only version. Deleting it will archive “${plan.name}”.`
+          : `This ${statusLabel(pendingDeleteVersion?.status ?? "").toLowerCase()} version will be removed. This cannot be undone.`
+      }
+      confirmLabel={(plan.versions.length ?? 0) <= 1 ? "Delete plan" : "Delete version"}
+      danger
+      pending={busy}
+      onCancel={() => {
+        if (busy) return;
+        setPendingDeleteVersion(null);
+      }}
+      onConfirm={() => void confirmDeleteVersion()}
+    />
     <Dialog open={settingsOpen} title="Plan settings" onClose={() => setSettingsOpen(false)}>
       <div className="ui-mp__settings">
         <div>
@@ -1510,30 +1803,6 @@ export function ClientMealPlanWorkspace({
               <strong>Numbered</strong>
               <span>Day 1 – Day 7</span>
             </button>
-          </div>
-        </div>
-        <div>
-          <p className="ui-mp__settings-label">Versions</p>
-          <div className="ui-mp__version-list">
-            {plan.versions.map((row) => (
-              <div key={row.id} className={`ui-mp__version-row${row.id === version.id ? " is-active" : ""}`}>
-                <button type="button" className="ui-mp__version-item" onClick={() => void load(row.id)}>
-                  <span>Version {row.versionNumber}</span>
-                  <span>{statusLabel(row.status)}</span>
-                </button>
-                {allowManage && plan.status !== "ARCHIVED" ? (
-                  <button
-                    type="button"
-                    className="ui-mp__switcher-delete"
-                    aria-label={`Delete version ${row.versionNumber}`}
-                    disabled={busy}
-                    onClick={() => void deleteVersion(row)}
-                  >
-                    <TrashIcon />
-                  </button>
-                ) : null}
-              </div>
-            ))}
           </div>
         </div>
         {allowManage && plan.status !== "ARCHIVED" ? (

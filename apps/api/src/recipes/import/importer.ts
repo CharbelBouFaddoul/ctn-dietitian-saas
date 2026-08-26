@@ -1,7 +1,8 @@
 import type { PrismaClient, QuantityUnit } from "@prisma/client";
 import type { RecipeDatasetFile, RecipeDatasetRecord, RecipeImportReport } from "./dataset.types";
 
-const FOOD_SOURCE_KEY = "usda-fdc-foundation-curated";
+const DEFAULT_FOOD_SOURCE_KEY = "usda-fdc-foundation-curated";
+const CATALOG_FOOD_SOURCE_KEYS = [DEFAULT_FOOD_SOURCE_KEY, "usda-fdc-sr-legacy"];
 const UNITS = new Set(["g", "kg", "oz", "lb", "ml", "l", "fl_oz"]);
 
 function validateRecord(record: RecipeDatasetRecord): string | null {
@@ -33,18 +34,25 @@ export async function importRecipeDataset(
     errors: [],
   };
 
-  const foodSource = await prisma.foodSource.findUnique({ where: { key: FOOD_SOURCE_KEY } });
-  if (!foodSource) {
+  const foodSources = await prisma.foodSource.findMany({
+    where: { key: { in: CATALOG_FOOD_SOURCE_KEYS } },
+    select: { id: true, key: true },
+  });
+  const sourceByKey = new Map(foodSources.map((row) => [row.key, row]));
+  if (!sourceByKey.has(DEFAULT_FOOD_SOURCE_KEY)) {
     throw new Error(
-      `Food catalog source "${FOOD_SOURCE_KEY}" not found. Run pnpm food:import first.`,
+      `Food catalog source "${DEFAULT_FOOD_SOURCE_KEY}" not found. Run pnpm food:import:foundation first.`,
     );
   }
 
   const foods = await prisma.food.findMany({
-    where: { foodSourceId: foodSource.id, dietitianAccountId: null },
-    select: { id: true, sourceFoodId: true, referenceUnit: true },
+    where: { foodSourceId: { in: foodSources.map((row) => row.id) }, dietitianAccountId: null },
+    select: { id: true, sourceFoodId: true, referenceUnit: true, foodSourceId: true },
   });
-  const foodBySourceId = new Map(foods.map((f) => [f.sourceFoodId, f]));
+  const sourceKeyById = new Map(foodSources.map((row) => [row.id, row.key]));
+  const foodBySource = new Map(
+    foods.map((f) => [`${sourceKeyById.get(f.foodSourceId)}::${f.sourceFoodId}`, f]),
+  );
 
   for (const record of dataset.recipes) {
     report.processed += 1;
@@ -66,9 +74,10 @@ export async function importRecipeDataset(
     let unitMismatch: string | null = null;
     for (let i = 0; i < record.ingredients.length; i += 1) {
       const item = record.ingredients[i]!;
-      const food = foodBySourceId.get(item.sourceFoodId);
+      const sourceKey = item.foodSourceKey?.trim() || DEFAULT_FOOD_SOURCE_KEY;
+      const food = foodBySource.get(`${sourceKey}::${item.sourceFoodId}`);
       if (!food) {
-        missingFood = item.sourceFoodId;
+        missingFood = `${sourceKey}:${item.sourceFoodId}`;
         break;
       }
       const massUnits = item.unit === "g" || item.unit === "kg" || item.unit === "oz" || item.unit === "lb";

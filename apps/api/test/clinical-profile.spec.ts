@@ -11,6 +11,7 @@ describe("clinical data", () => {
     });
     expect(data.visit.reason).toHaveLength(4000);
     expect(data.eating.allergies).toBe("");
+    expect(data.identity.occupation).toBe("");
     expect(data).not.toHaveProperty("ignored");
   });
 

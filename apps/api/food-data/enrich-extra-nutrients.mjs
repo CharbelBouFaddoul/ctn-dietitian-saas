@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Enrich usda-foundation-curated.json with extraNutrients from USDA FDC.
+ * Enrich a mapped Foundation JSON file with extraNutrients from USDA FDC.
  *
  * Prefers offline dumps when present under food-data/.fdc-cache/ (or --dump):
  *   - Foundation Foods JSON (FoundationFoods[])
@@ -24,7 +24,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DEFAULT_INPUT = path.join(__dirname, "usda-foundation-curated.json");
+const DEFAULT_INPUT = path.join(__dirname, "usda-foundation-sample.json");
 const CACHE_DIR = path.join(__dirname, ".fdc-cache");
 const FDC_BASE = "https://api.nal.usda.gov/fdc/v1";
 const BATCH_SIZE = 10;

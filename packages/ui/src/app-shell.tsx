@@ -29,6 +29,7 @@ export type ShellLink = ComponentType<{
   onClick?: () => void;
   "data-active"?: boolean;
   title?: string;
+  "aria-label"?: string;
 }>;
 
 const DefaultLink: ShellLink = ({ href, className, children, onClick, title, ...rest }) => (
@@ -151,7 +152,7 @@ export function AppShell({
                       className={cn("ui-nav-link", isCollapsed && "ui-nav-link--collapsed")}
                       data-active={active}
                       onClick={() => setOpen(false)}
-                      title={
+                      aria-label={
                         isCollapsed
                           ? item.badge && item.badge > 0
                             ? `${item.label} (${item.badge} unread)`

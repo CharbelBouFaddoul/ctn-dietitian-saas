@@ -3,9 +3,9 @@
     "key": "usda-myplate-kitchen-starter",
     "name": "MyPlate Kitchen–style starter recipes (platform catalog)",
     "provider": "Curated for Nutrition SaaS from USDA MyPlate Kitchen public-domain patterns",
-    "datasetVersion": "2026-08-23-starter-v2",
+    "datasetVersion": "2026-08-26-starter-v3",
     "license": "United States government work / public domain in the U.S. Commercial use permitted. No USDA endorsement claimed.",
-    "attribution": "Recipe structures inspired by USDA MyPlate Kitchen public-domain recipes. Ingredient nutrient values come from USDA FoodData Central Foundation Foods already imported into this product.",
+    "attribution": "Recipe structures inspired by USDA MyPlate Kitchen public-domain recipes. Ingredient nutrient values come from USDA FoodData Central Foundation Foods (April 2026) and SR Legacy (April 2018).",
     "homepage": "https://www.myplate.gov/myplate-kitchen"
   },
   "recipes": [
@@ -18,19 +18,19 @@
       "instructions": "Cook oats with water or milk. Top with sliced banana.",
       "ingredients": [
         {
-          "sourceFoodId": "168876",
+          "sourceFoodId": "2346396",
           "quantity": 40,
           "unit": "g",
           "displayNote": "dry oats, cooked weight ~1 cup cooked"
         },
         {
-          "sourceFoodId": "170880",
+          "sourceFoodId": "746776",
           "quantity": 120,
           "unit": "g",
           "displayNote": "nonfat milk"
         },
         {
-          "sourceFoodId": "171689",
+          "sourceFoodId": "1105314",
           "quantity": 80,
           "unit": "g",
           "displayNote": "banana"
@@ -46,25 +46,25 @@
       "instructions": "Spoon yogurt into a bowl. Add berries and almonds.",
       "ingredients": [
         {
-          "sourceFoodId": "170903",
+          "sourceFoodId": "330137",
           "quantity": 170,
           "unit": "g",
           "displayNote": "nonfat Greek yogurt"
         },
         {
-          "sourceFoodId": "171699",
+          "sourceFoodId": "2346409",
           "quantity": 80,
           "unit": "g",
           "displayNote": "strawberries"
         },
         {
-          "sourceFoodId": "171686",
+          "sourceFoodId": "2346411",
           "quantity": 40,
           "unit": "g",
           "displayNote": "blueberries"
         },
         {
-          "sourceFoodId": "170567",
+          "sourceFoodId": "2346393",
           "quantity": 15,
           "unit": "g",
           "displayNote": "almonds"
@@ -80,33 +80,36 @@
       "instructions": "Scramble eggs with vegetables in a lightly oiled pan.",
       "ingredients": [
         {
-          "sourceFoodId": "172183",
+          "sourceFoodId": "748967",
           "quantity": 100,
           "unit": "g",
           "displayNote": "whole eggs (~2 large)"
         },
         {
-          "sourceFoodId": "170000",
+          "sourceFoodId": "168462",
           "quantity": 40,
           "unit": "g",
-          "displayNote": "spinach"
+          "displayNote": "spinach",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         },
         {
-          "sourceFoodId": "170003",
+          "sourceFoodId": "170457",
           "quantity": 60,
           "unit": "g",
-          "displayNote": "tomato"
+          "displayNote": "tomato",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         },
         {
-          "sourceFoodId": "170007",
+          "sourceFoodId": "170000",
           "quantity": 30,
           "unit": "g",
-          "displayNote": "onion"
+          "displayNote": "onion",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         },
         {
-          "sourceFoodId": "171413",
+          "sourceFoodId": "748608",
           "quantity": 5,
-          "unit": "ml",
+          "unit": "g",
           "displayNote": "olive oil"
         }
       ]
@@ -120,19 +123,19 @@
       "instructions": "Combine oats, milk, and diced apple. Chill overnight.",
       "ingredients": [
         {
-          "sourceFoodId": "168876",
+          "sourceFoodId": "2346396",
           "quantity": 45,
           "unit": "g",
           "displayNote": "oats"
         },
         {
-          "sourceFoodId": "170879",
+          "sourceFoodId": "746778",
           "quantity": 150,
           "unit": "g",
           "displayNote": "2% milk"
         },
         {
-          "sourceFoodId": "171688",
+          "sourceFoodId": "1750339",
           "quantity": 80,
           "unit": "g",
           "displayNote": "apple"
@@ -148,13 +151,13 @@
       "instructions": "Top cottage cheese with diced peach.",
       "ingredients": [
         {
-          "sourceFoodId": "173416",
+          "sourceFoodId": "328841",
           "quantity": 150,
           "unit": "g",
           "displayNote": "lowfat cottage cheese"
         },
         {
-          "sourceFoodId": "167760",
+          "sourceFoodId": "325430",
           "quantity": 100,
           "unit": "g",
           "displayNote": "peach"
@@ -170,13 +173,13 @@
       "instructions": "Drain tuna and spoon onto cucumber.",
       "ingredients": [
         {
-          "sourceFoodId": "175168b",
+          "sourceFoodId": "334194",
           "quantity": 85,
           "unit": "g",
           "displayNote": "canned tuna, drained"
         },
         {
-          "sourceFoodId": "170004",
+          "sourceFoodId": "2346406",
           "quantity": 120,
           "unit": "g",
           "displayNote": "cucumber"
@@ -192,13 +195,13 @@
       "instructions": "Slice apple and serve with almond butter.",
       "ingredients": [
         {
-          "sourceFoodId": "171688",
+          "sourceFoodId": "1750339",
           "quantity": 140,
           "unit": "g",
           "displayNote": "apple"
         },
         {
-          "sourceFoodId": "173739",
+          "sourceFoodId": "2262072",
           "quantity": 16,
           "unit": "g",
           "displayNote": "peanut butter (smooth)"
@@ -214,25 +217,27 @@
       "instructions": "Mash chickpeas with olive oil and lemon. Serve with carrots.",
       "ingredients": [
         {
-          "sourceFoodId": "173737",
+          "sourceFoodId": "173757",
           "quantity": 120,
           "unit": "g",
-          "displayNote": "cooked chickpeas"
+          "displayNote": "cooked chickpeas",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         },
         {
-          "sourceFoodId": "171413",
+          "sourceFoodId": "748608",
           "quantity": 10,
-          "unit": "ml",
+          "unit": "g",
           "displayNote": "olive oil"
         },
         {
-          "sourceFoodId": "167756",
+          "sourceFoodId": "167746",
           "quantity": 15,
           "unit": "g",
-          "displayNote": "lemon"
+          "displayNote": "lemon",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         },
         {
-          "sourceFoodId": "170005",
+          "sourceFoodId": "2258586",
           "quantity": 120,
           "unit": "g",
           "displayNote": "carrots"
@@ -248,27 +253,28 @@
       "instructions": "Serve sliced chicken over rice with steamed broccoli.",
       "ingredients": [
         {
-          "sourceFoodId": "171077",
+          "sourceFoodId": "331960",
           "quantity": 200,
           "unit": "g",
           "displayNote": "cooked chicken breast"
         },
         {
-          "sourceFoodId": "168875",
+          "sourceFoodId": "169704",
           "quantity": 200,
           "unit": "g",
-          "displayNote": "cooked brown rice"
+          "displayNote": "cooked brown rice",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         },
         {
-          "sourceFoodId": "170457",
+          "sourceFoodId": "747447",
           "quantity": 150,
           "unit": "g",
           "displayNote": "broccoli"
         },
         {
-          "sourceFoodId": "171413",
+          "sourceFoodId": "748608",
           "quantity": 8,
-          "unit": "ml",
+          "unit": "g",
           "displayNote": "olive oil"
         }
       ]
@@ -282,28 +288,31 @@
       "instructions": "Cook turkey with peppers and onion. Serve over quinoa.",
       "ingredients": [
         {
-          "sourceFoodId": "171116",
+          "sourceFoodId": "746785",
           "quantity": 180,
           "unit": "g",
           "displayNote": "cooked ground turkey"
         },
         {
-          "sourceFoodId": "168877",
+          "sourceFoodId": "168917",
           "quantity": 200,
           "unit": "g",
-          "displayNote": "cooked quinoa"
+          "displayNote": "cooked quinoa",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         },
         {
-          "sourceFoodId": "170006",
+          "sourceFoodId": "170108",
           "quantity": 80,
           "unit": "g",
-          "displayNote": "bell pepper"
+          "displayNote": "bell pepper",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         },
         {
-          "sourceFoodId": "170007",
+          "sourceFoodId": "170000",
           "quantity": 40,
           "unit": "g",
-          "displayNote": "onion"
+          "displayNote": "onion",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         }
       ]
     },
@@ -316,27 +325,30 @@
       "instructions": "Bake salmon and sweet potato. Serve with spinach salad.",
       "ingredients": [
         {
-          "sourceFoodId": "175034",
+          "sourceFoodId": "175168",
           "quantity": 200,
           "unit": "g",
-          "displayNote": "cooked salmon"
+          "displayNote": "cooked salmon",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         },
         {
-          "sourceFoodId": "170010",
+          "sourceFoodId": "168483",
           "quantity": 250,
           "unit": "g",
-          "displayNote": "baked sweet potato"
+          "displayNote": "baked sweet potato",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         },
         {
-          "sourceFoodId": "170000",
+          "sourceFoodId": "168462",
           "quantity": 80,
           "unit": "g",
-          "displayNote": "spinach"
+          "displayNote": "spinach",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         },
         {
-          "sourceFoodId": "171413",
+          "sourceFoodId": "748608",
           "quantity": 8,
-          "unit": "ml",
+          "unit": "g",
           "displayNote": "olive oil"
         }
       ]
@@ -350,27 +362,28 @@
       "instructions": "Grill steak. Roast vegetables with olive oil.",
       "ingredients": [
         {
-          "sourceFoodId": "174570",
+          "sourceFoodId": "174693",
           "quantity": 200,
           "unit": "g",
-          "displayNote": "grilled sirloin"
+          "displayNote": "grilled sirloin",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         },
         {
-          "sourceFoodId": "170005",
+          "sourceFoodId": "2258586",
           "quantity": 120,
           "unit": "g",
           "displayNote": "carrots"
         },
         {
-          "sourceFoodId": "170014",
+          "sourceFoodId": "2685568",
           "quantity": 150,
           "unit": "g",
           "displayNote": "zucchini"
         },
         {
-          "sourceFoodId": "171413",
+          "sourceFoodId": "748608",
           "quantity": 10,
-          "unit": "ml",
+          "unit": "g",
           "displayNote": "olive oil"
         }
       ]
@@ -384,22 +397,25 @@
       "instructions": "Roast pork and potato. Serve with green beans.",
       "ingredients": [
         {
-          "sourceFoodId": "172068",
+          "sourceFoodId": "168250",
           "quantity": 200,
           "unit": "g",
-          "displayNote": "roasted pork tenderloin"
+          "displayNote": "roasted pork tenderloin",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         },
         {
-          "sourceFoodId": "170009",
+          "sourceFoodId": "170030",
           "quantity": 250,
           "unit": "g",
-          "displayNote": "baked potato"
+          "displayNote": "baked potato",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         },
         {
-          "sourceFoodId": "170013",
+          "sourceFoodId": "169141",
           "quantity": 150,
           "unit": "g",
-          "displayNote": "green beans"
+          "displayNote": "green beans",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         }
       ]
     },
@@ -412,33 +428,36 @@
       "instructions": "Toss shrimp with quinoa and chopped vegetables.",
       "ingredients": [
         {
-          "sourceFoodId": "174036",
+          "sourceFoodId": "171971",
           "quantity": 160,
           "unit": "g",
-          "displayNote": "cooked shrimp"
+          "displayNote": "cooked shrimp",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         },
         {
-          "sourceFoodId": "168877",
+          "sourceFoodId": "168917",
           "quantity": 200,
           "unit": "g",
-          "displayNote": "cooked quinoa"
+          "displayNote": "cooked quinoa",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         },
         {
-          "sourceFoodId": "170004",
+          "sourceFoodId": "2346406",
           "quantity": 80,
           "unit": "g",
           "displayNote": "cucumber"
         },
         {
-          "sourceFoodId": "170003",
+          "sourceFoodId": "170457",
           "quantity": 100,
           "unit": "g",
-          "displayNote": "tomato"
+          "displayNote": "tomato",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         },
         {
-          "sourceFoodId": "171413",
+          "sourceFoodId": "748608",
           "quantity": 8,
-          "unit": "ml",
+          "unit": "g",
           "displayNote": "olive oil"
         }
       ]
@@ -452,22 +471,25 @@
       "instructions": "Bake cod. Serve with rice and asparagus.",
       "ingredients": [
         {
-          "sourceFoodId": "175167b",
+          "sourceFoodId": "171956",
           "quantity": 200,
           "unit": "g",
-          "displayNote": "cooked cod"
+          "displayNote": "cooked cod",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         },
         {
           "sourceFoodId": "168878",
           "quantity": 200,
           "unit": "g",
-          "displayNote": "cooked white rice"
+          "displayNote": "cooked white rice",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         },
         {
-          "sourceFoodId": "170019",
+          "sourceFoodId": "168390",
           "quantity": 150,
           "unit": "g",
-          "displayNote": "asparagus"
+          "displayNote": "asparagus",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         }
       ]
     },
@@ -480,27 +502,28 @@
       "instructions": "Bake tilapia. Steam vegetables.",
       "ingredients": [
         {
-          "sourceFoodId": "175167c",
+          "sourceFoodId": "175177",
           "quantity": 200,
           "unit": "g",
-          "displayNote": "cooked tilapia"
+          "displayNote": "cooked tilapia",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         },
         {
-          "sourceFoodId": "170457",
+          "sourceFoodId": "747447",
           "quantity": 150,
           "unit": "g",
           "displayNote": "broccoli"
         },
         {
-          "sourceFoodId": "170005",
+          "sourceFoodId": "2258586",
           "quantity": 100,
           "unit": "g",
           "displayNote": "carrots"
         },
         {
-          "sourceFoodId": "171413",
+          "sourceFoodId": "748608",
           "quantity": 8,
-          "unit": "ml",
+          "unit": "g",
           "displayNote": "olive oil"
         }
       ]
@@ -517,28 +540,31 @@
           "sourceFoodId": "173735",
           "quantity": 180,
           "unit": "g",
-          "displayNote": "cooked black beans"
+          "displayNote": "cooked black beans",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         },
         {
-          "sourceFoodId": "168875",
+          "sourceFoodId": "169704",
           "quantity": 200,
           "unit": "g",
-          "displayNote": "cooked brown rice"
+          "displayNote": "cooked brown rice",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         },
         {
-          "sourceFoodId": "170011",
+          "sourceFoodId": "169999",
           "quantity": 100,
           "unit": "g",
-          "displayNote": "corn"
+          "displayNote": "corn",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         },
         {
-          "sourceFoodId": "172341",
+          "sourceFoodId": "746777",
           "quantity": 60,
           "unit": "g",
           "displayNote": "salsa"
         },
         {
-          "sourceFoodId": "173944",
+          "sourceFoodId": "2710824",
           "quantity": 60,
           "unit": "g",
           "displayNote": "avocado"
@@ -554,39 +580,42 @@
       "instructions": "Simmer lentils with vegetables until tender.",
       "ingredients": [
         {
-          "sourceFoodId": "173738",
+          "sourceFoodId": "172421",
           "quantity": 300,
           "unit": "g",
-          "displayNote": "cooked lentils"
+          "displayNote": "cooked lentils",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         },
         {
-          "sourceFoodId": "170003",
+          "sourceFoodId": "170457",
           "quantity": 200,
           "unit": "g",
-          "displayNote": "tomato"
+          "displayNote": "tomato",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         },
         {
-          "sourceFoodId": "170005",
+          "sourceFoodId": "2258586",
           "quantity": 120,
           "unit": "g",
           "displayNote": "carrots"
         },
         {
-          "sourceFoodId": "170007",
+          "sourceFoodId": "170000",
           "quantity": 80,
           "unit": "g",
-          "displayNote": "onion"
+          "displayNote": "onion",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         },
         {
-          "sourceFoodId": "170008",
+          "sourceFoodId": "1104647",
           "quantity": 6,
           "unit": "g",
           "displayNote": "garlic"
         },
         {
-          "sourceFoodId": "171413",
+          "sourceFoodId": "748608",
           "quantity": 10,
-          "unit": "ml",
+          "unit": "g",
           "displayNote": "olive oil"
         }
       ]
@@ -600,40 +629,43 @@
       "instructions": "Combine ingredients and dress with olive oil and vinegar.",
       "ingredients": [
         {
-          "sourceFoodId": "173737",
+          "sourceFoodId": "173757",
           "quantity": 200,
           "unit": "g",
-          "displayNote": "cooked chickpeas"
+          "displayNote": "cooked chickpeas",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         },
         {
-          "sourceFoodId": "170004",
+          "sourceFoodId": "2346406",
           "quantity": 100,
           "unit": "g",
           "displayNote": "cucumber"
         },
         {
-          "sourceFoodId": "170003",
+          "sourceFoodId": "170457",
           "quantity": 120,
           "unit": "g",
-          "displayNote": "tomato"
+          "displayNote": "tomato",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         },
         {
-          "sourceFoodId": "173417",
+          "sourceFoodId": "2259796",
           "quantity": 40,
           "unit": "g",
           "displayNote": "feta"
         },
         {
-          "sourceFoodId": "171413",
+          "sourceFoodId": "748608",
           "quantity": 10,
-          "unit": "ml",
+          "unit": "g",
           "displayNote": "olive oil"
         },
         {
-          "sourceFoodId": "172339",
+          "sourceFoodId": "172241",
           "quantity": 10,
           "unit": "g",
-          "displayNote": "balsamic vinegar"
+          "displayNote": "balsamic vinegar",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         }
       ]
     },
@@ -646,27 +678,30 @@
       "instructions": "Slice eggs over spinach and tomato. Drizzle olive oil.",
       "ingredients": [
         {
-          "sourceFoodId": "170379",
+          "sourceFoodId": "173424",
           "quantity": 100,
           "unit": "g",
-          "displayNote": "hard-boiled eggs"
+          "displayNote": "hard-boiled eggs",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         },
         {
-          "sourceFoodId": "170000",
+          "sourceFoodId": "168462",
           "quantity": 80,
           "unit": "g",
-          "displayNote": "spinach"
+          "displayNote": "spinach",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         },
         {
-          "sourceFoodId": "170003",
+          "sourceFoodId": "170457",
           "quantity": 80,
           "unit": "g",
-          "displayNote": "tomato"
+          "displayNote": "tomato",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         },
         {
-          "sourceFoodId": "171413",
+          "sourceFoodId": "748608",
           "quantity": 8,
-          "unit": "ml",
+          "unit": "g",
           "displayNote": "olive oil"
         }
       ]
@@ -680,27 +715,27 @@
       "instructions": "Toss kale with oil. Top with chicken and blueberries.",
       "ingredients": [
         {
-          "sourceFoodId": "171077",
+          "sourceFoodId": "331960",
           "quantity": 160,
           "unit": "g",
           "displayNote": "cooked chicken breast"
         },
         {
-          "sourceFoodId": "170001",
+          "sourceFoodId": "323505",
           "quantity": 100,
           "unit": "g",
           "displayNote": "kale"
         },
         {
-          "sourceFoodId": "171686",
+          "sourceFoodId": "2346411",
           "quantity": 60,
           "unit": "g",
           "displayNote": "blueberries"
         },
         {
-          "sourceFoodId": "171413",
+          "sourceFoodId": "748608",
           "quantity": 10,
-          "unit": "ml",
+          "unit": "g",
           "displayNote": "olive oil"
         }
       ]
@@ -714,27 +749,27 @@
       "instructions": "Flake tuna over romaine with cucumber.",
       "ingredients": [
         {
-          "sourceFoodId": "175168b",
+          "sourceFoodId": "334194",
           "quantity": 85,
           "unit": "g",
           "displayNote": "canned tuna"
         },
         {
-          "sourceFoodId": "170002",
+          "sourceFoodId": "746769",
           "quantity": 100,
           "unit": "g",
           "displayNote": "romaine"
         },
         {
-          "sourceFoodId": "170004",
+          "sourceFoodId": "2346406",
           "quantity": 80,
           "unit": "g",
           "displayNote": "cucumber"
         },
         {
-          "sourceFoodId": "171413",
+          "sourceFoodId": "748608",
           "quantity": 8,
-          "unit": "ml",
+          "unit": "g",
           "displayNote": "olive oil"
         }
       ]
@@ -748,28 +783,31 @@
       "instructions": "Stir-fry tofu and vegetables.",
       "ingredients": [
         {
-          "sourceFoodId": "173740",
+          "sourceFoodId": "172448",
           "quantity": 200,
           "unit": "g",
-          "displayNote": "firm tofu"
+          "displayNote": "firm tofu",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         },
         {
-          "sourceFoodId": "170457",
+          "sourceFoodId": "747447",
           "quantity": 150,
           "unit": "g",
           "displayNote": "broccoli"
         },
         {
-          "sourceFoodId": "170006",
+          "sourceFoodId": "170108",
           "quantity": 80,
           "unit": "g",
-          "displayNote": "bell pepper"
+          "displayNote": "bell pepper",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         },
         {
-          "sourceFoodId": "171416",
+          "sourceFoodId": "171016",
           "quantity": 8,
-          "unit": "ml",
-          "displayNote": "sesame oil"
+          "unit": "g",
+          "displayNote": "sesame oil",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         }
       ]
     },
@@ -782,19 +820,20 @@
       "instructions": "Toss cooked pasta with sauce and sliced chicken.",
       "ingredients": [
         {
-          "sourceFoodId": "168874",
+          "sourceFoodId": "169737",
           "quantity": 300,
           "unit": "g",
-          "displayNote": "cooked pasta"
+          "displayNote": "cooked pasta",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         },
         {
-          "sourceFoodId": "172340",
+          "sourceFoodId": "332282",
           "quantity": 180,
           "unit": "g",
           "displayNote": "marinara sauce"
         },
         {
-          "sourceFoodId": "171077",
+          "sourceFoodId": "331960",
           "quantity": 180,
           "unit": "g",
           "displayNote": "cooked chicken breast"
@@ -810,22 +849,24 @@
       "instructions": "Mash avocado on toast. Top with sliced egg.",
       "ingredients": [
         {
-          "sourceFoodId": "168873",
+          "sourceFoodId": "172688",
           "quantity": 56,
           "unit": "g",
-          "displayNote": "whole-wheat bread (~2 slices)"
+          "displayNote": "whole-wheat bread (~2 slices)",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         },
         {
-          "sourceFoodId": "173944",
+          "sourceFoodId": "2710824",
           "quantity": 50,
           "unit": "g",
           "displayNote": "avocado"
         },
         {
-          "sourceFoodId": "170379",
+          "sourceFoodId": "173424",
           "quantity": 50,
           "unit": "g",
-          "displayNote": "hard-boiled egg"
+          "displayNote": "hard-boiled egg",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         }
       ]
     },
@@ -838,22 +879,25 @@
       "instructions": "Warm beans and serve over rice with onion.",
       "ingredients": [
         {
-          "sourceFoodId": "173736",
+          "sourceFoodId": "175194",
           "quantity": 200,
           "unit": "g",
-          "displayNote": "cooked kidney beans"
+          "displayNote": "cooked kidney beans",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         },
         {
-          "sourceFoodId": "168875",
+          "sourceFoodId": "169704",
           "quantity": 250,
           "unit": "g",
-          "displayNote": "cooked brown rice"
+          "displayNote": "cooked brown rice",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         },
         {
-          "sourceFoodId": "170007",
+          "sourceFoodId": "170000",
           "quantity": 40,
           "unit": "g",
-          "displayNote": "onion"
+          "displayNote": "onion",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         }
       ]
     },
@@ -866,22 +910,24 @@
       "instructions": "Cook eggs. Serve with ham and tomato.",
       "ingredients": [
         {
-          "sourceFoodId": "172183",
+          "sourceFoodId": "748967",
           "quantity": 100,
           "unit": "g",
           "displayNote": "eggs"
         },
         {
-          "sourceFoodId": "175167",
+          "sourceFoodId": "173864",
           "quantity": 40,
           "unit": "g",
-          "displayNote": "ham"
+          "displayNote": "ham",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         },
         {
-          "sourceFoodId": "170003",
+          "sourceFoodId": "170457",
           "quantity": 80,
           "unit": "g",
-          "displayNote": "tomato"
+          "displayNote": "tomato",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         }
       ]
     },
@@ -894,19 +940,21 @@
       "instructions": "Brown beef, combine with pasta and sauce.",
       "ingredients": [
         {
-          "sourceFoodId": "174032",
+          "sourceFoodId": "171793",
           "quantity": 200,
           "unit": "g",
-          "displayNote": "cooked lean ground beef"
+          "displayNote": "cooked lean ground beef",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         },
         {
-          "sourceFoodId": "168874",
+          "sourceFoodId": "169737",
           "quantity": 300,
           "unit": "g",
-          "displayNote": "cooked pasta"
+          "displayNote": "cooked pasta",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         },
         {
-          "sourceFoodId": "172340",
+          "sourceFoodId": "332282",
           "quantity": 180,
           "unit": "g",
           "displayNote": "marinara"
@@ -922,27 +970,28 @@
       "instructions": "Cook eggs with mushrooms and spinach.",
       "ingredients": [
         {
-          "sourceFoodId": "172183",
+          "sourceFoodId": "748967",
           "quantity": 100,
           "unit": "g",
           "displayNote": "eggs"
         },
         {
-          "sourceFoodId": "170018",
+          "sourceFoodId": "1999629",
           "quantity": 60,
           "unit": "g",
           "displayNote": "mushrooms"
         },
         {
-          "sourceFoodId": "170000",
+          "sourceFoodId": "168462",
           "quantity": 40,
           "unit": "g",
-          "displayNote": "spinach"
+          "displayNote": "spinach",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         },
         {
-          "sourceFoodId": "171413",
+          "sourceFoodId": "748608",
           "quantity": 5,
-          "unit": "ml",
+          "unit": "g",
           "displayNote": "olive oil"
         }
       ]
@@ -956,19 +1005,20 @@
       "instructions": "Warm peas and carrots. Season lightly.",
       "ingredients": [
         {
-          "sourceFoodId": "170012",
+          "sourceFoodId": "170420",
           "quantity": 150,
           "unit": "g",
-          "displayNote": "cooked peas"
+          "displayNote": "cooked peas",
+          "foodSourceKey": "usda-fdc-sr-legacy"
         },
         {
-          "sourceFoodId": "170005",
+          "sourceFoodId": "2258586",
           "quantity": 120,
           "unit": "g",
           "displayNote": "carrots"
         },
         {
-          "sourceFoodId": "170870",
+          "sourceFoodId": "790508",
           "quantity": 5,
           "unit": "g",
           "displayNote": "butter"

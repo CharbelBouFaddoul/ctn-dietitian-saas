@@ -1,6 +1,19 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
-import { IsEnum, IsInt, IsNumber, IsOptional, IsString, IsUUID, Max, MaxLength, Min, MinLength } from "class-validator";
+import {
+  ArrayMinSize,
+  IsArray,
+  IsEnum,
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  MaxLength,
+  Min,
+  MinLength,
+} from "class-validator";
 
 export class ListMealPlansQueryDto {
   @ApiPropertyOptional()
@@ -147,6 +160,14 @@ export class UpdateMealDto {
   @IsInt()
   @Min(0)
   sortOrder?: number;
+}
+
+export class ReorderMealItemsDto {
+  @ApiProperty({ type: [String] })
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsUUID("4", { each: true })
+  itemIds!: string[];
 }
 
 const UNITS = ["g", "kg", "oz", "lb", "ml", "l", "fl_oz", "serving"] as const;

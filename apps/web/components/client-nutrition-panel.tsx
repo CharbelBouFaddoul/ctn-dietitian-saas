@@ -138,7 +138,6 @@ export function ClientNutritionPanel({
           <header className="ui-mp__top">
             <div className="ui-mp__identity">
               <h2 className="ui-mp__title">Meal plan</h2>
-              <p className="ui-mp__meta">Create a plan to start building days and meals.</p>
             </div>
             {allowManage ? (
               <div className="ui-mp__toolbar">
@@ -157,9 +156,7 @@ export function ClientNutritionPanel({
                 </Button>
               ) : undefined
             }
-          >
-            Build days from foods and recipes, then publish for the patient.
-          </EmptyState>
+          />
         </div>
       )}
 

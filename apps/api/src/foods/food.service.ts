@@ -4,8 +4,6 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import type { Prisma } from "@prisma/client";
 import { Prisma as PrismaNamespace } from "@prisma/client";
 import {
@@ -28,13 +26,26 @@ import {
   nutritionPayloadExtras,
   sourcePayload,
 } from "./food.mapper";
+import { replaceCatalogFoods } from "./import/catalog-replace";
+import {
+  datasetFromFoundationDump,
+  FOUNDATION_SOURCE_KEY,
+  resolveFoundationDumpPath,
+} from "./import/foundation-dataset";
 import { importFoodDataset } from "./import/importer";
-import type { FoodDatasetFile } from "./import/dataset.types";
 
 export const PRACTICE_CUSTOM_SOURCE_KEY = "practice-custom";
-export const CURATED_FOOD_DATASET_RELATIVE = "food-data/usda-foundation-curated.json";
 
 type FoodOrigin = "catalog" | "custom" | "all";
+type FoodSort = "name" | "energy" | "fat" | "carbohydrate" | "protein";
+type FoodSortDir = "asc" | "desc";
+
+const FOOD_SORT_FIELD: Record<Exclude<FoodSort, "name">, "energyKcal" | "fatG" | "carbohydrateG" | "proteinG"> = {
+  energy: "energyKcal",
+  fat: "fatG",
+  carbohydrate: "carbohydrateG",
+  protein: "proteinG",
+};
 
 @Injectable()
 export class FoodService {
@@ -49,12 +60,20 @@ export class FoodService {
       origin?: FoodOrigin;
       page?: number;
       pageSize?: number;
+      sort?: FoodSort;
+      sortDir?: FoodSortDir;
       /** Portal logging: catalog only (no practice customs). */
       catalogOnly?: boolean;
     },
   ) {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 20;
+    const sort: FoodSort = query.sort ?? "name";
+    const sortDir: FoodSortDir = query.sortDir ?? (sort === "name" ? "asc" : "desc");
+    const orderBy: Prisma.FoodOrderByWithRelationInput[] =
+      sort === "name"
+        ? [{ nameNormalized: sortDir }, { name: sortDir }]
+        : [{ [FOOD_SORT_FIELD[sort]]: sortDir }, { nameNormalized: "asc" }];
     const origin: FoodOrigin = query.catalogOnly ? "catalog" : (query.origin ?? "all");
     const ownership: Prisma.FoodWhereInput =
       origin === "catalog"
@@ -94,27 +113,29 @@ export class FoodService {
       this.prisma.food.findMany({
         where,
         include: { source: true },
-        orderBy: [{ nameNormalized: "asc" }, { name: "asc" }],
+        orderBy,
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),
     ]);
 
-    // Prefer prefix matches when searching.
-    const sorted = q
-      ? [...rows].sort((a, b) => {
-          const aPrefix =
-            a.nameNormalized.startsWith(normalized) || a.name.toLowerCase().startsWith(q.toLowerCase())
-              ? 0
-              : 1;
-          const bPrefix =
-            b.nameNormalized.startsWith(normalized) || b.name.toLowerCase().startsWith(q.toLowerCase())
-              ? 0
-              : 1;
-          if (aPrefix !== bPrefix) return aPrefix - bPrefix;
-          return a.nameNormalized.localeCompare(b.nameNormalized);
-        })
-      : rows;
+    // Prefer prefix matches when searching by name.
+    const sorted =
+      q && sort === "name"
+        ? [...rows].sort((a, b) => {
+            const aPrefix =
+              a.nameNormalized.startsWith(normalized) || a.name.toLowerCase().startsWith(q.toLowerCase())
+                ? 0
+                : 1;
+            const bPrefix =
+              b.nameNormalized.startsWith(normalized) || b.name.toLowerCase().startsWith(q.toLowerCase())
+                ? 0
+                : 1;
+            if (aPrefix !== bPrefix) return aPrefix - bPrefix;
+            const byName = a.nameNormalized.localeCompare(b.nameNormalized);
+            return sortDir === "desc" ? -byName : byName;
+          })
+        : rows;
 
     return {
       page,
@@ -475,22 +496,14 @@ export class FoodService {
   }
 
   async adminImportCuratedDataset() {
-    const candidates = [
-      resolve(process.cwd(), CURATED_FOOD_DATASET_RELATIVE),
-      resolve(process.cwd(), "apps/api", CURATED_FOOD_DATASET_RELATIVE),
-      resolve(__dirname, "../../", CURATED_FOOD_DATASET_RELATIVE),
-    ];
-    let filePath = candidates[0]!;
-    for (const candidate of candidates) {
-      if (existsSync(candidate)) {
-        filePath = candidate;
-        break;
-      }
+    const dumpPath = resolveFoundationDumpPath();
+    if (!dumpPath) {
+      throw new BadRequestException(
+        "USDA Foundation April 2026 dump not found. Run pnpm food:import:foundation.",
+      );
     }
-    const dataset = JSON.parse(readFileSync(filePath, "utf8")) as FoodDatasetFile;
-    if (!dataset.source?.key || !Array.isArray(dataset.foods)) {
-      throw new BadRequestException("Curated dataset is invalid");
-    }
+    const dataset = datasetFromFoundationDump(dumpPath);
+    await replaceCatalogFoods(this.prisma, FOUNDATION_SOURCE_KEY);
     return importFoodDataset(this.prisma, dataset);
   }
 

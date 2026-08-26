@@ -1,0 +1,5 @@
+Food Code,Food Name,Description,Group,Previous,Main data references,Footnote,Retinol (µg),Carotene (µg),Retinol Equivalent (µg),Vitamin D (µg),Vitamin E (mg),Vitamin K1 (µg),Thiamin (mg),Riboflavin (mg),Niacin (mg),Tryptophan/60 (mg),Niacin equivalent (mg),Vitamin B6 (mg),Vitamin B12 (µg),Folate (µg),Pantothenate (mg),Biotin (µg),Vitamin C (mg),,,,,,,,,,,,,,,,,,,,,,,
+,,,,,,,RET,CAREQU,RETEQU,VITD,VITE,VITK1,THIA,RIBO,NIAC,TRYP60,NIACEQU,VITB6,VITB12,FOLT,PANTO,BIOT,VITC,,,,,,,,,,,,,,,,,,,,,,,
+,,,,,,,Retinol,Carotene,Total retinol equivalent,Total Vitamin D,Total Vitamin E,Phylloquinone,Thiamin,Riboflavin,Niacin,Tryptophan divided by 60,Niacin equivalent,Vitamin B6,Vitamin B12,Folate,Pantothenate,Biotin,Vitamin C,,,,,,,,,,,,,,,,,,,,,,,
+13-145,"Ackee, canned, drained",8 cans,DG,554,"MW4, 1978; and Vegetables, Herbs and Spices Supplement, 1991",,0,N,N,0.0,N,,0.03,0.07,0.6,0.5,1.1,0.06,0.0,41,N,N,30,,,,,,,,,,,,,,,,,,,,,,,
+14-896,"Almonds, whole kernels","Literature sources, Prunus dulcis",GA,,"USDA SR28, 2015",,0,1,Tr,0,25.63,0,0.21,1.14,3.6,3.4,7,0.14,0,44,0.47,64,0,,,,,,,,,,,,,,,,,,,,,,,

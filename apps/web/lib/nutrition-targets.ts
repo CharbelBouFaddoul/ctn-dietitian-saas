@@ -13,6 +13,10 @@ export const DAILY_MACRO_TARGETS = {
  * Adult woman 19–50 (or closest published band) — one number per nutrient so the
  * 100% marker can switch by authority. Sex/age-specific clinical targets are not applied.
  * Missing keys mean that authority did not publish a single RDA/RNI/PRI/AI for that nutrient.
+ *
+ * These profiles are independent of the food catalog (USDA, CNF, CoFID, custom). Catalogs
+ * supply nutrient amounts in foods; this picker only chooses which reference scale Analysis
+ * uses for “% of target”.
  */
 export type RdaProfileId = "iom" | "sacn" | "anses" | "sinu" | "nhmrc";
 
@@ -103,11 +107,11 @@ const ANSES_MICROS: Partial<Record<MicronutrientKey, number>> = {
   cholineMg: 400,
 };
 
-/** SINU LARN 2014 PRI or AI, women 18–64 (pre-menopause). Thiamin is 0.4 mg/1000 kcal at 2000 kcal. */
+/** SINU LARN V 2024 PRI or AI, women 18–64 (pre-menopause). Thiamin is 0.4 mg/1000 kcal at 2000 kcal. */
 const SINU_MICROS: Partial<Record<MicronutrientKey, number>> = {
   calciumMg: 950,
   ironMg: 18,
-  magnesiumMg: 240,
+  magnesiumMg: 350,
   phosphorusMg: 550,
   potassiumMg: 4500,
   zincMg: 9,
@@ -183,7 +187,7 @@ export const RDA_PROFILES: Record<RdaProfileId, RdaProfile> = {
   },
   sinu: {
     id: "sinu",
-    label: "SINU 2014 (LARN)",
+    label: "SINU 2024 (LARN)",
     basis: "Italian PRI/AI, woman 18–64 pre-menopause · potassium SDT",
     micros: SINU_MICROS,
     sodiumMg: 1500,

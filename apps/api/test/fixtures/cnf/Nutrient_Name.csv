@@ -1,0 +1,9 @@
+Nutrient_Code,Nutrient_Symbol,Nutrient_Unit,Nutrient_Name_EN,Nutrient_Name_FR,Tagname,Nutrient_Decimals
+203,PROT,Gram,Protein,Proteines,PROCNT,2
+204,FAT,Gram,Fat (total lipids),Lipides,FAT,2
+205,CARB,Gram,"Carbohydrate, total (by difference)",Glucides,CHOCDF,2
+208,KCAL,kilocalorie,Energy (kilocalories),Energie,ENERC_KCAL,0
+291,TDF,Gram,"Fibre, total dietary",Fibres,FIBTG,1
+307,NA,Milligram,Sodium,Sodium,NA,0
+320,RAE,Microgram,Retinol activity equivalents,RAE,VITA_RAE,0
+328,D3+D2-ug,Microgram,Vitamin D (D2 + D3),Vitamine D,VITD,1

@@ -52,6 +52,17 @@ export type ClinicalData = {
     waterIntake: string;
     other: string;
   };
+  identity: {
+    occupation: string;
+    workplace: string;
+    processNumber: string;
+    healthNumber: string;
+    nationalNumber: string;
+    vatNumber: string;
+    country: string;
+    zipCode: string;
+    address: string;
+  };
 };
 
 function text(value: unknown, max = TEXT_MAX): string {
@@ -108,6 +119,17 @@ export function emptyClinicalData(): ClinicalData {
       intolerancesNotes: "",
     },
     nutrition: { deficiencies: "", deficienciesNotes: "", waterIntake: "", other: "" },
+    identity: {
+      occupation: "",
+      workplace: "",
+      processNumber: "",
+      healthNumber: "",
+      nationalNumber: "",
+      vatNumber: "",
+      country: "",
+      zipCode: "",
+      address: "",
+    },
   };
 }
 
@@ -122,6 +144,7 @@ export function sanitizeClinicalData(input: unknown): ClinicalData {
   const health = asRecord(root.health);
   const eating = asRecord(root.eating);
   const nutrition = asRecord(root.nutrition);
+  const identity = asRecord(root.identity);
   return {
     visit: {
       reason: text(visit.reason),
@@ -171,6 +194,17 @@ export function sanitizeClinicalData(input: unknown): ClinicalData {
       deficienciesNotes: text(nutrition.deficienciesNotes),
       waterIntake: code(nutrition.waterIntake),
       other: text(nutrition.other),
+    },
+    identity: {
+      occupation: text(identity.occupation, 120),
+      workplace: text(identity.workplace, 120),
+      processNumber: text(identity.processNumber, 80),
+      healthNumber: text(identity.healthNumber, 80),
+      nationalNumber: text(identity.nationalNumber, 80),
+      vatNumber: text(identity.vatNumber, 80),
+      country: text(identity.country, 80),
+      zipCode: text(identity.zipCode, 40),
+      address: text(identity.address, 400),
     },
   };
 }

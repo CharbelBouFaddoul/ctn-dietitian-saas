@@ -2,6 +2,10 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { PrismaClient } from "@prisma/client";
 import { importFoodDataset } from "../foods/import/importer";
+import {
+  datasetFromFoundationDump,
+  resolveFoundationDumpPath,
+} from "../foods/import/foundation-dataset";
 import type { FoodDatasetFile } from "../foods/import/dataset.types";
 import { importRecipeDataset } from "../recipes/import/importer";
 import type { RecipeDatasetFile } from "../recipes/import/dataset.types";
@@ -13,15 +17,28 @@ function apiRoot(): string {
   return process.cwd();
 }
 
+function loadSampleCatalog(): FoodDatasetFile {
+  const filePath = resolve(apiRoot(), "food-data/usda-foundation-sample.json");
+  return JSON.parse(readFileSync(filePath, "utf8")) as FoodDatasetFile;
+}
+
 export async function importDemoFoodCatalog(
   prisma: PrismaClient,
   mode: CatalogImportMode,
 ): Promise<{ foods: number; sourceKey: string } | null> {
   if (mode === "none") return null;
-  const relative =
-    mode === "full" ? "food-data/usda-foundation-curated.json" : "food-data/usda-foundation-sample.json";
-  const filePath = resolve(apiRoot(), relative);
-  const dataset = JSON.parse(readFileSync(filePath, "utf8")) as FoodDatasetFile;
+  let dataset: FoodDatasetFile;
+  if (mode === "full") {
+    const dumpPath = resolveFoundationDumpPath();
+    if (!dumpPath) {
+      throw new Error(
+        "USDA Foundation April 2026 dump not found. Run pnpm food:import:foundation first.",
+      );
+    }
+    dataset = datasetFromFoundationDump(dumpPath);
+  } else {
+    dataset = loadSampleCatalog();
+  }
   const report = await importFoodDataset(prisma, dataset);
   return { foods: report.imported + report.updated, sourceKey: dataset.source.key };
 }

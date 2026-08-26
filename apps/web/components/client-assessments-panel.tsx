@@ -251,7 +251,7 @@ export function ClientAssessmentsPanel({
 
   return (
     <div className="ui-eval ui-eval--client">
-      <div className="ui-clinical-savebar">
+      <div className="ui-eval__client-toolbar">
         <div>
           <h2 className="ui-eval__client-title">Custom forms</h2>
           <p className="ui-muted">Questionnaires you created — separate from the default clinical profile.</p>

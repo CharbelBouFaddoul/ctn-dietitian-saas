@@ -1,0 +1,35 @@
+{
+  "FoundationFoods": [
+    {
+      "fdcId": 330137,
+      "description": "Yogurt, Greek, plain, nonfat",
+      "foodCategory": { "description": "Dairy and Egg Products" },
+      "foodNutrients": [
+        { "amount": 59, "nutrient": { "number": "208" } },
+        { "amount": 10.19, "nutrient": { "number": "203" } },
+        { "amount": 0.39, "nutrient": { "number": "204" } },
+        { "amount": 3.6, "nutrient": { "number": "205" } },
+        { "amount": 0, "nutrient": { "number": "291" } },
+        { "amount": 3.24, "nutrient": { "number": "269" } },
+        { "amount": 36, "nutrient": { "number": "307" } },
+        { "amount": 1.2, "nutrient": { "number": "328" } },
+        { "amount": 4, "nutrient": { "number": "320" } }
+      ]
+    },
+    {
+      "fdcId": 747447,
+      "description": "Broccoli, raw",
+      "foodCategory": { "description": "Vegetables and Vegetable Products" },
+      "foodNutrients": [
+        { "amount": 34, "nutrient": { "number": "208" } },
+        { "amount": 2.82, "nutrient": { "number": "203" } },
+        { "amount": 0.37, "nutrient": { "number": "204" } },
+        { "amount": 6.64, "nutrient": { "number": "205" } },
+        { "amount": 2.6, "nutrient": { "number": "291" } },
+        { "amount": 1.7, "nutrient": { "number": "269" } },
+        { "amount": 33, "nutrient": { "number": "307" } },
+        { "amount": 89.2, "nutrient": { "number": "401" } }
+      ]
+    }
+  ]
+}

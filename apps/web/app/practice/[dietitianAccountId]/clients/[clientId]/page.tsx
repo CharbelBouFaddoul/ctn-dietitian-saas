@@ -160,6 +160,7 @@ type Portfolio = {
     dateOfBirth: string | null;
     sex: string | null;
     status: string;
+    createdAt?: string | null;
     connectionStatus?: string | null;
     portalStatus?: string | null;
     tags: Array<{ id: string; name: string; color?: string | null }>;
@@ -958,6 +959,9 @@ function ClientWorkspacePage() {
             onSelectedTagIdsChange={setSelectedTagIds}
             onError={setError}
             onPortfolioRefresh={loadPortfolio}
+            onDeleteClient={
+              allowManage && portfolio.client.status !== "ARCHIVED" ? () => setConfirmArchive(true) : undefined
+            }
           />
         </div>
       ) : null}

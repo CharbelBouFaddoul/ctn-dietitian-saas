@@ -45,7 +45,7 @@ import {
   assertClinicalDocumentFile,
   downloadAuthenticatedFile,
 } from "../lib/documents";
-import { formatDateOnly, localDateInputValue } from "../lib/format";
+import { formatDate, formatDateOnly, localDateInputValue } from "../lib/format";
 import { errorMessage } from "../lib/humanize-error";
 
 type ChartNote = {
@@ -82,6 +82,7 @@ type Props = {
   orgBase: string;
   allowManage: boolean;
   client: {
+    id: string;
     firstName: string;
     lastName: string;
     displayName: string | null;
@@ -89,6 +90,8 @@ type Props = {
     phone: string | null;
     dateOfBirth: string | null;
     sex: string | null;
+    status?: string | null;
+    createdAt?: string | null;
     tags: Array<{ id: string; name: string; color?: string | null }>;
   };
   orgTags: Array<{ id: string; name: string }>;
@@ -97,6 +100,7 @@ type Props = {
   onSelectedTagIdsChange: (ids: string[]) => void;
   onError: (message: string) => void;
   onPortfolioRefresh: () => Promise<unknown>;
+  onDeleteClient?: () => void;
 };
 
 function identityFromClient(client: Props["client"]): ClientIdentity {
@@ -110,6 +114,23 @@ function identityFromClient(client: Props["client"]): ClientIdentity {
     sex: client.sex ?? "UNSPECIFIED",
   };
 }
+
+function ageFromDob(value: string): number | null {
+  if (!value) return null;
+  const dob = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(dob.getTime())) return null;
+  const now = new Date();
+  let age = now.getFullYear() - dob.getFullYear();
+  const month = now.getMonth() - dob.getMonth();
+  if (month < 0 || (month === 0 && now.getDate() < dob.getDate())) age -= 1;
+  return age >= 0 && age < 130 ? age : null;
+}
+
+function patientIdLabel(id: string): string {
+  return id.replace(/-/g, "").slice(0, 9).toUpperCase();
+}
+
+const IDENTITY_PLACEHOLDER = "Write here...";
 
 function useOverflowHint() {
   const ref = useRef<HTMLDivElement>(null);
@@ -332,6 +353,7 @@ export function ClientClinicalProfilePanel({
   onSelectedTagIdsChange,
   onError,
   onPortfolioRefresh,
+  onDeleteClient,
 }: Props) {
   const [identity, setIdentity] = useState<ClientIdentity>(() => identityFromClient(client));
   const [clinical, setClinical] = useState<ClinicalData>(emptyClinicalData);
@@ -374,7 +396,14 @@ export function ClientClinicalProfilePanel({
       emergencyContactName?: string | null;
       emergencyContactPhone?: string | null;
     }>(`${base}/profile`);
-    setClinical(profile.clinicalData ?? emptyClinicalData());
+    setClinical({
+      ...emptyClinicalData(),
+      ...(profile.clinicalData ?? {}),
+      identity: {
+        ...emptyClinicalData().identity,
+        ...(profile.clinicalData?.identity ?? {}),
+      },
+    });
     setEmergencyName(profile.emergencyContactName ?? "");
     setEmergencyPhone(profile.emergencyContactPhone ?? "");
   }
@@ -440,6 +469,7 @@ export function ClientClinicalProfilePanel({
       await api(`${base}/profile`, {
         method: "PATCH",
         body: JSON.stringify({
+          clinicalData: clinical,
           emergencyContactName: emergencyName || null,
           emergencyContactPhone: emergencyPhone || null,
         }),
@@ -554,6 +584,7 @@ export function ClientClinicalProfilePanel({
   const mealNotes = notes.filter((row) => row.kind === "MEAL");
   const habitNotes = notes.filter((row) => row.kind === "EATING_HABIT");
   const pregnancyNotes = notes.filter((row) => row.kind === "PREGNANCY");
+  const identityAge = ageFromDob(identity.dateOfBirth);
   const mainHint = useOverflowHint();
   const railHint = useOverflowHint();
 
@@ -563,93 +594,221 @@ export function ClientClinicalProfilePanel({
         className={`ui-clinical__pane${mainHint.above ? " is-more-above" : ""}${mainHint.below ? " is-more-below" : ""}`}
       >
       <div className="ui-clinical__main" ref={mainHint.ref}>
-        <form className="ui-clinical-card" onSubmit={(event) => void saveIdentity(event)}>
-          <h2 className="ui-clinical-card__title">Identity</h2>
-          <div className="ui-client-chart__form-grid">
-            <Field label="First name">
-              <Input
-                value={identity.firstName}
-                required
-                disabled={!allowManage}
-                onChange={(event) => setIdentity({ ...identity, firstName: event.target.value })}
-              />
-            </Field>
-            <Field label="Last name">
-              <Input
-                value={identity.lastName}
-                required
-                disabled={!allowManage}
-                onChange={(event) => setIdentity({ ...identity, lastName: event.target.value })}
-              />
-            </Field>
-            <Field label="Preferred name">
-              <Input
-                value={identity.displayName}
-                disabled={!allowManage}
-                onChange={(event) => setIdentity({ ...identity, displayName: event.target.value })}
-              />
-            </Field>
-            <Field label="Email">
-              <Input
-                type="email"
-                value={identity.email}
-                disabled={!allowManage}
-                onChange={(event) => setIdentity({ ...identity, email: event.target.value })}
-              />
-            </Field>
-            <Field label="Phone">
-              <Input
-                type="tel"
-                value={identity.phone}
-                disabled={!allowManage}
-                placeholder="+961 71 123 456"
-                onChange={(event) => setIdentity({ ...identity, phone: event.target.value })}
-              />
-            </Field>
-            <Field label="Date of birth">
-              <Input
-                type="date"
-                value={identity.dateOfBirth}
-                disabled={!allowManage}
-                onChange={(event) => setIdentity({ ...identity, dateOfBirth: event.target.value })}
-              />
-            </Field>
-            <Field label="Sex">
-              <Select
-                value={identity.sex}
-                disabled={!allowManage}
-                onChange={(event) => setIdentity({ ...identity, sex: event.target.value })}
-              >
-                <option value="FEMALE">Female</option>
-                <option value="MALE">Male</option>
-                <option value="OTHER">Other</option>
-                <option value="UNSPECIFIED">Unspecified</option>
-              </Select>
-            </Field>
-            <Field label="Emergency contact">
-              <Input
-                value={emergencyName}
-                disabled={!allowManage}
-                onChange={(event) => setEmergencyName(event.target.value)}
-              />
-            </Field>
-            <Field label="Emergency phone">
-              <Input
-                type="tel"
-                value={emergencyPhone}
-                disabled={!allowManage}
-                onChange={(event) => setEmergencyPhone(event.target.value)}
-              />
-            </Field>
-          </div>
-          <Button type="submit" size="sm" variant="secondary" disabled={!allowManage || savingIdentity}>
-            {savingIdentity ? "Saving…" : "Save identity"}
-          </Button>
+        <form className="ui-clinical-identity-form" onSubmit={(event) => void saveIdentity(event)}>
+          <ClinicalBlock title="Identity" initiallyOpen={false}>
+            <div className="ui-clinical-identity">
+              <div className="ui-clinical-identity__col">
+                <div className="ui-clinical-identity__pair">
+                  <Field label="First name">
+                    <Input
+                      value={identity.firstName}
+                      required
+                      disabled={!allowManage}
+                      placeholder={IDENTITY_PLACEHOLDER}
+                      onChange={(event) => setIdentity({ ...identity, firstName: event.target.value })}
+                    />
+                  </Field>
+                  <Field label="Last name">
+                    <Input
+                      value={identity.lastName}
+                      required
+                      disabled={!allowManage}
+                      placeholder={IDENTITY_PLACEHOLDER}
+                      onChange={(event) => setIdentity({ ...identity, lastName: event.target.value })}
+                    />
+                  </Field>
+                </div>
+                <Field label="Preferred name">
+                  <Input
+                    value={identity.displayName}
+                    disabled={!allowManage}
+                    placeholder={IDENTITY_PLACEHOLDER}
+                    onChange={(event) => setIdentity({ ...identity, displayName: event.target.value })}
+                  />
+                </Field>
+                <Field label="Tags">
+                  <button
+                    type="button"
+                    className="ui-clinical-identity__tags"
+                    disabled={!allowManage}
+                    onClick={() => setTagsOpen(true)}
+                  >
+                    {client.tags.length > 0 ? client.tags.map((tag) => tag.name).join(", ") : IDENTITY_PLACEHOLDER}
+                  </button>
+                </Field>
+                <div className="ui-clinical-identity__pair">
+                  <Field label="Gender">
+                    <Select
+                      value={identity.sex}
+                      disabled={!allowManage}
+                      onChange={(event) => setIdentity({ ...identity, sex: event.target.value })}
+                    >
+                      <option value="FEMALE">Female</option>
+                      <option value="MALE">Male</option>
+                      <option value="OTHER">Other</option>
+                      <option value="UNSPECIFIED">Unspecified</option>
+                    </Select>
+                  </Field>
+                  <Field label={identityAge != null ? `Birthdate (${identityAge} years)` : "Birthdate"}>
+                    <Input
+                      type="date"
+                      value={identity.dateOfBirth}
+                      disabled={!allowManage}
+                      onChange={(event) => setIdentity({ ...identity, dateOfBirth: event.target.value })}
+                    />
+                  </Field>
+                </div>
+                <div className="ui-clinical-identity__pair">
+                  <Field label="Occupation">
+                    <Input
+                      value={clinical.identity.occupation}
+                      disabled={!allowManage}
+                      placeholder={IDENTITY_PLACEHOLDER}
+                      onChange={(event) => patchClinical("identity", "occupation", event.target.value)}
+                    />
+                  </Field>
+                  <Field label="Workplace">
+                    <Input
+                      value={clinical.identity.workplace}
+                      disabled={!allowManage}
+                      placeholder={IDENTITY_PLACEHOLDER}
+                      list="identity-workplace"
+                      onChange={(event) => patchClinical("identity", "workplace", event.target.value)}
+                    />
+                    <datalist id="identity-workplace">
+                      <option value="Online" />
+                      <option value="In person" />
+                      <option value="Hybrid" />
+                      <option value="Remote" />
+                    </datalist>
+                  </Field>
+                </div>
+                <div className="ui-clinical-identity__pair">
+                  <Field label="Process number">
+                    <Input
+                      value={clinical.identity.processNumber}
+                      disabled={!allowManage}
+                      placeholder={IDENTITY_PLACEHOLDER}
+                      onChange={(event) => patchClinical("identity", "processNumber", event.target.value)}
+                    />
+                  </Field>
+                  <Field label="Health number">
+                    <Input
+                      value={clinical.identity.healthNumber}
+                      disabled={!allowManage}
+                      placeholder={IDENTITY_PLACEHOLDER}
+                      onChange={(event) => patchClinical("identity", "healthNumber", event.target.value)}
+                    />
+                  </Field>
+                </div>
+                <div className="ui-clinical-identity__pair">
+                  <Field label="National number">
+                    <Input
+                      value={clinical.identity.nationalNumber}
+                      disabled={!allowManage}
+                      placeholder={IDENTITY_PLACEHOLDER}
+                      onChange={(event) => patchClinical("identity", "nationalNumber", event.target.value)}
+                    />
+                  </Field>
+                  <Field label="VAT number">
+                    <Input
+                      value={clinical.identity.vatNumber}
+                      disabled={!allowManage}
+                      placeholder={IDENTITY_PLACEHOLDER}
+                      onChange={(event) => patchClinical("identity", "vatNumber", event.target.value)}
+                    />
+                  </Field>
+                </div>
+              </div>
+              <div className="ui-clinical-identity__col">
+                <Field label="Email">
+                  <Input
+                    type="email"
+                    value={identity.email}
+                    disabled={!allowManage}
+                    placeholder={IDENTITY_PLACEHOLDER}
+                    onChange={(event) => setIdentity({ ...identity, email: event.target.value })}
+                  />
+                </Field>
+                <Field label="Mobile phone">
+                  <Input
+                    type="tel"
+                    value={identity.phone}
+                    disabled={!allowManage}
+                    placeholder={IDENTITY_PLACEHOLDER}
+                    onChange={(event) => setIdentity({ ...identity, phone: event.target.value })}
+                  />
+                </Field>
+                <div className="ui-clinical-identity__pair">
+                  <Field label="Country">
+                    <Input
+                      value={clinical.identity.country}
+                      disabled={!allowManage}
+                      placeholder={IDENTITY_PLACEHOLDER}
+                      onChange={(event) => patchClinical("identity", "country", event.target.value)}
+                    />
+                  </Field>
+                  <Field label="Zip code">
+                    <Input
+                      value={clinical.identity.zipCode}
+                      disabled={!allowManage}
+                      placeholder={IDENTITY_PLACEHOLDER}
+                      onChange={(event) => patchClinical("identity", "zipCode", event.target.value)}
+                    />
+                  </Field>
+                </div>
+                <Field label="Address">
+                  <Input
+                    value={clinical.identity.address}
+                    disabled={!allowManage}
+                    placeholder={IDENTITY_PLACEHOLDER}
+                    onChange={(event) => patchClinical("identity", "address", event.target.value)}
+                  />
+                </Field>
+                <div className="ui-clinical-identity__pair">
+                  <Field label="Emergency contact">
+                    <Input
+                      value={emergencyName}
+                      disabled={!allowManage}
+                      placeholder={IDENTITY_PLACEHOLDER}
+                      onChange={(event) => setEmergencyName(event.target.value)}
+                    />
+                  </Field>
+                  <Field label="Emergency phone">
+                    <Input
+                      type="tel"
+                      value={emergencyPhone}
+                      disabled={!allowManage}
+                      placeholder={IDENTITY_PLACEHOLDER}
+                      onChange={(event) => setEmergencyPhone(event.target.value)}
+                    />
+                  </Field>
+                </div>
+              </div>
+              <div className="ui-clinical-identity__foot">
+                {onDeleteClient && client.status !== "ARCHIVED" ? (
+                  <button type="button" className="ui-clinical-identity__delete" onClick={onDeleteClient}>
+                    {IconTrash}
+                    Delete client
+                  </button>
+                ) : null}
+                <div className="ui-clinical-identity__meta">
+                  <span>Created at {formatDate(client.createdAt)}</span>
+                  <strong>Patient ID {patientIdLabel(client.id)}</strong>
+                </div>
+                <Button type="submit" size="sm" disabled={!allowManage || savingIdentity}>
+                  {savingIdentity ? "Saving…" : "Save identity"}
+                </Button>
+              </div>
+            </div>
+          </ClinicalBlock>
         </form>
 
         <form className="ui-clinical-stack" onSubmit={(event) => void saveClinical(event)}>
+          <p className="ui-clinical-lead">
+            Default clinical questions for every patient. Custom questionnaires live on Custom forms.
+          </p>
           <div className="ui-clinical-savebar">
-            <p className="ui-muted">Default clinical questions for every patient. Custom questionnaires live on Custom forms.</p>
             <Button type="submit" size="sm" disabled={!allowManage || savingClinical}>
               {savingClinical ? "Saving…" : "Save clinical profile"}
             </Button>

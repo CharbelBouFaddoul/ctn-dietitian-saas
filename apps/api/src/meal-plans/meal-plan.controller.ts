@@ -20,6 +20,7 @@ import {
   CreateMealItemDto,
   CreateMealPlanDto,
   ListMealPlansQueryDto,
+  ReorderMealItemsDto,
   UpdateDayDto,
   UpdateMealDto,
   UpdateMealItemDto,
@@ -180,6 +181,17 @@ export class MealPlanController {
     @Body() body: CreateMealItemDto,
   ) {
     return this.plans.addItem(tenant, planId, versionId, mealId, body);
+  }
+
+  @Patch(":planId/versions/:versionId/meals/:mealId/items/reorder")
+  reorderItems(
+    @CurrentTenant() tenant: DietitianTenantContext,
+    @Param("planId", ParseUUIDPipe) planId: string,
+    @Param("versionId", ParseUUIDPipe) versionId: string,
+    @Param("mealId", ParseUUIDPipe) mealId: string,
+    @Body() body: ReorderMealItemsDto,
+  ) {
+    return this.plans.reorderItems(tenant, planId, versionId, mealId, body.itemIds);
   }
 
   @Patch(":planId/versions/:versionId/items/:itemId")

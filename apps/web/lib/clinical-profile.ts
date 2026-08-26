@@ -48,6 +48,17 @@ export type ClinicalData = {
     waterIntake: string;
     other: string;
   };
+  identity: {
+    occupation: string;
+    workplace: string;
+    processNumber: string;
+    healthNumber: string;
+    nationalNumber: string;
+    vatNumber: string;
+    country: string;
+    zipCode: string;
+    address: string;
+  };
 };
 
 export type SelectOption = { value: string; label: string };
@@ -226,6 +237,17 @@ export function emptyClinicalData(): ClinicalData {
       intolerancesNotes: "",
     },
     nutrition: { deficiencies: "", deficienciesNotes: "", waterIntake: "", other: "" },
+    identity: {
+      occupation: "",
+      workplace: "",
+      processNumber: "",
+      healthNumber: "",
+      nationalNumber: "",
+      vatNumber: "",
+      country: "",
+      zipCode: "",
+      address: "",
+    },
   };
 }
 

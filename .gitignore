@@ -16,5 +16,7 @@ backups
 *.tsbuildinfo
 apps/api/generated
 apps/api/food-data/.fdc-cache
+apps/api/food-data/.cnf-cache
+apps/api/food-data/.cofid-cache
 # Only ignore a root-level .prisma folder — never node_modules/.prisma (Prisma Client types).
 /.prisma
