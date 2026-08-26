@@ -138,7 +138,7 @@ export function ClientTrackingPanel({
         <div>
           <p className="ui-track__eyebrow">Daily tracking</p>
           <h2 className="ui-track__title">{formatDayLabel(trackingDate || summary?.date || "")}</h2>
-          <p className="ui-muted ui-track__hint">Patient-entered logs for this day. Body measurements stay on Evolution.</p>
+          <p className="ui-muted ui-track__hint">Patient-entered logs for this day. Body measurements stay on Measurement.</p>
         </div>
         <div className="ui-track__day-controls">
           <Button type="button" size="sm" variant="secondary" onClick={() => onShiftDate(-1)} disabled={!trackingDate}>

@@ -1195,6 +1195,93 @@ export async function seedDemoWorld(
       recordedById: aliceUser.id,
     },
   });
+  await prisma.clientMeasurement.create({
+    data: {
+      dietitianAccountId: aliceId,
+      clientId: emma.client.id,
+      type: "HIPS",
+      value: 98,
+      unit: "cm",
+      measuredAt: daysAgo(7),
+      recordedById: aliceUser.id,
+    },
+  });
+  await prisma.clientMeasurement.create({
+    data: {
+      dietitianAccountId: aliceId,
+      clientId: emma.client.id,
+      type: "BODY_FAT",
+      value: 28.4,
+      unit: "%",
+      measuredAt: daysAgo(7),
+      recordedById: aliceUser.id,
+    },
+  });
+  await prisma.clientMeasurement.create({
+    data: {
+      dietitianAccountId: aliceId,
+      clientId: emma.client.id,
+      type: "FAT_MASS",
+      value: 17.0,
+      unit: "kg",
+      measuredAt: daysAgo(7),
+      recordedById: aliceUser.id,
+    },
+  });
+  await prisma.clientMeasurement.create({
+    data: {
+      dietitianAccountId: aliceId,
+      clientId: emma.client.id,
+      type: "MUSCLE_MASS",
+      value: 23.5,
+      unit: "kg",
+      measuredAt: daysAgo(7),
+      recordedById: aliceUser.id,
+    },
+  });
+  for (const [type, value] of [
+    ["SKINFOLD_ABDOMINAL", 25],
+    ["SKINFOLD_CHEST", 10],
+    ["SKINFOLD_FRONT_THIGH", 15],
+    ["SKINFOLD_MIDAXILLARY", 12],
+    ["SKINFOLD_SUBSCAPULAR", 12],
+    ["SKINFOLD_SUPRAILIAC", 14],
+    ["SKINFOLD_TRICEPS", 12],
+  ] as const) {
+    await prisma.clientMeasurement.create({
+      data: {
+        dietitianAccountId: aliceId,
+        clientId: emma.client.id,
+        type,
+        value,
+        unit: "mm",
+        measuredAt: daysAgo(7),
+        recordedById: aliceUser.id,
+      },
+    });
+  }
+  await prisma.clientMeasurement.create({
+    data: {
+      dietitianAccountId: aliceId,
+      clientId: emma.client.id,
+      type: "BP_SYSTOLIC",
+      value: 118,
+      unit: "mmHg",
+      measuredAt: daysAgo(14),
+      recordedById: aliceUser.id,
+    },
+  });
+  await prisma.clientMeasurement.create({
+    data: {
+      dietitianAccountId: aliceId,
+      clientId: emma.client.id,
+      type: "BP_DIASTOLIC",
+      value: 76,
+      unit: "mmHg",
+      measuredAt: daysAgo(14),
+      recordedById: aliceUser.id,
+    },
+  });
   for (const [week, weight] of [
     [28, 98.2],
     [21, 96.5],

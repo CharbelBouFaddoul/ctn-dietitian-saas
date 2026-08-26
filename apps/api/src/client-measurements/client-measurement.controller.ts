@@ -9,11 +9,12 @@ import type { DietitianTenantContext } from "../dietitian/dietitian.types";
 import { ClientActionRequired } from "../clients/decorators/client-action.decorator";
 import { ClientAccessGuard } from "../clients/guards/client-access.guard";
 import { ClientMeasurementService } from "./client-measurement.service";
+import { STORED_MEASUREMENT_TYPES } from "./measurement-types";
 
 class CreateMeasurementDto {
-  @ApiProperty({ enum: ["WEIGHT", "HEIGHT", "WAIST", "HIPS", "BODY_FAT", "MUSCLE_MASS"] })
-  @IsEnum(["WEIGHT", "HEIGHT", "WAIST", "HIPS", "BODY_FAT", "MUSCLE_MASS"])
-  type!: "WEIGHT" | "HEIGHT" | "WAIST" | "HIPS" | "BODY_FAT" | "MUSCLE_MASS";
+  @ApiProperty({ enum: STORED_MEASUREMENT_TYPES })
+  @IsEnum(STORED_MEASUREMENT_TYPES)
+  type!: MeasurementType;
 
   @ApiProperty()
   @IsNumber()
@@ -35,9 +36,9 @@ class CreateMeasurementDto {
 }
 
 class MeasurementQueryDto {
-  @ApiPropertyOptional({ enum: ["WEIGHT", "HEIGHT", "WAIST", "HIPS", "BODY_FAT", "MUSCLE_MASS"] })
+  @ApiPropertyOptional({ enum: STORED_MEASUREMENT_TYPES })
   @IsOptional()
-  @IsEnum(["WEIGHT", "HEIGHT", "WAIST", "HIPS", "BODY_FAT", "MUSCLE_MASS"])
+  @IsEnum(STORED_MEASUREMENT_TYPES)
   type?: MeasurementType;
 
   @ApiPropertyOptional()

@@ -14,7 +14,22 @@ const INTERNAL_BY_TYPE: Record<MeasurementType, string> = {
   WAIST: INTERNAL_UNITS.height,
   HIPS: INTERNAL_UNITS.height,
   BODY_FAT: "%",
+  FAT_MASS: INTERNAL_UNITS.weight,
   MUSCLE_MASS: INTERNAL_UNITS.weight,
+  MUSCLE_MASS_PERCENT: "%",
+  SKINFOLD_ABDOMINAL: "mm",
+  SKINFOLD_CHEST: "mm",
+  SKINFOLD_FRONT_THIGH: "mm",
+  SKINFOLD_MIDAXILLARY: "mm",
+  SKINFOLD_SUBSCAPULAR: "mm",
+  SKINFOLD_SUPRAILIAC: "mm",
+  SKINFOLD_TRICEPS: "mm",
+  BP_DIASTOLIC: "mmHg",
+  BP_SYSTOLIC: "mmHg",
+  CHOLESTEROL_HDL: "mg/dL",
+  CHOLESTEROL_LDL: "mg/dL",
+  CHOLESTEROL_TOTAL: "mg/dL",
+  TRIGLYCERIDES: "mg/dL",
 };
 
 export type MeasurementListFilters = {
@@ -213,7 +228,7 @@ export class ClientMeasurementService {
 
   toInternal(type: MeasurementType, value: number, unit: string): number {
     const normalized = unit.toLowerCase();
-    if (type === "WEIGHT" || type === "MUSCLE_MASS") {
+    if (type === "WEIGHT" || type === "MUSCLE_MASS" || type === "FAT_MASS") {
       if (normalized === "kg") {
         return value;
       }
@@ -229,7 +244,31 @@ export class ClientMeasurementService {
         return value * 2.54;
       }
     }
-    if (type === "BODY_FAT" && (normalized === "%" || normalized === "percent")) {
+    if (
+      (type === "BODY_FAT" || type === "MUSCLE_MASS_PERCENT") &&
+      (normalized === "%" || normalized === "percent")
+    ) {
+      return value;
+    }
+    if (
+      type.startsWith("SKINFOLD_") &&
+      (normalized === "mm" || normalized === "millimeter" || normalized === "millimeters")
+    ) {
+      return value;
+    }
+    if (
+      (type === "BP_DIASTOLIC" || type === "BP_SYSTOLIC") &&
+      (normalized === "mmhg" || normalized === "mm hg")
+    ) {
+      return value;
+    }
+    if (
+      (type === "CHOLESTEROL_HDL" ||
+        type === "CHOLESTEROL_LDL" ||
+        type === "CHOLESTEROL_TOTAL" ||
+        type === "TRIGLYCERIDES") &&
+      (normalized === "mg/dl" || normalized === "mgdl")
+    ) {
       return value;
     }
     throw new BadRequestException("Unsupported measurement unit");

@@ -52,7 +52,7 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     audience: "dietitian",
     category: "Clinic & clients",
     title: "Measurement tracking",
-    summary: "Track weight, height, BMI, waist, hips, body fat, muscle mass, and evolution over time.",
+    summary: "Track weight, height, BMI, waist, hips, body composition, skinfolds, labs, and trends over time.",
   },
   {
     id: "d-timeline",
@@ -320,7 +320,7 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     audience: "patient",
     category: "Progress",
     title: "Progress & measurement charts",
-    summary: "Today’s tracking overview plus measurement evolution charts for weight, BMI, body composition, and more.",
+    summary: "Today’s tracking overview plus measurement charts for weight, BMI, body composition, skinfolds, and labs.",
   },
 
   // Assessments

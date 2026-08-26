@@ -11,6 +11,8 @@ export type LineChartPoint = {
 export type LineChartProps = {
   points: LineChartPoint[];
   unit?: string;
+  /** Shown in the hover tooltip pill, e.g. "Weight (kg)". */
+  seriesLabel?: string;
   emptyTitle?: string;
   /** SVG viewBox height; keep compact by default. */
   height?: number;
@@ -63,6 +65,7 @@ function niceDomain(minV: number, maxV: number): { yMin: number; yMax: number; t
 export function LineChart({
   points,
   unit = "",
+  seriesLabel,
   emptyTitle = "Not enough data to chart",
   height = 220,
 }: LineChartProps) {
@@ -71,7 +74,7 @@ export function LineChart({
 
   const layout = useMemo(() => {
     if (points.length === 0) return null;
-    const pad = { top: 12, right: 14, bottom: 28, left: 42 };
+    const pad = { top: 14, right: 14, bottom: 26, left: 36 };
     const width = 640;
     const innerW = width - pad.left - pad.right;
     const innerH = height - pad.top - pad.bottom;
@@ -95,6 +98,10 @@ export function LineChart({
     return { pad, width, height, innerW, innerH, xs, ys, line, area, yTicks, yMin, yMax };
   }, [points, height]);
 
+  const tipLabel =
+    seriesLabel?.trim() ||
+    (unit ? `Value (${unit})` : "Value");
+
   if (!layout || points.length === 0) {
     return (
       <div className="ui-line-chart ui-line-chart--empty" role="img" aria-label={emptyTitle}>
@@ -102,6 +109,13 @@ export function LineChart({
       </div>
     );
   }
+
+  const active = hover != null ? points[hover] : null;
+  const tipLeftPct =
+    hover != null ? (layout.xs[hover]! / layout.width) * 100 : 0;
+  const tipTopPct =
+    hover != null ? (layout.ys[hover]! / layout.height) * 100 : 0;
+  const tipOnRight = tipLeftPct < 55;
 
   return (
     <div className="ui-line-chart">
@@ -132,7 +146,7 @@ export function LineChart({
                 y2={y}
                 className="ui-line-chart__grid"
               />
-              <text x={layout.pad.left - 6} y={y + 3.5} textAnchor="end" className="ui-line-chart__tick">
+              <text x={layout.pad.left - 6} y={y + 3} textAnchor="end" className="ui-line-chart__tick">
                 {formatTick(tick)}
               </text>
             </g>
@@ -141,35 +155,24 @@ export function LineChart({
         {layout.area ? <path d={layout.area} fill={`url(#${gradId})`} /> : null}
         <path d={layout.line} className="ui-line-chart__line" fill="none" />
         {points.map((p, i) => (
-          <circle
-            key={p.at + String(i)}
-            cx={layout.xs[i]}
-            cy={layout.ys[i]}
-            r={hover === i ? 5 : 3.25}
-            className="ui-line-chart__dot"
-            onMouseEnter={() => setHover(i)}
-          />
+          <g key={p.at + String(i)}>
+            <circle
+              cx={layout.xs[i]}
+              cy={layout.ys[i]}
+              r={14}
+              fill="transparent"
+              className="ui-line-chart__hit"
+              onMouseEnter={() => setHover(i)}
+            />
+            <circle
+              cx={layout.xs[i]}
+              cy={layout.ys[i]}
+              r={hover === i ? 5 : 3.25}
+              className="ui-line-chart__dot"
+              pointerEvents="none"
+            />
+          </g>
         ))}
-        {/* Endpoint value callouts when few points — avoids a permanent footer tooltip */}
-        {points.length <= 4
-          ? points.map((p, i) => {
-              const x = layout.xs[i]!;
-              const y = layout.ys[i]!;
-              const above = y > layout.pad.top + 18;
-              return (
-                <text
-                  key={`vl-${i}`}
-                  x={x}
-                  y={above ? y - 10 : y + 16}
-                  textAnchor="middle"
-                  className="ui-line-chart__value"
-                >
-                  {formatTick(p.value)}
-                  {unit ? ` ${unit}` : ""}
-                </text>
-              );
-            })
-          : null}
         {points.map((p, i) => {
           const show =
             points.length <= 6 || i === 0 || i === points.length - 1 || i === Math.floor(points.length / 2);
@@ -178,7 +181,7 @@ export function LineChart({
             <text
               key={`xl-${i}`}
               x={layout.xs[i]}
-              y={layout.height - 8}
+              y={layout.height - 7}
               textAnchor="middle"
               className="ui-line-chart__tick"
             >
@@ -187,22 +190,20 @@ export function LineChart({
           );
         })}
       </svg>
-      {hover != null && points[hover] ? (
-        <div className="ui-line-chart__tooltip" aria-live="polite">
-          <strong>
-            {formatTick(points[hover]!.value)}
-            {unit ? ` ${unit}` : ""}
-          </strong>
-          <span className="ui-muted">{formatAxisDate(points[hover]!.at)}</span>
+
+      {active && hover != null ? (
+        <div
+          className={`ui-line-chart__tip${tipOnRight ? " ui-line-chart__tip--right" : " ui-line-chart__tip--left"}`}
+          style={{ left: `${tipLeftPct}%`, top: `${tipTopPct}%` }}
+          aria-live="polite"
+        >
+          <div className="ui-line-chart__tip-date">{formatAxisDate(active.at)}</div>
+          <div className="ui-line-chart__tip-row">
+            <span className="ui-line-chart__tip-badge">{tipLabel}</span>
+            <strong className="ui-line-chart__tip-value">{formatTick(active.value)}</strong>
+          </div>
         </div>
-      ) : (
-        <div className="ui-line-chart__tooltip ui-line-chart__tooltip--hint">
-          <span className="ui-muted">
-            {points.length} reading{points.length === 1 ? "" : "s"}
-            {unit ? ` · ${unit}` : ""}
-          </span>
-        </div>
-      )}
+      ) : null}
     </div>
   );
 }

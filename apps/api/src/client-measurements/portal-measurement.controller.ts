@@ -1,16 +1,18 @@
 import { Body, Controller, Post, UseGuards } from "@nestjs/common";
 import { ApiCookieAuth, ApiOperation, ApiProperty, ApiPropertyOptional, ApiTags } from "@nestjs/swagger";
 import { IsDateString, IsEnum, IsNumber, IsOptional, IsString, MaxLength, Min } from "class-validator";
+import type { MeasurementType } from "@prisma/client";
 import { CurrentSession, CurrentUser } from "../auth/decorators/current-user.decorator";
 import { SessionGuard } from "../auth/guards/session.guard";
 import type { AuthenticatedRequestUser, AuthenticatedSession } from "../auth/auth.types";
 import { ClientAccessService } from "../clients/client-access.service";
 import { ClientMeasurementService } from "./client-measurement.service";
+import { STORED_MEASUREMENT_TYPES } from "./measurement-types";
 
 class PortalCreateMeasurementDto {
-  @ApiProperty({ enum: ["WEIGHT", "HEIGHT", "WAIST", "HIPS", "BODY_FAT", "MUSCLE_MASS"] })
-  @IsEnum(["WEIGHT", "HEIGHT", "WAIST", "HIPS", "BODY_FAT", "MUSCLE_MASS"])
-  type!: "WEIGHT" | "HEIGHT" | "WAIST" | "HIPS" | "BODY_FAT" | "MUSCLE_MASS";
+  @ApiProperty({ enum: STORED_MEASUREMENT_TYPES })
+  @IsEnum(STORED_MEASUREMENT_TYPES)
+  type!: MeasurementType;
 
   @ApiProperty()
   @IsNumber()

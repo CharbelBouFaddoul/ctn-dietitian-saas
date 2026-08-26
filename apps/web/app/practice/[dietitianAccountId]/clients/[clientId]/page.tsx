@@ -45,7 +45,7 @@ import { usePractice } from "../../practice-shell";
 
 type Tab =
   | "overview"
-  | "evolution"
+  | "measurement"
   | "clinical"
   | "assessments"
   | "meal-plan"
@@ -69,6 +69,7 @@ const LEGACY_TABS: Record<string, Tab> = {
   personal: "clinical",
   goals: "clinical",
   documents: "clinical",
+  evolution: "measurement",
 };
 
 const chartSections: ChartSection[] = [
@@ -89,7 +90,7 @@ const chartSections: ChartSection[] = [
     id: "progress",
     label: "Progress & tracking",
     tabs: [
-      { id: "evolution", label: "Evolution" },
+      { id: "measurement", label: "Measurement" },
       { id: "tracking", label: "Tracking" },
       { id: "timeline", label: "Timeline" },
     ],
@@ -424,14 +425,14 @@ function ClientWorkspacePage() {
     setTab(value);
     const params = new URLSearchParams();
     params.set("tab", value);
-    if (value === "evolution" && extras?.metric) {
+    if (value === "measurement" && extras?.metric) {
       params.set("metric", extras.metric);
     }
     router.replace(`/practice/${dietitianAccountId}/clients/${clientId}?${params.toString()}`, { scroll: false });
   }
 
-  function openEvolution(metric: "WEIGHT" | "HEIGHT" | "BMI") {
-    selectTab("evolution", { metric });
+  function openMeasurement(metric: "WEIGHT" | "HEIGHT" | "BMI") {
+    selectTab("measurement", { metric });
   }
 
   function selectSection(sectionId: string) {
@@ -699,7 +700,7 @@ function ClientWorkspacePage() {
                   {client?.dateOfBirth ? formatFullDate(client.dateOfBirth) : "Date of birth not set"}
                 </span>
               </button>
-              <button type="button" className="ui-client-chart__vital" onClick={() => openEvolution("WEIGHT")}>
+              <button type="button" className="ui-client-chart__vital" onClick={() => openMeasurement("WEIGHT")}>
                 <span className="ui-client-chart__metric-label">Weight</span>
                 <span className="ui-client-chart__vital-value">
                   {weightMeasurement ? (
@@ -712,7 +713,7 @@ function ClientWorkspacePage() {
                   )}
                 </span>
               </button>
-              <button type="button" className="ui-client-chart__vital" onClick={() => openEvolution("WEIGHT")}>
+              <button type="button" className="ui-client-chart__vital" onClick={() => openMeasurement("WEIGHT")}>
                 <span className="ui-client-chart__metric-label">Previous weight</span>
                 <span className="ui-client-chart__vital-value">
                   {previousWeight ? (
@@ -730,7 +731,7 @@ function ClientWorkspacePage() {
                   </span>
                 ) : null}
               </button>
-              <button type="button" className="ui-client-chart__vital" onClick={() => openEvolution("WEIGHT")}>
+              <button type="button" className="ui-client-chart__vital" onClick={() => openMeasurement("WEIGHT")}>
                 <span className="ui-client-chart__metric-label">Weight change</span>
                 <span className="ui-client-chart__vital-value">
                   {recentWeightChange != null ? (
@@ -745,7 +746,7 @@ function ClientWorkspacePage() {
                 </span>
                 <span className="ui-client-chart__vital-meta">vs previous</span>
               </button>
-              <button type="button" className="ui-client-chart__vital" onClick={() => openEvolution("HEIGHT")}>
+              <button type="button" className="ui-client-chart__vital" onClick={() => openMeasurement("HEIGHT")}>
                 <span className="ui-client-chart__metric-label">Height</span>
                 <span className="ui-client-chart__vital-value">
                   {heightMeasurement ? (
@@ -758,16 +759,16 @@ function ClientWorkspacePage() {
                   )}
                 </span>
               </button>
-              <button type="button" className="ui-client-chart__vital" onClick={() => openEvolution("BMI")}>
+              <button type="button" className="ui-client-chart__vital" onClick={() => openMeasurement("BMI")}>
                 <span className="ui-client-chart__metric-label">BMI</span>
                 <span className="ui-client-chart__vital-value">{portfolio.bmi ?? "—"}</span>
               </button>
               <button
                 type="button"
                 className="ui-client-chart__vital ui-client-chart__vital--trend"
-                onClick={() => openEvolution("WEIGHT")}
+                onClick={() => openMeasurement("WEIGHT")}
               >
-                <span className="ui-client-chart__metric-label">Evolution</span>
+                <span className="ui-client-chart__metric-label">Measurement</span>
                 <span className="ui-client-chart__vital-value">
                   {portfolio.evolutionSummary
                     ? `${portfolio.evolutionSummary.weightDelta ?? "—"} ${
@@ -909,8 +910,8 @@ function ClientWorkspacePage() {
         </div>
       ) : null}
 
-      {/* ── EVOLUTION ── */}
-      {tab === "evolution" ? (
+      {/* ── MEASUREMENT ── */}
+      {tab === "measurement" ? (
         <ClientEvolutionPanel
           base={base}
           allowManage={allowManage}
@@ -918,7 +919,7 @@ function ClientWorkspacePage() {
           initialMetric={searchParams.get("metric")}
           onMetricChange={(metric) => {
             const params = new URLSearchParams(searchParams.toString());
-            params.set("tab", "evolution");
+            params.set("tab", "measurement");
             params.set("metric", metric);
             router.replace(`/practice/${dietitianAccountId}/clients/${clientId}?${params.toString()}`, {
               scroll: false,

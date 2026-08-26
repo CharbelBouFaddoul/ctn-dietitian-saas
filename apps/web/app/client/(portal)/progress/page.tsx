@@ -100,7 +100,7 @@ export default function ClientProgressPage() {
       <PageHeader
         eyebrow="Reflection"
         title="Progress"
-        description="Today’s tracking plus your measurement evolution for the active practice."
+        description="Today’s tracking plus your measurement history for the active practice."
         actions={
           <Link href="/client/tracking" className="ui-btn ui-btn--secondary ui-btn--sm">
             Log tracking
@@ -145,8 +145,8 @@ export default function ClientProgressPage() {
       )}
 
       <Section
-        title="Measurement evolution"
-        description="Weight, height, BMI, body composition, and other readings recorded for this clinic."
+        title="Measurements"
+        description="Weight, height, BMI, body composition, skinfolds, and analytical readings recorded for this clinic."
         tone="muted"
       >
         <ClientEvolutionPanel

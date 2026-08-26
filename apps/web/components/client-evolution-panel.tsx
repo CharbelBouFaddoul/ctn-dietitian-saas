@@ -1,18 +1,22 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import {
-  Button,
-  Field,
-  Input,
-  LineChart,
-  Section,
-  Select,
-} from "@nutrition-saas/ui";
+import { Button, Field, Input, LineChart, Select } from "@nutrition-saas/ui";
 import { api } from "../lib/api";
-import { formatDate } from "../lib/format";
+import { formatFullDate } from "../lib/format";
 import { errorMessage } from "../lib/humanize-error";
-import { addLocalDays, localDateKey } from "../lib/local-date";
+import { localDateKey } from "../lib/local-date";
+import {
+  ALL_MEASUREMENT_METRICS,
+  findMeasurementMetric,
+  formatMeasurementValue,
+  isMeasurementMetricId,
+  MEASUREMENT_GROUPS,
+  STORED_MEASUREMENT_METRICS,
+  type MeasurementMetricId,
+} from "../lib/measurements";
+
+type Point = { at: string; value: number; unit: string; id?: string };
 
 type EvolutionResponse = {
   series: Record<string, Array<{ at: string; value: number; unit: string; id: string }>>;
@@ -34,22 +38,6 @@ type Comparison = {
   percent: number | null;
 };
 
-const METRICS = [
-  { id: "WEIGHT", label: "Weight" },
-  { id: "HEIGHT", label: "Height" },
-  { id: "BMI", label: "BMI" },
-  { id: "WAIST", label: "Waist" },
-  { id: "HIPS", label: "Hips" },
-  { id: "BODY_FAT", label: "Body fat" },
-  { id: "MUSCLE_MASS", label: "Muscle mass" },
-] as const;
-
-const METRIC_IDS = METRICS.map((m) => m.id);
-
-function isMetricId(value: string | null | undefined): value is (typeof METRICS)[number]["id"] {
-  return !!value && (METRIC_IDS as readonly string[]).includes(value);
-}
-
 type Props = {
   base: string;
   allowManage: boolean;
@@ -57,6 +45,18 @@ type Props = {
   initialMetric?: string | null;
   onMetricChange?: (metric: string) => void;
 };
+
+function roundDelta(value: number) {
+  return Math.round(value * 10) / 10;
+}
+
+function unitLabel(unit: string) {
+  if (unit === "kg") return "kilogram";
+  if (unit === "lb") return "pound";
+  if (unit === "cm") return "centimeter";
+  if (unit === "in") return "inch";
+  return unit;
+}
 
 export function ClientEvolutionPanel({
   base,
@@ -66,44 +66,57 @@ export function ClientEvolutionPanel({
   onMetricChange,
 }: Props) {
   const [data, setData] = useState<EvolutionResponse | null>(null);
-  const [metric, setMetric] = useState<string>(() =>
-    isMetricId(initialMetric) ? initialMetric : "WEIGHT",
+  const [metric, setMetric] = useState<MeasurementMetricId>(() =>
+    isMeasurementMetricId(initialMetric) ? initialMetric : "WEIGHT",
   );
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
-  const [rangePreset, setRangePreset] = useState<"7" | "30" | "90" | "all" | "custom">("all");
-  const [measureType, setMeasureType] = useState("WEIGHT");
   const [measureValue, setMeasureValue] = useState("");
   const [measureUnit, setMeasureUnit] = useState("kg");
   const [measureAt, setMeasureAt] = useState(() => localDateKey());
   const [saving, setSaving] = useState(false);
+  const [multiOpen, setMultiOpen] = useState(false);
+  const [multiAt, setMultiAt] = useState(() => localDateKey());
+  const [multiValues, setMultiValues] = useState<Record<string, string>>({});
+  const [multiSaving, setMultiSaving] = useState(false);
+
+  const selected = findMeasurementMetric(metric) ?? ALL_MEASUREMENT_METRICS[0]!;
 
   async function load() {
-    const query = new URLSearchParams();
-    // Local calendar keys → inclusive UTC day bounds (avoids Date("YYYY-MM-DD") quirks).
-    if (from) query.set("from", `${from}T00:00:00.000Z`);
-    if (to) query.set("to", `${to}T23:59:59.999Z`);
-    const qs = query.toString();
-    const row = await api<EvolutionResponse>(`${base}/evolution${qs ? `?${qs}` : ""}`);
+    const row = await api<EvolutionResponse>(`${base}/evolution`);
     setData(row);
   }
 
   useEffect(() => {
-    void load().catch((err) => onError(errorMessage(err, "Unable to load evolution")));
-  }, [base, from, to]);
+    void load().catch((err) => onError(errorMessage(err, "Unable to load measurements")));
+  }, [base]);
 
   useEffect(() => {
-    if (isMetricId(initialMetric) && initialMetric !== metric) {
+    if (isMeasurementMetricId(initialMetric) && initialMetric !== metric) {
       setMetric(initialMetric);
+      const next = findMeasurementMetric(initialMetric);
+      if (next?.stored) setMeasureUnit(next.unit);
     }
   }, [initialMetric]);
 
-  function selectMetric(next: string) {
+  useEffect(() => {
+    if (selected.stored) {
+      setMeasureUnit(selected.unit);
+    }
+  }, [selected.id]);
+
+  function selectMetric(next: MeasurementMetricId) {
     setMetric(next);
     onMetricChange?.(next);
   }
 
-  const points = useMemo(() => {
+  const history: Point[] = useMemo(() => {
+    if (!data) return [];
+    if (metric === "BMI") {
+      return [...data.bmiSeries].map((p, i) => ({ ...p, id: `bmi-${i}` })).reverse();
+    }
+    return [...(data.series[metric] ?? [])].reverse();
+  }, [data, metric]);
+
+  const chartPoints = useMemo(() => {
     if (!data) return [];
     if (metric === "BMI") {
       return data.bmiSeries.map((p) => ({ at: p.at, value: p.value }));
@@ -112,231 +125,294 @@ export function ClientEvolutionPanel({
   }, [data, metric]);
 
   const unit =
-    metric === "BMI"
-      ? "kg/m²"
-      : data?.series[metric]?.[0]?.unit ??
-        (metric === "WEIGHT" || metric === "MUSCLE_MASS" ? "kg" : metric === "BODY_FAT" ? "%" : "cm");
+    metric === "BMI" ? "kg/m²" : (data?.series[metric]?.[0]?.unit ?? selected.unit);
 
-  const latest = metric === "BMI" ? data?.bmiSeries.at(-1) : data?.latest[metric];
-  const previous =
-    metric === "BMI"
-      ? data?.bmiSeries.length && data.bmiSeries.length >= 2
-        ? data.bmiSeries[data.bmiSeries.length - 2]
-        : null
-      : data?.previous[metric];
-
-  const metricLabel = METRICS.find((m) => m.id === metric)?.label ?? metric;
-
-  function defaultUnit(type: string) {
-    if (type === "WEIGHT" || type === "MUSCLE_MASS") return "kg";
-    if (type === "BODY_FAT") return "%";
-    return "cm";
+  function latestFor(id: MeasurementMetricId): { value: number; unit: string } | null {
+    if (!data) return null;
+    if (id === "BMI") {
+      const last = data.bmiSeries.at(-1);
+      return last ? { value: last.value, unit: last.unit } : null;
+    }
+    const row = data.latest[id];
+    return row ? { value: row.value, unit: row.unit } : null;
   }
 
-  function applyPreset(preset: "7" | "30" | "90" | "all") {
-    setRangePreset(preset);
-    if (preset === "all") {
-      setFrom("");
-      setTo("");
-      return;
-    }
-    const days = Number(preset);
-    const today = localDateKey();
-    setFrom(addLocalDays(today, -(days - 1)));
-    setTo(today);
+  async function saveOne(type: string, value: number, unitValue: string, at: string) {
+    await api(`${base}/measurements`, {
+      method: "POST",
+      body: JSON.stringify({
+        type,
+        value,
+        unit: unitValue,
+        measuredAt: new Date(`${at}T12:00:00.000Z`).toISOString(),
+      }),
+    });
   }
 
   return (
     <div className="ui-evo">
-      <div className="ui-evo__toolbar">
-        <Field label="Metric">
-          <Select value={metric} onChange={(e) => selectMetric(e.target.value)}>
-            {METRICS.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.label}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <div className="ui-evo__ranges" role="group" aria-label="Date range">
-          {(
-            [
-              { id: "7", label: "7d" },
-              { id: "30", label: "30d" },
-              { id: "90", label: "90d" },
-              { id: "all", label: "All" },
-            ] as const
-          ).map((preset) => (
+      {allowManage ? (
+        <div className="ui-evo__topbar">
+          <Button
+            type="button"
+            size="sm"
+            variant={multiOpen ? "primary" : "secondary"}
+            onClick={() => setMultiOpen((open) => !open)}
+          >
+            Register multiple measurements at once
+          </Button>
+        </div>
+      ) : null}
+
+      {allowManage && multiOpen ? (
+        <div className="ui-evo__multi">
+          <div className="ui-evo__multi-head">
+            <div>
+              <h3>Register multiple measurements</h3>
+              <p className="ui-muted">Leave blank any metrics you are not recording today.</p>
+            </div>
+            <Field label="Date">
+              <Input type="date" value={multiAt} onChange={(e) => setMultiAt(e.target.value)} />
+            </Field>
+          </div>
+          <div className="ui-evo__multi-groups">
+            {MEASUREMENT_GROUPS.map((group) => {
+              const metrics = group.metrics.filter((m) => m.stored);
+              if (metrics.length === 0) return null;
+              return (
+                <section key={group.id} className="ui-evo__multi-group">
+                  <h4>{group.label}</h4>
+                  <div className="ui-evo__multi-grid">
+                    {metrics.map((m) => (
+                      <label key={m.id} className="ui-evo__multi-row">
+                        <span className="ui-evo__multi-label">{m.label}</span>
+                        <span className="ui-evo__multi-input">
+                          <Input
+                            type="number"
+                            step="any"
+                            placeholder="—"
+                            value={multiValues[m.id] ?? ""}
+                            onChange={(e) =>
+                              setMultiValues((prev) => ({ ...prev, [m.id]: e.target.value }))
+                            }
+                          />
+                          <span className="ui-evo__multi-unit">{m.unit}</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
+          <div className="ui-evo__multi-actions">
             <Button
-              key={preset.id}
               type="button"
               size="sm"
-              variant={rangePreset === preset.id ? "primary" : "secondary"}
-              onClick={() => applyPreset(preset.id)}
+              variant="secondary"
+              disabled={multiSaving}
+              onClick={() => {
+                setMultiValues({});
+                setMultiOpen(false);
+              }}
             >
-              {preset.label}
+              Cancel
             </Button>
-          ))}
+            <Button
+              type="button"
+              size="sm"
+              disabled={multiSaving}
+              onClick={() => {
+                const entries = STORED_MEASUREMENT_METRICS.flatMap((m) => {
+                  const raw = multiValues[m.id]?.trim();
+                  if (!raw) return [];
+                  const value = Number(raw);
+                  if (!Number.isFinite(value)) return [];
+                  return [{ type: m.id, value, unit: m.unit }];
+                });
+                if (entries.length === 0) return;
+                setMultiSaving(true);
+                void (async () => {
+                  for (const entry of entries) {
+                    await saveOne(entry.type, entry.value, entry.unit, multiAt);
+                  }
+                  setMultiValues({});
+                  setMultiOpen(false);
+                  await load();
+                })()
+                  .catch((err) => onError(errorMessage(err, "Unable to save measurements")))
+                  .finally(() => setMultiSaving(false));
+              }}
+            >
+              {multiSaving ? "Saving…" : "Register selected"}
+            </Button>
+          </div>
         </div>
-        <Field label="From">
-          <Input
-            type="date"
-            value={from}
-            onChange={(e) => {
-              setRangePreset("custom");
-              setFrom(e.target.value);
-            }}
-          />
-        </Field>
-        <Field label="To">
-          <Input
-            type="date"
-            value={to}
-            onChange={(e) => {
-              setRangePreset("custom");
-              setTo(e.target.value);
-            }}
-          />
-        </Field>
-      </div>
-
-      <div className="ui-evo__main">
-        <Section
-          className="ui-evo__chart"
-          title={`${metricLabel} trend`}
-          description={
-            points.length > 0
-              ? `${points.length} reading${points.length === 1 ? "" : "s"} in range`
-              : "Add measurements to see a trend."
-          }
-          tone="mint"
-        >
-          <LineChart
-            points={points}
-            unit={unit}
-            height={240}
-            emptyTitle="Add measurements to see a trend chart."
-          />
-        </Section>
-
-        <aside className="ui-evo__aside">
-          <div className="ui-evo__stat">
-            <span className="ui-evo__stat-label">Current</span>
-            <strong className="ui-evo__stat-value">
-              {latest ? `${latest.value} ${"unit" in latest ? latest.unit : unit}` : "—"}
-            </strong>
-            {latest && "measuredAt" in latest ? (
-              <span className="ui-muted">{formatDate(latest.measuredAt)}</span>
-            ) : latest && "at" in latest ? (
-              <span className="ui-muted">{formatDate((latest as { at: string }).at)}</span>
-            ) : null}
-          </div>
-          <div className="ui-evo__stat">
-            <span className="ui-evo__stat-label">Previous</span>
-            <strong className="ui-evo__stat-value">
-              {previous ? `${previous.value} ${"unit" in previous ? previous.unit : unit}` : "—"}
-            </strong>
-          </div>
-          {(["weight", "height", "bmi"] as const).map((key) => {
-            const row = data?.comparison[key];
-            return (
-              <div key={key} className="ui-evo__stat">
-                <span className="ui-evo__stat-label">{key}</span>
-                <strong className="ui-evo__stat-value">
-                  {row ? (
-                    <>
-                      {row.baseline.value}
-                      <span className="ui-evo__stat-arrow">→</span>
-                      {row.current.value}
-                      <span className="ui-muted" style={{ fontWeight: 500, fontSize: "0.85em" }}>
-                        {" "}
-                        {row.current.unit}
-                      </span>
-                    </>
-                  ) : (
-                    "—"
-                  )}
-                </strong>
-                {row ? (
-                  <span className="ui-muted">
-                    Δ {row.absolute >= 0 ? "+" : ""}
-                    {row.absolute}
-                    {row.percent != null ? ` (${row.percent >= 0 ? "+" : ""}${row.percent}%)` : ""}
-                  </span>
-                ) : null}
-              </div>
-            );
-          })}
-        </aside>
-      </div>
-
-      {allowManage ? (
-        <Section title="Record measurement" description="Adds to this client’s measurement history.">
-          <form
-            className="ui-evo__form"
-            onSubmit={(event) => {
-              event.preventDefault();
-              const value = Number(measureValue);
-              if (!Number.isFinite(value)) return;
-              setSaving(true);
-              void api(`${base}/measurements`, {
-                method: "POST",
-                body: JSON.stringify({
-                  type: measureType,
-                  value,
-                  unit: measureUnit,
-                  measuredAt: new Date(`${measureAt}T12:00:00.000Z`).toISOString(),
-                }),
-              })
-                .then(() => {
-                  setMeasureValue("");
-                  return load();
-                })
-                .catch((err) => onError(errorMessage(err, "Unable to save measurement")))
-                .finally(() => setSaving(false));
-            }}
-          >
-            <Field label="Type">
-              <Select
-                value={measureType}
-                onChange={(e) => {
-                  setMeasureType(e.target.value);
-                  setMeasureUnit(defaultUnit(e.target.value));
-                }}
-              >
-                {METRICS.filter((m) => m.id !== "BMI").map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.label}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field label="Value">
-              <Input
-                type="number"
-                step="any"
-                value={measureValue}
-                onChange={(e) => setMeasureValue(e.target.value)}
-                required
-              />
-            </Field>
-            <Field label="Unit">
-              <Input value={measureUnit} onChange={(e) => setMeasureUnit(e.target.value)} required />
-            </Field>
-            <Field label="Date">
-              <Input type="date" value={measureAt} onChange={(e) => setMeasureAt(e.target.value)} required />
-            </Field>
-            <div className="ui-evo__form-action">
-              <span className="ui-label" aria-hidden="true">
-                Save
-              </span>
-              <Button type="submit" size="sm" variant="secondary" disabled={saving}>
-                {saving ? "Saving…" : "Save"}
-              </Button>
-            </div>
-          </form>
-        </Section>
       ) : null}
+
+      <div className="ui-evo__layout">
+        <aside className="ui-evo__nav" aria-label="Measurement types">
+          {MEASUREMENT_GROUPS.map((group) => (
+            <section key={group.id} className="ui-evo__nav-group">
+              <h3>{group.label}</h3>
+              <ul>
+                {group.metrics.map((m) => {
+                  const latest = latestFor(m.id);
+                  const active = metric === m.id;
+                  return (
+                    <li key={m.id}>
+                      <button
+                        type="button"
+                        className={`ui-evo__nav-item${active ? " is-active" : ""}`}
+                        aria-current={active ? "true" : undefined}
+                        onClick={() => selectMetric(m.id)}
+                      >
+                        <span className="ui-evo__nav-label">{m.label}</span>
+                        <span className="ui-evo__nav-value">
+                          {latest ? formatMeasurementValue(latest.value, latest.unit) : "—"}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          ))}
+        </aside>
+
+        <div className="ui-evo__detail">
+          <header className="ui-evo__detail-head">
+            <h2>{selected.label}</h2>
+            {!selected.stored ? (
+              <p className="ui-muted">Calculated from weight and height readings.</p>
+            ) : null}
+          </header>
+
+          {allowManage && selected.stored ? (
+            <form
+              className="ui-evo__register"
+              onSubmit={(event) => {
+                event.preventDefault();
+                const value = Number(measureValue);
+                if (!Number.isFinite(value)) return;
+                setSaving(true);
+                void saveOne(selected.id, value, measureUnit, measureAt)
+                  .then(() => {
+                    setMeasureValue("");
+                    return load();
+                  })
+                  .catch((err) => onError(errorMessage(err, "Unable to save measurement")))
+                  .finally(() => setSaving(false));
+              }}
+            >
+              <h3>New measurement</h3>
+              <div className="ui-evo__register-grid">
+                <Field label="Date">
+                  <Input
+                    type="date"
+                    value={measureAt}
+                    onChange={(e) => setMeasureAt(e.target.value)}
+                    required
+                  />
+                </Field>
+                <Field label="Value">
+                  <Input
+                    type="number"
+                    step="any"
+                    value={measureValue}
+                    onChange={(e) => setMeasureValue(e.target.value)}
+                    required
+                  />
+                </Field>
+                <Field label="Unit">
+                  {selected.units.length > 1 ? (
+                    <Select value={measureUnit} onChange={(e) => setMeasureUnit(e.target.value)}>
+                      {selected.units.map((u) => (
+                        <option key={u} value={u}>
+                          {unitLabel(u)}
+                        </option>
+                      ))}
+                    </Select>
+                  ) : (
+                    <Input value={measureUnit} readOnly />
+                  )}
+                </Field>
+                <div className="ui-evo__register-action">
+                  <Button type="submit" size="sm" disabled={saving}>
+                    {saving ? "Saving…" : "Register"}
+                  </Button>
+                </div>
+              </div>
+            </form>
+          ) : null}
+
+          <section className="ui-evo__progress">
+            <div className="ui-evo__progress-head">
+              <h3>Progress</h3>
+              <p className="ui-muted">
+                {chartPoints.length > 0
+                  ? `${chartPoints.length} reading${chartPoints.length === 1 ? "" : "s"} · ${unit}`
+                  : "Add measurements to see a trend."}
+              </p>
+            </div>
+            <LineChart
+              points={chartPoints}
+              unit={unit}
+              seriesLabel={`${selected.label} (${unit})`}
+              height={220}
+              emptyTitle="Add measurements to see a trend chart."
+            />
+          </section>
+
+          <section className="ui-evo__history">
+            <h3>History</h3>
+            {history.length === 0 ? (
+              <p className="ui-muted ui-evo__history-empty">
+                No readings yet for {selected.label.toLowerCase()}.
+              </p>
+            ) : (
+              <ul>
+                {history.map((point, index) => {
+                  const older = history[index + 1];
+                  const delta = older ? roundDelta(point.value - older.value) : null;
+                  const deltaTone =
+                    delta == null || delta === 0 ? "flat" : delta > 0 ? "up" : "down";
+                  return (
+                    <li key={point.id ?? `${point.at}-${point.value}`}>
+                      <span className="ui-evo__history-avatar" aria-hidden="true">
+                        <svg
+                          viewBox="0 0 24 24"
+                          width="16"
+                          height="16"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                        >
+                          <circle cx="12" cy="8" r="3.5" />
+                          <path d="M5 19c1.6-3.2 4-4.8 7-4.8s5.4 1.6 7 4.8" strokeLinecap="round" />
+                        </svg>
+                      </span>
+                      <div className="ui-evo__history-main">
+                        <strong>{formatFullDate(point.at)}</strong>
+                        <span className="ui-evo__history-value">
+                          {formatMeasurementValue(point.value, point.unit || unit)}
+                        </span>
+                      </div>
+                      <span className={`ui-evo__delta ui-evo__delta--${deltaTone}`}>
+                        {delta == null
+                          ? "—"
+                          : delta === 0
+                            ? "="
+                            : `${delta > 0 ? "+" : ""}${delta} ${unit}`}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+        </div>
+      </div>
     </div>
   );
 }
