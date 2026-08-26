@@ -19,6 +19,8 @@ export type EvaluationAssessment = {
   createdAt: string;
   completedAt: string | null;
   startedAt?: string | null;
+  responses?: Record<string, unknown> | null;
+  schema?: AssessmentSchemaView;
 };
 
 export type EvaluationAssessmentDetail = EvaluationAssessment & {
@@ -37,6 +39,32 @@ export function evaluationStatusLabel(status: string): string {
 export function countActiveQuestions(schema?: AssessmentSchemaView): number {
   if (!schema) return 0;
   return schema.sections.flatMap((s) => s.questions).filter((q) => q.active !== false).length;
+}
+
+function isEmptyAnswer(value: unknown): boolean {
+  if (value == null) return true;
+  if (typeof value === "string") return value.trim() === "";
+  if (Array.isArray(value)) return value.length === 0;
+  return false;
+}
+
+/** Answered active questions vs total active questions on the form. */
+export function assessmentProgress(row: {
+  responses?: Record<string, unknown> | null;
+  schema?: AssessmentSchemaView;
+}): { answered: number; total: number; requiredAnswered: number; requiredTotal: number } {
+  const questions =
+    row.schema?.sections.flatMap((s) => s.questions).filter((q) => q.active !== false) ?? [];
+  const responses = row.responses ?? {};
+  const answered = questions.filter((q) => !isEmptyAnswer(responses[q.id])).length;
+  const required = questions.filter((q) => q.required);
+  const requiredAnswered = required.filter((q) => !isEmptyAnswer(responses[q.id])).length;
+  return {
+    answered,
+    total: questions.length,
+    requiredAnswered,
+    requiredTotal: required.length,
+  };
 }
 
 export function emptyEvaluationSchema(): AssessmentSchemaView {

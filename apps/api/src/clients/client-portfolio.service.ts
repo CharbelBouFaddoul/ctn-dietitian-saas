@@ -318,9 +318,8 @@ export class ClientPortfolioService {
         { tab: "tracking", label: "Tracking" },
         { tab: "appointments", label: "Appointments" },
         { tab: "messages", label: "Messages" },
-        { tab: "documents", label: "Documents" },
         { tab: "timeline", label: "Timeline" },
-        { tab: "goals", label: "Goals" },
+        { tab: "clinical", label: "Personal data" },
       ],
     };
   }

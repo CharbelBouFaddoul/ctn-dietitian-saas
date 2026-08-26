@@ -48,6 +48,7 @@ import { EMAIL_PROVIDER } from "../src/email/email.provider";
 import { EmailModule } from "../src/email/email.module";
 import { PrismaModule } from "../src/prisma/prisma.module";
 import { PrismaService } from "../src/prisma/prisma.service";
+import { FEATURE_KEYS } from "@nutrition-saas/config";
 import { CapturingEmailProvider } from "./capturing-email.provider";
 import { assertTestWipeAllowed } from "../src/demo/safety";
 import { wipeApplicationData, seedPlatformBootstrap } from "../src/demo/wipe";
@@ -155,6 +156,11 @@ export async function resetAuthDatabase(prisma: PrismaService): Promise<void> {
   await assertTestWipeAllowed(prisma);
   await wipeApplicationData(prisma);
   await seedPlatformBootstrap(prisma, { registrationEnabled: true });
+  // Demo/prod seed keeps AI catalog features inactive; automated tests re-enable them.
+  await prisma.feature.updateMany({
+    where: { key: { in: [FEATURE_KEYS.AI, FEATURE_KEYS.AI_REQUEST_LIMIT] } },
+    data: { status: "ACTIVE" },
+  });
 }
 
 export function extractEmailedToken(text: string): string {

@@ -57,7 +57,7 @@ export function hrefForNotification(
     case "client":
       return clientId ? `${base}/clients/${clientId}` : `${base}/clients`;
     case "document":
-      return clientId ? `${base}/clients/${clientId}?tab=documents` : `${base}/clients`;
+      return clientId ? `${base}/clients/${clientId}?tab=clinical` : `${base}/clients`;
     case "invoice":
       return `${base}/invoices`;
     case "task":

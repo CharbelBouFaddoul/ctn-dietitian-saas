@@ -133,24 +133,32 @@ export async function seedEntitlementCatalog(prisma: PrismaClient): Promise<void
 
   const ai = await prisma.feature.upsert({
     where: { key: FEATURE_KEYS.AI },
-    update: {},
+    update: {
+      name: "AI",
+      description: "Unified AI capability. Not a separate subscription.",
+      status: "INACTIVE",
+    },
     create: {
       key: FEATURE_KEYS.AI,
       name: "AI",
       description: "Unified AI capability. Not a separate subscription.",
       valueType: "BOOLEAN",
-      status: "ACTIVE",
+      status: "INACTIVE",
     },
   });
   const aiLimit = await prisma.feature.upsert({
     where: { key: FEATURE_KEYS.AI_REQUEST_LIMIT },
-    update: {},
+    update: {
+      name: "AI request limit",
+      description: "Monthly AI request quota for the organization subscription.",
+      status: "INACTIVE",
+    },
     create: {
       key: FEATURE_KEYS.AI_REQUEST_LIMIT,
       name: "AI request limit",
       description: "Monthly AI request quota for the organization subscription.",
       valueType: "LIMIT",
-      status: "ACTIVE",
+      status: "INACTIVE",
     },
   });
   const clientLimit = await prisma.feature.upsert({

@@ -128,11 +128,13 @@ function foodLogNutritionSnapshotV2(input: {
   };
 }
 
+function hoursAgo(n: number): Date {
+  return new Date(Date.now() - n * 60 * 60 * 1000);
+}
+
 function daysAgo(n: number): Date {
-  const d = new Date();
-  d.setUTCDate(d.getUTCDate() - n);
-  d.setUTCHours(12, 0, 0, 0);
-  return d;
+  // Always strictly in the past (avoids “today noon UTC” landing after live afternoon messages).
+  return hoursAgo(n * 24 + 3);
 }
 
 function daysFromNow(n: number): Date {
@@ -278,8 +280,18 @@ async function createClientWithPortal(
     passwordHash: string;
     sex?: "FEMALE" | "MALE" | "OTHER" | "UNSPECIFIED";
     notes?: string;
+    allergies?: string;
+    intolerances?: string;
+    lifestyle?: string;
+    clinicalData?: Prisma.InputJsonValue;
     goalTitle?: string;
     tags?: string[];
+    chartNotes?: Array<{
+      kind: "CLINICAL" | "MEAL" | "EATING_HABIT" | "PREGNANCY";
+      body: string;
+      mealSlot?: string;
+      notedAt?: Date;
+    }>;
     existingUserId?: string;
   },
 ) {
@@ -307,6 +319,10 @@ async function createClientWithPortal(
         create: {
           dietitianAccountId: input.dietitianAccountId,
           notes: input.notes ?? null,
+          allergies: input.allergies ?? null,
+          intolerances: input.intolerances ?? null,
+          lifestyle: input.lifestyle ?? null,
+          clinicalData: input.clinicalData ?? undefined,
         },
       },
     },
@@ -331,6 +347,19 @@ async function createClientWithPortal(
         status: "ACTIVE",
         targetDate: daysFromNow(90),
         createdById: input.createdById,
+      },
+    });
+  }
+
+  for (const note of input.chartNotes ?? []) {
+    await prisma.clientChartNote.create({
+      data: {
+        dietitianAccountId: input.dietitianAccountId,
+        clientId: client.id,
+        kind: note.kind,
+        body: note.body,
+        mealSlot: note.mealSlot ?? null,
+        notedAt: note.notedAt ?? new Date(),
       },
     });
   }
@@ -473,7 +502,7 @@ export async function seedDemoWorld(
   const passwordHash = await hashPassword(password);
   const catalogMode: CatalogImportMode = options.catalog ?? "full";
 
-  await seedPlatformBootstrap(prisma, { registrationEnabled: true });
+  await seedPlatformBootstrap(prisma, { registrationEnabled: false });
 
   if (catalogMode !== "none") {
     await importDemoFoodCatalog(prisma, catalogMode);
@@ -711,8 +740,80 @@ export async function seedDemoWorld(
     passwordHash,
     sex: "FEMALE",
     notes: "Marathon training — Harbor Nutrition only",
+    allergies: "Seasonal pollen (mild)",
+    intolerances: "None known",
+    lifestyle: "Runs 5–6 days/week; early wake for long runs",
+    clinicalData: {
+      visit: {
+        reason: "Race fueling and recovery for spring marathon",
+        expectations: "Stable energy on long runs; avoid GI issues",
+        clinicalAims: "sports",
+        clinicalAimsNotes: "Race weight and carb timing",
+        other: "Prefers evening check-ins after training",
+      },
+      lifestyle: {
+        bowelHabits: "regular",
+        bowelHabitsNotes: "Usually morning; stress before races can disrupt",
+        sleepQuality: "fair",
+        sleepQualityNotes: "6.5–7h; wakes early on long-run days",
+        smoking: "never",
+        smokingNotes: "",
+        alcohol: "occasional",
+        alcoholNotes: "Rare social drinks only",
+        maritalStatus: "partnered",
+        maritalStatusNotes: "",
+        physicalActivity: "vigorous",
+        physicalActivityNotes: "Marathon block: long run + tempo + strength 2x",
+        background: "",
+        other: "Works hybrid office; desk most afternoons",
+      },
+      health: {
+        conditions: "",
+        conditionsNotes: "No chronic diagnoses",
+        medication: "None",
+        personalHistory: "Prior shin splints resolved",
+        familyHistory: "Maternal type 2 diabetes",
+        other: "",
+      },
+      eating: {
+        usualWakeTime: "05:30",
+        usualBedTime: "22:00",
+        dietTypes: "",
+        dietTypesNotes: "High carb around long runs",
+        preferredFoods: "Oats, banana, rice, yogurt, chicken",
+        dislikedFoods: "Heavy cream sauces before runs",
+        allergies: "",
+        allergiesNotes: "Seasonal pollen only",
+        intolerances: "",
+        intolerancesNotes: "",
+      },
+      nutrition: {
+        deficiencies: "",
+        deficienciesNotes: "Ferritin monitored annually",
+        waterIntake: "about_2_3l",
+        other: "Electrolytes on runs over 90 minutes",
+      },
+    },
     goalTitle: "Race weight 58 kg",
     tags: ["athlete", "harbor-priority"],
+    chartNotes: [
+      {
+        kind: "CLINICAL",
+        body: "Discussed carb loading plan for race weekend; keep fiber moderate day before.",
+        notedAt: daysAgo(5),
+      },
+      {
+        kind: "MEAL",
+        body: "Oats + banana + honey; tolerated well on long-run morning.",
+        mealSlot: "BREAKFAST",
+        notedAt: daysAgo(3),
+      },
+      {
+        kind: "EATING_HABIT",
+        body: "Tends to under-fuel mid-afternoon on desk days — add snack before evening session.",
+        notedAt: daysAgo(2),
+      },
+    ],
   });
   const james = await createClientWithPortal(prisma, {
     dietitianAccountId: aliceId,
@@ -723,8 +824,74 @@ export async function seedDemoWorld(
     passwordHash,
     sex: "MALE",
     notes: "Prediabetes education",
+    allergies: "",
+    intolerances: "Lactose — prefers lactose-free dairy",
+    lifestyle: "Desk job; walks 20 min lunch",
+    clinicalData: {
+      visit: {
+        reason: "Prediabetes nutrition education",
+        expectations: "Lower fasting glucose; practical meal structure",
+        clinicalAims: "medical_support",
+        clinicalAimsNotes: "A1C under 5.7",
+        other: "",
+      },
+      lifestyle: {
+        bowelHabits: "regular",
+        bowelHabitsNotes: "",
+        sleepQuality: "fair",
+        sleepQualityNotes: "Screens late",
+        smoking: "never",
+        smokingNotes: "",
+        alcohol: "weekly",
+        alcoholNotes: "2–3 drinks weekends",
+        maritalStatus: "married",
+        maritalStatusNotes: "",
+        physicalActivity: "light",
+        physicalActivityNotes: "Lunch walks",
+        background: "",
+        other: "",
+      },
+      health: {
+        conditions: "",
+        conditionsNotes: "Prediabetes; BP borderline",
+        medication: "None",
+        personalHistory: "",
+        familyHistory: "Father type 2 diabetes",
+        other: "",
+      },
+      eating: {
+        usualWakeTime: "07:00",
+        usualBedTime: "23:30",
+        dietTypes: "",
+        dietTypesNotes: "",
+        preferredFoods: "Rice bowls, noodles",
+        dislikedFoods: "",
+        allergies: "",
+        allergiesNotes: "",
+        intolerances: "",
+        intolerancesNotes: "Lactose — lactose-free milk/yogurt",
+      },
+      nutrition: {
+        deficiencies: "",
+        deficienciesNotes: "",
+        waterIntake: "about_1_2l",
+        other: "Aim fiber 25–30g/day",
+      },
+    },
     goalTitle: "A1C under 5.7",
     tags: ["metabolic"],
+    chartNotes: [
+      {
+        kind: "CLINICAL",
+        body: "Reviewed plate method; swap sugary drinks for water or sparkling.",
+        notedAt: daysAgo(8),
+      },
+      {
+        kind: "EATING_HABIT",
+        body: "Late-night snacks 3–4 nights/week — plan protein + fiber evening meal.",
+        notedAt: daysAgo(4),
+      },
+    ],
   });
   const olivia = await createClientWithPortal(prisma, {
     dietitianAccountId: aliceId,
@@ -735,8 +902,72 @@ export async function seedDemoWorld(
     passwordHash,
     sex: "FEMALE",
     notes: "Postpartum return to training",
+    clinicalData: {
+      visit: {
+        reason: "Postpartum return to strength training",
+        expectations: "Energy and milk supply while rebuilding training",
+        clinicalAims: "energy",
+        clinicalAimsNotes: "Gradual training load",
+        other: "",
+      },
+      lifestyle: {
+        bowelHabits: "irregular",
+        bowelHabitsNotes: "Improving after birth",
+        sleepQuality: "disrupted",
+        sleepQualityNotes: "Night feeds",
+        smoking: "never",
+        smokingNotes: "",
+        alcohol: "never",
+        alcoholNotes: "Breastfeeding",
+        maritalStatus: "married",
+        maritalStatusNotes: "",
+        physicalActivity: "light",
+        physicalActivityNotes: "Walking + light PT",
+        background: "",
+        other: "",
+      },
+      health: {
+        conditions: "",
+        conditionsNotes: "6 months postpartum",
+        medication: "Prenatal vitamin continued",
+        personalHistory: "Vaginal delivery, uncomplicated",
+        familyHistory: "",
+        other: "",
+      },
+      eating: {
+        usualWakeTime: "06:00",
+        usualBedTime: "22:30",
+        dietTypes: "",
+        dietTypesNotes: "",
+        preferredFoods: "Eggs, oatmeal, fruit, soups",
+        dislikedFoods: "",
+        allergies: "",
+        allergiesNotes: "",
+        intolerances: "",
+        intolerancesNotes: "",
+      },
+      nutrition: {
+        deficiencies: "",
+        deficienciesNotes: "Watch iron and calcium",
+        waterIntake: "about_2_3l",
+        other: "Prioritize protein at each meal",
+      },
+    },
     goalTitle: "Rebuild strength",
     tags: ["postpartum"],
+    chartNotes: [
+      {
+        kind: "PREGNANCY",
+        body: "Postpartum week 24 — breastfeeding; energy dips mid-afternoon.",
+        notedAt: daysAgo(10),
+      },
+      {
+        kind: "MEAL",
+        body: "Added Greek yogurt + berries snack after lunch — helped afternoon fatigue.",
+        mealSlot: "SNACK",
+        notedAt: daysAgo(1),
+      },
+    ],
   });
   const daniel = await createClientWithPortal(prisma, {
     dietitianAccountId: aliceId,
@@ -747,8 +978,67 @@ export async function seedDemoWorld(
     passwordHash,
     sex: "MALE",
     notes: "Shift-work sleep hygiene",
+    lifestyle: "Night shifts every other week",
+    clinicalData: {
+      visit: {
+        reason: "Shift-work eating and sleep",
+        expectations: "More consistent bedtime and meal timing",
+        clinicalAims: "energy",
+        clinicalAimsNotes: "",
+        other: "",
+      },
+      lifestyle: {
+        bowelHabits: "irregular",
+        bowelHabitsNotes: "",
+        sleepQuality: "disrupted",
+        sleepQualityNotes: "Rotating nights",
+        smoking: "former",
+        smokingNotes: "Quit 2 years ago",
+        alcohol: "occasional",
+        alcoholNotes: "",
+        maritalStatus: "single",
+        maritalStatusNotes: "",
+        physicalActivity: "light",
+        physicalActivityNotes: "Gym on off days",
+        background: "",
+        other: "",
+      },
+      health: {
+        conditions: "",
+        conditionsNotes: "",
+        medication: "None",
+        personalHistory: "",
+        familyHistory: "",
+        other: "",
+      },
+      eating: {
+        usualWakeTime: "",
+        usualBedTime: "",
+        dietTypes: "",
+        dietTypesNotes: "Irregular meal times on nights",
+        preferredFoods: "Sandwiches, coffee, rice",
+        dislikedFoods: "",
+        allergies: "",
+        allergiesNotes: "",
+        intolerances: "",
+        intolerancesNotes: "",
+      },
+      nutrition: {
+        deficiencies: "",
+        deficienciesNotes: "",
+        waterIntake: "under_1l",
+        other: "Caffeine cutoff before day sleep",
+      },
+    },
     goalTitle: "Consistent bedtime",
     tags: ["shift-work"],
+    chartNotes: [
+      {
+        kind: "CLINICAL",
+        body: "Plan main meal before night shift; light snack mid-shift only.",
+        notedAt: daysAgo(6),
+      },
+    ],
   });
 
   const sharedUser = await upsertUser(prisma, {
@@ -1247,7 +1537,7 @@ export async function seedDemoWorld(
         clientId: emma.client.id,
         senderUserId: aliceUser.id,
         body: "Emma — great splits this week. Keep carbs high on long-run days.",
-        createdAt: daysAgo(2),
+        createdAt: hoursAgo(50),
       },
       {
         conversationId: emmaConvo.id,
@@ -1255,7 +1545,7 @@ export async function seedDemoWorld(
         clientId: emma.client.id,
         senderUserId: emma.user.id,
         body: "Thanks! Should I bump the evening snack before Saturday’s 28k?",
-        createdAt: daysAgo(1),
+        createdAt: hoursAgo(26),
       },
       {
         conversationId: emmaConvo.id,
@@ -1263,7 +1553,7 @@ export async function seedDemoWorld(
         clientId: emma.client.id,
         senderUserId: aliceUser.id,
         body: "Yes — add 30–40g carbs. I’ll tweak the plan tonight.",
-        createdAt: daysAgo(0),
+        createdAt: hoursAgo(4),
       },
     ],
   });
@@ -1284,7 +1574,7 @@ export async function seedDemoWorld(
       conversationId: emmaConvo.id,
       readerUserId: aliceUser.id,
       dietitianAccountId: aliceId,
-      lastReadAt: daysAgo(2),
+      lastReadAt: hoursAgo(48),
     },
   });
 
@@ -1298,7 +1588,7 @@ export async function seedDemoWorld(
       clientId: noah.client.id,
       senderUserId: noah.user.id,
       body: "Bob — grocery list for the oat blend?",
-      createdAt: daysAgo(0),
+      createdAt: hoursAgo(5),
     },
   });
   await prisma.conversation.update({

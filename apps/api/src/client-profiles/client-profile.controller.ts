@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, UseGuards } from "@nestjs/common";
 import { ApiCookieAuth, ApiPropertyOptional, ApiTags } from "@nestjs/swagger";
-import { IsOptional, IsString, MaxLength } from "class-validator";
+import { IsObject, IsOptional, IsString, MaxLength } from "class-validator";
 import { SessionGuard } from "../auth/guards/session.guard";
 import { CurrentTenant } from "../dietitian/decorators/current-tenant.decorator";
 import { DietitianGuard } from "../dietitian/guards/dietitian.guard";
@@ -63,6 +63,11 @@ class UpdateProfileDto {
   @IsString()
   @MaxLength(40)
   emergencyContactPhone?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsObject()
+  clinicalData?: Record<string, unknown>;
 }
 
 @ApiTags("client-profiles")

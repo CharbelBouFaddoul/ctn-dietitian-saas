@@ -31,10 +31,22 @@ export default function ClientPortalLayout({ children }: { children: ReactNode }
   }, []);
 
   useMessagingRealtime(state === "ok", {
-    onUnreadUpdated: () => {
+    onUnreadUpdated: (event) => {
+      if (pathname?.startsWith("/client/messages")) {
+        setUnreadMessages(0);
+        return;
+      }
+      if (typeof event.unreadCount === "number") {
+        setUnreadMessages(event.unreadCount);
+        return;
+      }
       void refreshUnreadMessages().catch(() => undefined);
     },
     onMessageCreated: () => {
+      if (pathname?.startsWith("/client/messages")) {
+        setUnreadMessages(0);
+        return;
+      }
       void refreshUnreadMessages().catch(() => undefined);
     },
     onReconnect: () => {
@@ -44,8 +56,21 @@ export default function ClientPortalLayout({ children }: { children: ReactNode }
 
   useEffect(() => {
     if (state !== "ok") return;
+    if (pathname?.startsWith("/client/messages")) {
+      setUnreadMessages(0);
+      return;
+    }
     void refreshUnreadMessages().catch(() => undefined);
   }, [state, refreshUnreadMessages, pathname, me?.client.id]);
+
+  useEffect(() => {
+    function onMessagesRead() {
+      setUnreadMessages(0);
+      void refreshUnreadMessages().catch(() => undefined);
+    }
+    window.addEventListener("portal-messages-read", onMessagesRead);
+    return () => window.removeEventListener("portal-messages-read", onMessagesRead);
+  }, [refreshUnreadMessages]);
 
   const load = useCallback(async () => {
     const profile = await api<PortalMe>("/api/v1/portal/me");
@@ -113,7 +138,7 @@ export default function ClientPortalLayout({ children }: { children: ReactNode }
         { href: "/client/plan", label: "My Plan", icon: PatientNavIcons.plan },
         { href: "/client/tracking", label: "Daily log", icon: PatientNavIcons.tracking },
         { href: "/client/progress", label: "Progress", icon: PatientNavIcons.progress },
-        { href: "/client/assessments", label: "Assessments", icon: PatientNavIcons.assessments },
+        { href: "/client/assessments", label: "Forms", icon: PatientNavIcons.assessments },
       ],
     },
     {

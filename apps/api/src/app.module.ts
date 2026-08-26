@@ -13,6 +13,7 @@ import { DietitianModule } from "./dietitian/dietitian.module";
 import { TimelineModule } from "./timeline/timeline.module";
 import { ClientsModule } from "./clients/clients.module";
 import { ClientAccountsModule } from "./client-accounts/client-accounts.module";
+import { ClientChartNotesModule } from "./client-chart-notes/client-chart-notes.module";
 import { ClientProfilesModule } from "./client-profiles/client-profiles.module";
 import { ClientGoalsModule } from "./client-goals/client-goals.module";
 import { ClientTagsModule } from "./client-tags/client-tags.module";
@@ -60,6 +61,7 @@ import { loadEnv } from "./config/env";
     ClientsModule,
     ClientAccountsModule,
     ClientProfilesModule,
+    ClientChartNotesModule,
     ClientGoalsModule,
     ClientTagsModule,
     ClientMeasurementsModule,

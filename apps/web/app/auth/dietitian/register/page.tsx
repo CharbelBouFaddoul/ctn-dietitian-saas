@@ -79,18 +79,14 @@ export default function DietitianRegisterPage() {
       <AuthShell
         title="Registration is closed"
         audience="dietitian"
-        description="Self-serve clinic registration is currently disabled. View plans and contact us to get set up, or sign in if you already have an account."
+        description="Self-serve clinic registration is currently disabled. Contact us to get set up, or sign in if you already have an account."
       >
-        <Link href="/plans" className="ui-btn ui-btn--primary ui-btn--block">
-          View plans
+        <Link href="/contact" className="ui-btn ui-btn--primary ui-btn--block">
+          Contact us
         </Link>
         <p style={{ marginTop: 16 }}>
           <Link href="/auth/dietitian/login" className="ui-link">
             Sign in as Dietitian
-          </Link>
-          {" · "}
-          <Link href="/contact" className="ui-link">
-            Contact us
           </Link>
         </p>
       </AuthShell>

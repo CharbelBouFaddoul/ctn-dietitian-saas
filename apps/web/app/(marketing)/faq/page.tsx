@@ -18,7 +18,7 @@ const FAQ_CATEGORIES = [
       },
       {
         q: "Where can I see pricing?",
-        a: "Visit the Plans page for current plans and included features. Online checkout is not built in yet — use Choose on a plan to contact us and get set up.",
+        a: "Contact us for current plans and included features. Online checkout is not built in yet — we will help you get set up.",
       },
     ],
   },
@@ -104,7 +104,7 @@ const FAQ_CATEGORIES = [
     items: [
       {
         q: "How do I start as a dietitian?",
-        a: "Open the Plans page, choose a plan, and contact us so we can activate your clinic. When self-registration is enabled, you can also create an account directly — your plan is still assigned through our team.",
+        a: "Contact us so we can activate your clinic. When self-registration is enabled, you can also create an account directly — your plan is still assigned through our team.",
       },
       {
         q: "How do I start as a patient?",

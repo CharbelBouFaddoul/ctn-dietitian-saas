@@ -221,6 +221,7 @@ model DietitianAccount {
   clientAccounts         ClientAccount[]
   clientAssignments      ClientAssignment[]
   clientProfiles         ClientProfile[]
+  clientChartNotes       ClientChartNote[]
   clientGoals            ClientGoal[]
   clientTags             ClientTag[]
   clientMeasurements     ClientMeasurement[]
@@ -502,6 +503,13 @@ enum TemplateStatus {
   ARCHIVED
 }
 
+enum ChartNoteKind {
+  CLINICAL
+  MEAL
+  EATING_HABIT
+  PREGNANCY
+}
+
 enum AppointmentStatus {
   SCHEDULED
   COMPLETED
@@ -716,6 +724,7 @@ model Client {
   createdBy        User?               @relation("ClientCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   account          ClientAccount?
   profile          ClientProfile?
+  chartNotes       ClientChartNote[]
   assignments      ClientAssignment[]
   goals            ClientGoal[]
   tags             ClientTag[]
@@ -800,6 +809,7 @@ model ClientProfile {
   notes                 String?  @db.Text
   emergencyContactName  String?  @map("emergency_contact_name")
   emergencyContactPhone String?  @map("emergency_contact_phone")
+  clinicalData          Json?    @map("clinical_data")
   createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt             DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -808,6 +818,26 @@ model ClientProfile {
 
   @@index([dietitianAccountId])
   @@map("client_profiles")
+}
+
+model ClientChartNote {
+  id                 String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  dietitianAccountId String        @map("dietitian_account_id") @db.Uuid
+  clientId           String        @map("client_id") @db.Uuid
+  kind               ChartNoteKind
+  body               String        @db.Text
+  mealSlot           String?       @map("meal_slot")
+  notedAt            DateTime      @default(now()) @map("noted_at") @db.Timestamptz
+  createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+
+  client           Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  dietitianAccount DietitianAccount @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
+
+  @@index([dietitianAccountId, clientId, kind])
+  @@index([clientId, kind, createdAt])
+  @@index([clientId, kind, notedAt])
+  @@map("client_chart_notes")
 }
 
 model ClientGoal {
@@ -1831,7 +1861,7 @@ model PlatformSettings {
   contactHours              String?          @map("contact_hours")
   dietitianRegistrationEnabled Boolean       @default(false) @map("dietitian_registration_enabled")
   patientRegistrationEnabled   Boolean       @default(false) @map("patient_registration_enabled")
-  plansPageEnabled          Boolean          @default(true) @map("plans_page_enabled")
+  plansPageEnabled          Boolean          @default(false) @map("plans_page_enabled")
   emailNotificationsEnabled Boolean          @default(false) @map("email_notifications_enabled")
   createdAt                 DateTime         @default(now()) @map("created_at") @db.Timestamptz
   updatedAt                 DateTime         @updatedAt @map("updated_at") @db.Timestamptz

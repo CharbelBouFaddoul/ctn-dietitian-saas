@@ -39,6 +39,7 @@ const DIETITIAN_GROUPS: FeatureGroup[] = [
     title: "Clients & care",
     featureIds: [
       "d-clients",
+      "d-clinical-profile",
       "d-measurements",
       "d-timeline",
       "d-join-codes",
@@ -78,8 +79,8 @@ const DIETITIAN_GROUPS: FeatureGroup[] = [
   },
   {
     id: "advanced",
-    title: "AI & automations",
-    featureIds: ["d-ai", "d-automations"],
+    title: "Automations",
+    featureIds: ["d-automations"],
   },
 ];
 
@@ -193,7 +194,7 @@ function FeatureGroupGrid({
 export default function FeaturesPage() {
   const [activeKeys, setActiveKeys] = useState<Set<string> | null>(null);
   const [loading, setLoading] = useState(true);
-  const [plansHref, setPlansHref] = useState("/plans");
+  const [plansHref, setPlansHref] = useState("/contact");
 
   useEffect(() => {
     void fetch(`${API_URL}/api/v1/public/features`)
@@ -213,7 +214,7 @@ export default function FeaturesPage() {
       .then(async (res) => {
         if (!res.ok) return;
         const data = (await res.json()) as { plansPageEnabled?: boolean };
-        setPlansHref(data.plansPageEnabled === false ? "/contact" : "/plans");
+        setPlansHref(data.plansPageEnabled === true ? "/plans" : "/contact");
       })
       .catch(() => undefined);
   }, []);

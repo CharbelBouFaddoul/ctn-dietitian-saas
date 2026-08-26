@@ -1,14 +1,29 @@
 /** Default matches API `MAX_DOCUMENT_BYTES` (20 MB). Override server-side via env. */
 export const MAX_DOCUMENT_BYTES = 20 * 1024 * 1024;
 
-export const DOCUMENT_UPLOAD_HINT = "Max 20 MB · PDF, JPG, PNG, WebP, DOCX";
+export const DOCUMENT_UPLOAD_HINT = "Max 20 MB · PDF, JPG, PNG, WebP, Word, TXT";
 
 export const DOCUMENT_ACCEPT =
-  ".pdf,.png,.jpg,.jpeg,.webp,.docx,application/pdf,image/png,image/jpeg,image/webp";
+  ".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.txt,application/pdf,image/png,image/jpeg,image/webp,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain";
+
+export const CLINICAL_FILE_HINT = "Max 20 MB · PDF, Word, or TXT";
+
+export const CLINICAL_FILE_ACCEPT =
+  ".pdf,.doc,.docx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain";
 
 export function assertDocumentFileSize(file: File): void {
+  if (file.size <= 0) {
+    throw new Error("Empty files are not allowed");
+  }
   if (file.size > MAX_DOCUMENT_BYTES) {
     throw new Error("File exceeds the 20 MB limit");
+  }
+}
+
+export function assertClinicalDocumentFile(file: File): void {
+  assertDocumentFileSize(file);
+  if (!/\.(pdf|docx?|txt)$/i.test(file.name)) {
+    throw new Error("Use a PDF, Word, or TXT file");
   }
 }
 
@@ -16,7 +31,9 @@ export function documentTypeLabel(mimeType: string | undefined, filename: string
   const lower = filename.toLowerCase();
   if ((mimeType && mimeType.includes("pdf")) || lower.endsWith(".pdf")) return "PDF";
   if ((mimeType && mimeType.startsWith("image/")) || /\.(png|jpe?g|webp|gif)$/i.test(lower)) return "Image";
-  if ((mimeType && mimeType.includes("word")) || lower.endsWith(".docx") || lower.endsWith(".doc")) return "DOC";
+  if ((mimeType && (mimeType.includes("word") || mimeType === "application/msword")) || lower.endsWith(".docx") || lower.endsWith(".doc"))
+    return "DOC";
+  if ((mimeType && mimeType.includes("text/plain")) || lower.endsWith(".txt")) return "TXT";
   return "File";
 }
 

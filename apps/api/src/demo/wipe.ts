@@ -39,6 +39,7 @@ export async function wipeApplicationData(prisma: PrismaClient): Promise<void> {
   await prisma.appointment.deleteMany();
   await prisma.clientMeasurement.deleteMany();
   await prisma.clientGoal.deleteMany();
+  await prisma.clientChartNote.deleteMany();
   await prisma.clientTag.deleteMany();
   await prisma.clientProfile.deleteMany();
   await prisma.clientAssignment.deleteMany();
@@ -77,12 +78,13 @@ export async function seedPlatformBootstrap(
   await seedPlatformAssessmentTemplate(prisma);
   await seedPlatformSettings(prisma);
   await seedGlobalHabits(prisma);
-  const both = options?.registrationEnabled ?? true;
+  const both = options?.registrationEnabled ?? false;
   await prisma.platformSettings.updateMany({
     data: {
       dietitianRegistrationEnabled: options?.dietitianRegistrationEnabled ?? both,
       patientRegistrationEnabled: options?.patientRegistrationEnabled ?? both,
       emailNotificationsEnabled: false,
+      plansPageEnabled: false,
     },
   });
 }

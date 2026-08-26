@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { Alert, Button, Field, PasswordInput } from "@nutrition-saas/ui";
-import { api } from "../../../lib/api";
+import { api, API_URL } from "../../../lib/api";
 import { errorMessage } from "../../../lib/humanize-error";
 import { AuthShell } from "../auth-shell";
 
@@ -13,6 +13,7 @@ export default function InvitationPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [hasToken, setHasToken] = useState(false);
+  const [patientRegistrationEnabled, setPatientRegistrationEnabled] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -21,6 +22,22 @@ export default function InvitationPage() {
       setToken(fromQuery);
       setHasToken(true);
     }
+  }, []);
+
+  useEffect(() => {
+    void fetch(`${API_URL}/api/v1/public/site-settings`)
+      .then(async (res) => {
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          patientRegistrationEnabled?: boolean;
+          registrationEnabled?: boolean;
+        };
+        setPatientRegistrationEnabled(
+          data.patientRegistrationEnabled === true ||
+            (data.patientRegistrationEnabled === undefined && data.registrationEnabled === true),
+        );
+      })
+      .catch(() => undefined);
   }, []);
 
   async function onSubmit(event: FormEvent) {
@@ -91,16 +108,37 @@ export default function InvitationPage() {
     <AuthShell
       title="Join with a code"
       audience="client"
-      description="Create a client account, verify your email, and sign in. Then enter the join code your dietitian sends you."
+      description={
+        patientRegistrationEnabled
+          ? "Create a client account, verify your email, and sign in. Then enter the join code your dietitian sends you."
+          : "Sign in to your patient account, then enter the join code your dietitian sends you."
+      }
     >
-      <Link href="/auth/client/register" className="ui-btn ui-btn--primary ui-btn--block">
-        Create a client account
-      </Link>
-      <p style={{ marginTop: 16 }}>
-        Already registered?{" "}
-        <Link href="/auth/client/login" className="ui-link">
-          Sign in
+      {patientRegistrationEnabled ? (
+        <Link href="/auth/client/register" className="ui-btn ui-btn--primary ui-btn--block">
+          Create a client account
         </Link>
+      ) : (
+        <Link href="/auth/client/login" className="ui-btn ui-btn--primary ui-btn--block">
+          Sign in as Patient
+        </Link>
+      )}
+      <p style={{ marginTop: 16 }}>
+        {patientRegistrationEnabled ? (
+          <>
+            Already registered?{" "}
+            <Link href="/auth/client/login" className="ui-link">
+              Sign in
+            </Link>
+          </>
+        ) : (
+          <>
+            Need help joining?{" "}
+            <Link href="/contact" className="ui-link">
+              Contact us
+            </Link>
+          </>
+        )}
       </p>
     </AuthShell>
   );

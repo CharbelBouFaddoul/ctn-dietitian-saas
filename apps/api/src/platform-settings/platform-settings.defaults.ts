@@ -64,17 +64,17 @@ export const DEFAULT_PLATFORM_SETTINGS: PlatformSettingsPayload = {
   navItems: [
     { href: "/how-it-works", label: "How it works", visible: true, order: 0 },
     { href: "/features", label: "Features", visible: true, order: 1 },
-    { href: "/plans", label: "Plans", visible: true, order: 2 },
+    { href: "/plans", label: "Plans", visible: false, order: 2 },
     { href: "/faq", label: "FAQ", visible: true, order: 3 },
     { href: "/contact", label: "Contact", visible: true, order: 4 },
   ],
   ctaText: "Get Started",
-  ctaHref: "/plans",
+  ctaHref: "/contact",
   ctaVisible: true,
   dietitianRegistrationEnabled: false,
   patientRegistrationEnabled: false,
   registrationEnabled: false,
-  plansPageEnabled: true,
+  plansPageEnabled: false,
   emailNotificationsEnabled: false,
   dietitianSignInLabel: "Sign in as Dietitian",
   patientSignInLabel: "Sign in as Patient",
@@ -86,7 +86,6 @@ export const DEFAULT_PLATFORM_SETTINGS: PlatformSettingsPayload = {
       links: [
         { href: "/how-it-works", label: "How it works" },
         { href: "/features", label: "Features" },
-        { href: "/plans", label: "Plans" },
         { href: "/faq", label: "FAQ" },
         { href: "/contact", label: "Contact" },
       ],
@@ -95,7 +94,7 @@ export const DEFAULT_PLATFORM_SETTINGS: PlatformSettingsPayload = {
       title: "For Dietitians",
       links: [
         { href: "/auth/dietitian/login", label: "Dietitian sign in" },
-        { href: "/plans", label: "View plans" },
+        { href: "/contact", label: "Contact us" },
       ],
     },
     {

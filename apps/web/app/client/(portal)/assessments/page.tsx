@@ -44,9 +44,9 @@ export default function PortalAssessmentsPage() {
   return (
     <section className="ui-eval ui-eval--portal">
       <PageHeader
-        eyebrow="Assessments"
-        title="Patient evaluation"
-        description="Complete evaluations from your dietitian. Your answers stay with the active clinic connection."
+        eyebrow="Questionnaires"
+        title="Your forms"
+        description="Complete questionnaires from your dietitian. These are separate from the clinic’s standard chart notes."
       />
       {error ? <Alert tone="danger">{error}</Alert> : null}
       {loading ? <Skeleton style={{ height: 140, borderRadius: 14 }} /> : null}

@@ -363,8 +363,17 @@ export class ConversationService {
     client: { id: string; dietitianAccountId: string },
     readerUserId: string,
   ) {
-    const now = new Date();
     const dietitianAccountId = requireDietitianAccountId(client);
+    const latest = await this.prisma.message.findFirst({
+      where: { conversationId, deletedAt: null },
+      orderBy: { createdAt: "desc" },
+      select: { createdAt: true },
+    });
+    const now = new Date();
+    // Cover clock skew / seeded future-dated rows so opening a thread clears unread.
+    const lastReadAt =
+      latest?.createdAt && latest.createdAt.getTime() > now.getTime() ? latest.createdAt : now;
+
     await this.prisma.conversationReadState.upsert({
       where: {
         conversationId_readerUserId: { conversationId, readerUserId },
@@ -373,12 +382,12 @@ export class ConversationService {
         dietitianAccountId,
         conversationId,
         readerUserId,
-        lastReadAt: now,
+        lastReadAt,
       },
-      update: { lastReadAt: now },
+      update: { lastReadAt },
     });
 
-    const readAt = now.toISOString();
+    const readAt = lastReadAt.toISOString();
     this.realtime.emitMessageRead({
       conversationId,
       clientId: client.id,
@@ -414,7 +423,7 @@ export class ConversationService {
     return { readAt };
   }
 
-  async unreadCount(conversationId: string, readerUserId: string, excludeSenderUserId?: string): Promise<number> {
+  async unreadCount(conversationId: string, readerUserId: string): Promise<number> {
     const state = await this.prisma.conversationReadState.findUnique({
       where: { conversationId_readerUserId: { conversationId, readerUserId } },
     });
@@ -424,7 +433,7 @@ export class ConversationService {
         conversationId,
         createdAt: { gt: since },
         deletedAt: null,
-        ...(excludeSenderUserId ? { senderUserId: { not: excludeSenderUserId } } : {}),
+        senderUserId: { not: readerUserId },
       },
     });
   }

@@ -58,7 +58,7 @@ function AdminSiteSettingsForm() {
   const [ctaVisible, setCtaVisible] = useState(true);
   const [dietitianRegistrationEnabled, setDietitianRegistrationEnabled] = useState(false);
   const [patientRegistrationEnabled, setPatientRegistrationEnabled] = useState(false);
-  const [plansPageEnabled, setPlansPageEnabled] = useState(true);
+  const [plansPageEnabled, setPlansPageEnabled] = useState(false);
   const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState(false);
   const [dietitianSignInLabel, setDietitianSignInLabel] = useState("");
   const [patientSignInLabel, setPatientSignInLabel] = useState("");
@@ -81,7 +81,7 @@ function AdminSiteSettingsForm() {
       data.dietitianRegistrationEnabled ?? data.registrationEnabled,
     );
     setPatientRegistrationEnabled(data.patientRegistrationEnabled ?? data.registrationEnabled);
-    setPlansPageEnabled(data.plansPageEnabled !== false);
+    setPlansPageEnabled(data.plansPageEnabled === true);
     setEmailNotificationsEnabled(data.emailNotificationsEnabled === true);
     setDietitianSignInLabel(data.dietitianSignInLabel);
     setPatientSignInLabel(data.patientSignInLabel);

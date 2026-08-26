@@ -65,7 +65,7 @@ function ProductPreview() {
 }
 
 export default function HomePage() {
-  const [getStartedHref, setGetStartedHref] = useState("/plans");
+  const [getStartedHref, setGetStartedHref] = useState("/contact");
   const dietitianHighlights = highlightedFeatures("dietitian").slice(0, 4);
   const patientHighlights = highlightedFeatures("patient").slice(0, 4);
 
@@ -74,7 +74,7 @@ export default function HomePage() {
       .then(async (res) => {
         if (!res.ok) return;
         const data = (await res.json()) as { plansPageEnabled?: boolean };
-        setGetStartedHref(data.plansPageEnabled === false ? "/contact" : "/plans");
+        setGetStartedHref(data.plansPageEnabled === true ? "/plans" : "/contact");
       })
       .catch(() => undefined);
   }, []);
@@ -195,7 +195,7 @@ export default function HomePage() {
             </li>
             <li>
               <strong>Clinic operations included</strong>
-              <span>Calendar, tasks, analytics, and optional AI assistance and automations when your plan includes them.</span>
+              <span>Calendar, tasks, analytics, and optional automations when your plan includes them.</span>
             </li>
           </ul>
         </div>

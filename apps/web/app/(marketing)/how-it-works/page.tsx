@@ -100,8 +100,8 @@ export default function HowItWorksPage() {
                 <li>Message, schedule appointments, and manage invoices</li>
                 <li>Use analytics — plus AI and automations when your plan includes them</li>
               </ul>
-              <Link href="/plans" className="ui-link">
-                View plans →
+              <Link href="/contact" className="ui-link">
+                Contact us →
               </Link>
             </article>
             <article className="ui-mkt__experience ui-mkt__experience--patient">

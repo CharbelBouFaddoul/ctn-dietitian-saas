@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Alert,
@@ -11,6 +11,7 @@ import {
 import { api } from "../../../lib/api";
 import { errorMessage } from "../../../lib/humanize-error";
 import { formatDate } from "../../../lib/format";
+import { useMessagingRealtime } from "../../../lib/realtime";
 import { PatientAccents } from "./patient-accents";
 
 interface PortalDashboard {
@@ -69,13 +70,54 @@ export default function ClientHomePage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const loadDashboard = useCallback(async () => {
+    const next = await api<PortalDashboard>("/api/v1/portal/dashboard");
+    setData(next);
+    return next;
+  }, []);
+
   useEffect(() => {
     setLoading(true);
-    void api<PortalDashboard>("/api/v1/portal/dashboard")
-      .then(setData)
+    void loadDashboard()
       .catch((err) => setError(errorMessage(err, "Unable to load your home")))
       .finally(() => setLoading(false));
-  }, []);
+  }, [loadDashboard]);
+
+  useEffect(() => {
+    function onMessagesRead() {
+      setData((prev) =>
+        prev
+          ? {
+              ...prev,
+              messages: { ...prev.messages, unreadCount: 0 },
+            }
+          : prev,
+      );
+      void loadDashboard().catch(() => undefined);
+    }
+    window.addEventListener("portal-messages-read", onMessagesRead);
+    return () => window.removeEventListener("portal-messages-read", onMessagesRead);
+  }, [loadDashboard]);
+
+  useMessagingRealtime(true, {
+    onUnreadUpdated: (event) => {
+      setData((prev) =>
+        prev
+          ? {
+              ...prev,
+              messages: {
+                ...prev.messages,
+                unreadCount: typeof event.unreadCount === "number" ? event.unreadCount : prev.messages.unreadCount,
+              },
+            }
+          : prev,
+      );
+      void loadDashboard().catch(() => undefined);
+    },
+    onMessageCreated: () => {
+      void loadDashboard().catch(() => undefined);
+    },
+  });
 
   const greeting = useMemo(() => greetingForNow(), []);
   const dateLabel = useMemo(() => todayLabel(), []);

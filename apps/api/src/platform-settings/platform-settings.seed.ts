@@ -9,7 +9,14 @@ export async function seedPlatformSettings(prisma: PrismaClient): Promise<void> 
   const defaults = DEFAULT_PLATFORM_SETTINGS;
   await prisma.platformSettings.upsert({
     where: { id: PLATFORM_SETTINGS_SINGLETON_ID },
-    update: {},
+    update: {
+      plansPageEnabled: defaults.plansPageEnabled,
+      ctaHref: defaults.ctaHref,
+      navItems: defaults.navItems as unknown as Prisma.InputJsonValue,
+      footerGroups: defaults.footerGroups as unknown as Prisma.InputJsonValue,
+      dietitianRegistrationEnabled: defaults.dietitianRegistrationEnabled,
+      patientRegistrationEnabled: defaults.patientRegistrationEnabled,
+    },
     create: {
       id: PLATFORM_SETTINGS_SINGLETON_ID,
       brandText: defaults.brandText,

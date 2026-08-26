@@ -9,7 +9,6 @@ import {
   Badge,
   Breadcrumbs,
   Button,
-  Checkbox,
   ConfirmDialog,
   Dialog,
   EmptyState,
@@ -18,31 +17,27 @@ import {
   LoadingState,
   PageHeader,
   Section,
-  Select,
   Skeleton,
   StatusBadge,
   Table,
   Tabs,
   Td,
-  Textarea,
   humanizeLabel,
 } from "@nutrition-saas/ui";
 import { AiPanel } from "../../../../../components/ai-panel";
-import { DocumentsLibrary, type DocumentsLibraryItem } from "../../../../../components/documents-library";
 import { JoinCodePanel } from "../../../../../components/join-code-panel";
 import { ClientAssessmentsPanel } from "../../../../../components/client-assessments-panel";
+import { ClientClinicalProfilePanel } from "../../../../../components/client-clinical-profile-panel";
 import { ClientEvolutionPanel } from "../../../../../components/client-evolution-panel";
 import { ClientTimelinePanel } from "../../../../../components/client-timeline-panel";
 import { ClientTrackingPanel } from "../../../../../components/client-tracking-panel";
-import { ClinicTagsManager } from "../../../../../components/clinic-tags-manager";
-import { api, apiUrl } from "../../../../../lib/api";
+import { api } from "../../../../../lib/api";
 import {
   combineLocalDateTime,
   toDateInputValue,
   toTimeInputValue,
 } from "../../../../../lib/calendar-range";
-import { downloadAuthenticatedFile } from "../../../../../lib/documents";
-import { formatDate, formatMoney } from "../../../../../lib/format";
+import { ageInYears, formatDate, formatFullDate, formatMoney } from "../../../../../lib/format";
 import { errorMessage } from "../../../../../lib/humanize-error";
 import { canManageClients } from "../../../../../lib/practice-access";
 import { portalStatusLabel, statusLabel, activityLabel } from "../../../../../lib/practice-labels";
@@ -51,13 +46,11 @@ import { usePractice } from "../../practice-shell";
 type Tab =
   | "overview"
   | "evolution"
-  | "personal"
+  | "clinical"
   | "assessments"
-  | "goals"
   | "meal-plan"
   | "tracking"
   | "messages"
-  | "documents"
   | "invoices"
   | "appointments"
   | "timeline"
@@ -70,8 +63,13 @@ type ChartSection = {
   tabs: Array<{ id: Tab; label: string }>;
 };
 
-const MEASUREMENTS_PAGE_SIZE = 8;
 const TIMELINE_PAGE_SIZE = 25;
+
+const LEGACY_TABS: Record<string, Tab> = {
+  personal: "clinical",
+  goals: "clinical",
+  documents: "clinical",
+};
 
 const chartSections: ChartSection[] = [
   {
@@ -83,14 +81,9 @@ const chartSections: ChartSection[] = [
     id: "personal",
     label: "Personal data",
     tabs: [
-      { id: "personal", label: "Profile" },
-      { id: "goals", label: "Goals" },
+      { id: "clinical", label: "Clinical profile" },
+      { id: "assessments", label: "Custom forms" },
     ],
-  },
-  {
-    id: "evaluation",
-    label: "Evaluation",
-    tabs: [{ id: "assessments", label: "Patient evaluation" }],
   },
   {
     id: "progress",
@@ -108,10 +101,9 @@ const chartSections: ChartSection[] = [
   },
   {
     id: "care",
-    label: "Appointments & documents",
+    label: "Appointments",
     tabs: [
       { id: "appointments", label: "Appointments" },
-      { id: "documents", label: "Documents" },
       { id: "messages", label: "Messages" },
     ],
   },
@@ -141,6 +133,12 @@ function chartSectionsForAi(aiAvailable: boolean): ChartSection[] {
 
 function isTab(value: string | null, sections: ChartSection[]): value is Tab {
   return sections.some((section) => section.tabs.some((item) => item.id === value));
+}
+
+function resolveTab(value: string | null, sections: ChartSection[]): Tab {
+  const mapped = value && LEGACY_TABS[value] ? LEGACY_TABS[value] : value;
+  if (isTab(mapped, sections)) return mapped;
+  return "overview";
 }
 
 function sectionForTab(tab: Tab, sections: ChartSection[]): ChartSection {
@@ -243,37 +241,9 @@ type Portfolio = {
   quickLinks: Array<{ tab: string; label: string }>;
 };
 
-type ClientForm = {
-  firstName: string;
-  lastName: string;
-  displayName: string;
-  email: string;
-  phone: string;
-  dateOfBirth: string;
-  sex: string;
-};
-
-type ProfileForm = {
-  nutritionContext: string;
-  preferences: string;
-  dietaryPreferences: string;
-  allergies: string;
-  intolerances: string;
-  lifestyle: string;
-  notes: string;
-  emergencyContactName: string;
-  emergencyContactPhone: string;
-};
-
-type GoalRow = {
-  id: string;
-  title: string;
-  description: string | null;
-  status: string;
-  targetValue: number | null;
-  targetUnit: string | null;
-  targetDate: string | null;
-};
+function measurementOf(portfolio: Portfolio, type: string) {
+  return portfolio.latestMeasurements.find((row) => row.type === type) ?? null;
+}
 
 type TimelineRow = {
   id: string;
@@ -282,72 +252,6 @@ type TimelineRow = {
   targetType: string | null;
   targetId: string | null;
 };
-
-type MeasurementRow = {
-  id: string;
-  type: string;
-  value: number;
-  unit: string;
-  measuredAt: string;
-};
-
-function emptyClientForm(): ClientForm {
-  return {
-    firstName: "",
-    lastName: "",
-    displayName: "",
-    email: "",
-    phone: "",
-    dateOfBirth: "",
-    sex: "UNSPECIFIED",
-  };
-}
-
-function emptyProfileForm(): ProfileForm {
-  return {
-    nutritionContext: "",
-    preferences: "",
-    dietaryPreferences: "",
-    allergies: "",
-    intolerances: "",
-    lifestyle: "",
-    notes: "",
-    emergencyContactName: "",
-    emergencyContactPhone: "",
-  };
-}
-
-function clientFormFromPortfolio(portfolio: Portfolio): ClientForm {
-  const c = portfolio.client;
-  return {
-    firstName: c.firstName,
-    lastName: c.lastName,
-    displayName: c.displayName ?? "",
-    email: c.email ?? "",
-    phone: c.phone ?? "",
-    dateOfBirth: c.dateOfBirth?.slice(0, 10) ?? "",
-    sex: c.sex ?? "UNSPECIFIED",
-  };
-}
-
-function profileFormFromPortfolio(portfolio: Portfolio): ProfileForm {
-  const p = portfolio.profile;
-  return {
-    nutritionContext: p?.nutritionContext ?? "",
-    preferences: p?.preferences ?? "",
-    dietaryPreferences: p?.dietaryPreferences ?? "",
-    allergies: p?.allergies ?? "",
-    intolerances: p?.intolerances ?? "",
-    lifestyle: p?.lifestyle ?? "",
-    notes: p?.notes ?? "",
-    emergencyContactName: p?.emergencyContactName ?? "",
-    emergencyContactPhone: p?.emergencyContactPhone ?? "",
-  };
-}
-
-function measurementOf(portfolio: Portfolio, type: string) {
-  return portfolio.latestMeasurements.find((row) => row.type === type) ?? null;
-}
 
 export default function ClientWorkspaceRoute() {
   return (
@@ -386,27 +290,18 @@ function ClientWorkspacePage() {
   const base = `/api/v1/dietitian/${dietitianAccountId}/clients/${clientId}`;
   const orgBase = `/api/v1/dietitian/${dietitianAccountId}`;
   const tabFromQuery = searchParams.get("tab");
-  const [tab, setTab] = useState<Tab>(() =>
-    isTab(tabFromQuery, chartSectionsForAi(true)) && !(tabFromQuery === "ai" && !practice.aiAvailable)
-      ? (tabFromQuery as Tab)
-      : "overview",
-  );
+  const [tab, setTab] = useState<Tab>(() => {
+    const next = resolveTab(tabFromQuery, chartSectionsForAi(true));
+    if (next === "ai" && !practice.aiAvailable) return "overview";
+    return next;
+  });
 
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showCreatedTip, setShowCreatedTip] = useState(() => searchParams.get("created") === "1");
 
-  const [clientForm, setClientForm] = useState<ClientForm>(emptyClientForm);
-  const [profileForm, setProfileForm] = useState<ProfileForm>(emptyProfileForm);
   const [orgTags, setOrgTags] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
-  const [measurements, setMeasurements] = useState<MeasurementRow[]>([]);
-  const [measurementsPage, setMeasurementsPage] = useState(1);
-  const [weight, setWeight] = useState("");
-
-  const [goals, setGoals] = useState<GoalRow[]>([]);
-  const [goalTitle, setGoalTitle] = useState("");
-  const [goalDescription, setGoalDescription] = useState("");
 
   const [plans, setPlans] = useState<Array<{ id: string; name: string; status: string; client: { id: string } }>>([]);
 
@@ -472,9 +367,6 @@ function ClientWorkspacePage() {
     setTrackingDate(next.toISOString().slice(0, 10));
   }
 
-  const [clientDocuments, setClientDocuments] = useState<DocumentsLibraryItem[]>([]);
-  const [documentsUploading, setDocumentsUploading] = useState(false);
-  const [documentsDownloadingId, setDocumentsDownloadingId] = useState<string | null>(null);
   const [clientInvoices, setClientInvoices] = useState<
     Array<{ id: string; invoiceNumber: string | null; status: string; dueDate: string | null; total: number; currency: string }>
   >([]);
@@ -520,7 +412,11 @@ function ClientWorkspacePage() {
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
 
   function selectTab(next: string, extras?: { metric?: string }) {
-    const value = isTab(next, visibleSections) ? next : "overview";
+    const value = resolveTab(next, visibleSections);
+    if (next === "ai" && !practice.aiAvailable) {
+      setTab("overview");
+      return;
+    }
     if (value === "messages") {
       router.push(`/practice/${dietitianAccountId}/messages?clientId=${clientId}`);
       return;
@@ -563,8 +459,6 @@ function ClientWorkspacePage() {
 
   function applyPortfolio(data: Portfolio) {
     setPortfolio(data);
-    setClientForm(clientFormFromPortfolio(data));
-    setProfileForm(profileFormFromPortfolio(data));
     setSelectedTagIds(data.client.tags.map((tag) => tag.id));
     setTimelineNotes(data.profile?.notes ?? "");
   }
@@ -591,17 +485,6 @@ function ClientWorkspacePage() {
     } catch (err) {
       setError(errorMessage(err, "Unable to load client"));
     }
-  }
-
-  async function loadGoals() {
-    const rows = await api<GoalRow[]>(`${base}/goals`);
-    setGoals(rows);
-  }
-
-  async function loadMeasurements() {
-    const rows = await api<MeasurementRow[]>(`${base}/measurements`);
-    setMeasurements(rows);
-    setMeasurementsPage(1);
   }
 
   async function loadAppointments() {
@@ -655,14 +538,11 @@ function ClientWorkspacePage() {
   }, [dietitianAccountId, clientId]);
 
   useEffect(() => {
-    if (tab !== "personal") return;
-    void loadMeasurements().catch((err) => setError(errorMessage(err, "Unable to load measurements")));
-  }, [tab, base]);
-
-  useEffect(() => {
-    if (tab !== "goals") return;
-    void loadGoals().catch((err) => setError(errorMessage(err, "Unable to load goals")));
-  }, [tab, base]);
+    const raw = searchParams.get("tab");
+    if (raw && LEGACY_TABS[raw]) {
+      selectTab(LEGACY_TABS[raw]!);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (tab !== "timeline") return;
@@ -699,13 +579,6 @@ function ClientWorkspacePage() {
   }, [tab, trackingDate, base, dietitianAccountId]);
 
   useEffect(() => {
-    if (tab !== "documents") return;
-    void api<typeof clientDocuments>(`${base}/documents`)
-      .then(setClientDocuments)
-      .catch((err) => setError(errorMessage(err, "Unable to load documents")));
-  }, [tab, base]);
-
-  useEffect(() => {
     if (tab !== "invoices") return;
     void api<typeof clientInvoices>(`${base}/invoices`)
       .then(setClientInvoices)
@@ -724,6 +597,7 @@ function ClientWorkspacePage() {
     weightMeasurement && previousWeight && weightMeasurement.unit === previousWeight.unit
       ? Math.round((weightMeasurement.value - previousWeight.value) * 1000) / 1000
       : null;
+  const clientAgeYears = ageInYears(client?.dateOfBirth);
 
   function dismissCreatedTip() {
     setShowCreatedTip(false);
@@ -809,6 +683,22 @@ function ClientWorkspacePage() {
         <div className="ui-client-chart__panel ui-stack">
           <div className="ui-client-chart__snapshot">
             <div className="ui-client-chart__vitals" role="group" aria-label="Body metrics">
+              <button type="button" className="ui-client-chart__vital" onClick={() => selectTab("clinical")}>
+                <span className="ui-client-chart__metric-label">Age</span>
+                <span className="ui-client-chart__vital-value">
+                  {clientAgeYears != null ? (
+                    <>
+                      {clientAgeYears}
+                      <span className="ui-client-chart__vital-unit">years</span>
+                    </>
+                  ) : (
+                    "—"
+                  )}
+                </span>
+                <span className="ui-client-chart__vital-meta">
+                  {client?.dateOfBirth ? formatFullDate(client.dateOfBirth) : "Date of birth not set"}
+                </span>
+              </button>
               <button type="button" className="ui-client-chart__vital" onClick={() => openEvolution("WEIGHT")}>
                 <span className="ui-client-chart__metric-label">Weight</span>
                 <span className="ui-client-chart__vital-value">
@@ -905,7 +795,7 @@ function ClientWorkspacePage() {
                     : "Manage this chart without portal login"}
                 </span>
               </button>
-              <button type="button" className="ui-client-chart__care-card" onClick={() => selectTab("goals")}>
+              <button type="button" className="ui-client-chart__care-card" onClick={() => selectTab("clinical")}>
                 <span className="ui-client-chart__metric-label">Primary goal</span>
                 <span className="ui-client-chart__care-value">{portfolio.primaryGoal?.title ?? "No goal set"}</span>
                 {portfolio.activeGoalsCount > 0 ? (
@@ -1007,16 +897,6 @@ function ClientWorkspacePage() {
             )}
           </Section>
 
-          <Section title="Quick links">
-            <div className="ui-client-chart__toolbar" style={{ flexWrap: "wrap" }}>
-              {portfolio.quickLinks.map((link) => (
-                <Button key={link.tab} variant="secondary" size="sm" onClick={() => selectTab(link.tab)}>
-                  {link.label}
-                </Button>
-              ))}
-            </div>
-          </Section>
-
           {allowManage && client?.status === "ACTIVE" ? (
             <Section title="Chart management">
               <div className="ui-client-chart__toolbar">
@@ -1047,300 +927,27 @@ function ClientWorkspacePage() {
         />
       ) : null}
 
-      {/* ── PERSONAL ── */}
-      {tab === "personal" && portfolio ? (
-        <div className="ui-client-chart__panel ui-stack">
-          <Section title="Identity & contact">
-            <form
-              onSubmit={(event) => {
-                event.preventDefault();
-                void api(base, {
-                  method: "PATCH",
-                  body: JSON.stringify({
-                    firstName: clientForm.firstName,
-                    lastName: clientForm.lastName,
-                    displayName: clientForm.displayName || undefined,
-                    email: clientForm.email || undefined,
-                    phone: clientForm.phone || undefined,
-                    dateOfBirth: clientForm.dateOfBirth || undefined,
-                    sex: clientForm.sex || undefined,
-                  }),
-                })
-                  .then(() => loadPortfolio())
-                  .catch((err) => setError(errorMessage(err, "Unable to save client")));
-              }}
-            >
-              <div className="ui-client-chart__form-grid">
-                <Field label="First name">
-                  <Input
-                    value={clientForm.firstName}
-                    onChange={(event) => setClientForm({ ...clientForm, firstName: event.target.value })}
-                    required
-                  />
-                </Field>
-                <Field label="Last name">
-                  <Input
-                    value={clientForm.lastName}
-                    onChange={(event) => setClientForm({ ...clientForm, lastName: event.target.value })}
-                    required
-                  />
-                </Field>
-                <Field label="Display name">
-                  <Input
-                    value={clientForm.displayName}
-                    onChange={(event) => setClientForm({ ...clientForm, displayName: event.target.value })}
-                  />
-                </Field>
-                <Field label="Email">
-                  <Input
-                    type="email"
-                    value={clientForm.email}
-                    onChange={(event) => setClientForm({ ...clientForm, email: event.target.value })}
-                  />
-                </Field>
-                <Field label="Phone">
-                  <Input
-                    type="tel"
-                    value={clientForm.phone}
-                    onChange={(event) => setClientForm({ ...clientForm, phone: event.target.value })}
-                    placeholder="+961 71 123 456"
-                  />
-                </Field>
-                <Field label="Date of birth">
-                  <Input
-                    type="date"
-                    value={clientForm.dateOfBirth}
-                    onChange={(event) => setClientForm({ ...clientForm, dateOfBirth: event.target.value })}
-                  />
-                </Field>
-                <Field label="Sex">
-                  <Select
-                    value={clientForm.sex}
-                    onChange={(event) => setClientForm({ ...clientForm, sex: event.target.value })}
-                  >
-                    <option value="FEMALE">Female</option>
-                    <option value="MALE">Male</option>
-                    <option value="OTHER">Other</option>
-                    <option value="UNSPECIFIED">Unspecified</option>
-                  </Select>
-                </Field>
-              </div>
-              <Button type="submit" size="sm" variant="secondary" disabled={!allowManage}>
-                Save identity
-              </Button>
-            </form>
-          </Section>
-
-          <Section title="Nutrition profile">
-            <form
-              onSubmit={(event) => {
-                event.preventDefault();
-                void api(`${base}/profile`, {
-                  method: "PATCH",
-                  body: JSON.stringify(profileForm),
-                })
-                  .then(() => loadPortfolio())
-                  .catch((err) => setError(errorMessage(err, "Unable to save profile")));
-              }}
-            >
-              <div className="ui-client-chart__form-grid">
-                {(
-                  [
-                    ["nutritionContext", "Nutrition context"],
-                    ["preferences", "Preferences"],
-                    ["dietaryPreferences", "Dietary preferences"],
-                    ["allergies", "Allergies"],
-                    ["intolerances", "Intolerances"],
-                    ["lifestyle", "Lifestyle"],
-                    ["notes", "Notes"],
-                  ] as const
-                ).map(([key, label]) => (
-                  <Field key={key} label={label}>
-                    <Textarea
-                      value={profileForm[key]}
-                      onChange={(event) => setProfileForm({ ...profileForm, [key]: event.target.value })}
-                      style={{ minHeight: 80 }}
-                    />
-                  </Field>
-                ))}
-                <Field label="Emergency contact name">
-                  <Input
-                    value={profileForm.emergencyContactName}
-                    onChange={(event) =>
-                      setProfileForm({ ...profileForm, emergencyContactName: event.target.value })
-                    }
-                  />
-                </Field>
-                <Field label="Emergency contact phone">
-                  <Input
-                    value={profileForm.emergencyContactPhone}
-                    onChange={(event) =>
-                      setProfileForm({ ...profileForm, emergencyContactPhone: event.target.value })
-                    }
-                  />
-                </Field>
-              </div>
-              <Button type="submit" size="sm" variant="secondary" disabled={!allowManage}>
-                Save profile
-              </Button>
-            </form>
-          </Section>
-
-          <Section title="Tags">
-            <div className="ui-client-tags">
-              <ClinicTagsManager
-                dietitianAccountId={dietitianAccountId}
-                tags={orgTags}
-                disabled={!allowManage}
-                compact
-                onChange={(next) => {
-                  setOrgTags(next);
-                  setSelectedTagIds((prev) => prev.filter((id) => next.some((tag) => tag.id === id)));
-                  void loadPortfolio();
-                }}
-              />
-              {orgTags.length > 0 ? (
-                <form
-                  className="ui-client-tags__assign"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    void api(`${orgBase}/clients/${clientId}/tags`, {
-                      method: "PUT",
-                      body: JSON.stringify({ tagIds: selectedTagIds }),
-                    })
-                      .then(() => loadPortfolio())
-                      .catch((err) => setError(errorMessage(err, "Unable to save tags")));
-                  }}
-                >
-                  <p className="ui-client-tags__assign-label">Assigned to this client</p>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 12 }}>
-                    {orgTags.map((tag) => (
-                      <Checkbox
-                        key={tag.id}
-                        label={tag.name}
-                        checked={selectedTagIds.includes(tag.id)}
-                        disabled={!allowManage}
-                        onChange={(event) => {
-                          const checked = event.target.checked;
-                          setSelectedTagIds((prev) =>
-                            checked ? [...prev, tag.id] : prev.filter((id) => id !== tag.id),
-                          );
-                        }}
-                      />
-                    ))}
-                  </div>
-                  <Button type="submit" size="sm" variant="secondary" disabled={!allowManage}>
-                    Save tags
-                  </Button>
-                </form>
-              ) : null}
-            </div>
-          </Section>
-
-          <Section title="Measurements">
-            {allowManage ? (
-              <form
-                className="ui-client-chart__measure-form"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void api(`${base}/measurements`, {
-                    method: "POST",
-                    body: JSON.stringify({
-                      type: "WEIGHT",
-                      value: Number(weight),
-                      unit: "kg",
-                      measuredAt: new Date().toISOString(),
-                    }),
-                  })
-                    .then(() => {
-                      setWeight("");
-                      return Promise.all([loadMeasurements(), loadPortfolio()]);
-                    })
-                    .catch((err) => setError(errorMessage(err, "Unable to record measurement")));
-                }}
-              >
-                <Field label="Weight (kg)">
-                  <Input
-                    type="number"
-                    step="0.1"
-                    value={weight}
-                    onChange={(event) => setWeight(event.target.value)}
-                    placeholder="e.g. 72.5"
-                    required
-                  />
-                </Field>
-                <div className="ui-client-chart__measure-action">
-                  <span className="ui-label" aria-hidden="true">
-                    Record
-                  </span>
-                  <Button type="submit" size="sm" variant="secondary">
-                    Record
-                  </Button>
-                </div>
-              </form>
-            ) : null}
-            {measurements.length === 0 ? (
-              <EmptyState title="No measurements yet" />
-            ) : (
-              <>
-                <Table>
-                  <thead>
-                    <tr>
-                      <th style={{ width: "28%" }}>Type</th>
-                      <th style={{ width: "28%" }}>Value</th>
-                      <th style={{ width: "44%" }}>Date</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {measurements
-                      .slice(
-                        (measurementsPage - 1) * MEASUREMENTS_PAGE_SIZE,
-                        measurementsPage * MEASUREMENTS_PAGE_SIZE,
-                      )
-                      .map((row) => (
-                        <tr key={row.id}>
-                          <Td label="Type">{humanizeLabel(row.type)}</Td>
-                          <Td label="Value">
-                            {row.value} {row.unit}
-                          </Td>
-                          <Td label="Date">{formatDate(row.measuredAt)}</Td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </Table>
-                {measurements.length > MEASUREMENTS_PAGE_SIZE ? (
-                  <p className="ui-row" style={{ marginTop: 12 }}>
-                    <span className="ui-muted">
-                      Page {measurementsPage} of{" "}
-                      {Math.max(1, Math.ceil(measurements.length / MEASUREMENTS_PAGE_SIZE))}
-                      {" · "}
-                      {measurements.length} total
-                    </span>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      disabled={measurementsPage <= 1}
-                      onClick={() => setMeasurementsPage((p) => p - 1)}
-                    >
-                      Previous
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      disabled={measurementsPage >= Math.ceil(measurements.length / MEASUREMENTS_PAGE_SIZE)}
-                      onClick={() => setMeasurementsPage((p) => p + 1)}
-                    >
-                      Next
-                    </Button>
-                  </p>
-                ) : null}
-              </>
-            )}
-          </Section>
+      {/* ── CLINICAL ── */}
+      {tab === "clinical" && portfolio ? (
+        <div className="ui-client-chart__panel">
+          <ClientClinicalProfilePanel
+            dietitianAccountId={dietitianAccountId}
+            clientId={clientId}
+            base={base}
+            orgBase={orgBase}
+            allowManage={allowManage}
+            client={portfolio.client}
+            orgTags={orgTags}
+            selectedTagIds={selectedTagIds}
+            onOrgTagsChange={setOrgTags}
+            onSelectedTagIdsChange={setSelectedTagIds}
+            onError={setError}
+            onPortfolioRefresh={loadPortfolio}
+          />
         </div>
       ) : null}
 
-      {/* ── ASSESSMENTS ── */}
+      {/* ── CUSTOM FORMS ── */}
       {tab === "assessments" ? (
         <ClientAssessmentsPanel
           dietitianAccountId={dietitianAccountId}
@@ -1353,108 +960,6 @@ function ClientWorkspacePage() {
             await loadPortfolio();
           }}
         />
-      ) : null}
-
-      {/* ── GOALS ── */}
-      {tab === "goals" ? (
-        <div className="ui-client-chart__panel ui-stack">
-          <Section title="Add goal">
-            <form
-              onSubmit={(event) => {
-                event.preventDefault();
-                void api(`${base}/goals`, {
-                  method: "POST",
-                  body: JSON.stringify({
-                    title: goalTitle,
-                    description: goalDescription || undefined,
-                  }),
-                })
-                  .then(() => {
-                    setGoalTitle("");
-                    setGoalDescription("");
-                    return Promise.all([loadGoals(), loadPortfolio()]);
-                  })
-                  .catch((err) => setError(errorMessage(err, "Unable to add goal")));
-              }}
-            >
-              <div className="ui-client-chart__form-grid">
-                <Field label="Title">
-                  <Input
-                    value={goalTitle}
-                    onChange={(event) => setGoalTitle(event.target.value)}
-                    placeholder="New goal…"
-                    required
-                    disabled={!allowManage}
-                  />
-                </Field>
-                <Field label="Description">
-                  <Textarea
-                    value={goalDescription}
-                    onChange={(event) => setGoalDescription(event.target.value)}
-                    style={{ minHeight: 80 }}
-                    disabled={!allowManage}
-                  />
-                </Field>
-              </div>
-              <Button type="submit" size="sm" variant="secondary" disabled={!allowManage || !goalTitle.trim()}>
-                Add goal
-              </Button>
-            </form>
-          </Section>
-
-          <Section title="Goals">
-            {goals.length === 0 ? (
-              <EmptyState title="No goals yet" />
-            ) : (
-              <ul className="ui-client-chart__list">
-                {goals.map((goal) => (
-                  <li key={goal.id} style={{ alignItems: "flex-start" }}>
-                    <div>
-                      <div style={{ fontWeight: 500 }}>{goal.title}</div>
-                      {goal.description ? <div className="ui-hint">{goal.description}</div> : null}
-                      {goal.targetValue != null ? (
-                        <div className="ui-hint">
-                          Target: {goal.targetValue}
-                          {goal.targetUnit ? ` ${goal.targetUnit}` : ""}
-                          {goal.targetDate ? ` by ${goal.targetDate}` : ""}
-                        </div>
-                      ) : null}
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <StatusBadge status={goal.status} label={humanizeLabel(goal.status)} />
-                      {goal.status === "ACTIVE" && allowManage ? (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={() => {
-                              void api(`${base}/goals/${goal.id}/complete`, { method: "POST" })
-                                .then(() => Promise.all([loadGoals(), loadPortfolio()]))
-                                .catch((err) => setError(errorMessage(err, "Unable to complete goal")));
-                            }}
-                          >
-                            Complete
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => {
-                              void api(`${base}/goals/${goal.id}/cancel`, { method: "POST" })
-                                .then(() => Promise.all([loadGoals(), loadPortfolio()]))
-                                .catch((err) => setError(errorMessage(err, "Unable to cancel goal")));
-                            }}
-                          >
-                            Cancel
-                          </Button>
-                        </>
-                      ) : null}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Section>
-        </div>
       ) : null}
 
       {/* ── MEAL PLAN ── */}
@@ -1549,55 +1054,6 @@ function ClientWorkspacePage() {
       {tab === "messages" ? (
         <div className="ui-client-chart__panel">
           <LoadingState>Opening client chat…</LoadingState>
-        </div>
-      ) : null}
-
-      {/* ── DOCUMENTS ── */}
-      {tab === "documents" ? (
-        <div className="ui-client-chart__panel">
-          <DocumentsLibrary
-            variant="clinic"
-            documents={clientDocuments}
-            uploading={documentsUploading}
-            downloadingId={documentsDownloadingId}
-            onUpload={async (file, visibility) => {
-              setDocumentsUploading(true);
-              setError(null);
-              try {
-                const body = new FormData();
-                body.append("file", file);
-                body.append("visibility", visibility);
-                const res = await fetch(apiUrl(`${base}/documents`), {
-                  method: "POST",
-                  body,
-                  credentials: "include",
-                });
-                if (!res.ok) {
-                  throw new Error(res.status === 413 ? "File exceeds the 20 MB limit" : "Upload failed");
-                }
-                setClientDocuments(await api<DocumentsLibraryItem[]>(`${base}/documents`));
-              } catch (err) {
-                setError(errorMessage(err, "Unable to upload document"));
-                throw err;
-              } finally {
-                setDocumentsUploading(false);
-              }
-            }}
-            onDownload={async (doc) => {
-              setDocumentsDownloadingId(doc.id);
-              setError(null);
-              try {
-                await downloadAuthenticatedFile(
-                  apiUrl(`${base}/documents/${doc.id}/download`),
-                  doc.filename,
-                );
-              } catch (err) {
-                setError(errorMessage(err, "Unable to download document"));
-              } finally {
-                setDocumentsDownloadingId(null);
-              }
-            }}
-          />
         </div>
       ) : null}
 

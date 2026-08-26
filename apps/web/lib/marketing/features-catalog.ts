@@ -34,7 +34,17 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     audience: "dietitian",
     category: "Clinic & clients",
     title: "Client roster & charts",
-    summary: "Search, filter, tag, create, and archive clients with full charts: profile, goals, preferences, allergies, and notes.",
+    summary:
+      "Search, filter, tag, create, and archive clients with full charts for identity, goals, tags, and care history.",
+    highlight: true,
+  },
+  {
+    id: "d-clinical-profile",
+    audience: "dietitian",
+    category: "Clinic & clients",
+    title: "Clinical profile & chart notes",
+    summary:
+      "Default clinical questions for every patient (visit, lifestyle, health history, eating patterns, nutrition, pregnancy) plus dated clinical, meal, and eating-habit notes beside goals and documents.",
     highlight: true,
   },
   {
@@ -55,8 +65,9 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     id: "d-assessments",
     audience: "dietitian",
     category: "Clinic & clients",
-    title: "Custom assessment forms",
-    summary: "Build evaluation forms, assign them to patients, and review in-progress or submitted answers.",
+    title: "Custom forms",
+    summary:
+      "Build questionnaires, assign them to patients, and review in-progress or submitted answers — kept separate from the default clinical profile.",
   },
   {
     id: "d-join-codes",
@@ -85,7 +96,8 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     audience: "dietitian",
     category: "Clinic & clients",
     title: "Documents share or internal",
-    summary: "Upload client files and share with the patient or keep them internal to the clinic.",
+    summary:
+      "Upload client files (including PDF, Word, and TXT on the clinical chart) and share with the patient or keep them internal.",
   },
 
   // Meal planning
@@ -205,7 +217,7 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     summary: "Review overview metrics, financial summaries, clients needing attention, and activity.",
   },
 
-  // AI
+  // AI — catalog feature is seeded INACTIVE (hidden on /features until re-enabled).
   {
     id: "d-ai",
     audience: "dietitian",
@@ -214,7 +226,7 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     summary:
       "Optional plan capability for client summaries, meal-plan help, nutrition assistance, consultation notes, and message drafts.",
     entitlementKey: "AI",
-    highlight: true,
+    highlight: false,
   },
 
   // Automations
@@ -317,7 +329,7 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     audience: "patient",
     category: "Assessments",
     title: "Complete & submit forms",
-    summary: "Complete evaluations assigned by your dietitian; save progress and submit when ready.",
+    summary: "Complete custom forms assigned by your dietitian; save progress and submit when ready — separate from clinic chart notes.",
   },
 
   // Messages
@@ -363,7 +375,8 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     audience: "patient",
     category: "Profile",
     title: "Profile, notes & multi-clinic",
-    summary: "Edit personal details, view clinic notes, connect to multiple clinics, switch between them, or leave a clinic.",
+    summary:
+      "Edit personal details, view clinic notes for allergies and lifestyle context, connect to multiple clinics, switch between them, or leave a clinic.",
   },
 
   // Join-code onboarding

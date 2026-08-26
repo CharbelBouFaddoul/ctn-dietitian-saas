@@ -92,7 +92,7 @@ Patient UI: `/auth/client/login` → `/client`.
 
 - **Plan:** Standard → AI off, Automation off, client limit overridden to **6** (near-limit demo; 5 clients seeded)
 - **Clients:** Emma, James, Olivia, Daniel, Maya (shared)
-- **Distinct markers:** tags like `athlete`, `harbor-priority`; notes say “Harbor”
+- **Distinct markers:** tags like `athlete`, `harbor-priority`; notes say “Harbor”; clinical profile + dated chart notes (clinical / meal / eating habit)
 - **Custom food:** Harbor Protein Smoothie Base (Alice-only)
 - **Recipe:** Harbor Power Bowl
 - **Meal plans:** Emma Race Prep 14-day (published), James draft 7-day, Olivia 28-day published, Maya@Harbor hypertrophy
@@ -186,7 +186,7 @@ What exists in the app (and is represented in demo / tests):
 
 ### Practice (dietitian)
 - Dashboard
-- Clients (portfolio: profile, goals, tags, timeline)
+- Clients (portfolio: clinical profile, chart notes, goals, tags, timeline)
 - Foods (catalog search, custom foods, overrides, nutrition calculate)
 - Recipes / meal library (starter + practice-owned)
 - Meal plans (multi-week, draft/publish, immutable published snapshots)

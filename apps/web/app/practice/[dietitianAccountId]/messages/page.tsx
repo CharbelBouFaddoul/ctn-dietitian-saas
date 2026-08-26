@@ -49,7 +49,9 @@ function relativeTime(value: string | null): string {
 
 function mergeMessage(prev: ChatMessage[], next: ChatMessage): ChatMessage[] {
   if (prev.some((row) => row.id === next.id)) return prev;
-  return [...prev, next];
+  return [...prev, next].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+  );
 }
 
 function matchesInboxSearch(row: InboxRow, query: string): boolean {
@@ -111,9 +113,15 @@ export default function PracticeMessagesPage() {
   const loadThread = useCallback(
     async (clientId: string) => {
       const base = `/api/v1/dietitian/${dietitianAccountId}/clients/${clientId}`;
+      // Clear unread immediately so the active row / nav badge don't linger.
+      setRows((prev) =>
+        prev
+          ? prev.map((row) => (row.clientId === clientId ? { ...row, unreadCount: 0 } : row))
+          : prev,
+      );
+      await api(`${base}/conversation/read`, { method: "POST", body: JSON.stringify({}) }).catch(() => undefined);
       const data = await api<ChatMessage[]>(`${base}/conversation/messages`);
       setMessages(data);
-      await api(`${base}/conversation/read`, { method: "POST", body: JSON.stringify({}) }).catch(() => undefined);
       await refreshInbox().catch(() => undefined);
     },
     [dietitianAccountId, refreshInbox],
@@ -136,9 +144,20 @@ export default function PracticeMessagesPage() {
           canDeleteForEveryone: true,
         }),
       );
-      void refreshInbox().catch(() => undefined);
+      // Viewing this thread — keep it read.
+      setRows((prev) =>
+        prev
+          ? prev.map((row) =>
+              row.clientId === event.clientId ? { ...row, unreadCount: 0 } : row,
+            )
+          : prev,
+      );
+      const base = `/api/v1/dietitian/${dietitianAccountId}/clients/${event.clientId}`;
+      void api(`${base}/conversation/read`, { method: "POST", body: JSON.stringify({}) })
+        .then(() => refreshInbox())
+        .catch(() => undefined);
     },
-    [selectedClientId, refreshInbox],
+    [selectedClientId, dietitianAccountId, refreshInbox],
   );
 
   const onRealtimeDeleted = useCallback(

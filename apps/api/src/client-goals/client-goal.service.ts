@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { SecurityEventLogger } from "../auth/security-event.logger";
 import type { DietitianTenantContext } from "../dietitian/dietitian.types";
@@ -30,11 +30,15 @@ export class ClientGoalService {
     input: { title: string; description?: string; targetValue?: number; targetUnit?: string; startDate?: string; targetDate?: string },
   ) {
     await this.access.assertCanAccess(tenant, clientId, "manageRecords");
+    const title = input.title.trim();
+    if (!title) {
+      throw new BadRequestException("Goal title is required");
+    }
     const goal = await this.prisma.clientGoal.create({
       data: {
         dietitianAccountId: tenant.dietitianAccountId,
         clientId,
-        title: input.title.trim(),
+        title,
         description: input.description?.trim() ?? null,
         targetValue: input.targetValue ?? null,
         targetUnit: input.targetUnit ?? null,

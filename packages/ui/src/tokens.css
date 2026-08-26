@@ -96,6 +96,12 @@
   --color-info: #2563eb;
   --color-info-soft: #dbeafe;
   --focus-ring: 0 0 0 3px rgb(13 148 136 / 28%);
+  --text-xs: 0.72rem;
+  --text-sm: 0.8125rem;
+  --text-md: 0.875rem;
+  --text-lg: 1.05rem;
+  --text-xl: 1.35rem;
+  --text-2xl: 1.75rem;
   --sidebar-width: 260px;
   --sidebar-collapsed-width: 72px;
   --practice-deep-teal: #0f766e;
@@ -201,6 +207,10 @@ body {
   font-family: var(--font-sans);
   font-size: 16px;
   line-height: 1.5;
+}
+
+html:has([data-theme="practice"]) {
+  font-size: 15px;
 }
 
 a {

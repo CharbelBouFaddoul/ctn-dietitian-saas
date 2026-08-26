@@ -36,7 +36,9 @@ interface Me {
 
 function mergeMessage(prev: Message[], next: Message): Message[] {
   if (prev.some((row) => row.id === next.id)) return prev;
-  return [...prev, next];
+  return [...prev, next].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+  );
 }
 
 function SendIcon() {
@@ -72,17 +74,21 @@ export default function ClientMessagesPage() {
   const clientIdRef = useRef<string | null>(null);
 
   const load = useCallback(async () => {
-    const [authMe, profile, conv, rows] = await Promise.all([
+    const [authMe, profile] = await Promise.all([
       api<{ user: { id: string } }>("/api/v1/auth/me"),
       api<{ client: { id: string } }>("/api/v1/portal/me"),
+    ]);
+    setMe({ user: authMe.user, client: profile.client });
+    clientIdRef.current = profile.client.id;
+    // Mark read first so nav/home badges clear before conversation refetch.
+    await api("/api/v1/portal/conversation/read", { method: "POST", body: JSON.stringify({}) }).catch(() => undefined);
+    window.dispatchEvent(new Event("portal-messages-read"));
+    const [conv, rows] = await Promise.all([
       api<Conversation>("/api/v1/portal/conversation"),
       api<Message[]>("/api/v1/portal/conversation/messages"),
     ]);
-    setMe({ user: authMe.user, client: profile.client });
-    setConversation(conv);
+    setConversation({ ...conv, unreadCount: 0 });
     setMessages(rows);
-    clientIdRef.current = profile.client.id;
-    await api("/api/v1/portal/conversation/read", { method: "POST", body: JSON.stringify({}) }).catch(() => undefined);
     return profile.client.id;
   }, []);
 
@@ -105,10 +111,13 @@ export default function ClientMessagesPage() {
           ? {
               ...prev,
               lastMessagePreview: event.body.slice(0, 120),
-              unreadCount: event.senderUserId === me?.user.id ? prev.unreadCount : prev.unreadCount,
+              unreadCount: 0,
             }
           : prev,
       );
+      void api("/api/v1/portal/conversation/read", { method: "POST", body: JSON.stringify({}) })
+        .then(() => window.dispatchEvent(new Event("portal-messages-read")))
+        .catch(() => undefined);
     },
     [me?.user.id],
   );
@@ -166,7 +175,8 @@ export default function ClientMessagesPage() {
     },
     onUnreadUpdated: (event) => {
       if (clientIdRef.current && event.clientId !== clientIdRef.current) return;
-      setConversation((prev) => (prev ? { ...prev, unreadCount: event.unreadCount } : prev));
+      // While viewing the thread, keep unread cleared for the patient.
+      setConversation((prev) => (prev ? { ...prev, unreadCount: 0 } : prev));
     },
     onReconnect: () => {
       void (async () => {

@@ -9,7 +9,7 @@ import { API_URL } from "../lib/api";
 import { FALLBACK_SITE_SETTINGS, type SiteSettings } from "../lib/marketing/site-settings";
 
 function withMarketingDefaults(settings: SiteSettings): SiteSettings {
-  const plansPageEnabled = settings.plansPageEnabled !== false;
+  const plansPageEnabled = settings.plansPageEnabled === true;
 
   let navItems = settings.navItems;
   const hasPlans = navItems.some((item) => item.href === "/plans");

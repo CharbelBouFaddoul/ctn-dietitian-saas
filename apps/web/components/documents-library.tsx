@@ -42,6 +42,16 @@ type DocumentsLibraryProps = {
   onDelete?: (doc: DocumentsLibraryItem) => Promise<void>;
   /** Portal uses a page header; clinic embeds under chart tabs. */
   pageHeader?: boolean;
+  accept?: string;
+  uploadHint?: string;
+  assertFile?: (file: File) => void;
+  title?: string;
+  description?: string;
+  compact?: boolean;
+  hideUpload?: boolean;
+  hideToolbar?: boolean;
+  startOpen?: boolean;
+  uploadOnly?: boolean;
 };
 
 function FileTypeIcon({ label }: { label: string }) {
@@ -68,11 +78,19 @@ function UploadPanel({
   uploading,
   onCancel,
   onUpload,
+  accept,
+  uploadHint,
+  assertFile,
+  hideCancel = false,
 }: {
   variant: "portal" | "clinic";
   uploading: boolean;
   onCancel: () => void;
   onUpload: (file: File, visibility: Visibility) => Promise<void>;
+  accept: string;
+  uploadHint: string;
+  assertFile: (file: File) => void;
+  hideCancel?: boolean;
 }) {
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -88,7 +106,7 @@ function UploadPanel({
       return;
     }
     try {
-      assertDocumentFileSize(next);
+      assertFile(next);
       setFile(next);
     } catch (err) {
       setFile(null);
@@ -138,14 +156,14 @@ function UploadPanel({
           id={inputId}
           type="file"
           name="file"
-          accept={DOCUMENT_ACCEPT}
+          accept={accept}
           className="ui-docs-dropzone__input"
           onChange={(event) => pickFile(event.target.files?.[0] ?? null)}
         />
         <span className="ui-docs-dropzone__title">
           {file ? file.name : "Drop a file here, or click to browse"}
         </span>
-        <span className="ui-docs-dropzone__hint">{DOCUMENT_UPLOAD_HINT}</span>
+        <span className="ui-docs-dropzone__hint">{uploadHint}</span>
       </label>
 
       <div className="ui-docs-upload__footer">
@@ -164,9 +182,11 @@ function UploadPanel({
           <p className="ui-muted ui-docs-upload__note">Shared with your dietitian when uploaded.</p>
         )}
         <div className="ui-row">
-          <Button type="button" variant="ghost" size="sm" onClick={onCancel} disabled={uploading}>
-            Cancel
-          </Button>
+          {hideCancel ? null : (
+            <Button type="button" variant="ghost" size="sm" onClick={onCancel} disabled={uploading}>
+              Cancel
+            </Button>
+          )}
           <Button type="submit" size="sm" disabled={uploading || !file}>
             {uploading ? "Uploading…" : "Upload"}
           </Button>
@@ -187,8 +207,18 @@ export function DocumentsLibrary({
   onDownload,
   onDelete,
   pageHeader = false,
+  accept = DOCUMENT_ACCEPT,
+  uploadHint = DOCUMENT_UPLOAD_HINT,
+  assertFile = assertDocumentFileSize,
+  title = "Documents",
+  description = "Upload internal notes or share files with this client.",
+  compact = false,
+  hideUpload = false,
+  hideToolbar = false,
+  startOpen = false,
+  uploadOnly = false,
 }: DocumentsLibraryProps) {
-  const [showUpload, setShowUpload] = useState(false);
+  const [showUpload, setShowUpload] = useState(startOpen || uploadOnly);
   const [pendingDelete, setPendingDelete] = useState<DocumentsLibraryItem | null>(null);
 
   async function handleUpload(file: File, visibility: Visibility) {
@@ -211,50 +241,61 @@ export function DocumentsLibrary({
     </Button>
   );
 
-  const header: ReactNode = pageHeader ? (
+  const header: ReactNode =
+    hideToolbar || hideUpload || uploadOnly ? null : pageHeader ? (
     <PageHeader
       eyebrow="Library"
       title="Documents"
       description="Files shared with you by your dietitian — and anything you upload."
       actions={uploadButton}
     />
+  ) : compact ? (
+    <div className="ui-docs-toolbar ui-docs-toolbar--compact">{uploadButton}</div>
   ) : (
     <div className="ui-docs-toolbar">
       <div>
-        <h2 className="ui-docs-toolbar__title">Documents</h2>
-        <p className="ui-muted ui-docs-toolbar__desc">
-          Upload internal notes or share files with this client.
-        </p>
+        <h2 className="ui-docs-toolbar__title">{title}</h2>
+        <p className="ui-muted ui-docs-toolbar__desc">{description}</p>
       </div>
       {uploadButton}
     </div>
   );
 
-  const uploadBlock = showUpload ? (
+  const uploadBlock = showUpload || uploadOnly ? (
     <Section tone="mint" className="ui-docs-upload-section">
       <UploadPanel
         variant={variant}
         uploading={uploading}
-        onCancel={() => setShowUpload(false)}
+        onCancel={() => {
+          if (!uploadOnly) setShowUpload(false);
+        }}
         onUpload={handleUpload}
+        accept={accept}
+        uploadHint={uploadHint}
+        assertFile={assertFile}
+        hideCancel={uploadOnly}
       />
     </Section>
   ) : null;
+
+  if (uploadOnly) {
+    return <div className="ui-docs">{uploadBlock}</div>;
+  }
 
   let body: ReactNode;
   if (documents === null) {
     body = <LoadingState>Loading documents…</LoadingState>;
   } else if (documents.length === 0) {
     body = (
-      <Section title={variant === "portal" ? "Your files" : "All documents"} tone="muted">
+      <Section title={variant === "portal" ? "Your files" : compact ? undefined : "All documents"} tone="muted">
         <EmptyState
           title="No documents yet"
           action={
-            !showUpload ? (
+            hideUpload || showUpload ? undefined : (
               <Button type="button" size="sm" onClick={() => setShowUpload(true)}>
                 Upload a file
               </Button>
-            ) : undefined
+            )
           }
         >
           {variant === "portal"
@@ -266,47 +307,95 @@ export function DocumentsLibrary({
   } else {
     body = (
       <Section
-        title={variant === "portal" ? "Your files" : "All documents"}
-        description={`${documents.length} file${documents.length === 1 ? "" : "s"}`}
+        title={variant === "portal" ? "Your files" : compact ? undefined : "All documents"}
+        description={compact ? undefined : `${documents.length} file${documents.length === 1 ? "" : "s"}`}
       >
         <ul className="ui-docs-list">
           {documents.map((doc) => {
             const type = documentTypeLabel(doc.mimeType, doc.filename);
+            const busy = downloadingId === doc.id || deletingId === doc.id;
             return (
               <li key={doc.id}>
                 <div className="ui-docs-list__main">
                   <FileTypeIcon label={type} />
                   <div className="ui-docs-list__text">
                     <span className="ui-docs-list__name">{doc.filename}</span>
-                    <span className="ui-muted ui-docs-list__meta">{documentMeta(doc)}</span>
+                    <span className="ui-docs-list__meta-row">
+                      <span className="ui-muted ui-docs-list__meta">{documentMeta(doc)}</span>
+                      {variant === "clinic" && doc.visibility ? (
+                        <Badge tone={doc.visibility === "SHARED" ? "info" : "neutral"}>
+                          {humanizeLabel(doc.visibility)}
+                        </Badge>
+                      ) : null}
+                    </span>
                   </div>
                 </div>
                 <div className="ui-docs-list__actions">
-                  {variant === "clinic" && doc.visibility ? (
-                    <Badge tone={doc.visibility === "SHARED" ? "info" : "neutral"}>
-                      {humanizeLabel(doc.visibility)}
-                    </Badge>
-                  ) : null}
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    disabled={downloadingId === doc.id || deletingId === doc.id}
-                    onClick={() => void onDownload(doc)}
-                  >
-                    {downloadingId === doc.id ? "Downloading…" : "Download"}
-                  </Button>
-                  {onDelete ? (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      disabled={downloadingId === doc.id || deletingId === doc.id}
-                      onClick={() => setPendingDelete(doc)}
-                    >
-                      {deletingId === doc.id ? "Deleting…" : "Delete"}
-                    </Button>
-                  ) : null}
+                  {compact ? (
+                    <>
+                      <button
+                        type="button"
+                        className="ui-docs-icon-btn"
+                        disabled={busy}
+                        aria-label={downloadingId === doc.id ? "Downloading" : "Download"}
+                        title={downloadingId === doc.id ? "Downloading…" : "Download"}
+                        onClick={() => void onDownload(doc)}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+                          <path
+                            d="M12 4v11m0 0 4-4m-4 4-4-4M5 19h14"
+                            stroke="currentColor"
+                            strokeWidth="1.75"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </button>
+                      {onDelete ? (
+                        <button
+                          type="button"
+                          className="ui-docs-icon-btn ui-docs-icon-btn--danger"
+                          disabled={busy}
+                          aria-label={deletingId === doc.id ? "Deleting" : "Delete"}
+                          title={deletingId === doc.id ? "Deleting…" : "Delete"}
+                          onClick={() => setPendingDelete(doc)}
+                        >
+                          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden>
+                            <path
+                              d="M3 4h10M6 4V3h4v1M5 4l.6 9h4.8L11 4"
+                              stroke="currentColor"
+                              strokeWidth="1.4"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        </button>
+                      ) : null}
+                    </>
+                  ) : (
+                    <>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        disabled={busy}
+                        onClick={() => void onDownload(doc)}
+                      >
+                        {downloadingId === doc.id ? "Downloading…" : "Download"}
+                      </Button>
+                      {onDelete ? (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          disabled={busy}
+                          onClick={() => setPendingDelete(doc)}
+                        >
+                          {deletingId === doc.id ? "Deleting…" : "Delete"}
+                        </Button>
+                      ) : null}
+                    </>
+                  )}
                 </div>
               </li>
             );
@@ -317,7 +406,7 @@ export function DocumentsLibrary({
   }
 
   return (
-    <div className="ui-docs">
+    <div className={compact ? "ui-docs ui-docs--compact" : "ui-docs"}>
       {header}
       {uploadBlock}
       {body}

@@ -158,6 +158,7 @@ services:
       PORT: "3000"
       HOSTNAME: 0.0.0.0
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
+      INTERNAL_API_URL: ${INTERNAL_API_URL:-http://api:3001}
       WATCHPACK_POLLING: "true"
       CHOKIDAR_USEPOLLING: "true"
       CHOKIDAR_INTERVAL: "1000"

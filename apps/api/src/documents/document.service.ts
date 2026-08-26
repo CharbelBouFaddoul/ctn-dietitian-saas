@@ -92,7 +92,7 @@ export class DocumentService {
     const detected = detectMime(input.buffer.subarray(0, Math.min(input.buffer.length, 512)));
     let mime: string;
     try {
-      mime = assertAllowedUpload(detected, input.declaredMime);
+      mime = assertAllowedUpload(detected, input.declaredMime, input.originalFilename, input.buffer);
     } catch {
       throw new UnsupportedMediaTypeException("Unsupported file type");
     }

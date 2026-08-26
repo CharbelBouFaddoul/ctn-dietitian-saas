@@ -41,7 +41,7 @@ function ContactPageContent() {
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [prefilled, setPrefilled] = useState(false);
-  const plansPageEnabled = settings.plansPageEnabled !== false;
+  const plansPageEnabled = settings.plansPageEnabled === true;
 
   useEffect(() => {
     void fetch(`${API_URL}/api/v1/public/site-settings`)
