@@ -5,6 +5,7 @@ import {
   Get,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -43,6 +44,26 @@ class CreateChartNoteDto {
   notedAt?: string;
 }
 
+class UpdateChartNoteDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(4000)
+  body?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  mealSlot?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsDateString()
+  notedAt?: string;
+}
+
 @ApiTags("client-chart-notes")
 @ApiCookieAuth()
 @UseGuards(SessionGuard, DietitianGuard, ClientAccessGuard)
@@ -67,6 +88,17 @@ export class ClientChartNoteController {
     @Body() body: CreateChartNoteDto,
   ) {
     return this.notes.create(tenant, clientId, body);
+  }
+
+  @Patch(":noteId")
+  @ClientActionRequired("manageRecords")
+  update(
+    @CurrentTenant() tenant: DietitianTenantContext,
+    @Param("clientId", ParseUUIDPipe) clientId: string,
+    @Param("noteId", ParseUUIDPipe) noteId: string,
+    @Body() body: UpdateChartNoteDto,
+  ) {
+    return this.notes.update(tenant, clientId, noteId, body);
   }
 
   @Delete(":noteId")

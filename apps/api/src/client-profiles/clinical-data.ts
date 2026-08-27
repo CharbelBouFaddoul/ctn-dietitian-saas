@@ -70,6 +70,31 @@ export type ClinicalData = {
     zipCode: string;
     address: string;
   };
+  prescription: {
+    weightGoalKg: number | null;
+    bodyFatFormula: string;
+    bodyFatConversion: string;
+    bodyFatCurrentPct: number | null;
+    bodyFatGoalPct: number | null;
+    bmrFormula: string;
+    palCurrentKey: string;
+    palGoalKey: string;
+    palCurrentValue: number | null;
+    activities: Array<{ key: string; met: number | null; minutes: number | null }>;
+    energyGoalKcal: number | null;
+    macro: {
+      fatPct: number | null;
+      carbPct: number | null;
+      proteinPct: number | null;
+    };
+    proteinPerKg: number | null;
+    rdaAuthority: string;
+    fiberSource: string;
+    fiberGoalG: number | null;
+    energyFormula: string;
+    beginDate: string;
+    forecastFinishDate: string;
+  };
 };
 
 function text(value: unknown, max = TEXT_MAX): string {
@@ -156,6 +181,31 @@ export function emptyClinicalData(): ClinicalData {
       zipCode: "",
       address: "",
     },
+    prescription: {
+      weightGoalKg: null,
+      bodyFatFormula: "",
+      bodyFatConversion: "",
+      bodyFatCurrentPct: null,
+      bodyFatGoalPct: null,
+      bmrFormula: "",
+      palCurrentKey: "",
+      palGoalKey: "",
+      palCurrentValue: null,
+      activities: [],
+      energyGoalKcal: null,
+      macro: {
+        fatPct: null,
+        carbPct: null,
+        proteinPct: null,
+      },
+      proteinPerKg: null,
+      rdaAuthority: "",
+      fiberSource: "",
+      fiberGoalG: null,
+      energyFormula: "",
+      beginDate: "",
+      forecastFinishDate: "",
+    },
   };
 }
 
@@ -171,6 +221,21 @@ export function sanitizeClinicalData(input: unknown): ClinicalData {
   const eating = asRecord(root.eating);
   const nutrition = asRecord(root.nutrition);
   const identity = asRecord(root.identity);
+  const prescription = asRecord(root.prescription);
+  const prescriptionMacro = asRecord(prescription.macro);
+  const activities = Array.isArray(prescription.activities)
+    ? prescription.activities
+        .slice(0, 40)
+        .map((entry) => {
+          const record = asRecord(entry);
+          return {
+            key: code(record.key),
+            met: positiveNumber(record.met, 25),
+            minutes: positiveNumber(record.minutes, 1440),
+          };
+        })
+        .filter((entry) => entry.key !== "")
+    : [];
   return {
     visit: {
       reason: text(visit.reason),
@@ -241,6 +306,31 @@ export function sanitizeClinicalData(input: unknown): ClinicalData {
       country: text(identity.country, 80),
       zipCode: text(identity.zipCode, 40),
       address: text(identity.address, 400),
+    },
+    prescription: {
+      weightGoalKg: positiveNumber(prescription.weightGoalKg, 1000),
+      bodyFatFormula: code(prescription.bodyFatFormula),
+      bodyFatConversion: code(prescription.bodyFatConversion),
+      bodyFatCurrentPct: positiveNumber(prescription.bodyFatCurrentPct, 100),
+      bodyFatGoalPct: positiveNumber(prescription.bodyFatGoalPct, 100),
+      bmrFormula: code(prescription.bmrFormula),
+      palCurrentKey: code(prescription.palCurrentKey),
+      palGoalKey: code(prescription.palGoalKey),
+      palCurrentValue: positiveNumber(prescription.palCurrentValue, 5),
+      activities,
+      energyGoalKcal: positiveNumber(prescription.energyGoalKcal, 20000),
+      macro: {
+        fatPct: positiveNumber(prescriptionMacro.fatPct, 100),
+        carbPct: positiveNumber(prescriptionMacro.carbPct, 100),
+        proteinPct: positiveNumber(prescriptionMacro.proteinPct, 100),
+      },
+      proteinPerKg: positiveNumber(prescription.proteinPerKg, 10),
+      rdaAuthority: code(prescription.rdaAuthority),
+      fiberSource: code(prescription.fiberSource),
+      fiberGoalG: positiveNumber(prescription.fiberGoalG, 200),
+      energyFormula: code(prescription.energyFormula),
+      beginDate: code(prescription.beginDate),
+      forecastFinishDate: code(prescription.forecastFinishDate),
     },
   };
 }

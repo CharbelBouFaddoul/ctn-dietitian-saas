@@ -9,10 +9,10 @@ import {
   Input,
   Select,
   Skeleton,
-  Textarea,
   humanizeLabel,
 } from "@nutrition-saas/ui";
 import { formatDate, nutritionLabel } from "../lib/format";
+import { ChartNotesSection } from "./chart-notes-list";
 import {
   careActivityLabel,
   TIMELINE_CATEGORIES,
@@ -111,9 +111,7 @@ type Props = {
   activitiesHasOlder: boolean;
   onActivitiesNewer: () => void;
   onActivitiesOlder: () => void;
-  notes: string;
-  onNotesChange: (value: string) => void;
-  onSaveNotes: () => void;
+  onError: (message: string) => void;
 };
 
 function formatSleep(minutes: number) {
@@ -200,9 +198,7 @@ export function ClientTrackingPanel({
   activitiesHasOlder,
   onActivitiesNewer,
   onActivitiesOlder,
-  notes,
-  onNotesChange,
-  onSaveNotes,
+  onError,
 }: Props) {
   const [openMeals, setOpenMeals] = useState<Record<string, boolean>>({});
   const [activityFilter, setActivityFilter] = useState<TimelineCategoryId>("all");
@@ -615,24 +611,16 @@ export function ClientTrackingPanel({
             </div>
           ) : null}
 
-          <form
-            className="ui-track__notes"
-            onSubmit={(event) => {
-              event.preventDefault();
-              onSaveNotes();
-            }}
-          >
-            <h4>Clinical notes</h4>
-            <Textarea
-              value={notes}
-              onChange={(event) => onNotesChange(event.target.value)}
-              disabled={!allowManage}
-              placeholder="Private clinic notes…"
-            />
-            <Button type="submit" size="sm" variant="secondary" disabled={!allowManage}>
-              Save notes
-            </Button>
-          </form>
+          <ChartNotesSection
+            className="ui-clinical-rail ui-track__notes"
+            dietitianAccountId={dietitianAccountId}
+            clientId={clientId}
+            kind="CLINICAL"
+            title="Clinical notes"
+            empty="No chart notes yet"
+            allowManage={allowManage}
+            onError={onError}
+          />
         </aside>
       </div>
     </div>

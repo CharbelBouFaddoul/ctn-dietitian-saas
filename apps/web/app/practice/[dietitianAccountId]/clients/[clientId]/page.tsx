@@ -1,13 +1,12 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   Alert,
   Avatar,
   Badge,
-  Breadcrumbs,
   Button,
   ConfirmDialog,
   Dialog,
@@ -31,6 +30,7 @@ import { ClientClinicalProfilePanel } from "../../../../../components/client-cli
 import { ClientEvolutionPanel } from "../../../../../components/client-evolution-panel";
 import { ClientTrackingPanel } from "../../../../../components/client-tracking-panel";
 import { ClientNutritionPanel } from "../../../../../components/client-nutrition-panel";
+import { ClientPrescriptionPanel } from "../../../../../components/client-prescription-panel";
 import type { MealPlanView } from "../../../../../components/client-meal-plan-workspace";
 import { api } from "../../../../../lib/api";
 import {
@@ -50,6 +50,7 @@ type Tab =
   | "measurement"
   | "clinical"
   | "assessments"
+  | "prescription"
   | "meal-plan"
   | "tracking"
   | "messages"
@@ -61,8 +62,27 @@ type Tab =
 type ChartSection = {
   id: string;
   label: string;
+  icon: ReactNode;
   tabs: Array<{ id: Tab; label: string }>;
 };
+
+function ChartTabIcon({ children }: { children: ReactNode }) {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {children}
+    </svg>
+  );
+}
 
 const TIMELINE_PAGE_SIZE = 25;
 
@@ -80,11 +100,25 @@ const chartSections: ChartSection[] = [
   {
     id: "overview",
     label: "Overview",
+    icon: (
+      <ChartTabIcon>
+        <rect x="3" y="3" width="7" height="9" rx="1.5" />
+        <rect x="14" y="3" width="7" height="5" rx="1.5" />
+        <rect x="14" y="12" width="7" height="9" rx="1.5" />
+        <rect x="3" y="16" width="7" height="5" rx="1.5" />
+      </ChartTabIcon>
+    ),
     tabs: [{ id: "overview", label: "Summary" }],
   },
   {
     id: "personal",
     label: "Personal data",
+    icon: (
+      <ChartTabIcon>
+        <circle cx="12" cy="8" r="3.5" />
+        <path d="M5.2 19c.9-3.3 3.5-5 6.8-5s5.9 1.7 6.8 5" />
+      </ChartTabIcon>
+    ),
     tabs: [
       { id: "clinical", label: "Clinical profile" },
       { id: "assessments", label: "Custom forms" },
@@ -93,19 +127,51 @@ const chartSections: ChartSection[] = [
   {
     id: "progress",
     label: "Progress & tracking",
+    icon: (
+      <ChartTabIcon>
+        <path d="M4 15V9a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" />
+        <path d="M8 7v3M12 7v4.5M16 7v3" />
+      </ChartTabIcon>
+    ),
     tabs: [
       { id: "measurement", label: "Measurement" },
       { id: "tracking", label: "Tracking" },
     ],
   },
   {
+    id: "prescription",
+    label: "Prescription",
+    icon: (
+      <ChartTabIcon>
+        <path d="M9 2h6a1 1 0 0 1 1 1v2H8V3a1 1 0 0 1 1-1z" />
+        <path d="M6 5h12a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" />
+        <path d="M12 10v6M9 13h6" />
+      </ChartTabIcon>
+    ),
+    tabs: [{ id: "prescription", label: "Prescription" }],
+  },
+  {
     id: "nutrition",
     label: "Nutrition",
+    icon: (
+      <ChartTabIcon>
+        <path d="M5 3v6M8 3v6M11 3v6" />
+        <path d="M5 9h6M8 9v12" />
+        <path d="M16 3v18" />
+        <path d="M16 3c3.2 1.6 4.2 5.2 4.2 8.5H16" />
+      </ChartTabIcon>
+    ),
     tabs: [{ id: "meal-plan", label: "Nutrition" }],
   },
   {
     id: "care",
     label: "Appointments",
+    icon: (
+      <ChartTabIcon>
+        <rect x="3" y="5" width="18" height="16" rx="2" />
+        <path d="M16 3v4M8 3v4M3 11h18" />
+      </ChartTabIcon>
+    ),
     tabs: [
       { id: "appointments", label: "Appointments" },
       { id: "messages", label: "Messages" },
@@ -114,6 +180,12 @@ const chartSections: ChartSection[] = [
   {
     id: "practice",
     label: "Clinic tools",
+    icon: (
+      <ChartTabIcon>
+        <path d="M12 3l1.6 4.8L18.5 9.5 13.6 11.2 12 16l-1.6-4.8L5.5 9.5l4.9-1.7z" />
+        <path d="M18 15.5l.7 2.1 2.1.7-2.1.7-.7 2.1-.7-2.1-2.1-.7 2.1-.7z" />
+      </ChartTabIcon>
+    ),
     tabs: [
       { id: "invoices", label: "Invoices" },
       { id: "ai", label: "AI" },
@@ -122,6 +194,12 @@ const chartSections: ChartSection[] = [
   {
     id: "settings",
     label: "Settings",
+    icon: (
+      <ChartTabIcon>
+        <circle cx="12" cy="12" r="3" />
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09A1.65 1.65 0 0 0 15 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.36.3.59.75.59 1.24V11a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+      </ChartTabIcon>
+    ),
     tabs: [{ id: "settings", label: "Settings" }],
   },
 ];
@@ -399,7 +477,6 @@ function ClientWorkspacePage() {
   const [timelinePages, setTimelinePages] = useState<TimelineRow[][]>([]);
   const [timelinePageIndex, setTimelinePageIndex] = useState(0);
   const [timelineHasOlder, setTimelineHasOlder] = useState(false);
-  const [timelineNotes, setTimelineNotes] = useState("");
   const [timelineLoading, setTimelineLoading] = useState(false);
 
   const [portalAccount, setPortalAccount] = useState<{
@@ -461,7 +538,6 @@ function ClientWorkspacePage() {
   }
 
   const activeSection = sectionForTab(tab, visibleSections);
-  const activeSubTab = activeSection.tabs.find((item) => item.id === tab) ?? activeSection.tabs[0];
 
   useEffect(() => {
     if (tab === "messages") {
@@ -478,7 +554,6 @@ function ClientWorkspacePage() {
   function applyPortfolio(data: Portfolio) {
     setPortfolio(data);
     setSelectedTagIds(data.client.tags.map((tag) => tag.id));
-    setTimelineNotes(data.profile?.notes ?? "");
   }
 
   async function loadPortfolio() {
@@ -634,62 +709,58 @@ function ClientWorkspacePage() {
 
   return (
     <section className="ui-client-chart">
-      <Breadcrumbs
-        items={[
-          { label: "Clients", href: `/practice/${dietitianAccountId}/clients` },
-          { label: name },
-        ]}
-      />
-      <PageHeader
-        eyebrow="Client portfolio"
-        title={name}
-        description={
-          client ? (
-            <span style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
-              <StatusBadge status={client.status} label={statusLabel(client.status)} />
-              <StatusBadge status={connectionStatus ?? undefined} label={portalStatusLabel(connectionStatus)} />
-              {client.email ? <span>{client.email}</span> : null}
-              {client.tags.map((tag) => (
-                <Badge key={tag.id} tone="neutral">
-                  {tag.name}
-                </Badge>
-              ))}
-            </span>
-          ) : undefined
-        }
-        actions={client ? <Avatar name={name} /> : undefined}
-      />
+      <div className="ui-client-chart__chrome">
+        <PageHeader
+          eyebrow="Client portfolio"
+          title={name}
+          description={
+            client ? (
+              <span style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
+                <StatusBadge status={client.status} label={statusLabel(client.status)} />
+                <StatusBadge status={connectionStatus ?? undefined} label={portalStatusLabel(connectionStatus)} />
+                {client.email ? <span>{client.email}</span> : null}
+                {client.tags.map((tag) => (
+                  <Badge key={tag.id} tone="neutral">
+                    {tag.name}
+                  </Badge>
+                ))}
+              </span>
+            ) : undefined
+          }
+          actions={client ? <Avatar name={name} /> : undefined}
+        />
 
-      <div className="ui-client-chart__tabs ui-client-chart__nav">
-        <div className="ui-client-chart__sections">
-          <Tabs
-            items={visibleSections.map((section) => ({ id: section.id, label: section.label }))}
-            value={activeSection.id}
-            onChange={selectSection}
-          />
-        </div>
-        {activeSection.tabs.length > 1 ? (
-          <div className="ui-client-chart__subnav">
-            <p className="ui-client-chart__crumb">
-              <span>{activeSection.label}</span>
-              <span aria-hidden="true">/</span>
-              <strong>{activeSubTab?.label}</strong>
-            </p>
-            <div className="ui-client-chart__subtabs">
-              <Tabs items={activeSection.tabs} value={tab} onChange={selectTab} />
-            </div>
+        <div className="ui-client-chart__tabs ui-client-chart__nav">
+          <div className="ui-client-chart__sections">
+            <Tabs
+              variant="line"
+              items={visibleSections.map((section) => ({
+                id: section.id,
+                label: section.label,
+                icon: section.icon,
+              }))}
+              value={activeSection.id}
+              onChange={selectSection}
+            />
           </div>
-        ) : null}
+          {activeSection.tabs.length > 1 ? (
+            <div className="ui-client-chart__subnav">
+              <div className="ui-client-chart__subtabs">
+                <Tabs variant="line" items={activeSection.tabs} value={tab} onChange={selectTab} />
+              </div>
+            </div>
+          ) : null}
+        </div>
       </div>
 
       {error ? (
-        <div style={{ margin: "0 0 12px" }}>
+        <div style={{ marginBottom: 12 }}>
           <Alert tone="danger">{error}</Alert>
         </div>
       ) : null}
 
       {showCreatedTip ? (
-        <div style={{ margin: "0 0 12px" }}>
+        <div style={{ marginBottom: 12 }}>
           <Alert tone="neutral">
             Client chart created. Manage profile, measurements, meal plans, and appointments from this
             workspace — portal login is optional. Invite them later from Settings when ready.{" "}
@@ -981,6 +1052,22 @@ function ClientWorkspacePage() {
         />
       ) : null}
 
+      {/* ── PRESCRIPTION ── */}
+      {tab === "prescription" && portfolio ? (
+        <div className="ui-client-chart__panel">
+          <ClientPrescriptionPanel
+            base={base}
+            allowManage={allowManage}
+            client={{
+              sex: portfolio.client.sex ?? null,
+              dateOfBirth: portfolio.client.dateOfBirth ?? null,
+            }}
+            latestMeasurements={portfolio.latestMeasurements}
+            onError={setError}
+          />
+        </div>
+      ) : null}
+
       {/* ── NUTRITION ── */}
       {tab === "meal-plan" && portfolio ? (
         <ClientNutritionPanel
@@ -1046,16 +1133,7 @@ function ClientWorkspacePage() {
             activitiesHasOlder={timelinePageIndex < timelinePages.length - 1 || timelineHasOlder}
             onActivitiesNewer={goTimelineNewer}
             onActivitiesOlder={goTimelineOlder}
-            notes={timelineNotes}
-            onNotesChange={setTimelineNotes}
-            onSaveNotes={() => {
-              void api(`${base}/profile`, {
-                method: "PATCH",
-                body: JSON.stringify({ notes: timelineNotes }),
-              })
-                .then(() => loadPortfolio())
-                .catch((err) => setError(errorMessage(err, "Unable to save notes")));
-            }}
+            onError={setError}
           />
         </div>
       ) : null}

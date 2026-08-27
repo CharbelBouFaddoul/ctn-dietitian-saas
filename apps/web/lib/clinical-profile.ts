@@ -66,7 +66,64 @@ export type ClinicalData = {
     zipCode: string;
     address: string;
   };
+  prescription: PrescriptionData;
 };
+
+export type PrescriptionData = {
+  weightGoalKg: number | null;
+  bodyFatFormula: string;
+  bodyFatConversion: string;
+  bodyFatCurrentPct: number | null;
+  bodyFatGoalPct: number | null;
+  bmrFormula: string;
+  palCurrentKey: string;
+  palGoalKey: string;
+  palCurrentValue: number | null;
+  activities: PrescriptionActivity[];
+  energyGoalKcal: number | null;
+  macro: {
+    fatPct: number | null;
+    carbPct: number | null;
+    proteinPct: number | null;
+  };
+  proteinPerKg: number | null;
+  rdaAuthority: string;
+  fiberSource: string;
+  fiberGoalG: number | null;
+  energyFormula: string;
+  beginDate: string;
+  forecastFinishDate: string;
+};
+
+export type PrescriptionActivity = {
+  key: string;
+  met: number | null;
+  minutes: number | null;
+};
+
+export function emptyPrescription(): PrescriptionData {
+  return {
+    weightGoalKg: null,
+    bodyFatFormula: "",
+    bodyFatConversion: "",
+    bodyFatCurrentPct: null,
+    bodyFatGoalPct: null,
+    bmrFormula: "",
+    palCurrentKey: "",
+    palGoalKey: "",
+    palCurrentValue: null,
+    activities: [],
+    energyGoalKcal: null,
+    macro: { fatPct: null, carbPct: null, proteinPct: null },
+    proteinPerKg: null,
+    rdaAuthority: "",
+    fiberSource: "",
+    fiberGoalG: null,
+    energyFormula: "",
+    beginDate: "",
+    forecastFinishDate: "",
+  };
+}
 
 export type SelectOption = { value: string; label: string };
 
@@ -267,6 +324,7 @@ export function emptyClinicalData(): ClinicalData {
       zipCode: "",
       address: "",
     },
+    prescription: emptyPrescription(),
   };
 }
 

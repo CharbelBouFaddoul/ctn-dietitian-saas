@@ -66,6 +66,42 @@ export class ClientChartNoteService {
     return this.toResponse(row);
   }
 
+  async update(
+    tenant: DietitianTenantContext,
+    clientId: string,
+    noteId: string,
+    input: { body?: string; mealSlot?: string; notedAt?: string },
+  ) {
+    await this.access.assertCanAccess(tenant, clientId, "manageRecords");
+    const existing = await this.prisma.clientChartNote.findFirst({
+      where: { id: noteId, clientId, ...tenantWhere(tenant.dietitianAccountId) },
+    });
+    if (!existing) {
+      throw new NotFoundException("Note not found");
+    }
+    const body = input.body !== undefined ? input.body.trim() : existing.body;
+    if (!body) {
+      throw new BadRequestException("Write a note before saving");
+    }
+    if (body.length > 4000) {
+      throw new BadRequestException("Note is too long");
+    }
+    let mealSlot = existing.mealSlot;
+    if (existing.kind === "MEAL" && input.mealSlot !== undefined) {
+      const slot = input.mealSlot.toUpperCase();
+      if (!MEAL_SLOTS.has(slot)) {
+        throw new BadRequestException("Choose breakfast, lunch, dinner, or a snack");
+      }
+      mealSlot = slot;
+    }
+    const notedAt = input.notedAt !== undefined ? parseChartNoteDate(input.notedAt) : existing.notedAt;
+    const row = await this.prisma.clientChartNote.update({
+      where: { id: noteId },
+      data: { body, mealSlot, notedAt },
+    });
+    return this.toResponse(row);
+  }
+
   async remove(tenant: DietitianTenantContext, clientId: string, noteId: string) {
     await this.access.assertCanAccess(tenant, clientId, "manageRecords");
     const existing = await this.prisma.clientChartNote.findFirst({

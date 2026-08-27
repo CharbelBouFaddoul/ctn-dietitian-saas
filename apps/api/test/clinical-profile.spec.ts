@@ -51,6 +51,10 @@ describe("chart note dates", () => {
     expect(parseChartNoteDate("2026-08-20").toISOString()).toBe("2026-08-20T12:00:00.000Z");
   });
 
+  it("parses an ISO datetime", () => {
+    expect(parseChartNoteDate("2026-08-20T15:30:00.000Z").toISOString()).toBe("2026-08-20T15:30:00.000Z");
+  });
+
   it("defaults to now when empty", () => {
     const before = Date.now() - 1000;
     const parsed = parseChartNoteDate();

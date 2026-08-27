@@ -4,8 +4,6 @@ import { FormEvent, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Badge,
   Button,
-  Checkbox,
-  ConfirmDialog,
   Dialog,
   EmptyState,
   Field,
@@ -16,6 +14,7 @@ import {
   humanizeLabel,
 } from "@nutrition-saas/ui";
 import { ClinicTagsManager } from "./clinic-tags-manager";
+import { ChartNotesList, NoteWhenFields, type ChartNoteRow } from "./chart-notes-list";
 import { DocumentsLibrary, type DocumentsLibraryItem } from "./documents-library";
 import { api, apiUrl } from "../lib/api";
 import {
@@ -35,7 +34,6 @@ import {
   SMOKING_OPTIONS,
   WATER_OPTIONS,
   emptyClinicalData,
-  mealSlotLabel,
   type ClinicalData,
   type SelectOption,
 } from "../lib/clinical-profile";
@@ -45,16 +43,11 @@ import {
   assertClinicalDocumentFile,
   downloadAuthenticatedFile,
 } from "../lib/documents";
-import { formatDate, formatDateOnly, localDateInputValue } from "../lib/format";
+import { formatDate, formatDateOnly, localDateInputFromInstant, localTimeInputValue, toLocalDateTimeIso } from "../lib/format";
 import { errorMessage } from "../lib/humanize-error";
 
-type ChartNote = {
-  id: string;
+type ChartNote = ChartNoteRow & {
   kind: "CLINICAL" | "MEAL" | "EATING_HABIT" | "PREGNANCY";
-  body: string;
-  mealSlot: string | null;
-  notedAt?: string;
-  createdAt: string;
 };
 
 type GoalRow = {
@@ -286,60 +279,6 @@ const IconTrash = (
   </svg>
 );
 
-function NoteList({
-  rows,
-  empty,
-  allowManage,
-  onRemove,
-  meal,
-}: {
-  rows: ChartNote[];
-  empty: string;
-  allowManage: boolean;
-  onRemove: (id: string) => void;
-  meal?: boolean;
-}) {
-  const [pendingId, setPendingId] = useState<string | null>(null);
-
-  if (rows.length === 0) return <EmptyState title={empty} />;
-  return (
-    <>
-      <ul className="ui-clinical-rail__list">
-        {rows.map((row) => (
-          <li key={row.id}>
-            <div className="ui-clinical-rail__copy">
-              {meal ? <strong>{mealSlotLabel(row.mealSlot)}</strong> : null}
-              <p>{row.body}</p>
-              <div className="ui-clinical-rail__meta">
-                <span className="ui-muted">{formatDateOnly(row.notedAt ?? row.createdAt)}</span>
-                {allowManage ? (
-                  <div className="ui-clinical-rail__actions">
-                    <RailIconButton label="Remove note" danger onClick={() => setPendingId(row.id)}>
-                      {IconTrash}
-                    </RailIconButton>
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          </li>
-        ))}
-      </ul>
-      <ConfirmDialog
-        open={pendingId != null}
-        title="Remove this note?"
-        description="This note will be deleted from the chart."
-        confirmLabel="Remove"
-        danger
-        onCancel={() => setPendingId(null)}
-        onConfirm={() => {
-          if (pendingId) onRemove(pendingId);
-          setPendingId(null);
-        }}
-      />
-    </>
-  );
-}
-
 export function ClientClinicalProfilePanel({
   dietitianAccountId,
   clientId,
@@ -363,17 +302,23 @@ export function ClientClinicalProfilePanel({
   const [goals, setGoals] = useState<GoalRow[]>([]);
   const [documents, setDocuments] = useState<DocumentsLibraryItem[] | null>(null);
   const [clinicalNote, setClinicalNote] = useState("");
-  const [clinicalNoteDate, setClinicalNoteDate] = useState(() => localDateInputValue());
+  const [clinicalNoteDate, setClinicalNoteDate] = useState(() => localDateInputFromInstant());
+  const [clinicalNoteTime, setClinicalNoteTime] = useState(() => localTimeInputValue());
   const [mealSlot, setMealSlot] = useState("BREAKFAST");
   const [mealNote, setMealNote] = useState("");
-  const [mealNoteDate, setMealNoteDate] = useState(() => localDateInputValue());
+  const [mealNoteDate, setMealNoteDate] = useState(() => localDateInputFromInstant());
+  const [mealNoteTime, setMealNoteTime] = useState(() => localTimeInputValue());
   const [habitNote, setHabitNote] = useState("");
-  const [habitNoteDate, setHabitNoteDate] = useState(() => localDateInputValue());
+  const [habitNoteDate, setHabitNoteDate] = useState(() => localDateInputFromInstant());
+  const [habitNoteTime, setHabitNoteTime] = useState(() => localTimeInputValue());
   const [pregnancyNote, setPregnancyNote] = useState("");
+  const [pregnancyNoteDate, setPregnancyNoteDate] = useState(() => localDateInputFromInstant());
+  const [pregnancyNoteTime, setPregnancyNoteTime] = useState(() => localTimeInputValue());
   const [goalTitle, setGoalTitle] = useState("");
   const [goalDescription, setGoalDescription] = useState("");
   const [goalDeadline, setGoalDeadline] = useState("");
   const [goalOpen, setGoalOpen] = useState(false);
+  const [managingGoal, setManagingGoal] = useState<GoalRow | null>(null);
   const [tagsOpen, setTagsOpen] = useState(false);
   const [clinicalNoteOpen, setClinicalNoteOpen] = useState(false);
   const [mealNoteOpen, setMealNoteOpen] = useState(false);
@@ -383,6 +328,8 @@ export function ClientClinicalProfilePanel({
   const [savingIdentity, setSavingIdentity] = useState(false);
   const [savingClinical, setSavingClinical] = useState(false);
   const [noteBusy, setNoteBusy] = useState(false);
+  const [goalBusy, setGoalBusy] = useState(false);
+  const [tagBusy, setTagBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
@@ -444,21 +391,6 @@ export function ClientClinicalProfilePanel({
     setClinical((prev) => ({
       ...prev,
       [section]: { ...prev[section], [field]: value },
-    }));
-  }
-
-  function patchNutritionTarget(field: keyof ClinicalData["nutrition"]["targets"], raw: string) {
-    const trimmed = raw.trim();
-    const next = trimmed === "" ? null : Number(trimmed);
-    setClinical((prev) => ({
-      ...prev,
-      nutrition: {
-        ...prev.nutrition,
-        targets: {
-          ...prev.nutrition.targets,
-          [field]: next != null && Number.isFinite(next) && next >= 0 ? next : null,
-        },
-      },
     }));
   }
 
@@ -543,21 +475,26 @@ export function ClientClinicalProfilePanel({
       });
       if (kind === "CLINICAL") {
         setClinicalNote("");
-        setClinicalNoteDate(localDateInputValue());
+        setClinicalNoteDate(localDateInputFromInstant());
+        setClinicalNoteTime(localTimeInputValue());
         setClinicalNoteOpen(false);
       }
       if (kind === "MEAL") {
         setMealNote("");
-        setMealNoteDate(localDateInputValue());
+        setMealNoteDate(localDateInputFromInstant());
+        setMealNoteTime(localTimeInputValue());
         setMealNoteOpen(false);
       }
       if (kind === "EATING_HABIT") {
         setHabitNote("");
-        setHabitNoteDate(localDateInputValue());
+        setHabitNoteDate(localDateInputFromInstant());
+        setHabitNoteTime(localTimeInputValue());
         setHabitNoteOpen(false);
       }
       if (kind === "PREGNANCY") {
         setPregnancyNote("");
+        setPregnancyNoteDate(localDateInputFromInstant());
+        setPregnancyNoteTime(localTimeInputValue());
         setPregnancyOpen(false);
       }
       await loadNotes();
@@ -565,15 +502,6 @@ export function ClientClinicalProfilePanel({
       onError(errorMessage(err, "Unable to add note"));
     } finally {
       setNoteBusy(false);
-    }
-  }
-
-  async function removeNote(id: string) {
-    try {
-      await api(`${base}/chart-notes/${id}`, { method: "DELETE" });
-      await loadNotes();
-    } catch (err) {
-      onError(errorMessage(err, "Unable to remove note"));
     }
   }
 
@@ -600,6 +528,40 @@ export function ClientClinicalProfilePanel({
       await Promise.all([loadGoals(), onPortfolioRefresh()]);
     } catch (err) {
       onError(errorMessage(err, "Unable to add goal"));
+    }
+  }
+
+  async function updateGoalStatus(goalId: string, action: "complete" | "cancel") {
+    if (goalBusy) return;
+    setGoalBusy(true);
+    try {
+      await api(`${base}/goals/${goalId}/${action}`, { method: "POST" });
+      setManagingGoal(null);
+      await Promise.all([loadGoals(), onPortfolioRefresh()]);
+    } catch (err) {
+      onError(errorMessage(err, action === "complete" ? "Unable to complete goal" : "Unable to cancel goal"));
+    } finally {
+      setGoalBusy(false);
+    }
+  }
+
+  async function toggleClientTag(tagId: string) {
+    if (tagBusy || !allowManage) return;
+    const previous = selectedTagIds;
+    const next = previous.includes(tagId) ? previous.filter((id) => id !== tagId) : [...previous, tagId];
+    onSelectedTagIdsChange(next);
+    setTagBusy(true);
+    try {
+      await api(`${orgBase}/clients/${clientId}/tags`, {
+        method: "PUT",
+        body: JSON.stringify({ tagIds: next }),
+      });
+      await onPortfolioRefresh();
+    } catch (err) {
+      onSelectedTagIdsChange(previous);
+      onError(errorMessage(err, "Unable to save tags"));
+    } finally {
+      setTagBusy(false);
     }
   }
 
@@ -1058,74 +1020,6 @@ export function ClientClinicalProfilePanel({
           </ClinicalBlock>
 
           <ClinicalBlock title="Nutrition profile">
-            <div className="ui-clinical-targets">
-              <p className="ui-clinical-targets__title">Daily macro targets</p>
-              <p className="ui-muted ui-clinical-targets__hint">
-                Used in Nutrition → Analysis to show whether the day is under, on, or over target.
-              </p>
-              <div className="ui-clinical-targets__grid">
-                <Field label="Energy (kcal)">
-                  <Input
-                    type="number"
-                    min={0}
-                    step={1}
-                    inputMode="decimal"
-                    disabled={!allowManage}
-                    value={clinical.nutrition.targets.energyKcal ?? ""}
-                    placeholder="e.g. 2000"
-                    onChange={(event) => patchNutritionTarget("energyKcal", event.target.value)}
-                  />
-                </Field>
-                <Field label="Protein (g)">
-                  <Input
-                    type="number"
-                    min={0}
-                    step={1}
-                    inputMode="decimal"
-                    disabled={!allowManage}
-                    value={clinical.nutrition.targets.proteinG ?? ""}
-                    placeholder="e.g. 90"
-                    onChange={(event) => patchNutritionTarget("proteinG", event.target.value)}
-                  />
-                </Field>
-                <Field label="Fat (g)">
-                  <Input
-                    type="number"
-                    min={0}
-                    step={1}
-                    inputMode="decimal"
-                    disabled={!allowManage}
-                    value={clinical.nutrition.targets.fatG ?? ""}
-                    placeholder="e.g. 70"
-                    onChange={(event) => patchNutritionTarget("fatG", event.target.value)}
-                  />
-                </Field>
-                <Field label="Carbs (g)">
-                  <Input
-                    type="number"
-                    min={0}
-                    step={1}
-                    inputMode="decimal"
-                    disabled={!allowManage}
-                    value={clinical.nutrition.targets.carbohydrateG ?? ""}
-                    placeholder="e.g. 260"
-                    onChange={(event) => patchNutritionTarget("carbohydrateG", event.target.value)}
-                  />
-                </Field>
-                <Field label="Fiber (g)">
-                  <Input
-                    type="number"
-                    min={0}
-                    step={1}
-                    inputMode="decimal"
-                    disabled={!allowManage}
-                    value={clinical.nutrition.targets.fiberG ?? ""}
-                    placeholder="e.g. 28"
-                    onChange={(event) => patchNutritionTarget("fiberG", event.target.value)}
-                  />
-                </Field>
-              </div>
-            </div>
             <SelectNotes
               selectLabel="Nutrient gaps"
               notesLabel="Nutrient gaps — notes"
@@ -1163,15 +1057,24 @@ export function ClientClinicalProfilePanel({
             title="Pregnancy notes"
             actions={
               allowManage ? (
-                <RailAddButton label="Add pregnancy note" onClick={() => setPregnancyOpen(true)} />
+                <RailAddButton
+                  label="Add pregnancy note"
+                  onClick={() => {
+                    setPregnancyNoteDate(localDateInputFromInstant());
+                    setPregnancyNoteTime(localTimeInputValue());
+                    setPregnancyOpen(true);
+                  }}
+                />
               ) : undefined
             }
           >
-            <NoteList
+            <ChartNotesList
               rows={pregnancyNotes}
               empty="No pregnancy notes logged yet"
               allowManage={allowManage}
-              onRemove={(id) => void removeNote(id)}
+              notesBase={`${base}/chart-notes`}
+              onChanged={loadNotes}
+              onError={onError}
             />
           </ClinicalBlock>
         </form>
@@ -1190,17 +1093,20 @@ export function ClientClinicalProfilePanel({
               <RailAddButton
                 label="Add clinical note"
                 onClick={() => {
-                  setClinicalNoteDate(localDateInputValue());
+                  setClinicalNoteDate(localDateInputFromInstant());
+                  setClinicalNoteTime(localTimeInputValue());
                   setClinicalNoteOpen(true);
                 }}
               />
             ) : null}
           </header>
-          <NoteList
+          <ChartNotesList
             rows={clinicalNotes}
             empty="No chart notes yet"
             allowManage={allowManage}
-            onRemove={(id) => void removeNote(id)}
+            notesBase={`${base}/chart-notes`}
+            onChanged={loadNotes}
+            onError={onError}
           />
         </section>
 
@@ -1211,17 +1117,20 @@ export function ClientClinicalProfilePanel({
               <RailAddButton
                 label="Add meal note"
                 onClick={() => {
-                  setMealNoteDate(localDateInputValue());
+                  setMealNoteDate(localDateInputFromInstant());
+                  setMealNoteTime(localTimeInputValue());
                   setMealNoteOpen(true);
                 }}
               />
             ) : null}
           </header>
-          <NoteList
+          <ChartNotesList
             rows={mealNotes}
             empty="No meal notes yet"
             allowManage={allowManage}
-            onRemove={(id) => void removeNote(id)}
+            notesBase={`${base}/chart-notes`}
+            onChanged={loadNotes}
+            onError={onError}
             meal
           />
         </section>
@@ -1233,17 +1142,20 @@ export function ClientClinicalProfilePanel({
               <RailAddButton
                 label="Add eating habit"
                 onClick={() => {
-                  setHabitNoteDate(localDateInputValue());
+                  setHabitNoteDate(localDateInputFromInstant());
+                  setHabitNoteTime(localTimeInputValue());
                   setHabitNoteOpen(true);
                 }}
               />
             ) : null}
           </header>
-          <NoteList
+          <ChartNotesList
             rows={habitNotes}
             empty="No eating-habit notes yet"
             allowManage={allowManage}
-            onRemove={(id) => void removeNote(id)}
+            notesBase={`${base}/chart-notes`}
+            onChanged={loadNotes}
+            onError={onError}
           />
         </section>
 
@@ -1319,46 +1231,16 @@ export function ClientClinicalProfilePanel({
             <ul className="ui-clinical-rail__list">
               {goals.map((goal) => (
                 <li key={goal.id}>
-                  <div className="ui-clinical-rail__copy">
+                  <button type="button" className="ui-clinical-rail__note" onClick={() => setManagingGoal(goal)}>
                     <div className="ui-clinical-rail__title-row">
                       <strong>{goal.title}</strong>
                       <StatusBadge status={goal.status} label={humanizeLabel(goal.status)} />
                     </div>
                     {goal.description ? <p>{goal.description}</p> : null}
-                    <div className="ui-clinical-rail__meta">
-                      <span className="ui-muted">
-                        {goal.targetDate ? `By ${formatDateOnly(goal.targetDate)}` : "No deadline"}
-                      </span>
-                      {goal.status === "ACTIVE" && allowManage ? (
-                        <div className="ui-clinical-rail__actions ui-clinical-rail__actions--text">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="secondary"
-                            onClick={() => {
-                              void api(`${base}/goals/${goal.id}/complete`, { method: "POST" })
-                                .then(() => Promise.all([loadGoals(), onPortfolioRefresh()]))
-                                .catch((err) => onError(errorMessage(err, "Unable to complete goal")));
-                            }}
-                          >
-                            Done
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => {
-                              void api(`${base}/goals/${goal.id}/cancel`, { method: "POST" })
-                                .then(() => Promise.all([loadGoals(), onPortfolioRefresh()]))
-                                .catch((err) => onError(errorMessage(err, "Unable to cancel goal")));
-                            }}
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
+                    <span className="ui-muted">
+                      {goal.targetDate ? `By ${formatDateOnly(goal.targetDate)}` : "No deadline"}
+                    </span>
+                  </button>
                 </li>
               ))}
             </ul>
@@ -1390,17 +1272,15 @@ export function ClientClinicalProfilePanel({
           className="ui-stack"
           onSubmit={(event) => {
             event.preventDefault();
-            void addNote("CLINICAL", clinicalNote, undefined, clinicalNoteDate);
+            void addNote("CLINICAL", clinicalNote, undefined, toLocalDateTimeIso(clinicalNoteDate, clinicalNoteTime));
           }}
         >
-          <Field label="Date">
-            <Input
-              type="date"
-              value={clinicalNoteDate}
-              required
-              onChange={(event) => setClinicalNoteDate(event.target.value)}
-            />
-          </Field>
+          <NoteWhenFields
+            date={clinicalNoteDate}
+            time={clinicalNoteTime}
+            onDateChange={setClinicalNoteDate}
+            onTimeChange={setClinicalNoteTime}
+          />
           <Field label="Note">
             <Textarea
               value={clinicalNote}
@@ -1424,17 +1304,15 @@ export function ClientClinicalProfilePanel({
           className="ui-stack"
           onSubmit={(event) => {
             event.preventDefault();
-            void addNote("MEAL", mealNote, mealSlot, mealNoteDate);
+            void addNote("MEAL", mealNote, mealSlot, toLocalDateTimeIso(mealNoteDate, mealNoteTime));
           }}
         >
-          <Field label="Date">
-            <Input
-              type="date"
-              value={mealNoteDate}
-              required
-              onChange={(event) => setMealNoteDate(event.target.value)}
-            />
-          </Field>
+          <NoteWhenFields
+            date={mealNoteDate}
+            time={mealNoteTime}
+            onDateChange={setMealNoteDate}
+            onTimeChange={setMealNoteTime}
+          />
           <Field label="Meal">
             <Select value={mealSlot} onChange={(event) => setMealSlot(event.target.value)}>
               {MEAL_SLOT_OPTIONS.map((option) => (
@@ -1467,17 +1345,15 @@ export function ClientClinicalProfilePanel({
           className="ui-stack"
           onSubmit={(event) => {
             event.preventDefault();
-            void addNote("EATING_HABIT", habitNote, undefined, habitNoteDate);
+            void addNote("EATING_HABIT", habitNote, undefined, toLocalDateTimeIso(habitNoteDate, habitNoteTime));
           }}
         >
-          <Field label="Date">
-            <Input
-              type="date"
-              value={habitNoteDate}
-              required
-              onChange={(event) => setHabitNoteDate(event.target.value)}
-            />
-          </Field>
+          <NoteWhenFields
+            date={habitNoteDate}
+            time={habitNoteTime}
+            onDateChange={setHabitNoteDate}
+            onTimeChange={setHabitNoteTime}
+          />
           <Field label="Note">
             <Textarea
               value={habitNote}
@@ -1501,9 +1377,15 @@ export function ClientClinicalProfilePanel({
           className="ui-stack"
           onSubmit={(event) => {
             event.preventDefault();
-            void addNote("PREGNANCY", pregnancyNote);
+            void addNote("PREGNANCY", pregnancyNote, undefined, toLocalDateTimeIso(pregnancyNoteDate, pregnancyNoteTime));
           }}
         >
+          <NoteWhenFields
+            date={pregnancyNoteDate}
+            time={pregnancyNoteTime}
+            onDateChange={setPregnancyNoteDate}
+            onTimeChange={setPregnancyNoteTime}
+          />
           <Field label="Note">
             <Textarea
               value={pregnancyNote}
@@ -1596,55 +1478,67 @@ export function ClientClinicalProfilePanel({
         </form>
       </Dialog>
 
-      <Dialog open={tagsOpen} title="Client tags" onClose={() => setTagsOpen(false)}>
-        <div className="ui-client-tags">
-          <ClinicTagsManager
-            dietitianAccountId={dietitianAccountId}
-            tags={orgTags}
-            disabled={!allowManage}
-            compact
-            onChange={(next) => {
-              onOrgTagsChange(next);
-              onSelectedTagIdsChange(selectedTagIds.filter((id) => next.some((tag) => tag.id === id)));
-              void onPortfolioRefresh();
-            }}
-          />
-          {orgTags.length > 0 ? (
-            <form
-              className="ui-client-tags__assign"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void api(`${orgBase}/clients/${clientId}/tags`, {
-                  method: "PUT",
-                  body: JSON.stringify({ tagIds: selectedTagIds }),
-                })
-                  .then(() => onPortfolioRefresh())
-                  .catch((err) => onError(errorMessage(err, "Unable to save tags")));
-              }}
-            >
-              <p className="ui-client-tags__assign-label">Assigned to this client</p>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 12 }}>
-                {orgTags.map((tag) => (
-                  <Checkbox
-                    key={tag.id}
-                    label={tag.name}
-                    checked={selectedTagIds.includes(tag.id)}
-                    disabled={!allowManage}
-                    onChange={(event) => {
-                      const checked = event.target.checked;
-                      onSelectedTagIdsChange(
-                        checked ? [...selectedTagIds, tag.id] : selectedTagIds.filter((id) => id !== tag.id),
-                      );
-                    }}
-                  />
-                ))}
+      <Dialog
+        open={managingGoal != null}
+        title="Goal"
+        onClose={() => {
+          if (goalBusy) return;
+          setManagingGoal(null);
+        }}
+      >
+        {managingGoal ? (
+          <div className="ui-stack">
+            <div className="ui-clinical-rail__title-row">
+              <strong>{managingGoal.title}</strong>
+              <StatusBadge status={managingGoal.status} label={humanizeLabel(managingGoal.status)} />
+            </div>
+            {managingGoal.description ? <p>{managingGoal.description}</p> : null}
+            <p className="ui-muted">
+              {managingGoal.targetDate ? `By ${formatDateOnly(managingGoal.targetDate)}` : "No deadline"}
+            </p>
+            <div className="ui-row ui-clinical-rail__note-actions">
+              {allowManage && managingGoal.status === "ACTIVE" ? (
+                <Button
+                  type="button"
+                  variant="danger"
+                  disabled={goalBusy}
+                  onClick={() => void updateGoalStatus(managingGoal.id, "cancel")}
+                >
+                  Cancel goal
+                </Button>
+              ) : (
+                <span />
+              )}
+              <div className="ui-row" style={{ gap: 8 }}>
+                <Button type="button" variant="secondary" onClick={() => setManagingGoal(null)}>
+                  Close
+                </Button>
+                {allowManage && managingGoal.status === "ACTIVE" ? (
+                  <Button type="button" disabled={goalBusy} onClick={() => void updateGoalStatus(managingGoal.id, "complete")}>
+                    Mark done
+                  </Button>
+                ) : null}
               </div>
-              <Button type="submit" size="sm" variant="secondary" disabled={!allowManage}>
-                Save tags
-              </Button>
-            </form>
-          ) : null}
-        </div>
+            </div>
+          </div>
+        ) : null}
+      </Dialog>
+
+      <Dialog open={tagsOpen} title="Client tags" onClose={() => setTagsOpen(false)}>
+        <ClinicTagsManager
+          dietitianAccountId={dietitianAccountId}
+          tags={orgTags}
+          disabled={!allowManage}
+          compact
+          assignedIds={selectedTagIds}
+          assignBusy={tagBusy}
+          onToggleAssigned={allowManage ? (id) => void toggleClientTag(id) : undefined}
+          onChange={(next) => {
+            onOrgTagsChange(next);
+            onSelectedTagIdsChange(selectedTagIds.filter((id) => next.some((tag) => tag.id === id)));
+            void onPortfolioRefresh();
+          }}
+        />
       </Dialog>
     </div>
   );

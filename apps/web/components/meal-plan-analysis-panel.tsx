@@ -178,7 +178,7 @@ export function MealPlanAnalysisPanel({
           {" · "}
           {macroTargetsFromClient
             ? "Compared to this client’s daily targets"
-            : "Using default targets — set daily targets in Personal data"}
+            : "Using default targets — set daily targets in Prescription"}
         </p>
         <div className="ui-mp__macro-strip">
           <TargetBar

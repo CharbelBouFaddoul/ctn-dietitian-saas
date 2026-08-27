@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 export type DonutSlice = {
   label: string;
@@ -21,6 +21,8 @@ export type DonutChartProps = {
   showPct?: boolean;
   /** Unit shown in the hover tip, e.g. "kcal" or "g". */
   valueUnit?: string;
+  /** Content rendered in the middle of the ring; hidden while a slice is hovered. */
+  center?: ReactNode;
 };
 
 function polar(cx: number, cy: number, r: number, angle: number) {
@@ -61,6 +63,7 @@ export function DonutChart({
   legend = true,
   showPct = true,
   valueUnit,
+  center,
 }: DonutChartProps) {
   const [active, setActive] = useState<string | null>(null);
   const total = slices.reduce((sum, slice) => sum + Math.max(0, slice.value), 0);
@@ -134,6 +137,7 @@ export function DonutChart({
             })
           )}
         </svg>
+        {center && !activeArc ? <div className="ui-donut__center">{center}</div> : null}
         {activeArc ? (
           <div className="ui-donut__tip">
             <span className="ui-donut__tip-pill" style={{ background: activeArc.color, color: "#1e293b" }}>

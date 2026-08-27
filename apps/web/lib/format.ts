@@ -21,6 +21,21 @@ function parseCalendarDate(value: string | Date): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+/** Parse a stored instant; date-only strings stay on the local calendar day. */
+function parseInstant(value: string | Date): Date | null {
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+  const trimmed = value.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    const [year, month, day] = trimmed.split("-").map(Number);
+    const date = new Date(year ?? 0, (month ?? 1) - 1, day ?? 1);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  const date = new Date(trimmed);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 export function formatDate(value: string | Date | null | undefined): string {
   if (!value) return "—";
   const date = value instanceof Date ? value : new Date(value);
@@ -43,6 +58,43 @@ export function localDateInputValue(value?: string | Date | null): string {
   const month = String(source.getMonth() + 1).padStart(2, "0");
   const day = String(source.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+/** YYYY-MM-DD from a timestamp, using the local calendar day. */
+export function localDateInputFromInstant(value?: string | Date | null): string {
+  const date = value ? parseInstant(value) : new Date();
+  return localDateInputValue(date ?? new Date());
+}
+
+/** HH:mm for `<input type="time">`; defaults to now in local time. */
+export function localTimeInputValue(value?: string | Date | null): string {
+  const date = value ? parseInstant(value) : new Date();
+  const source = date ?? new Date();
+  const hours = String(source.getHours()).padStart(2, "0");
+  const minutes = String(source.getMinutes()).padStart(2, "0");
+  return `${hours}:${minutes}`;
+}
+
+/** Combine local date + time fields into an ISO timestamp. */
+export function toLocalDateTimeIso(date: string, time: string): string {
+  const [year, month, day] = date.split("-").map(Number);
+  const [hours = 0, minutes = 0, seconds = 0] = time.split(":").map(Number);
+  const instant = new Date(year ?? 0, (month ?? 1) - 1, day ?? 1, hours, minutes, seconds || 0, 0);
+  if (Number.isNaN(instant.getTime())) return new Date().toISOString();
+  return instant.toISOString();
+}
+
+export function formatDateAndTime(value: string | Date | null | undefined): string {
+  if (!value) return "—";
+  const date = parseInstant(value);
+  if (!date) return "—";
+  return date.toLocaleString(undefined, {
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
 /** Full calendar date for demographics (e.g. "May 15, 1990"). */

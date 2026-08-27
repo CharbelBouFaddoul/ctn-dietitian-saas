@@ -17,7 +17,33 @@ type Props = {
   onChange: (tags: ClinicTag[]) => void;
   disabled?: boolean;
   compact?: boolean;
+  assignedIds?: string[];
+  onToggleAssigned?: (id: string) => void;
+  assignBusy?: boolean;
 };
+
+const IconPencil = (
+  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden>
+    <path
+      d="M11.2 2.8a1.3 1.3 0 0 1 1.8 1.8L6.2 11.4 3.5 12l.6-2.7z"
+      stroke="currentColor"
+      strokeWidth="1.35"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+const IconTrash = (
+  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden>
+    <path
+      d="M3 4h10M6 4V3h4v1M5 4l.6 9h4.8L11 4"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
 
 export function ClinicTagsManager({
   dietitianAccountId,
@@ -25,6 +51,9 @@ export function ClinicTagsManager({
   onChange,
   disabled = false,
   compact = false,
+  assignedIds,
+  onToggleAssigned,
+  assignBusy = false,
 }: Props) {
   const base = `/api/v1/dietitian/${dietitianAccountId}/tags`;
   const [name, setName] = useState("");
@@ -33,6 +62,8 @@ export function ClinicTagsManager({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const selectable = typeof onToggleAssigned === "function";
+  const locked = disabled || busy || assignBusy;
 
   async function refresh() {
     const next = await api<ClinicTag[]>(base);
@@ -91,8 +122,12 @@ export function ClinicTagsManager({
   }
 
   return (
-    <div className={`ui-clinic-tags${compact ? " ui-clinic-tags--compact" : ""}`}>
+    <div className={`ui-clinic-tags${compact ? " ui-clinic-tags--compact" : ""}${selectable ? " ui-clinic-tags--assign" : ""}`}>
       {error ? <p className="ui-clinic-tags__error">{error}</p> : null}
+
+      {selectable ? (
+        <p className="ui-clinic-tags__hint">Tap a tag to assign it to this client. Add, rename, or remove tags here.</p>
+      ) : null}
 
       <form className="ui-clinic-tags__add" onSubmit={(event) => void handleCreate(event)}>
         <Input
@@ -101,14 +136,9 @@ export function ClinicTagsManager({
           placeholder="New tag name…"
           maxLength={40}
           aria-label="New tag name"
-          disabled={disabled || busy}
+          disabled={locked}
         />
-        <Button
-          type="submit"
-          size="sm"
-          variant="secondary"
-          disabled={disabled || busy || !name.trim()}
-        >
+        <Button type="submit" size="sm" variant="secondary" disabled={locked || !name.trim()}>
           Add
         </Button>
       </form>
@@ -117,67 +147,87 @@ export function ClinicTagsManager({
         <p className="ui-muted ui-clinic-tags__empty">No clinic tags yet. Add one above.</p>
       ) : (
         <ul className="ui-clinic-tags__list">
-          {tags.map((tag) => (
-            <li key={tag.id} className="ui-clinic-tags__row">
-              {editingId === tag.id ? (
-                <>
-                  <Input
-                    value={editName}
-                    onChange={(event) => setEditName(event.target.value)}
-                    maxLength={40}
-                    aria-label={`Rename ${tag.name}`}
-                    disabled={disabled || busy}
-                    autoFocus
-                  />
-                  <div className="ui-clinic-tags__row-actions">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="secondary"
-                      disabled={disabled || busy || !editName.trim()}
-                      onClick={() => void handleRename(tag.id)}
-                    >
-                      Save
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      disabled={busy}
-                      onClick={() => setEditingId(null)}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <span className="ui-clinic-tags__name">{tag.name}</span>
-                  <div className="ui-clinic-tags__row-actions">
-                    <button
-                      type="button"
-                      className="ui-clinic-tags__link"
-                      disabled={disabled || busy}
-                      onClick={() => {
-                        setEditingId(tag.id);
-                        setEditName(tag.name);
-                      }}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      className="ui-clinic-tags__link"
-                      disabled={disabled || busy}
-                      onClick={() => setDeleteId(tag.id)}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </>
-              )}
-            </li>
-          ))}
+          {tags.map((tag) => {
+            const assigned = assignedIds?.includes(tag.id) ?? false;
+            return (
+              <li
+                key={tag.id}
+                className={`ui-clinic-tags__row${assigned ? " is-on" : ""}${selectable ? " is-pick" : ""}`}
+              >
+                {editingId === tag.id ? (
+                  <>
+                    <Input
+                      value={editName}
+                      onChange={(event) => setEditName(event.target.value)}
+                      maxLength={40}
+                      aria-label={`Rename ${tag.name}`}
+                      disabled={locked}
+                      autoFocus
+                    />
+                    <div className="ui-clinic-tags__row-actions">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        disabled={locked || !editName.trim()}
+                        onClick={() => void handleRename(tag.id)}
+                      >
+                        Save
+                      </Button>
+                      <Button type="button" size="sm" variant="ghost" disabled={busy} onClick={() => setEditingId(null)}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {selectable ? (
+                      <button
+                        type="button"
+                        className="ui-clinic-tags__pick"
+                        disabled={locked}
+                        aria-pressed={assigned}
+                        onClick={() => onToggleAssigned(tag.id)}
+                      >
+                        <span className="ui-clinic-tags__check" aria-hidden>
+                          {assigned ? "✓" : ""}
+                        </span>
+                        <span className="ui-clinic-tags__name">{tag.name}</span>
+                        {assigned ? <span className="ui-clinic-tags__flag">Assigned</span> : null}
+                      </button>
+                    ) : (
+                      <span className="ui-clinic-tags__name">{tag.name}</span>
+                    )}
+                    <div className="ui-clinic-tags__row-actions">
+                      <button
+                        type="button"
+                        className="ui-clinic-tags__icon-btn"
+                        disabled={locked}
+                        aria-label={`Rename ${tag.name}`}
+                        title="Rename"
+                        onClick={() => {
+                          setEditingId(tag.id);
+                          setEditName(tag.name);
+                        }}
+                      >
+                        {IconPencil}
+                      </button>
+                      <button
+                        type="button"
+                        className="ui-clinic-tags__icon-btn ui-clinic-tags__icon-btn--danger"
+                        disabled={locked}
+                        aria-label={`Remove ${tag.name}`}
+                        title="Remove"
+                        onClick={() => setDeleteId(tag.id)}
+                      >
+                        {IconTrash}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
 

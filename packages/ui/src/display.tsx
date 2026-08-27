@@ -261,13 +261,15 @@ export function Tabs({
   items,
   value,
   onChange,
+  variant = "pills",
 }: {
-  items: Array<{ id: string; label: string }>;
+  items: Array<{ id: string; label: string; icon?: ReactNode }>;
   value: string;
   onChange: (id: string) => void;
+  variant?: "pills" | "line";
 }) {
   return (
-    <div className="ui-tabs" role="tablist">
+    <div className={cn("ui-tabs", variant === "line" && "ui-tabs--line")} role="tablist">
       {items.map((item) => (
         <button
           key={item.id}
@@ -278,6 +280,7 @@ export function Tabs({
           aria-selected={item.id === value}
           onClick={() => onChange(item.id)}
         >
+          {item.icon ? <span className="ui-tab__icon">{item.icon}</span> : null}
           {item.label}
         </button>
       ))}
