@@ -1028,17 +1028,18 @@ function TimeGrid({
 
   return (
     <div className={`ui-cal-time${view === "day" ? " is-day" : ""}`}>
-      <div className="ui-cal-time__head">
-        <span className="ui-cal-time__gutter" />
-        {days.map((day) => (
-          <div key={day.toISOString()} className={`ui-cal-time__dayhead${isSameDay(day, today) ? " is-today" : ""}`}>
-            <strong>{day.toLocaleDateString(undefined, { weekday: "short" })}</strong>
-            <span>{day.getDate()}</span>
-          </div>
-        ))}
-      </div>
       <div className="ui-cal-time__scroll" ref={scrollRef}>
-        <div className="ui-cal-time__body">
+        <div className="ui-cal-time__grid">
+          <div className="ui-cal-time__corner" aria-hidden="true" />
+          {days.map((day) => (
+            <div
+              key={`head-${day.toISOString()}`}
+              className={`ui-cal-time__dayhead${isSameDay(day, today) ? " is-today" : ""}`}
+            >
+              <strong>{day.toLocaleDateString(undefined, { weekday: "short" })}</strong>
+              <span>{day.getDate()}</span>
+            </div>
+          ))}
           <div className="ui-cal-time__hours">
             {DAY_HOURS.map((h) => (
               <div key={h} className="ui-cal-time__hourlabel" data-hour={h}>

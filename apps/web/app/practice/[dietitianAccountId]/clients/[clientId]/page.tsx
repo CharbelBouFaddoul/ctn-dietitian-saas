@@ -9,11 +9,7 @@ import {
   Badge,
   Button,
   ConfirmDialog,
-  Dialog,
   EmptyState,
-  Field,
-  Input,
-  LoadingState,
   PageHeader,
   Section,
   Skeleton,
@@ -25,6 +21,7 @@ import {
 } from "@nutrition-saas/ui";
 import { AiPanel } from "../../../../../components/ai-panel";
 import { JoinCodePanel } from "../../../../../components/join-code-panel";
+import { ClientAppointmentsPanel } from "../../../../../components/client-appointments-panel";
 import { ClientAssessmentsPanel } from "../../../../../components/client-assessments-panel";
 import { ClientClinicalProfilePanel } from "../../../../../components/client-clinical-profile-panel";
 import { ClientEvolutionPanel } from "../../../../../components/client-evolution-panel";
@@ -33,11 +30,6 @@ import { ClientNutritionPanel } from "../../../../../components/client-nutrition
 import { ClientPrescriptionPanel } from "../../../../../components/client-prescription-panel";
 import type { MealPlanView } from "../../../../../components/client-meal-plan-workspace";
 import { api } from "../../../../../lib/api";
-import {
-  combineLocalDateTime,
-  toDateInputValue,
-  toTimeInputValue,
-} from "../../../../../lib/calendar-range";
 import { ageInYears, formatDate, formatFullDate, formatMoney } from "../../../../../lib/format";
 import { errorMessage } from "../../../../../lib/humanize-error";
 import { canManageClients } from "../../../../../lib/practice-access";
@@ -53,7 +45,6 @@ type Tab =
   | "prescription"
   | "meal-plan"
   | "tracking"
-  | "messages"
   | "invoices"
   | "appointments"
   | "ai"
@@ -172,10 +163,7 @@ const chartSections: ChartSection[] = [
         <path d="M16 3v4M8 3v4M3 11h18" />
       </ChartTabIcon>
     ),
-    tabs: [
-      { id: "appointments", label: "Appointments" },
-      { id: "messages", label: "Messages" },
-    ],
+    tabs: [{ id: "appointments", label: "Appointments" }],
   },
   {
     id: "practice",
@@ -452,27 +440,6 @@ function ClientWorkspacePage() {
     Array<{ id: string; invoiceNumber: string | null; status: string; dueDate: string | null; total: number; currency: string }>
   >([]);
 
-  const [appointments, setAppointments] = useState<
-    Array<{
-      id: string;
-      title: string;
-      startAt: string;
-      endAt?: string;
-      status: string;
-      proposedStartAt?: string | null;
-      proposedEndAt?: string | null;
-      proposedByUserId?: string | null;
-    }>
-  >([]);
-  const [appointmentBusyId, setAppointmentBusyId] = useState<string | null>(null);
-  const [counterProposeId, setCounterProposeId] = useState<string | null>(null);
-  const [counterDate, setCounterDate] = useState(toDateInputValue(new Date()));
-  const [counterStart, setCounterStart] = useState("10:00");
-  const [counterEnd, setCounterEnd] = useState("11:00");
-  const [appointmentTitle, setAppointmentTitle] = useState("Consultation");
-  const [startAt, setStartAt] = useState("");
-  const [endAt, setEndAt] = useState("");
-
   const [timeline, setTimeline] = useState<TimelineRow[]>([]);
   const [timelinePages, setTimelinePages] = useState<TimelineRow[][]>([]);
   const [timelinePageIndex, setTimelinePageIndex] = useState(0);
@@ -493,13 +460,13 @@ function ClientWorkspacePage() {
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
 
   function selectTab(next: string, extras?: { metric?: string; planId?: string; view?: MealPlanView }) {
+    if (next === "messages") {
+      router.push(`/practice/${dietitianAccountId}/messages?clientId=${clientId}`);
+      return;
+    }
     const value = resolveTab(next, visibleSections);
     if (next === "ai" && !practice.aiAvailable) {
       setTab("overview");
-      return;
-    }
-    if (value === "messages") {
-      router.push(`/practice/${dietitianAccountId}/messages?clientId=${clientId}`);
       return;
     }
     setTab(value);
@@ -540,12 +507,6 @@ function ClientWorkspacePage() {
   const activeSection = sectionForTab(tab, visibleSections);
 
   useEffect(() => {
-    if (tab === "messages") {
-      router.replace(`/practice/${dietitianAccountId}/messages?clientId=${clientId}`);
-    }
-  }, [tab, dietitianAccountId, clientId, router]);
-
-  useEffect(() => {
     if (tab === "ai" && !practice.aiAvailable) {
       selectTab("overview");
     }
@@ -576,11 +537,6 @@ function ClientWorkspacePage() {
     } catch (err) {
       setError(errorMessage(err, "Unable to load client"));
     }
-  }
-
-  async function loadAppointments() {
-    const rows = await api<typeof appointments>(`${base}/appointments`);
-    setAppointments(rows);
   }
 
   async function loadTimelinePage(before?: string, replace = true, date?: string) {
@@ -633,6 +589,10 @@ function ClientWorkspacePage() {
 
   useEffect(() => {
     const raw = searchParams.get("tab");
+    if (raw === "messages") {
+      router.replace(`/practice/${dietitianAccountId}/messages?clientId=${clientId}`);
+      return;
+    }
     if (raw && LEGACY_TABS[raw]) {
       selectTab(LEGACY_TABS[raw]!);
     }
@@ -649,11 +609,6 @@ function ClientWorkspacePage() {
       setError(errorMessage(err, "Unable to load timeline")),
     );
   }, [tab, base, trackingDate]);
-
-  useEffect(() => {
-    if (tab !== "appointments") return;
-    void loadAppointments().catch((err) => setError(errorMessage(err, "Unable to load appointments")));
-  }, [tab, base]);
 
   useEffect(() => {
     if (tab !== "tracking") return;
@@ -1140,13 +1095,6 @@ function ClientWorkspacePage() {
         </div>
       ) : null}
 
-      {/* ── MESSAGES (opens inbox) ── */}
-      {tab === "messages" ? (
-        <div className="ui-client-chart__panel">
-          <LoadingState>Opening client chat…</LoadingState>
-        </div>
-      ) : null}
-
       {/* ── INVOICES ── */}
       {tab === "invoices" ? (
         <Section title="Invoices">
@@ -1185,195 +1133,13 @@ function ClientWorkspacePage() {
 
       {/* ── APPOINTMENTS ── */}
       {tab === "appointments" ? (
-        <div className="ui-client-chart__panel ui-stack">
-          <Section title="Schedule appointment">
-            <form
-              onSubmit={(event) => {
-                event.preventDefault();
-                void api(`${base}/appointments`, {
-                  method: "POST",
-                  body: JSON.stringify({
-                    title: appointmentTitle,
-                    startAt: new Date(startAt).toISOString(),
-                    endAt: new Date(endAt).toISOString(),
-                  }),
-                })
-                  .then(() => Promise.all([loadAppointments(), loadPortfolio()]))
-                  .catch((err) => setError(errorMessage(err, "Unable to schedule appointment")));
-              }}
-            >
-              <div className="ui-client-chart__form-grid">
-                <Field label="Title">
-                  <Input
-                    value={appointmentTitle}
-                    onChange={(event) => setAppointmentTitle(event.target.value)}
-                    required
-                  />
-                </Field>
-                <Field label="Start">
-                  <Input
-                    type="datetime-local"
-                    value={startAt}
-                    onChange={(event) => setStartAt(event.target.value)}
-                    required
-                  />
-                </Field>
-                <Field label="End">
-                  <Input
-                    type="datetime-local"
-                    value={endAt}
-                    onChange={(event) => setEndAt(event.target.value)}
-                    required
-                  />
-                </Field>
-              </div>
-              <Button type="submit" size="sm" variant="secondary">
-                Schedule
-              </Button>
-            </form>
-          </Section>
-
-          <Section title="Appointments">
-            {appointments.length === 0 ? (
-              <EmptyState title="No appointments yet" />
-            ) : (
-              <ul className="ui-client-appt-list">
-                {appointments.map((row) => {
-                  const busy = appointmentBusyId === row.id;
-                  const pendingReschedule =
-                    row.status === "RESCHEDULE_PENDING" && row.proposedStartAt && row.proposedEndAt;
-                  const pendingCancel = row.status === "CANCELLATION_PENDING";
-                  return (
-                    <li key={row.id} className="ui-client-appt">
-                      <div className="ui-client-appt__main">
-                        <div className="ui-client-appt__title-row">
-                          <strong>{row.title}</strong>
-                          <StatusBadge status={row.status} label={humanizeLabel(row.status)} />
-                        </div>
-                        <p className="ui-client-appt__when">{formatDate(row.startAt)}</p>
-                        {pendingReschedule ? (
-                          <p className="ui-client-appt__request">
-                            Requested: {formatDate(row.proposedStartAt)}
-                            {row.proposedEndAt ? ` – ${formatDate(row.proposedEndAt)}` : ""}
-                          </p>
-                        ) : null}
-                        {pendingCancel ? (
-                          <p className="ui-client-appt__request">Patient requested cancellation</p>
-                        ) : null}
-                      </div>
-                      {pendingReschedule || pendingCancel ? (
-                        <div className="ui-client-appt__actions">
-                          {pendingReschedule ? (
-                            <>
-                              <Button
-                                type="button"
-                                size="sm"
-                                disabled={busy}
-                                onClick={() => {
-                                  setAppointmentBusyId(row.id);
-                                  void api(
-                                    `/api/v1/dietitian/${dietitianAccountId}/appointments/${row.id}/accept-reschedule`,
-                                    { method: "POST", body: JSON.stringify({}) },
-                                  )
-                                    .then(() => Promise.all([loadAppointments(), loadPortfolio()]))
-                                    .catch((err) =>
-                                      setError(errorMessage(err, "Unable to accept reschedule")),
-                                    )
-                                    .finally(() => setAppointmentBusyId(null));
-                                }}
-                              >
-                                Approve
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="secondary"
-                                disabled={busy}
-                                onClick={() => {
-                                  const start = new Date(row.proposedStartAt ?? row.startAt);
-                                  const end = new Date(row.proposedEndAt ?? row.endAt ?? row.startAt);
-                                  setCounterProposeId(row.id);
-                                  setCounterDate(toDateInputValue(start));
-                                  setCounterStart(toTimeInputValue(start));
-                                  setCounterEnd(toTimeInputValue(end));
-                                }}
-                              >
-                                Suggest another time
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="ghost"
-                                disabled={busy}
-                                onClick={() => {
-                                  setAppointmentBusyId(row.id);
-                                  void api(
-                                    `/api/v1/dietitian/${dietitianAccountId}/appointments/${row.id}/reject-reschedule`,
-                                    { method: "POST", body: JSON.stringify({}) },
-                                  )
-                                    .then(() => loadAppointments())
-                                    .catch((err) =>
-                                      setError(errorMessage(err, "Unable to decline reschedule")),
-                                    )
-                                    .finally(() => setAppointmentBusyId(null));
-                                }}
-                              >
-                                Decline
-                              </Button>
-                            </>
-                          ) : null}
-                          {pendingCancel ? (
-                            <>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="danger"
-                                disabled={busy}
-                                onClick={() => {
-                                  setAppointmentBusyId(row.id);
-                                  void api(
-                                    `/api/v1/dietitian/${dietitianAccountId}/appointments/${row.id}/accept-cancellation`,
-                                    { method: "POST", body: JSON.stringify({}) },
-                                  )
-                                    .then(() => Promise.all([loadAppointments(), loadPortfolio()]))
-                                    .catch((err) =>
-                                      setError(errorMessage(err, "Unable to approve cancellation")),
-                                    )
-                                    .finally(() => setAppointmentBusyId(null));
-                                }}
-                              >
-                                Approve cancel
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="secondary"
-                                disabled={busy}
-                                onClick={() => {
-                                  setAppointmentBusyId(row.id);
-                                  void api(
-                                    `/api/v1/dietitian/${dietitianAccountId}/appointments/${row.id}/reject-cancellation`,
-                                    { method: "POST", body: JSON.stringify({}) },
-                                  )
-                                    .then(() => loadAppointments())
-                                    .catch((err) =>
-                                      setError(errorMessage(err, "Unable to decline cancellation")),
-                                    )
-                                    .finally(() => setAppointmentBusyId(null));
-                                }}
-                              >
-                                Keep
-                              </Button>
-                            </>
-                          ) : null}
-                        </div>
-                      ) : null}
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </Section>
+        <div className="ui-client-chart__panel">
+          <ClientAppointmentsPanel
+            dietitianAccountId={dietitianAccountId}
+            clientId={clientId}
+            base={base}
+            onChanged={() => void loadPortfolio()}
+          />
         </div>
       ) : null}
 
@@ -1488,73 +1254,6 @@ function ClientWorkspacePage() {
           ) : null}
         </div>
       ) : null}
-
-      <Dialog
-        open={!!counterProposeId}
-        title="Suggest another time"
-        onClose={() => setCounterProposeId(null)}
-      >
-        <form
-          className="ui-stack"
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (!counterProposeId) return;
-            setAppointmentBusyId(counterProposeId);
-            void api(
-              `/api/v1/dietitian/${dietitianAccountId}/appointments/${counterProposeId}/propose-reschedule`,
-              {
-                method: "POST",
-                body: JSON.stringify({
-                  startAt: combineLocalDateTime(counterDate, counterStart),
-                  endAt: combineLocalDateTime(counterDate, counterEnd),
-                }),
-              },
-            )
-              .then(() => {
-                setCounterProposeId(null);
-                return Promise.all([loadAppointments(), loadPortfolio()]);
-              })
-              .catch((err) => setError(errorMessage(err, "Unable to suggest another time")))
-              .finally(() => setAppointmentBusyId(null));
-          }}
-        >
-          <p className="ui-muted" style={{ margin: 0 }}>
-            Send a different time to the patient. They will need to accept it.
-          </p>
-          <Field label="Date">
-            <Input
-              type="date"
-              value={counterDate}
-              onChange={(event) => setCounterDate(event.target.value)}
-              required
-            />
-          </Field>
-          <Field label="Start">
-            <Input
-              type="time"
-              value={counterStart}
-              onChange={(event) => setCounterStart(event.target.value)}
-              required
-            />
-          </Field>
-          <Field label="End">
-            <Input
-              type="time"
-              value={counterEnd}
-              onChange={(event) => setCounterEnd(event.target.value)}
-              required
-            />
-          </Field>
-          <div className="ui-row" style={{ justifyContent: "flex-end", gap: 8 }}>
-            <Button type="button" variant="secondary" onClick={() => setCounterProposeId(null)}>
-              Back
-            </Button>
-            <Button type="submit" disabled={appointmentBusyId === counterProposeId}>
-              {appointmentBusyId === counterProposeId ? "Sending…" : "Send request"}
-            </Button>
-          </div>
-        </form>
-      </Dialog>
 
       <ConfirmDialog
         open={confirmArchive}
