@@ -118,6 +118,7 @@ export function MealMacroDonuts({
               thickness={layout === "wide" ? 16 : 14}
               legend={false}
               showPct={false}
+              interactive={false}
               valueUnit="kcal"
               slices={[
                 { label: "Fat", value: meal.fatG * FAT_KCAL, color: FAT },

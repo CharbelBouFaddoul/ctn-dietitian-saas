@@ -998,20 +998,22 @@ function ClientWorkspacePage() {
 
       {/* ── MEASUREMENT ── */}
       {tab === "measurement" ? (
-        <ClientEvolutionPanel
-          base={base}
-          allowManage={allowManage}
-          onError={setError}
-          initialMetric={searchParams.get("metric")}
-          onMetricChange={(metric) => {
-            const params = new URLSearchParams(searchParams.toString());
-            params.set("tab", "measurement");
-            params.set("metric", metric);
-            router.replace(`/practice/${dietitianAccountId}/clients/${clientId}?${params.toString()}`, {
-              scroll: false,
-            });
-          }}
-        />
+        <div className="ui-client-chart__panel">
+          <ClientEvolutionPanel
+            base={base}
+            allowManage={allowManage}
+            onError={setError}
+            initialMetric={searchParams.get("metric")}
+            onMetricChange={(metric) => {
+              const params = new URLSearchParams(searchParams.toString());
+              params.set("tab", "measurement");
+              params.set("metric", metric);
+              router.replace(`/practice/${dietitianAccountId}/clients/${clientId}?${params.toString()}`, {
+                scroll: false,
+              });
+            }}
+          />
+        </div>
       ) : null}
 
       {/* ── CLINICAL ── */}

@@ -41,7 +41,7 @@
   --space-10: 2.5rem;
   --space-12: 3rem;
   --space-16: 4rem;
-  --sidebar-width: 248px;
+  --sidebar-width: 252px;
   --focus-ring: 0 0 0 3px rgb(15 118 110 / 28%);
   --bp-sm: 640px;
   --bp-md: 900px;
@@ -67,7 +67,7 @@
   --color-info: #2563eb;
   --color-info-soft: #dbeafe;
   --focus-ring: 0 0 0 3px rgb(13 148 136 / 26%);
-  --sidebar-width: 260px;
+  --sidebar-width: 252px;
   --sidebar-collapsed-width: 72px;
   --admin-navy: #0f172a;
   --admin-slate: #334155;
@@ -102,7 +102,7 @@
   --text-lg: 1.05rem;
   --text-xl: 1.35rem;
   --text-2xl: 1.75rem;
-  --sidebar-width: 260px;
+  --sidebar-width: 252px;
   --sidebar-collapsed-width: 72px;
   --practice-deep-teal: #0f766e;
   --practice-teal: #0d9488;
@@ -145,7 +145,8 @@
   --color-info: #2563eb;
   --color-info-soft: #dbeafe;
   --focus-ring: 0 0 0 3px rgb(13 148 136 / 24%);
-  --sidebar-width: 240px;
+  --sidebar-width: 252px;
+  --sidebar-collapsed-width: 72px;
   --radius: 14px;
   --client-deep-teal: #0f766e;
   --client-teal: #0d9488;

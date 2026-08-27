@@ -23,6 +23,8 @@ export type DonutChartProps = {
   valueUnit?: string;
   /** Content rendered in the middle of the ring; hidden while a slice is hovered. */
   center?: ReactNode;
+  /** When false, slices don't respond to hover (no dim/tip). Default true. */
+  interactive?: boolean;
 };
 
 function polar(cx: number, cy: number, r: number, angle: number) {
@@ -64,6 +66,7 @@ export function DonutChart({
   showPct = true,
   valueUnit,
   center,
+  interactive = true,
 }: DonutChartProps) {
   const [active, setActive] = useState<string | null>(null);
   const total = slices.reduce((sum, slice) => sum + Math.max(0, slice.value), 0);
@@ -112,9 +115,9 @@ export function DonutChart({
             <path
               d={wedgePath(cx, cy, innerR, outerR, 0, 359.999)}
               fill={arcs[0]!.color}
-              className="ui-donut__slice"
-              onMouseEnter={() => setActive(arcs[0]!.label)}
-              onMouseLeave={() => setActive(null)}
+              className={`ui-donut__slice${interactive ? "" : " ui-donut__slice--static"}`}
+              onMouseEnter={interactive ? () => setActive(arcs[0]!.label) : undefined}
+              onMouseLeave={interactive ? () => setActive(null) : undefined}
             />
           ) : (
             arcs.map((arc) => {
@@ -129,9 +132,9 @@ export function DonutChart({
                   stroke="#fff"
                   strokeWidth={1}
                   paintOrder="fill stroke"
-                  className={`ui-donut__slice${active && active !== arc.label ? " is-dim" : ""}${active === arc.label ? " is-active" : ""}`}
-                  onMouseEnter={() => setActive(arc.label)}
-                  onMouseLeave={() => setActive(null)}
+                  className={`ui-donut__slice${interactive ? "" : " ui-donut__slice--static"}${active && active !== arc.label ? " is-dim" : ""}${active === arc.label ? " is-active" : ""}`}
+                  onMouseEnter={interactive ? () => setActive(arc.label) : undefined}
+                  onMouseLeave={interactive ? () => setActive(null) : undefined}
                 />
               );
             })
