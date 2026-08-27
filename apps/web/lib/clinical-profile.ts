@@ -47,6 +47,13 @@ export type ClinicalData = {
     deficienciesNotes: string;
     waterIntake: string;
     other: string;
+    targets: {
+      energyKcal: number | null;
+      fatG: number | null;
+      carbohydrateG: number | null;
+      proteinG: number | null;
+      fiberG: number | null;
+    };
   };
   identity: {
     occupation: string;
@@ -236,7 +243,19 @@ export function emptyClinicalData(): ClinicalData {
       intolerances: "",
       intolerancesNotes: "",
     },
-    nutrition: { deficiencies: "", deficienciesNotes: "", waterIntake: "", other: "" },
+    nutrition: {
+      deficiencies: "",
+      deficienciesNotes: "",
+      waterIntake: "",
+      other: "",
+      targets: {
+        energyKcal: null,
+        fatG: null,
+        carbohydrateG: null,
+        proteinG: null,
+        fiberG: null,
+      },
+    },
     identity: {
       occupation: "",
       workplace: "",

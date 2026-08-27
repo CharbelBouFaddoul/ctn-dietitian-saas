@@ -399,6 +399,14 @@ export function ClientClinicalProfilePanel({
     setClinical({
       ...emptyClinicalData(),
       ...(profile.clinicalData ?? {}),
+      nutrition: {
+        ...emptyClinicalData().nutrition,
+        ...(profile.clinicalData?.nutrition ?? {}),
+        targets: {
+          ...emptyClinicalData().nutrition.targets,
+          ...(profile.clinicalData?.nutrition?.targets ?? {}),
+        },
+      },
       identity: {
         ...emptyClinicalData().identity,
         ...(profile.clinicalData?.identity ?? {}),
@@ -431,11 +439,26 @@ export function ClientClinicalProfilePanel({
   function patchClinical<K extends keyof ClinicalData>(
     section: K,
     field: keyof ClinicalData[K],
-    value: string,
+    value: ClinicalData[K][keyof ClinicalData[K]],
   ) {
     setClinical((prev) => ({
       ...prev,
       [section]: { ...prev[section], [field]: value },
+    }));
+  }
+
+  function patchNutritionTarget(field: keyof ClinicalData["nutrition"]["targets"], raw: string) {
+    const trimmed = raw.trim();
+    const next = trimmed === "" ? null : Number(trimmed);
+    setClinical((prev) => ({
+      ...prev,
+      nutrition: {
+        ...prev.nutrition,
+        targets: {
+          ...prev.nutrition.targets,
+          [field]: next != null && Number.isFinite(next) && next >= 0 ? next : null,
+        },
+      },
     }));
   }
 
@@ -1035,6 +1058,74 @@ export function ClientClinicalProfilePanel({
           </ClinicalBlock>
 
           <ClinicalBlock title="Nutrition profile">
+            <div className="ui-clinical-targets">
+              <p className="ui-clinical-targets__title">Daily macro targets</p>
+              <p className="ui-muted ui-clinical-targets__hint">
+                Used in Nutrition → Analysis to show whether the day is under, on, or over target.
+              </p>
+              <div className="ui-clinical-targets__grid">
+                <Field label="Energy (kcal)">
+                  <Input
+                    type="number"
+                    min={0}
+                    step={1}
+                    inputMode="decimal"
+                    disabled={!allowManage}
+                    value={clinical.nutrition.targets.energyKcal ?? ""}
+                    placeholder="e.g. 2000"
+                    onChange={(event) => patchNutritionTarget("energyKcal", event.target.value)}
+                  />
+                </Field>
+                <Field label="Protein (g)">
+                  <Input
+                    type="number"
+                    min={0}
+                    step={1}
+                    inputMode="decimal"
+                    disabled={!allowManage}
+                    value={clinical.nutrition.targets.proteinG ?? ""}
+                    placeholder="e.g. 90"
+                    onChange={(event) => patchNutritionTarget("proteinG", event.target.value)}
+                  />
+                </Field>
+                <Field label="Fat (g)">
+                  <Input
+                    type="number"
+                    min={0}
+                    step={1}
+                    inputMode="decimal"
+                    disabled={!allowManage}
+                    value={clinical.nutrition.targets.fatG ?? ""}
+                    placeholder="e.g. 70"
+                    onChange={(event) => patchNutritionTarget("fatG", event.target.value)}
+                  />
+                </Field>
+                <Field label="Carbs (g)">
+                  <Input
+                    type="number"
+                    min={0}
+                    step={1}
+                    inputMode="decimal"
+                    disabled={!allowManage}
+                    value={clinical.nutrition.targets.carbohydrateG ?? ""}
+                    placeholder="e.g. 260"
+                    onChange={(event) => patchNutritionTarget("carbohydrateG", event.target.value)}
+                  />
+                </Field>
+                <Field label="Fiber (g)">
+                  <Input
+                    type="number"
+                    min={0}
+                    step={1}
+                    inputMode="decimal"
+                    disabled={!allowManage}
+                    value={clinical.nutrition.targets.fiberG ?? ""}
+                    placeholder="e.g. 28"
+                    onChange={(event) => patchNutritionTarget("fiberG", event.target.value)}
+                  />
+                </Field>
+              </div>
+            </div>
             <SelectNotes
               selectLabel="Nutrient gaps"
               notesLabel="Nutrient gaps — notes"

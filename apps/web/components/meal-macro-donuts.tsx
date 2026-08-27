@@ -13,9 +13,9 @@ export type MealMacro = {
   proteinG: number;
 };
 
-const FAT = "#e4c44a";
-const CARB = "#e8a090";
-const PROT = "#7eafd9";
+const FAT = "#e8a82e";
+const CARB = "#e89a6a";
+const PROT = "#4f8fe0";
 const FAT_KCAL = 9;
 const CARB_KCAL = 4;
 const PROT_KCAL = 4;
@@ -114,9 +114,11 @@ export function MealMacroDonuts({
             onMouseLeave={() => setHover(null)}
           >
             <DonutChart
-              size={layout === "wide" ? 64 : 56}
-              thickness={10}
+              size={layout === "wide" ? 72 : 64}
+              thickness={layout === "wide" ? 16 : 14}
               legend={false}
+              showPct={false}
+              valueUnit="kcal"
               slices={[
                 { label: "Fat", value: meal.fatG * FAT_KCAL, color: FAT },
                 { label: "Carbs", value: meal.carbohydrateG * CARB_KCAL, color: CARB },

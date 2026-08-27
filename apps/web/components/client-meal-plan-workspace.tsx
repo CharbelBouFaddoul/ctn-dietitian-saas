@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -13,7 +13,6 @@ import {
   Input,
   LoadingState,
   RdaBarList,
-  Select,
   Table,
   TargetBar,
   Td,
@@ -24,11 +23,11 @@ import { errorMessage } from "../lib/humanize-error";
 import { groupDaysByWeek, weekOfDay } from "../lib/meal-plan-weeks";
 import {
   analysisMicroLabel,
-  DAILY_MACRO_TARGETS,
   DEFAULT_RDA_PROFILE_ID,
   isRdaProfileId,
   RDA_PROFILE_STORAGE_KEY,
   RDA_PROFILES,
+  resolveDailyMacroTargets,
   type RdaProfile,
   type RdaProfileId,
 } from "../lib/nutrition-targets";
@@ -37,6 +36,7 @@ import { ClientMealNotesRail } from "./client-meal-notes-rail";
 import { MealFoodPicker } from "./meal-food-picker";
 import { MealItemNutritionDialog } from "./meal-item-nutrition-dialog";
 import { MealMacroDonuts } from "./meal-macro-donuts";
+import { MealPlanAnalysisPanel } from "./meal-plan-analysis-panel";
 
 export type MealPlanView = "plan" | "analysis";
 
@@ -60,6 +60,7 @@ type MealItem = {
     id: string;
     name: string;
     origin?: "catalog" | "custom";
+    category?: string | null;
     servingDescription?: string | null;
     referenceQuantity?: number;
     referenceUnit?: string;
@@ -123,7 +124,6 @@ const MEAL_NAME_PRESETS = [
 ] as const;
 
 const FOODS_PAGE_SIZE = 8;
-const MEAL_DONUT_COLORS = ["#0f766e", "#14b8a6", "#5eead4", "#f59e0b", "#3b82f6", "#8b5cf6"];
 
 function n(value: number | null | undefined) {
   return value ?? 0;
@@ -262,6 +262,55 @@ function TrashIcon() {
   );
 }
 
+function ImportIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M12 3v12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M8 11l4 4 4-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M5 19h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function MoreIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <circle cx="12" cy="5" r="1.6" />
+      <circle cx="12" cy="12" r="1.6" />
+      <circle cx="12" cy="19" r="1.6" />
+    </svg>
+  );
+}
+
+const MACRO_CHIP_COLORS = {
+  energy: "#9b7bc4",
+  fat: "#e8a82e",
+  carb: "#e89a6a",
+  protein: "#4f8fe0",
+  fiber: "#1f9a82",
+} as const;
+
+const MACRO_DONUT_COLORS = {
+  fat: "#e8a82e",
+  carb: "#e89a6a",
+  protein: "#4f8fe0",
+} as const;
+
+function MacroChip({
+  tone,
+  children,
+}: {
+  tone: keyof typeof MACRO_CHIP_COLORS;
+  children: ReactNode;
+}) {
+  const color = MACRO_CHIP_COLORS[tone];
+  return (
+    <span className="ui-mp__macro-chip" style={{ color, background: `${color}1f` }}>
+      {children}
+    </span>
+  );
+}
+
 function planStatusCaption(status: string) {
   if (status === "ACTIVE") return "Published";
   return statusLabel(status);
@@ -286,6 +335,98 @@ function GearIcon() {
 }
 
 type PlanOption = { id: string; name: string; status: string };
+
+type ImportClient = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  displayName: string | null;
+};
+
+function importClientName(client: ImportClient) {
+  return client.displayName?.trim() || `${client.firstName} ${client.lastName}`.trim() || "Client";
+}
+
+function SearchGlyph() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="11" cy="11" r="6.25" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M16.2 16.2L21 21" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ImportAvatar({ name }: { name: string }) {
+  const initials = name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
+  return <span className="ui-mp__import-avatar">{initials || "?"}</span>;
+}
+
+function SearchableSelect({
+  label,
+  open,
+  onOpenChange,
+  value,
+  search,
+  onSearch,
+  children,
+}: {
+  label: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  value: ReactNode;
+  search: string;
+  onSearch: (value: string) => void;
+  children: ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    function onPointer(event: MouseEvent) {
+      if (ref.current && !ref.current.contains(event.target as Node)) onOpenChange(false);
+    }
+    window.addEventListener("mousedown", onPointer);
+    return () => window.removeEventListener("mousedown", onPointer);
+  }, [open, onOpenChange]);
+
+  return (
+    <div className="ui-mp__ss" ref={ref}>
+      <span className="ui-mp__ss-label">{label}</span>
+      <button
+        type="button"
+        className={`ui-mp__ss-btn${open ? " is-open" : ""}`}
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        onClick={() => onOpenChange(!open)}
+      >
+        <span className="ui-mp__ss-value">{value}</span>
+        <span className="ui-mp__ss-caret" aria-hidden>
+          {open ? "▴" : "▾"}
+        </span>
+      </button>
+      {open ? (
+        <div className="ui-mp__ss-menu">
+          <div className="ui-mp__ss-search">
+            <input
+              value={search}
+              onChange={(event) => onSearch(event.target.value)}
+              autoFocus
+              aria-label={`Search ${label.toLowerCase()}`}
+            />
+            <SearchGlyph />
+          </div>
+          <div className="ui-mp__ss-list" role="listbox">
+            {children}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 function RdaProfilePicker({
   value,
@@ -384,7 +525,6 @@ export function ClientMealPlanWorkspace({
   const [activeDayId, setActiveDayId] = useState("");
   const [activeWeek, setActiveWeek] = useState(1);
   const [editingMealId, setEditingMealId] = useState<string | null>(null);
-  const [newMealName, setNewMealName] = useState("Breakfast");
   const [customMealName, setCustomMealName] = useState("");
   const [renameMealId, setRenameMealId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
@@ -394,9 +534,14 @@ export function ClientMealPlanWorkspace({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [foodsPage, setFoodsPage] = useState(0);
-  const [foodsSort, setFoodsSort] = useState<"energy" | "name">("energy");
+  const [foodsSort, setFoodsSort] = useState<{ key: "name" | "energy" | "meal"; dir: "asc" | "desc" }>({
+    key: "energy",
+    dir: "desc",
+  });
   const [tracking, setTracking] = useState<TrackingGlance | null>(null);
   const [weightKg, setWeightKg] = useState<number | null>(null);
+  const [macroTargets, setMacroTargets] = useState(() => resolveDailyMacroTargets().targets);
+  const [macroTargetsFromClient, setMacroTargetsFromClient] = useState(false);
   const [rdaProfileId, setRdaProfileId] = useState<RdaProfileId>(DEFAULT_RDA_PROFILE_ID);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [switcherOpen, setSwitcherOpen] = useState(false);
@@ -410,6 +555,21 @@ export function ClientMealPlanWorkspace({
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [dragItem, setDragItem] = useState<{ mealId: string; itemId: string } | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const [addMealOpen, setAddMealOpen] = useState(false);
+  const [mealMenuId, setMealMenuId] = useState<string | null>(null);
+  const [importTargetMealId, setImportTargetMealId] = useState<string | null>(null);
+  const [importClients, setImportClients] = useState<ImportClient[]>([]);
+  const [importClientId, setImportClientId] = useState("");
+  const [importClientOpen, setImportClientOpen] = useState(false);
+  const [importClientSearch, setImportClientSearch] = useState("");
+  const [importSourceVersion, setImportSourceVersion] = useState<VersionDetail | null>(null);
+  const [importSourceDayId, setImportSourceDayId] = useState("");
+  const [importDayOpen, setImportDayOpen] = useState(false);
+  const [importDaySearch, setImportDaySearch] = useState("");
+  const [importNotes, setImportNotes] = useState(true);
+  const [importLoading, setImportLoading] = useState(false);
+  const [pendingDeleteDay, setPendingDeleteDay] = useState<{ id: string; label: string } | null>(null);
+  const [pendingDeleteWeek, setPendingDeleteWeek] = useState<{ week: number; count: number } | null>(null);
   const switcherRef = useRef<HTMLDivElement>(null);
   const versionRef = useRef<HTMLDivElement>(null);
   const pendingDraftRef = useRef<{ dayNumber: number } | null>(null);
@@ -463,6 +623,7 @@ export function ClientMealPlanWorkspace({
     if (!selected) return;
     const loaded = await api<VersionDetail>(`${apiBase}/versions/${selected}`);
     applyVersion(loaded);
+    return loaded;
   }
 
   useEffect(() => {
@@ -487,6 +648,29 @@ export function ClientMealPlanWorkspace({
         setWeightKg(weight ? weightToKg(weight.value, weight.unit) : null);
       })
       .catch(() => setWeightKg(null));
+    void api<{
+      clinicalData?: {
+        nutrition?: {
+          targets?: {
+            energyKcal?: number | null;
+            fatG?: number | null;
+            carbohydrateG?: number | null;
+            proteinG?: number | null;
+            fiberG?: number | null;
+          };
+        };
+      };
+    }>(`${clientBase}/profile`)
+      .then((profile) => {
+        const resolved = resolveDailyMacroTargets(profile.clinicalData?.nutrition?.targets);
+        setMacroTargets(resolved.targets);
+        setMacroTargetsFromClient(resolved.fromClient);
+      })
+      .catch(() => {
+        const resolved = resolveDailyMacroTargets();
+        setMacroTargets(resolved.targets);
+        setMacroTargetsFromClient(false);
+      });
   }, [dietitianAccountId, trackingClientId]);
 
   useEffect(() => {
@@ -503,6 +687,18 @@ export function ClientMealPlanWorkspace({
     window.addEventListener("mousedown", onPointer);
     return () => window.removeEventListener("mousedown", onPointer);
   }, [switcherOpen, versionOpen]);
+
+  useEffect(() => {
+    if (!mealMenuId) return;
+    function onPointer(event: MouseEvent) {
+      const node = event.target as HTMLElement | null;
+      if (!node?.closest?.(`[data-meal-menu="${mealMenuId}"]`)) {
+        setMealMenuId(null);
+      }
+    }
+    window.addEventListener("mousedown", onPointer);
+    return () => window.removeEventListener("mousedown", onPointer);
+  }, [mealMenuId]);
 
   const canEdit = version?.status === "DRAFT" && !version.immutable;
   const canStartDraft = Boolean(allowManage && plan && plan.status !== "ARCHIVED" && !canEdit);
@@ -612,21 +808,27 @@ export function ClientMealPlanWorkspace({
     }
   }
 
-  async function createMeal(event: FormEvent) {
-    event.preventDefault();
+  async function createMealFromName(name: string) {
     if (!version || !focusedDay) return;
-    const name = newMealName === "Custom" ? customMealName.trim() : newMealName;
-    if (!name) {
+    const trimmed = name.trim();
+    if (!trimmed) {
       setError("Meal name is required");
       return;
     }
+    const keepPicker = Boolean(editingMealId);
     try {
       await api(`${apiBase}/versions/${version.id}/days/${focusedDay.id}/meals`, {
         method: "POST",
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name: trimmed }),
       });
       setCustomMealName("");
-      await load(version.id);
+      setAddMealOpen(false);
+      const loaded = await load(version.id);
+      if (keepPicker && loaded) {
+        const day = loaded.snapshot.days.find((row) => row.id === focusedDay.id);
+        const created = [...(day?.meals ?? [])].reverse().find((meal) => meal.name === trimmed);
+        if (created) setEditingMealId(created.id);
+      }
     } catch (err) {
       setError(errorMessage(err, "Could not create meal"));
     }
@@ -836,15 +1038,162 @@ export function ClientMealPlanWorkspace({
     }
   }
 
-  async function deleteDay() {
-    if (!version || !focusedDay) return;
-    if (!window.confirm(`Remove ${dayFullLabel(focusedDay)} from this version?`)) return;
+  async function deleteDay(dayId?: string) {
+    if (!version) return;
+    const target = dayId
+      ? version.snapshot.days.find((day) => day.id === dayId)
+      : focusedDay;
+    if (!target) return;
+    if (version.snapshot.days.length <= 1) {
+      setError("Keep at least one day in this version");
+      return;
+    }
     try {
-      await api(`${apiBase}/versions/${version.id}/days/${focusedDay.id}`, { method: "DELETE" });
-      setActiveDayId("");
+      await api(`${apiBase}/versions/${version.id}/days/${target.id}`, { method: "DELETE" });
+      if (activeDayId === target.id) setActiveDayId("");
       await load(version.id);
     } catch (err) {
       setError(errorMessage(err, "Could not delete day"));
+    }
+  }
+
+  async function deleteWeek(week: number) {
+    if (!version) return;
+    const group = weekGroups.find((row) => row.week === week);
+    if (!group || group.days.length === 0) return;
+    if (version.snapshot.days.length - group.days.length < 1) {
+      setError("Keep at least one day in this version");
+      return;
+    }
+    setBusy(true);
+    try {
+      for (const day of group.days) {
+        await api(`${apiBase}/versions/${version.id}/days/${day.id}`, { method: "DELETE" });
+      }
+      if (group.days.some((day) => day.id === activeDayId)) setActiveDayId("");
+      await load(version.id);
+    } catch (err) {
+      setError(errorMessage(err, "Could not delete week"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function openImport(mealId: string) {
+    setImportTargetMealId(mealId);
+    setImportNotes(true);
+    setImportClientOpen(false);
+    setImportDayOpen(false);
+    setImportClientSearch("");
+    setImportDaySearch("");
+    setMealMenuId(null);
+    const sourceClient = trackingClientId ?? plan?.clientId ?? "";
+    setImportClientId(sourceClient);
+    void (async () => {
+      try {
+        const rows = await api<{ items: ImportClient[] }>(
+          `/api/v1/dietitian/${dietitianAccountId}/clients?pageSize=50`,
+        );
+        setImportClients(rows.items);
+      } catch {
+        setImportClients([]);
+      }
+      await loadImportSource(sourceClient);
+    })();
+  }
+
+  async function loadImportSource(clientId: string) {
+    if (!clientId) {
+      setImportSourceVersion(null);
+      setImportSourceDayId("");
+      return;
+    }
+    setImportLoading(true);
+    try {
+      if (clientId === (trackingClientId ?? plan?.clientId) && version) {
+        setImportSourceVersion(version);
+        setImportSourceDayId(focusedDay?.id ?? version.snapshot.days[0]?.id ?? "");
+        return;
+      }
+      const listed = await api<{ items: Array<{ id: string; status: string }> }>(
+        `/api/v1/dietitian/${dietitianAccountId}/meal-plans?clientId=${encodeURIComponent(clientId)}&pageSize=20`,
+      );
+      const chosen =
+        listed.items.find((row) => row.status === "ACTIVE") ?? listed.items[0];
+      if (!chosen) {
+        setImportSourceVersion(null);
+        setImportSourceDayId("");
+        return;
+      }
+      const detail = await api<PlanDetail>(
+        `/api/v1/dietitian/${dietitianAccountId}/meal-plans/${chosen.id}`,
+      );
+      const versionId =
+        detail.versions.find((row) => row.status === "PUBLISHED")?.id ??
+        detail.versions.find((row) => row.status === "DRAFT")?.id ??
+        detail.versions[0]?.id;
+      if (!versionId) {
+        setImportSourceVersion(null);
+        setImportSourceDayId("");
+        return;
+      }
+      const loaded = await api<VersionDetail>(
+        `/api/v1/dietitian/${dietitianAccountId}/meal-plans/${chosen.id}/versions/${versionId}`,
+      );
+      setImportSourceVersion(loaded);
+      setImportSourceDayId(loaded.snapshot.days[0]?.id ?? "");
+    } catch (err) {
+      setImportSourceVersion(null);
+      setImportSourceDayId("");
+      setError(errorMessage(err, "Could not load meals to import"));
+    } finally {
+      setImportLoading(false);
+    }
+  }
+
+  async function importChosenMeal(sourceMeal: Meal) {
+    if (!version || !importTargetMealId) return;
+    if (sourceMeal.items.length === 0 && !(importNotes && sourceMeal.notes)) {
+      setError("That meal has no foods to import");
+      return;
+    }
+    setBusy(true);
+    try {
+      for (const item of sourceMeal.items) {
+        if (item.itemType === "FOOD" && item.food?.id) {
+          await api(`${apiBase}/versions/${version.id}/meals/${importTargetMealId}/items`, {
+            method: "POST",
+            body: JSON.stringify({
+              itemType: "FOOD",
+              foodId: item.food.id,
+              quantity: item.quantity,
+              unit: item.unit,
+            }),
+          });
+        } else if (item.itemType === "RECIPE" && item.recipe?.id) {
+          await api(`${apiBase}/versions/${version.id}/meals/${importTargetMealId}/items`, {
+            method: "POST",
+            body: JSON.stringify({
+              itemType: "RECIPE",
+              recipeId: item.recipe.id,
+              quantity: item.quantity,
+              unit: item.unit || "serving",
+            }),
+          });
+        }
+      }
+      if (importNotes && sourceMeal.notes) {
+        await api(`${apiBase}/versions/${version.id}/meals/${importTargetMealId}`, {
+          method: "PATCH",
+          body: JSON.stringify({ notes: sourceMeal.notes }),
+        });
+      }
+      setImportTargetMealId(null);
+      await load(version.id);
+    } catch (err) {
+      setError(errorMessage(err, "Could not import meal"));
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -860,12 +1209,25 @@ export function ClientMealPlanWorkspace({
         unit: item.unit,
       })),
     );
-    rows.sort((a, b) => (foodsSort === "name" ? a.name.localeCompare(b.name) : b.energy - a.energy));
+    const dir = foodsSort.dir === "asc" ? 1 : -1;
+    rows.sort((a, b) => {
+      if (foodsSort.key === "energy") return (a.energy - b.energy) * dir;
+      if (foodsSort.key === "meal") return a.meal.localeCompare(b.meal) * dir;
+      return a.name.localeCompare(b.name) * dir;
+    });
     return rows;
   }, [focusedDay, foodsSort]);
 
   const foodsPageCount = Math.max(1, Math.ceil(foods.length / FOODS_PAGE_SIZE));
   const foodsSlice = foods.slice(foodsPage * FOODS_PAGE_SIZE, foodsPage * FOODS_PAGE_SIZE + FOODS_PAGE_SIZE);
+
+  function toggleFoodsSort(key: "name" | "energy" | "meal") {
+    setFoodsSort((curr) =>
+      curr.key === key
+        ? { key, dir: curr.dir === "asc" ? "desc" : "asc" }
+        : { key, dir: key === "energy" ? "desc" : "asc" },
+    );
+  }
 
   useEffect(() => {
     setFoodsPage(0);
@@ -906,6 +1268,19 @@ export function ClientMealPlanWorkspace({
       carbohydrateG: n(meal.presented.carbohydrateG),
       proteinG: n(meal.presented.proteinG),
     })) ?? [];
+  const canDeleteDay = canEdit && version.snapshot.days.length > 1;
+  const selectedImportClient = importClients.find((row) => row.id === importClientId) ?? null;
+  const filteredImportClients = importClients.filter((row) =>
+    importClientName(row).toLowerCase().includes(importClientSearch.trim().toLowerCase()),
+  );
+  const importDays = importSourceVersion?.snapshot.days ?? [];
+  const filteredImportDays = importDays.filter((day) => {
+    const q = importDaySearch.trim().toLowerCase();
+    if (!q) return true;
+    return `${dayTabLabel(day)} ${dayFullLabel(day)}`.toLowerCase().includes(q);
+  });
+  const importDay = importDays.find((day) => day.id === importSourceDayId) ?? importDays[0] ?? null;
+  const importMeals = (importDay?.meals ?? []).filter((meal) => meal.id !== importTargetMealId);
 
   return (
     <>
@@ -1101,20 +1476,37 @@ export function ClientMealPlanWorkspace({
 
       <div className="ui-mp__schedule">
         <div className="ui-mp__weeks" role="tablist" aria-label="Weeks">
-          {weekGroups.map((group) => (
-            <button
-              key={group.week}
-              type="button"
-              className={group.week === currentWeek ? "is-active" : undefined}
-              onClick={() => {
-                setActiveWeek(group.week);
-                const first = group.days[0];
-                if (first) setActiveDayId(first.id);
-              }}
-            >
-              Week {group.week}
-            </button>
-          ))}
+          {weekGroups.map((group) => {
+            const canDeleteThisWeek = canEdit && version.snapshot.days.length - group.days.length >= 1;
+            return (
+              <div
+                key={group.week}
+                className={`ui-mp__chip${group.week === currentWeek ? " is-active" : ""}`}
+              >
+                <button
+                  type="button"
+                  className="ui-mp__chip-label"
+                  onClick={() => {
+                    setActiveWeek(group.week);
+                    const first = group.days[0];
+                    if (first) setActiveDayId(first.id);
+                  }}
+                >
+                  Week {group.week}
+                </button>
+                {canDeleteThisWeek ? (
+                  <button
+                    type="button"
+                    className="ui-mp__chip-del"
+                    aria-label={`Remove week ${group.week}`}
+                    onClick={() => setPendingDeleteWeek({ week: group.week, count: group.days.length })}
+                  >
+                    <TrashIcon />
+                  </button>
+                ) : null}
+              </div>
+            );
+          })}
           {canEdit ? (
             <button
               type="button"
@@ -1130,21 +1522,37 @@ export function ClientMealPlanWorkspace({
 
         <div className="ui-mp__days" role="tablist" aria-label="Days">
           {weekDays.map((day) => (
-            <button
+            <div
               key={day.id}
-              type="button"
-              role="tab"
-              className={day.id === focusedDay?.id ? "is-active" : undefined}
-              aria-selected={day.id === focusedDay?.id}
-              onClick={() => {
-                setActiveDayId(day.id);
-                setActiveWeek(weekOfDay(day.dayNumber));
-                setEditingMealId(null);
-                setRenameMealId(null);
-              }}
+              className={`ui-mp__chip${day.id === focusedDay?.id ? " is-active" : ""}`}
             >
-              {dayTabLabel(day as PlanDay)}
-            </button>
+              <button
+                type="button"
+                role="tab"
+                className="ui-mp__chip-label"
+                aria-selected={day.id === focusedDay?.id}
+                onClick={() => {
+                  setActiveDayId(day.id);
+                  setActiveWeek(weekOfDay(day.dayNumber));
+                  setEditingMealId(null);
+                  setRenameMealId(null);
+                }}
+              >
+                {dayTabLabel(day as PlanDay)}
+              </button>
+              {canDeleteDay ? (
+                <button
+                  type="button"
+                  className="ui-mp__chip-del"
+                  aria-label={`Remove ${dayTabLabel(day as PlanDay)}`}
+                  onClick={() =>
+                    setPendingDeleteDay({ id: day.id, label: dayFullLabel(day as PlanDay) })
+                  }
+                >
+                  <TrashIcon />
+                </button>
+              ) : null}
+            </div>
           ))}
           {canEdit ? (
             <button
@@ -1184,46 +1592,12 @@ export function ClientMealPlanWorkspace({
                   {focusedDay.meals.length === 1 ? "" : "s"}
                 </p>
               </div>
-              {canEdit && version.snapshot.days.length > 1 ? (
-                <button type="button" className="ui-mp__danger" onClick={() => void deleteDay()}>
-                  Remove day
-                </button>
-              ) : null}
             </div>
 
             {canEdit ? (
-              <form onSubmit={(event) => void createMeal(event)} className="ui-mp__add-meal">
-                <div className="ui-mp__meal-types" role="group" aria-label="Meal type">
-                  {MEAL_NAME_PRESETS.map((name) => (
-                    <button
-                      key={name}
-                      type="button"
-                      className={newMealName === name ? "is-active" : undefined}
-                      onClick={() => setNewMealName(name)}
-                    >
-                      {name}
-                    </button>
-                  ))}
-                  <button
-                    type="button"
-                    className={newMealName === "Custom" ? "is-active" : undefined}
-                    onClick={() => setNewMealName("Custom")}
-                  >
-                    Custom
-                  </button>
-                </div>
-                {newMealName === "Custom" ? (
-                  <Input
-                    value={customMealName}
-                    onChange={(e) => setCustomMealName(e.target.value)}
-                    placeholder="Meal name…"
-                    required
-                  />
-                ) : null}
-                <Button type="submit" size="sm" variant="secondary">
-                  Add meal
-                </Button>
-              </form>
+              <Button block variant="secondary" onClick={() => setAddMealOpen(true)}>
+                Add meal
+              </Button>
             ) : null}
 
             {focusedDay.meals.length === 0 ? (
@@ -1256,28 +1630,51 @@ export function ClientMealPlanWorkspace({
                     )}
                     {canEdit && renameMealId !== meal.id ? (
                       <div className="ui-mp__meal-actions">
-                        <Button
-                          variant={editingMealId === meal.id ? "secondary" : "ghost"}
-                          size="sm"
-                          onClick={() => {
-                            setEditingMealId(editingMealId === meal.id ? null : meal.id);
-                          }}
+                        <button
+                          type="button"
+                          className="ui-mp__item-icon ui-mp__import-btn"
+                          aria-label="Import food from other meal"
+                          onClick={() => openImport(meal.id)}
                         >
-                          {editingMealId === meal.id ? "Done" : "Add foods"}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setRenameMealId(meal.id);
-                            setRenameValue(meal.name);
-                          }}
-                        >
-                          Rename
-                        </Button>
-                        <button type="button" className="ui-mp__danger" onClick={() => void deleteMeal(meal.id)}>
-                          Remove
+                          <ImportIcon />
                         </button>
+                        <div className="ui-mp__meal-menu" data-meal-menu={meal.id}>
+                          <button
+                            type="button"
+                            className="ui-mp__item-icon"
+                            aria-label={`Meal actions for ${meal.name}`}
+                            aria-expanded={mealMenuId === meal.id}
+                            onClick={() => setMealMenuId(mealMenuId === meal.id ? null : meal.id)}
+                          >
+                            <MoreIcon />
+                          </button>
+                          {mealMenuId === meal.id ? (
+                            <div className="ui-mp__meal-menu-pop" role="menu">
+                              <button
+                                type="button"
+                                role="menuitem"
+                                onClick={() => {
+                                  setRenameMealId(meal.id);
+                                  setRenameValue(meal.name);
+                                  setMealMenuId(null);
+                                }}
+                              >
+                                Rename
+                              </button>
+                              <button
+                                type="button"
+                                role="menuitem"
+                                className="is-danger"
+                                onClick={() => {
+                                  setMealMenuId(null);
+                                  void deleteMeal(meal.id);
+                                }}
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          ) : null}
+                        </div>
                       </div>
                     ) : canStartDraft ? (
                       <div className="ui-mp__meal-actions">
@@ -1439,6 +1836,16 @@ export function ClientMealPlanWorkspace({
                     <p className="ui-muted ui-mp__empty-line">No items yet.</p>
                   )}
 
+                  {canEdit ? (
+                    <button
+                      type="button"
+                      className="ui-mp__add-food"
+                      onClick={() => setEditingMealId(editingMealId === meal.id ? null : meal.id)}
+                    >
+                      {editingMealId === meal.id ? "Done" : "Add new food +"}
+                    </button>
+                  ) : null}
+
                   {canEdit && editingMealId === meal.id ? (
                     <MealFoodPicker
                       dietitianAccountId={dietitianAccountId}
@@ -1468,11 +1875,11 @@ export function ClientMealPlanWorkspace({
                   ) : null}
 
                   <footer className="ui-mp__meal-macros">
-                    <span>Energy {n(meal.presented.energyKcal)} kcal</span>
-                    <span>Fat {n(meal.presented.fatG)} g</span>
-                    <span>Carbs {n(meal.presented.carbohydrateG)} g</span>
-                    <span>Protein {n(meal.presented.proteinG)} g</span>
-                    <span>Fiber {n(meal.presented.fiberG)} g</span>
+                    <MacroChip tone="energy">Energy {n(meal.presented.energyKcal)} kcal</MacroChip>
+                    <MacroChip tone="fat">Fat {n(meal.presented.fatG)} g</MacroChip>
+                    <MacroChip tone="carb">Carb {n(meal.presented.carbohydrateG)} g</MacroChip>
+                    <MacroChip tone="protein">Protein {n(meal.presented.proteinG)} g</MacroChip>
+                    <MacroChip tone="fiber">Fiber {n(meal.presented.fiberG)} g</MacroChip>
                   </footer>
                 </article>
               ))
@@ -1480,165 +1887,101 @@ export function ClientMealPlanWorkspace({
           </div>
 
           <aside className="ui-mp__rail" aria-label="Global analysis">
-            <h3>Global analysis</h3>
-            <TargetBar
-              label="Energy"
-              actual={presented?.energyKcal}
-              target={DAILY_MACRO_TARGETS.energyKcal}
-              unit="kcal"
-              tone="energy"
-            />
-            <DonutChart
-              caption="Macronutrients"
-              slices={[
-                { label: "Fat", value: n(presented?.fatG) * 9, color: "#e4c44a" },
-                { label: "Carbs", value: n(presented?.carbohydrateG) * 4, color: "#e8a090" },
-                { label: "Protein", value: n(presented?.proteinG) * 4, color: "#7eafd9" },
-              ]}
-            />
-            <TargetBar label="Fat" actual={presented?.fatG} target={DAILY_MACRO_TARGETS.fatG} unit="g" tone="fat" />
-            <TargetBar
-              label="Carbohydrate"
-              actual={presented?.carbohydrateG}
-              target={DAILY_MACRO_TARGETS.carbohydrateG}
-              unit="g"
-              tone="carb"
-            />
-            <TargetBar
-              label="Protein"
-              actual={presented?.proteinG}
-              target={DAILY_MACRO_TARGETS.proteinG}
-              unit="g"
-              tone="protein"
-            />
-            <TargetBar
-              label="Fiber"
-              actual={presented?.fiberG}
-              target={DAILY_MACRO_TARGETS.fiberG}
-              unit="g"
-              tone="fiber"
-            />
-            <MealMacroDonuts meals={mealMacros} weightKg={weightKg} />
-            {trackingClientId ? (
-              <ClientMealNotesRail
-                dietitianAccountId={dietitianAccountId}
-                clientId={trackingClientId}
-                allowManage={allowManage}
-                onError={(message) => setError(message)}
+            <section className="ui-mp__rail-card">
+              <h3>Global analysis</h3>
+              <p className="ui-muted ui-mp__source">
+                {macroTargetsFromClient
+                  ? "Compared to this client’s daily targets"
+                  : "Using default targets — set daily targets in Personal data"}
+              </p>
+              <div className="ui-mp__rail-bars">
+                <TargetBar
+                  layout="row"
+                  label="Energy"
+                  actual={presented?.energyKcal}
+                  target={macroTargets.energyKcal}
+                  unit="kcal"
+                  tone="energy"
+                />
+                <TargetBar
+                  layout="row"
+                  label="Fat"
+                  actual={presented?.fatG}
+                  target={macroTargets.fatG}
+                  unit="g"
+                  tone="fat"
+                />
+                <TargetBar
+                  layout="row"
+                  label="Carbohydrate"
+                  actual={presented?.carbohydrateG}
+                  target={macroTargets.carbohydrateG}
+                  unit="g"
+                  tone="carb"
+                />
+                <TargetBar
+                  layout="row"
+                  label="Protein"
+                  actual={presented?.proteinG}
+                  target={macroTargets.proteinG}
+                  unit="g"
+                  tone="protein"
+                />
+                <TargetBar
+                  layout="row"
+                  label="Fiber"
+                  actual={presented?.fiberG}
+                  target={macroTargets.fiberG}
+                  unit="g"
+                  tone="fiber"
+                />
+              </div>
+              <DonutChart
+                caption="Macronutrients"
+                size={132}
+                thickness={28}
+                showPct={false}
+                valueUnit="kcal"
+                slices={[
+                  { label: "Fat", value: n(presented?.fatG) * 9, color: MACRO_DONUT_COLORS.fat },
+                  { label: "Carbs", value: n(presented?.carbohydrateG) * 4, color: MACRO_DONUT_COLORS.carb },
+                  { label: "Protein", value: n(presented?.proteinG) * 4, color: MACRO_DONUT_COLORS.protein },
+                ]}
               />
+            </section>
+            <section className="ui-mp__rail-card">
+              <MealMacroDonuts meals={mealMacros} weightKg={weightKg} />
+            </section>
+            {trackingClientId ? (
+              <section className="ui-mp__rail-card">
+                <ClientMealNotesRail
+                  dietitianAccountId={dietitianAccountId}
+                  clientId={trackingClientId}
+                  allowManage={allowManage}
+                  onError={(message) => setError(message)}
+                />
+              </section>
             ) : null}
-            <div className="ui-mp__micro-list">
+            <section className="ui-mp__rail-card">
               <div className="ui-mp__micro-head">
                 <h3>Micronutrients</h3>
                 <RdaProfilePicker value={rdaProfileId} onChange={selectRdaProfile} />
               </div>
               <p className="ui-muted ui-mp__source">From imported food data · {rdaProfile.basis}</p>
               <RdaBarList rows={microRda} compact />
-            </div>
+            </section>
           </aside>
         </div>
       ) : (
         <div className="ui-mp__analysis">
-          <section className="ui-mp__card">
-            <h3>Daily analysis · {dayFullLabel(focusedDay)}</h3>
-            <div className="ui-mp__macro-grid">
-              <TargetBar
-                label="Energy"
-                actual={presented?.energyKcal}
-                target={DAILY_MACRO_TARGETS.energyKcal}
-                unit="kcal"
-                tone="energy"
-              />
-              <TargetBar label="Fat" actual={presented?.fatG} target={DAILY_MACRO_TARGETS.fatG} unit="g" tone="fat" />
-              <TargetBar
-                label="Carbohydrate"
-                actual={presented?.carbohydrateG}
-                target={DAILY_MACRO_TARGETS.carbohydrateG}
-                unit="g"
-                tone="carb"
-              />
-              <TargetBar
-                label="Protein"
-                actual={presented?.proteinG}
-                target={DAILY_MACRO_TARGETS.proteinG}
-                unit="g"
-                tone="protein"
-              />
-              <TargetBar
-                label="Fiber"
-                actual={presented?.fiberG}
-                target={DAILY_MACRO_TARGETS.fiberG}
-                unit="g"
-                tone="fiber"
-              />
-            </div>
-          </section>
-
-          <div className="ui-mp__chart-grid">
-            <section className="ui-mp__card">
-              <h3>Macronutrient distribution</h3>
-              <DonutChart
-                size={132}
-                slices={[
-                  { label: "Fat", value: n(presented?.fatG) * 9, color: "#e4c44a" },
-                  { label: "Carbs", value: n(presented?.carbohydrateG) * 4, color: "#e8a090" },
-                  { label: "Protein", value: n(presented?.proteinG) * 4, color: "#7eafd9" },
-                ]}
-              />
-            </section>
-            <section className="ui-mp__card">
-              <h3>Energy by meal</h3>
-              <DonutChart
-                size={132}
-                slices={focusedDay.meals.map((meal, i) => ({
-                  label: meal.name,
-                  value: n(meal.presented.energyKcal),
-                  color: MEAL_DONUT_COLORS[i % MEAL_DONUT_COLORS.length]!,
-                }))}
-              />
-            </section>
-            <section className="ui-mp__card">
-              <h3>Protein by meal</h3>
-              <DonutChart
-                size={132}
-                slices={focusedDay.meals.map((meal, i) => ({
-                  label: meal.name,
-                  value: n(meal.presented.proteinG),
-                  color: MEAL_DONUT_COLORS[i % MEAL_DONUT_COLORS.length]!,
-                }))}
-              />
-            </section>
-            <section className="ui-mp__card">
-              <h3>Fat types</h3>
-              <DonutChart
-                size={132}
-                slices={[
-                  { label: "Saturated", value: n(extras?.saturatedFatG), color: "#f59e0b" },
-                  { label: "Mono", value: n(extras?.monounsaturatedFatG), color: "#14b8a6" },
-                  { label: "Poly", value: n(extras?.polyunsaturatedFatG), color: "#3b82f6" },
-                  { label: "Trans", value: n(extras?.transFatG), color: "#ef4444" },
-                ]}
-              />
-            </section>
-            <section className="ui-mp__card">
-              <h3>Carbohydrate types</h3>
-              <DonutChart
-                size={132}
-                slices={[
-                  { label: "Sugars", value: n(presented?.sugarG), color: "#f59e0b" },
-                  {
-                    label: "Other carbs",
-                    value: Math.max(0, n(presented?.carbohydrateG) - n(presented?.sugarG)),
-                    color: "#14b8a6",
-                  },
-                ]}
-              />
-            </section>
-          </div>
-
-          <section className="ui-mp__card">
-            <MealMacroDonuts meals={mealMacros} weightKg={weightKg} layout="wide" />
-          </section>
+          <MealPlanAnalysisPanel
+            dayLabel={dayFullLabel(focusedDay)}
+            presented={presented}
+            extras={extras}
+            meals={focusedDay.meals}
+            macroTargets={macroTargets}
+            macroTargetsFromClient={macroTargetsFromClient}
+          />
 
           <section className="ui-mp__card">
             <div className="ui-mp__micro-head">
@@ -1672,22 +2015,39 @@ export function ClientMealPlanWorkspace({
 
           <section className="ui-mp__card">
             <header className="ui-mp__table-head">
-              <h3>Foods ordered by {foodsSort === "energy" ? "energy" : "name"}</h3>
-              <Select value={foodsSort} onChange={(e) => setFoodsSort(e.target.value as "energy" | "name")}>
-                <option value="energy">Energy</option>
-                <option value="name">Name</option>
-              </Select>
+              <h3>Foods ordered by {foodsSort.key === "energy" ? "energy" : foodsSort.key}</h3>
             </header>
             {foods.length === 0 ? (
               <EmptyState title="No foods on this day" />
             ) : (
               <>
                 <Table>
-                  <thead>
+                  <thead className="ui-mp__foods-head">
                     <tr>
-                      <th>Name</th>
-                      <th>Energy (kcal)</th>
-                      <th>Meal</th>
+                      {(
+                        [
+                          { key: "name", label: "Name" },
+                          { key: "energy", label: "Energy (kcal)" },
+                          { key: "meal", label: "Meal" },
+                        ] as const
+                      ).map((col) => {
+                        const active = foodsSort.key === col.key;
+                        return (
+                          <th key={col.key} scope="col">
+                            <button
+                              type="button"
+                              className={`ui-mp__sort-btn${active ? " is-active" : ""}`}
+                              aria-sort={active ? (foodsSort.dir === "asc" ? "ascending" : "descending") : "none"}
+                              onClick={() => toggleFoodsSort(col.key)}
+                            >
+                              <span>{col.label}</span>
+                              <span className="ui-mp__sort-icon" aria-hidden="true">
+                                {active ? (foodsSort.dir === "asc" ? "↑" : "↓") : "↕"}
+                              </span>
+                            </button>
+                          </th>
+                        );
+                      })}
                     </tr>
                   </thead>
                   <tbody>
@@ -1780,6 +2140,220 @@ export function ClientMealPlanWorkspace({
       }}
       onConfirm={() => void confirmDeleteVersion()}
     />
+    <ConfirmDialog
+      open={pendingDeleteDay !== null}
+      title={`Remove ${pendingDeleteDay?.label}?`}
+      description="This day and its meals will be deleted from this version."
+      confirmLabel="Remove day"
+      danger
+      pending={busy}
+      onCancel={() => {
+        if (busy) return;
+        setPendingDeleteDay(null);
+      }}
+      onConfirm={() => {
+        const id = pendingDeleteDay?.id;
+        setPendingDeleteDay(null);
+        if (id) void deleteDay(id);
+      }}
+    />
+    <ConfirmDialog
+      open={pendingDeleteWeek !== null}
+      title={`Remove week ${pendingDeleteWeek?.week}?`}
+      description={`This will delete ${pendingDeleteWeek?.count ?? 0} day${
+        pendingDeleteWeek?.count === 1 ? "" : "s"
+      } in that week.`}
+      confirmLabel="Remove week"
+      danger
+      pending={busy}
+      onCancel={() => {
+        if (busy) return;
+        setPendingDeleteWeek(null);
+      }}
+      onConfirm={() => {
+        const week = pendingDeleteWeek?.week;
+        setPendingDeleteWeek(null);
+        if (week != null) void deleteWeek(week);
+      }}
+    />
+    <Dialog open={addMealOpen} title="Add meal" onClose={() => setAddMealOpen(false)}>
+      <div className="ui-mp__preset-list" role="list">
+        {MEAL_NAME_PRESETS.map((name) => (
+          <button
+            key={name}
+            type="button"
+            disabled={busy}
+            onClick={() => void createMealFromName(name)}
+          >
+            {name}
+          </button>
+        ))}
+      </div>
+      <form
+        className="ui-mp__custom-meal"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void createMealFromName(customMealName);
+        }}
+      >
+        <Input
+          value={customMealName}
+          onChange={(e) => setCustomMealName(e.target.value)}
+          placeholder="Custom meal name…"
+        />
+        <Button type="submit" size="sm" variant="secondary" disabled={busy || !customMealName.trim()}>
+          Add custom
+        </Button>
+      </form>
+    </Dialog>
+    <Dialog
+      open={importTargetMealId !== null}
+      title="Import meal"
+      className="ui-mp__import-dialog"
+      onClose={() => {
+        if (busy) return;
+        setImportTargetMealId(null);
+        setImportClientOpen(false);
+        setImportDayOpen(false);
+      }}
+    >
+      <div className="ui-mp__import">
+        <SearchableSelect
+          label="Select client"
+          open={importClientOpen}
+          onOpenChange={(next) => {
+            setImportDayOpen(false);
+            setImportClientOpen(next);
+            if (next) setImportClientSearch("");
+          }}
+          value={
+            selectedImportClient ? (
+              <>
+                <ImportAvatar name={importClientName(selectedImportClient)} />
+                {importClientName(selectedImportClient)}
+              </>
+            ) : (
+              <span className="ui-muted">Select a client</span>
+            )
+          }
+          search={importClientSearch}
+          onSearch={setImportClientSearch}
+        >
+          {filteredImportClients.length === 0 ? (
+            <p className="ui-muted ui-mp__ss-empty">No clients match.</p>
+          ) : (
+            filteredImportClients.map((row) => {
+              const name = importClientName(row);
+              return (
+                <button
+                  key={row.id}
+                  type="button"
+                  role="option"
+                  className={row.id === importClientId ? "is-active" : undefined}
+                  aria-selected={row.id === importClientId}
+                  onClick={() => {
+                    setImportClientId(row.id);
+                    setImportClientOpen(false);
+                    void loadImportSource(row.id);
+                  }}
+                >
+                  <ImportAvatar name={name} />
+                  {name}
+                </button>
+              );
+            })
+          )}
+        </SearchableSelect>
+
+        <SearchableSelect
+          label="Select version"
+          open={importDayOpen}
+          onOpenChange={(next) => {
+            setImportClientOpen(false);
+            setImportDayOpen(next);
+            if (next) setImportDaySearch("");
+          }}
+          value={importDay ? dayTabLabel(importDay) : <span className="ui-muted">Select a version</span>}
+          search={importDaySearch}
+          onSearch={setImportDaySearch}
+        >
+          {filteredImportDays.length === 0 ? (
+            <p className="ui-muted ui-mp__ss-empty">No versions match.</p>
+          ) : (
+            filteredImportDays.map((day) => (
+              <button
+                key={day.id}
+                type="button"
+                role="option"
+                className={day.id === importDay?.id ? "is-active" : undefined}
+                aria-selected={day.id === importDay?.id}
+                onClick={() => {
+                  setImportSourceDayId(day.id);
+                  setImportDayOpen(false);
+                }}
+              >
+                {dayTabLabel(day)}
+              </button>
+            ))
+          )}
+        </SearchableSelect>
+
+        <div className="ui-mp__import-meals">
+          <p className="ui-mp__import-heading">Choose a meal to import</p>
+          {importLoading ? (
+            <LoadingState>Loading meals…</LoadingState>
+          ) : importMeals.length === 0 ? (
+            <p className="ui-muted">No meals to import from this version.</p>
+          ) : (
+            <ul>
+              {importMeals.map((meal) => (
+                <li key={meal.id}>
+                  <button
+                    type="button"
+                    className="ui-mp__import-meal"
+                    disabled={busy}
+                    onClick={() => void importChosenMeal(meal)}
+                  >
+                    <span className="ui-mp__import-meal-name">{meal.name}</span>
+                    <span className="ui-mp__import-macros">
+                      <span>
+                        <strong>{Math.round(n(meal.presented.energyKcal))} kcal</strong>
+                        <em>Energy</em>
+                      </span>
+                      <span>
+                        <strong>{Math.round(n(meal.presented.fatG))} g</strong>
+                        <em>Fat</em>
+                      </span>
+                      <span>
+                        <strong>{Math.round(n(meal.presented.carbohydrateG))} g</strong>
+                        <em>Carbohydrate</em>
+                      </span>
+                      <span>
+                        <strong>{Math.round(n(meal.presented.proteinG))} g</strong>
+                        <em>Protein</em>
+                      </span>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <button
+          type="button"
+          role="checkbox"
+          aria-checked={importNotes}
+          className={`ui-mp__import-notes${importNotes ? " is-on" : ""}`}
+          onClick={() => setImportNotes((value) => !value)}
+        >
+          <span className="ui-mp__import-notes-box" aria-hidden>
+            {importNotes ? "✓" : ""}
+          </span>
+          Import Notes
+        </button>
+      </div>
+    </Dialog>
     <Dialog open={settingsOpen} title="Plan settings" onClose={() => setSettingsOpen(false)}>
       <div className="ui-mp__settings">
         <div>

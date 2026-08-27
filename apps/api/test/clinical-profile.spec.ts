@@ -4,6 +4,21 @@ import { parseChartNoteDate } from "../src/client-chart-notes/chart-note-date";
 import { assertAllowedUpload, isLikelyPlainText } from "../src/documents/file-validation";
 
 describe("clinical data", () => {
+  it("keeps daily macro targets when provided", () => {
+    const data = sanitizeClinicalData({
+      nutrition: {
+        targets: { energyKcal: 1800, proteinG: 110, fatG: -1, carbohydrateG: "220", fiberG: "x" },
+      },
+    });
+    expect(data.nutrition.targets).toEqual({
+      energyKcal: 1800,
+      fatG: null,
+      carbohydrateG: 220,
+      proteinG: 110,
+      fiberG: null,
+    });
+  });
+
   it("drops unknown keys and caps strings", () => {
     const data = sanitizeClinicalData({
       visit: { reason: "a".repeat(5000), extra: "nope" },

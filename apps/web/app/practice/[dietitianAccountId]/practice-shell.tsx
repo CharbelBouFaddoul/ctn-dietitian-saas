@@ -221,7 +221,7 @@ export function PracticeShell({ children }: { children: ReactNode }) {
       label: "Nutrition",
       items: [
         { href: `${base}/meal-plans`, label: "Meal Plans", icon: PracticeNavIcons.mealPlans },
-        { href: `${base}/recipes`, label: "Meal library", icon: PracticeNavIcons.recipes },
+        { href: `${base}/recipes`, label: "Recipes", icon: PracticeNavIcons.recipes },
         { href: `${base}/foods`, label: "Foods", icon: PracticeNavIcons.foods },
       ],
     },

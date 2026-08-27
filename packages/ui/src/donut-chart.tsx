@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 export type DonutSlice = {
   label: string;
   value: number;
@@ -9,11 +11,16 @@ export type DonutSlice = {
 export type DonutChartProps = {
   slices: DonutSlice[];
   size?: number;
+  /** Radial thickness of the ring (outer − inner). */
   thickness?: number;
   emptyLabel?: string;
   caption?: string;
   /** Hide the legend and render only the ring. */
   legend?: boolean;
+  /** Show percent next to legend labels. Default true. */
+  showPct?: boolean;
+  /** Unit shown in the hover tip, e.g. "kcal" or "g". */
+  valueUnit?: string;
 };
 
 function polar(cx: number, cy: number, r: number, angle: number) {
@@ -21,25 +28,46 @@ function polar(cx: number, cy: number, r: number, angle: number) {
   return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
 }
 
-function arcPath(cx: number, cy: number, r: number, start: number, end: number) {
-  const s = polar(cx, cy, r, end);
-  const e = polar(cx, cy, r, start);
-  const large = end - start > 180 ? 1 : 0;
-  return `M ${s.x} ${s.y} A ${r} ${r} 0 ${large} 0 ${e.x} ${e.y}`;
+/** Filled donut wedge between innerR and outerR. */
+function wedgePath(cx: number, cy: number, innerR: number, outerR: number, start: number, end: number) {
+  const sweep = Math.max(0, Math.min(359.999, end - start));
+  if (sweep <= 0) return "";
+  const large = sweep > 180 ? 1 : 0;
+  const oStart = polar(cx, cy, outerR, start);
+  const oEnd = polar(cx, cy, outerR, end);
+  const iEnd = polar(cx, cy, innerR, end);
+  const iStart = polar(cx, cy, innerR, start);
+  return [
+    `M ${oStart.x} ${oStart.y}`,
+    `A ${outerR} ${outerR} 0 ${large} 1 ${oEnd.x} ${oEnd.y}`,
+    `L ${iEnd.x} ${iEnd.y}`,
+    `A ${innerR} ${innerR} 0 ${large} 0 ${iStart.x} ${iStart.y}`,
+    "Z",
+  ].join(" ");
+}
+
+function formatValue(value: number) {
+  if (!Number.isFinite(value)) return "—";
+  const rounded = Math.round(value * 10) / 10;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
 }
 
 export function DonutChart({
   slices,
   size = 112,
-  thickness = 16,
+  thickness = 14,
   emptyLabel = "No data",
   caption,
   legend = true,
+  showPct = true,
+  valueUnit,
 }: DonutChartProps) {
+  const [active, setActive] = useState<string | null>(null);
   const total = slices.reduce((sum, slice) => sum + Math.max(0, slice.value), 0);
   const cx = size / 2;
   const cy = size / 2;
-  const r = size / 2 - thickness / 2;
+  const outerR = size / 2 - 2;
+  const innerR = Math.max(8, outerR - thickness);
 
   let cursor = 0;
   const arcs =
@@ -52,28 +80,75 @@ export function DonutChart({
             const start = cursor;
             const end = cursor + sweep;
             cursor = end;
-            return { ...slice, start, end, pct: Math.round((slice.value / total) * 100) };
+            const pct = (slice.value / total) * 100;
+            return {
+              ...slice,
+              start,
+              end,
+              pct,
+              pctLabel: `${pct.toFixed(1)}%`,
+            };
           });
+
+  const gapDeg = arcs.length > 1 ? 0.7 : 0;
+  const activeArc = arcs.find((arc) => arc.label === active) ?? null;
 
   return (
     <div className={`ui-donut${legend ? "" : " ui-donut--ring"}`}>
-      <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size} className="ui-donut__svg" aria-hidden="true">
-        <circle cx={cx} cy={cy} r={r} fill="none" stroke="rgb(15 23 42 / 8%)" strokeWidth={thickness} />
-        {arcs.length === 0 ? null : arcs.length === 1 ? (
-          <circle cx={cx} cy={cy} r={r} fill="none" stroke={arcs[0]!.color} strokeWidth={thickness} />
-        ) : (
-          arcs.map((arc) => (
+      <div className="ui-donut__chart">
+        <svg
+          viewBox={`0 0 ${size} ${size}`}
+          width={size}
+          height={size}
+          className="ui-donut__svg"
+          role="img"
+          aria-label={caption ?? "Distribution chart"}
+        >
+          <circle cx={cx} cy={cy} r={(outerR + innerR) / 2} fill="none" stroke="rgb(15 23 42 / 6%)" strokeWidth={thickness} />
+          {arcs.length === 0 ? null : arcs.length === 1 ? (
             <path
-              key={arc.label}
-              d={arcPath(cx, cy, r, arc.start, arc.end)}
-              fill="none"
-              stroke={arc.color}
-              strokeWidth={thickness}
-              strokeLinecap="butt"
+              d={wedgePath(cx, cy, innerR, outerR, 0, 359.999)}
+              fill={arcs[0]!.color}
+              className="ui-donut__slice"
+              onMouseEnter={() => setActive(arcs[0]!.label)}
+              onMouseLeave={() => setActive(null)}
             />
-          ))
-        )}
-      </svg>
+          ) : (
+            arcs.map((arc) => {
+              const start = arc.start + gapDeg / 2;
+              const end = arc.end - gapDeg / 2;
+              if (end <= start) return null;
+              return (
+                <path
+                  key={arc.label}
+                  d={wedgePath(cx, cy, innerR, outerR, start, end)}
+                  fill={arc.color}
+                  stroke="#fff"
+                  strokeWidth={1}
+                  paintOrder="fill stroke"
+                  className={`ui-donut__slice${active && active !== arc.label ? " is-dim" : ""}${active === arc.label ? " is-active" : ""}`}
+                  onMouseEnter={() => setActive(arc.label)}
+                  onMouseLeave={() => setActive(null)}
+                />
+              );
+            })
+          )}
+        </svg>
+        {activeArc ? (
+          <div className="ui-donut__tip">
+            <span className="ui-donut__tip-pill" style={{ background: activeArc.color, color: "#1e293b" }}>
+              {activeArc.label}
+            </span>
+            <span className="ui-donut__tip-stats">
+              <em>{activeArc.pctLabel}</em>
+              <strong>
+                {formatValue(activeArc.value)}
+                {valueUnit ? ` ${valueUnit}` : ""}
+              </strong>
+            </span>
+          </div>
+        ) : null}
+      </div>
       {legend ? (
         <ul className="ui-donut__legend">
           {caption ? <li className="ui-donut__caption">{caption}</li> : null}
@@ -81,10 +156,16 @@ export function DonutChart({
             <li className="ui-muted">{emptyLabel}</li>
           ) : (
             arcs.map((arc) => (
-              <li key={arc.label}>
+              <li
+                key={arc.label}
+                className={active && active !== arc.label ? "is-dim" : active === arc.label ? "is-active" : undefined}
+                onMouseEnter={() => setActive(arc.label)}
+                onMouseLeave={() => setActive(null)}
+              >
                 <span className="ui-donut__swatch" style={{ background: arc.color }} />
                 <span>
-                  {arc.label} {arc.pct}%
+                  {arc.label}
+                  {showPct ? ` ${Math.round(arc.pct)}%` : ""}
                 </span>
               </li>
             ))

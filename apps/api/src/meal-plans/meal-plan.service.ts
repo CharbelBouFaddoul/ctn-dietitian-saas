@@ -89,6 +89,7 @@ export interface MealPlanSnapshot {
           id: string;
           name: string;
           origin: "catalog" | "custom";
+          category?: string | null;
           servingDescription: string | null;
           referenceQuantity?: number;
           referenceUnit?: string;
@@ -933,6 +934,7 @@ export class MealPlanService {
             id: food.id,
             name: food.name,
             origin: food.origin === "custom" ? ("custom" as const) : ("catalog" as const),
+            category: food.category ?? null,
             servingDescription: food.servingDescription ?? null,
             referenceQuantity: food.referenceQuantity,
             referenceUnit: food.referenceUnit,
@@ -956,6 +958,7 @@ export class MealPlanService {
             id: food.id,
             name: food.name,
             origin: food.origin === "custom" ? ("custom" as const) : ("catalog" as const),
+            category: food.category ?? null,
             servingDescription: food.servingDescription ?? null,
             referenceQuantity: food.referenceQuantity,
             referenceUnit: food.referenceUnit,

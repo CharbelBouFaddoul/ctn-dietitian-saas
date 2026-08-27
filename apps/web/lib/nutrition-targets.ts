@@ -9,6 +9,47 @@ export const DAILY_MACRO_TARGETS = {
   fiberG: 28,
 } as const;
 
+export type DailyMacroTargets = {
+  energyKcal: number;
+  fatG: number;
+  carbohydrateG: number;
+  proteinG: number;
+  fiberG: number;
+};
+
+export type ClientMacroTargets = {
+  energyKcal?: number | null;
+  fatG?: number | null;
+  carbohydrateG?: number | null;
+  proteinG?: number | null;
+  fiberG?: number | null;
+};
+
+/** Prefer client prescription; fall back to platform defaults per field. */
+export function resolveDailyMacroTargets(client?: ClientMacroTargets | null): {
+  targets: DailyMacroTargets;
+  fromClient: boolean;
+} {
+  const pick = (value: number | null | undefined, fallback: number) =>
+    value != null && value > 0 ? value : fallback;
+  const fromClient = Boolean(
+    client &&
+      [client.energyKcal, client.fatG, client.carbohydrateG, client.proteinG, client.fiberG].some(
+        (v) => v != null && v > 0,
+      ),
+  );
+  return {
+    fromClient,
+    targets: {
+      energyKcal: pick(client?.energyKcal, DAILY_MACRO_TARGETS.energyKcal),
+      fatG: pick(client?.fatG, DAILY_MACRO_TARGETS.fatG),
+      carbohydrateG: pick(client?.carbohydrateG, DAILY_MACRO_TARGETS.carbohydrateG),
+      proteinG: pick(client?.proteinG, DAILY_MACRO_TARGETS.proteinG),
+      fiberG: pick(client?.fiberG, DAILY_MACRO_TARGETS.fiberG),
+    },
+  };
+}
+
 /**
  * Adult woman 19–50 (or closest published band) — one number per nutrient so the
  * 100% marker can switch by authority. Sex/age-specific clinical targets are not applied.

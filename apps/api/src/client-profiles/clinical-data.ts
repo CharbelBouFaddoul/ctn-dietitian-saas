@@ -51,6 +51,13 @@ export type ClinicalData = {
     deficienciesNotes: string;
     waterIntake: string;
     other: string;
+    targets: {
+      energyKcal: number | null;
+      fatG: number | null;
+      carbohydrateG: number | null;
+      proteinG: number | null;
+      fiberG: number | null;
+    };
   };
   identity: {
     occupation: string;
@@ -77,6 +84,13 @@ function code(value: unknown): string {
 function time(value: unknown): string {
   const raw = text(value, 5);
   return TIME_RE.test(raw) ? raw : "";
+}
+
+function positiveNumber(value: unknown, max = 20000): number | null {
+  if (value == null || value === "") return null;
+  const n = typeof value === "number" ? value : Number(String(value).trim());
+  if (!Number.isFinite(n) || n < 0 || n > max) return null;
+  return Math.round(n * 10) / 10;
 }
 
 export function emptyClinicalData(): ClinicalData {
@@ -118,7 +132,19 @@ export function emptyClinicalData(): ClinicalData {
       intolerances: "",
       intolerancesNotes: "",
     },
-    nutrition: { deficiencies: "", deficienciesNotes: "", waterIntake: "", other: "" },
+    nutrition: {
+      deficiencies: "",
+      deficienciesNotes: "",
+      waterIntake: "",
+      other: "",
+      targets: {
+        energyKcal: null,
+        fatG: null,
+        carbohydrateG: null,
+        proteinG: null,
+        fiberG: null,
+      },
+    },
     identity: {
       occupation: "",
       workplace: "",
@@ -194,6 +220,16 @@ export function sanitizeClinicalData(input: unknown): ClinicalData {
       deficienciesNotes: text(nutrition.deficienciesNotes),
       waterIntake: code(nutrition.waterIntake),
       other: text(nutrition.other),
+      targets: (() => {
+        const targets = asRecord(nutrition.targets);
+        return {
+          energyKcal: positiveNumber(targets.energyKcal, 20000),
+          fatG: positiveNumber(targets.fatG, 1000),
+          carbohydrateG: positiveNumber(targets.carbohydrateG, 2000),
+          proteinG: positiveNumber(targets.proteinG, 1000),
+          fiberG: positiveNumber(targets.fiberG, 200),
+        };
+      })(),
     },
     identity: {
       occupation: text(identity.occupation, 120),
