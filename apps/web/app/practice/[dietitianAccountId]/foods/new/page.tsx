@@ -75,7 +75,7 @@ export default function NewCustomFoodPage() {
           extraNutrients: Object.keys(extraNutrients).length > 0 ? extraNutrients : undefined,
         }),
       });
-      router.push(`/practice/${dietitianAccountId}/foods/${created.id}`);
+      router.push(`/practice/${dietitianAccountId}/foods?food=${created.id}`);
     } catch (err) {
       setError(errorMessage(err, "Unable to create custom food"));
       setBusy(false);

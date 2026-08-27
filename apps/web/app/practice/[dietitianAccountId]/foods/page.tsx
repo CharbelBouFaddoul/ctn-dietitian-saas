@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   Alert,
   Badge,
@@ -14,10 +14,12 @@ import {
   Table,
   Td,
 } from "@nutrition-saas/ui";
+import { FoodInformationDialog } from "../../../../components/food-information-dialog";
 import { api } from "../../../../lib/api";
 import { errorMessage } from "../../../../lib/humanize-error";
 import { foodSourceShortLabel } from "../../../../lib/food-source-label";
 import { unitLabel } from "../../../../lib/practice-labels";
+import { usePractice } from "../practice-shell";
 
 interface NutritionValues {
   energyKcal: number | null;
@@ -60,6 +62,11 @@ function fmtNutrient(value: number | null): string {
 export default function FoodsPage() {
   const params = useParams<{ dietitianAccountId: string }>();
   const dietitianAccountId = params.dietitianAccountId;
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const practice = usePractice();
+  const selectedFoodId = searchParams.get("food");
+  const canMutate = practice.role === "OWNER" || practice.role === "DIETITIAN";
   const [q, setQ] = useState("");
   const [category, setCategory] = useState("");
   const [sourceId, setSourceId] = useState("");
@@ -112,6 +119,19 @@ export default function FoodsPage() {
     event.preventDefault();
     setPage(1);
     void load();
+  }
+
+  function openFood(id: string) {
+    const next = new URLSearchParams(searchParams.toString());
+    next.set("food", id);
+    router.replace(`/practice/${dietitianAccountId}/foods?${next.toString()}`, { scroll: false });
+  }
+
+  function closeFood() {
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete("food");
+    const query = next.toString();
+    router.replace(`/practice/${dietitianAccountId}/foods${query ? `?${query}` : ""}`, { scroll: false });
   }
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
@@ -214,11 +234,9 @@ export default function FoodsPage() {
           </thead>
           <tbody>
             {items.map((row) => (
-              <tr key={row.id}>
+              <tr key={row.id} className="ui-foods__row" onClick={() => openFood(row.id)}>
                 <Td label="Food">
-                  <Link href={`/practice/${dietitianAccountId}/foods/${row.id}`} className="ui-link">
-                    {row.name}
-                  </Link>
+                  <span className="ui-link">{row.name}</span>
                   {row.servingDescription ? (
                     <div className="ui-muted" style={{ fontSize: 12 }}>
                       {row.servingDescription}
@@ -261,6 +279,17 @@ export default function FoodsPage() {
           Next
         </Button>
       </p>
+
+      {selectedFoodId ? (
+        <FoodInformationDialog
+          foodId={selectedFoodId}
+          dietitianAccountId={dietitianAccountId}
+          canMutate={canMutate}
+          onClose={closeFood}
+          onChanged={() => void load()}
+          onFoodIdChange={openFood}
+        />
+      ) : null}
     </section>
   );
 }

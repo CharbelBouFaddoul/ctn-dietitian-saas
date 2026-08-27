@@ -779,6 +779,10 @@
   z-index: 40;
 }
 
+.ui-dialog-backdrop.is-elevated {
+  z-index: 70;
+}
+
 .ui-dialog {
   position: fixed;
   z-index: 60;
@@ -795,6 +799,10 @@
   box-shadow: 0 24px 64px rgb(15 23 42 / 18%);
   padding: 0;
   overflow: hidden;
+}
+
+.ui-dialog.is-elevated {
+  z-index: 80;
 }
 
 .ui-dialog__head {
@@ -939,6 +947,277 @@
   .ui-food-nutri__grid {
     grid-template-columns: 1fr;
   }
+}
+
+.ui-dialog.ui-food-info {
+  width: min(44rem, calc(100vw - 1.5rem));
+  height: min(88vh, 52rem);
+  max-height: min(88vh, 52rem);
+}
+
+.ui-food-info .ui-dialog__head {
+  background: #fff;
+}
+
+.ui-food-info .ui-dialog__body {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+.ui-food-info__layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+.ui-food-info__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 1rem 1.2rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.ui-food-info__scroll > .ui-alert {
+  margin: 0;
+}
+
+.ui-food-info__general {
+  position: relative;
+  padding: 0.95rem 5.25rem 0.95rem 1rem;
+  border-radius: 12px;
+  background: #eef6fb;
+}
+
+.ui-food-info__badge {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+}
+
+.ui-food-info__facts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.85rem 1.25rem;
+}
+
+.ui-food-info__fact {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.ui-food-info__fact-label {
+  font-size: 0.72rem;
+  font-weight: 650;
+  color: #64748b;
+}
+
+.ui-food-info__fact-value {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #0f172a;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.ui-food-info__qty {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.ui-food-info__qty .ui-input {
+  width: 5.5rem;
+  min-height: 2rem;
+  padding: 0.28rem 0.5rem;
+}
+
+.ui-food-info__qty .ui-select {
+  width: 6.5rem;
+  min-height: 2rem;
+  padding: 0.28rem 1.5rem 0.28rem 0.5rem;
+}
+
+.ui-food-info__serving {
+  margin: 0.7rem 0 0;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.ui-food-info__serving-field {
+  display: grid;
+  gap: 0.2rem;
+  margin-top: 0.7rem;
+}
+
+.ui-food-info__fact .ui-input,
+.ui-food-info__serving-field .ui-input {
+  min-height: 2rem;
+  width: 100%;
+}
+
+.ui-food-info__modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid #dbe4ea;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.ui-food-info__mode {
+  appearance: none;
+  border: 0;
+  background: #fff;
+  color: #64748b;
+  border-radius: 0;
+  padding: 0.62rem 0.75rem;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 650;
+  cursor: pointer;
+  text-align: center;
+}
+
+.ui-food-info__mode + .ui-food-info__mode {
+  border-left: 1px solid #dbe4ea;
+}
+
+.ui-food-info__mode.is-active {
+  color: #1d4e6b;
+  background: #f4fafd;
+  box-shadow: inset 0 -2px 0 #7eb6d9;
+}
+
+.ui-food-info__mode:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ui-food-info__block {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.ui-food-info__block h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.ui-food-info__macros {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.85rem 1rem;
+}
+
+.ui-food-info__micros {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.85rem 1.1rem;
+}
+
+.ui-food-info__stat {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.ui-food-info__stat-label {
+  font-size: 0.75rem;
+  font-weight: 650;
+  color: #475569;
+}
+
+.ui-food-info__stat-readout {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.12rem 0 0.28rem;
+  border-bottom: 1px solid #e8eef2;
+  font-variant-numeric: tabular-nums;
+}
+
+.ui-food-info__stat-readout strong {
+  font-size: 0.95rem;
+  font-weight: 650;
+  color: #0f172a;
+}
+
+.ui-food-info__stat-readout span {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #94a3b8;
+}
+
+.ui-food-info__stat.is-edit .ui-food-info__stat-readout {
+  border: 1px solid #dbe4ea;
+  border-radius: 8px;
+  padding: 0.15rem 0.5rem;
+  background: #fff;
+}
+
+.ui-food-info__stat.is-edit .ui-food-info__stat-readout .ui-input {
+  border: 0;
+  box-shadow: none;
+  padding: 0.15rem 0;
+  min-height: 1.55rem;
+  background: transparent;
+  min-width: 0;
+  flex: 1;
+}
+
+.ui-food-info__foot {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.8rem 1.2rem;
+  border-top: 1px solid #e8eef2;
+  background: #fff;
+}
+
+.ui-food-info__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.ui-food-info__foot .ui-food-info__icon-btn {
+  width: 2.05rem;
+  height: 2.05rem;
+  border-radius: 8px;
+}
+
+@media (max-width: 720px) {
+  .ui-food-info__facts,
+  .ui-food-info__macros,
+  .ui-food-info__modes {
+    grid-template-columns: 1fr;
+  }
+
+  .ui-food-info__micros {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.ui-foods__row {
+  cursor: pointer;
+}
+
+.ui-foods__row:hover {
+  background: color-mix(in srgb, var(--color-accent-soft) 35%, transparent);
 }
 
 .ui-dropdown {
@@ -7245,7 +7524,8 @@
 }
 
 .ui-clinical-rail__icon-btn,
-.ui-docs-icon-btn {
+.ui-docs-icon-btn,
+.ui-food-info__icon-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -7263,19 +7543,22 @@
 }
 
 .ui-clinical-rail__icon-btn:hover,
-.ui-docs-icon-btn:hover {
+.ui-docs-icon-btn:hover,
+.ui-food-info__icon-btn:hover {
   background: rgb(13 148 136 / 8%);
   color: var(--color-text);
 }
 
 .ui-clinical-rail__icon-btn:disabled,
-.ui-docs-icon-btn:disabled {
+.ui-docs-icon-btn:disabled,
+.ui-food-info__icon-btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
 
 .ui-clinical-rail__icon-btn--danger:hover,
-.ui-docs-icon-btn--danger:hover {
+.ui-docs-icon-btn--danger:hover,
+.ui-food-info__icon-btn--danger:hover {
   background: rgb(185 28 28 / 8%);
   border-color: rgb(185 28 28 / 22%);
   color: var(--color-danger, #b91c1c);
