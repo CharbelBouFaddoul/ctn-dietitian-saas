@@ -52,6 +52,8 @@ export class InvoiceService {
       status?: InvoiceStatus;
       overdue?: boolean;
       search?: string;
+      issuedFrom?: string;
+      issuedTo?: string;
       page?: number;
       limit?: number;
     },
@@ -60,6 +62,8 @@ export class InvoiceService {
     const visible = this.access.visibleWhere(tenant);
     const page = Math.max(1, query.page ?? 1);
     const limit = Math.min(100, Math.max(1, query.limit ?? 25));
+    const issuedFrom = this.tryParseDate(query.issuedFrom);
+    const issuedTo = this.tryParseDate(query.issuedTo);
     const where: Prisma.InvoiceWhereInput = {
       dietitianAccountId: tenant.dietitianAccountId,
       archivedAt: null,
@@ -67,12 +71,21 @@ export class InvoiceService {
       ...(query.clientId ? { clientId: query.clientId } : {}),
       ...(query.status ? { status: query.status } : {}),
       ...(query.overdue ? { status: "OVERDUE" } : {}),
+      ...(issuedFrom || issuedTo
+        ? {
+            issueDate: {
+              ...(issuedFrom ? { gte: issuedFrom } : {}),
+              ...(issuedTo ? { lte: issuedTo } : {}),
+            },
+          }
+        : {}),
       ...(query.search
         ? {
             OR: [
               { invoiceNumber: { contains: query.search, mode: "insensitive" } },
               { client: { firstName: { contains: query.search, mode: "insensitive" } } },
               { client: { lastName: { contains: query.search, mode: "insensitive" } } },
+              { client: { displayName: { contains: query.search, mode: "insensitive" } } },
             ],
           }
         : {}),
@@ -654,6 +667,15 @@ export class InvoiceService {
   private todayDate(timezone: string): Date {
     const key = localDateKey(new Date(), timezone);
     return this.parseDate(key);
+  }
+
+  private tryParseDate(value?: string): Date | undefined {
+    if (!value) return undefined;
+    try {
+      return this.parseDate(value);
+    } catch {
+      return undefined;
+    }
   }
 
   private parseDate(value: string): Date {

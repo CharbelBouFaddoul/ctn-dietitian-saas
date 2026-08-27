@@ -3,23 +3,16 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import {
-  Alert,
-  Breadcrumbs,
-  Button,
-  Field,
-  Input,
-  LoadingState,
-  PageHeader,
-  Select,
-  Textarea,
-} from "@nutrition-saas/ui";
+import { Alert, Breadcrumbs, Button, Input, LoadingState, PageHeader, Textarea } from "@nutrition-saas/ui";
 import {
   InvoiceDocument,
   computeInvoicePreview,
   computeLinePreview,
 } from "../../../../../components/invoice-document";
+import { SearchableSelect } from "../../../../../components/searchable-select";
 import { api } from "../../../../../lib/api";
+import { clientDisplayName } from "../../../../../lib/client-identity";
+import { formatMoney } from "../../../../../lib/format";
 import { errorMessage } from "../../../../../lib/humanize-error";
 import { localDateKey } from "../../../../../lib/local-date";
 
@@ -27,6 +20,7 @@ interface ClientRow {
   id: string;
   firstName: string;
   lastName: string;
+  displayName?: string | null;
 }
 
 interface PracticeSettings {
@@ -78,6 +72,7 @@ export default function NewInvoicePage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -91,7 +86,10 @@ export default function NewInvoicePage() {
         if (cancelled) return;
         setClients(clientList.items);
         setPractice(settings);
-        if (clientList.items[0]) setClientId(clientList.items[0].id);
+        const presetClientId =
+          typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("clientId") : null;
+        if (presetClientId) setClientId(presetClientId);
+        else if (clientList.items[0]) setClientId(clientList.items[0].id);
         if (settings.invoiceDefaultTaxPercent != null) {
           setTaxRatePercent(String(settings.invoiceDefaultTaxPercent));
         }
@@ -107,8 +105,30 @@ export default function NewInvoicePage() {
     };
   }, [dietitianAccountId]);
 
-  const selectedClient = clients.find((c) => c.id === clientId);
+  useEffect(() => {
+    if (!previewOpen) return;
+    const html = document.documentElement;
+    const previous = html.style.overflow;
+    html.style.overflow = "hidden";
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setPreviewOpen(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => {
+      html.style.overflow = previous;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [previewOpen]);
+
+  const selectedClient = clients.find((client) => client.id === clientId);
   const currency = practice?.currency ?? "USD";
+  const clientOptions = useMemo(() => {
+    const options = clients.map((client) => ({ id: client.id, label: clientDisplayName(client) }));
+    if (clientId && !options.some((option) => option.id === clientId)) {
+      options.unshift({ id: clientId, label: "Selected client" });
+    }
+    return options;
+  }, [clientId, clients]);
 
   const previewItems = useMemo(
     () =>
@@ -195,17 +215,20 @@ export default function NewInvoicePage() {
   return (
     <section className="ui-invoice-builder">
       <div className="ui-invoice-builder__toolbar no-print">
-        <Breadcrumbs items={[{ label: "Invoices", href: base }, { label: "New document" }]} />
+        <Breadcrumbs items={[{ label: "Invoices", href: base }, { label: "New" }]} />
         <PageHeader
           eyebrow="Billing"
-          title="New invoice"
-          description="Fill in the details on the left. The paper preview on the right is what you can print or save as PDF after saving."
+          title={docKind === "quotation" ? "New quotation" : "New invoice"}
+          description="Choose the client and lines, then preview the printable document when you need it."
           actions={
             <div className="ui-row">
+              <button type="button" className="ui-btn ui-btn--secondary" onClick={() => setPreviewOpen(true)}>
+                Preview document
+              </button>
               <Link href={base} className="ui-btn ui-btn--secondary">
                 Cancel
               </Link>
-              <Button type="submit" form="invoice-create-form" disabled={saving}>
+              <Button type="submit" form="invoice-create-form" disabled={saving || clients.length === 0}>
                 {saving ? "Saving…" : "Save draft"}
               </Button>
             </div>
@@ -217,186 +240,255 @@ export default function NewInvoicePage() {
       <div className="ui-invoice-builder__grid">
         <form id="invoice-create-form" className="ui-invoice-builder__form no-print" onSubmit={(e) => void saveDraft(e)}>
           <div className="ui-invoice-builder__panel">
-            <h2 className="ui-invoice-builder__panel-title">Document</h2>
-            <div className="ui-invoice-builder__fields">
-              <Field label="Document type">
-                <Select
-                  value={docKind}
-                  onChange={(e) => setDocKind(e.target.value as "quotation" | "invoice")}
-                >
-                  <option value="quotation">Quotation (draft)</option>
-                  <option value="invoice">Invoice (draft)</option>
-                </Select>
-              </Field>
-              <Field label="Client">
-                <Select value={clientId} onChange={(e) => setClientId(e.target.value)} required>
-                  {clients.length === 0 ? <option value="">No clients yet</option> : null}
-                  {clients.map((client) => (
-                    <option key={client.id} value={client.id}>
-                      {client.firstName} {client.lastName}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
+            <div className="ui-invoice-builder__meta">
+              <div className="ui-invoice-builder__field">
+                <span className="ui-invoice-builder__label">Type</span>
+                <div className="ui-invoice-builder__seg" role="group" aria-label="Document type">
+                  <button
+                    type="button"
+                    className={docKind === "quotation" ? "is-active" : ""}
+                    onClick={() => setDocKind("quotation")}
+                  >
+                    Quotation
+                  </button>
+                  <button
+                    type="button"
+                    className={docKind === "invoice" ? "is-active" : ""}
+                    onClick={() => setDocKind("invoice")}
+                  >
+                    Invoice
+                  </button>
+                </div>
+              </div>
+              <div className="ui-invoice-builder__field">
+                <span className="ui-invoice-builder__label">Client</span>
+                <SearchableSelect
+                  value={clientId}
+                  onChange={setClientId}
+                  options={clientOptions}
+                  placeholder="Select a client"
+                  searchPlaceholder="Search clients"
+                  emptyLabel="No clients match"
+                  disabled={clients.length === 0 && !clientId}
+                  aria-label="Client"
+                />
+              </div>
             </div>
-          </div>
 
-          <div className="ui-invoice-builder__panel">
-            <div className="ui-invoice-builder__panel-head">
-              <h2 className="ui-invoice-builder__panel-title">Line items</h2>
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={() => setLines((prev) => [...prev, newLine({ description: "", quantity: "1", unitPrice: "0" })])}
-              >
-                Add line
-              </Button>
+            <div className="ui-invoice-builder__section">
+              <div className="ui-invoice-builder__section-head">
+                <h2>Line items</h2>
+                <button
+                  type="button"
+                  className="ui-invoice-builder__text-btn"
+                  onClick={() =>
+                    setLines((prev) => [...prev, newLine({ description: "", quantity: "1", unitPrice: "0" })])
+                  }
+                >
+                  Add line
+                </button>
+              </div>
+              <div className="ui-invoice-builder__table">
+                <div className="ui-invoice-builder__thead">
+                  <span>Description</span>
+                  <span>Qty</span>
+                  <span>Price</span>
+                  <span>Amount</span>
+                  <span className="ui-sr-only">Remove</span>
+                </div>
+                {lines.map((line) => {
+                  const amount = computeLinePreview(Number(line.quantity), Number(line.unitPrice)).lineTotal;
+                  return (
+                    <div key={line.key} className="ui-invoice-builder__row">
+                      <Input
+                        value={line.description}
+                        onChange={(event) => updateLine(line.key, { description: event.target.value })}
+                        placeholder="Service or package"
+                        aria-label="Description"
+                        required
+                      />
+                      <Input
+                        type="number"
+                        min="0.0001"
+                        step="any"
+                        value={line.quantity}
+                        onChange={(event) => updateLine(line.key, { quantity: event.target.value })}
+                        aria-label="Quantity"
+                        required
+                      />
+                      <Input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={line.unitPrice}
+                        onChange={(event) => updateLine(line.key, { unitPrice: event.target.value })}
+                        aria-label="Unit price"
+                        required
+                      />
+                      <p className="ui-invoice-builder__amount">{formatMoney(amount, currency)}</p>
+                      <button
+                        type="button"
+                        className="ui-invoice-builder__remove"
+                        disabled={lines.length <= 1}
+                        onClick={() => removeLine(line.key)}
+                        aria-label="Remove line"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-            <div className="ui-invoice-builder__lines">
-              {lines.map((line) => (
-                <div key={line.key} className="ui-invoice-builder__line">
-                  <Field label="Description">
-                    <Input
-                      value={line.description}
-                      onChange={(e) => updateLine(line.key, { description: e.target.value })}
-                      placeholder="Service or package"
-                      required
-                    />
-                  </Field>
-                  <Field label="Qty">
-                    <Input
-                      type="number"
-                      min="0.0001"
-                      step="any"
-                      value={line.quantity}
-                      onChange={(e) => updateLine(line.key, { quantity: e.target.value })}
-                      required
-                    />
-                  </Field>
-                  <Field label="Unit price">
+
+            <div className="ui-invoice-builder__extras">
+              <div className="ui-invoice-builder__field">
+                <span className="ui-invoice-builder__label">Notes</span>
+                <Textarea
+                  rows={3}
+                  value={notes}
+                  onChange={(event) => setNotes(event.target.value)}
+                  placeholder="Payment terms, bank details…"
+                />
+              </div>
+              <div className="ui-invoice-builder__adjust">
+                <div className="ui-invoice-builder__field">
+                  <span className="ui-invoice-builder__label">Discount</span>
+                  <div className="ui-invoice-builder__seg" role="group" aria-label="Discount type">
+                    <button
+                      type="button"
+                      className={discountType === "" ? "is-active" : ""}
+                      onClick={() => {
+                        setDiscountType("");
+                        setDiscountValue("");
+                      }}
+                    >
+                      None
+                    </button>
+                    <button
+                      type="button"
+                      className={discountType === "PERCENT" ? "is-active" : ""}
+                      onClick={() => setDiscountType("PERCENT")}
+                    >
+                      %
+                    </button>
+                    <button
+                      type="button"
+                      className={discountType === "FIXED" ? "is-active" : ""}
+                      onClick={() => setDiscountType("FIXED")}
+                    >
+                      Amount
+                    </button>
+                  </div>
+                  {discountType ? (
                     <Input
                       type="number"
                       min="0"
                       step="any"
-                      value={line.unitPrice}
-                      onChange={(e) => updateLine(line.key, { unitPrice: e.target.value })}
-                      required
+                      value={discountValue}
+                      onChange={(event) => setDiscountValue(event.target.value)}
+                      placeholder={discountType === "PERCENT" ? "Percent" : "Amount"}
+                      aria-label="Discount value"
                     />
-                  </Field>
-                  <div className="ui-invoice-builder__line-actions">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      disabled={lines.length <= 1}
-                      onClick={() => removeLine(line.key)}
-                      aria-label="Remove line"
-                    >
-                      Remove
-                    </Button>
-                  </div>
+                  ) : null}
                 </div>
-              ))}
+                <div className="ui-invoice-builder__field">
+                  <span className="ui-invoice-builder__label">Tax %</span>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="any"
+                    value={taxRatePercent}
+                    onChange={(event) => setTaxRatePercent(event.target.value)}
+                    aria-label="Tax percent"
+                  />
+                </div>
+                <dl className="ui-invoice-builder__summary">
+                  <div>
+                    <dt>Subtotal</dt>
+                    <dd>{formatMoney(totals.subtotal, currency)}</dd>
+                  </div>
+                  {totals.discountAmount > 0 ? (
+                    <div>
+                      <dt>Discount</dt>
+                      <dd>−{formatMoney(totals.discountAmount, currency)}</dd>
+                    </div>
+                  ) : null}
+                  {Number(taxRatePercent) > 0 ? (
+                    <div>
+                      <dt>Tax</dt>
+                      <dd>{formatMoney(totals.taxAmount, currency)}</dd>
+                    </div>
+                  ) : null}
+                  <div className="is-total">
+                    <dt>Total</dt>
+                    <dd>{formatMoney(totals.total, currency)}</dd>
+                  </div>
+                </dl>
+              </div>
             </div>
-          </div>
-
-          <div className="ui-invoice-builder__panel">
-            <h2 className="ui-invoice-builder__panel-title">Totals</h2>
-            <div className="ui-invoice-builder__fields ui-invoice-builder__fields--3">
-              <Field label="Discount type">
-                <Select
-                  value={discountType}
-                  onChange={(e) => setDiscountType(e.target.value as "" | "PERCENT" | "FIXED")}
-                >
-                  <option value="">None</option>
-                  <option value="PERCENT">Percent %</option>
-                  <option value="FIXED">Fixed amount</option>
-                </Select>
-              </Field>
-              <Field label="Discount value">
-                <Input
-                  type="number"
-                  min="0"
-                  step="any"
-                  value={discountValue}
-                  onChange={(e) => setDiscountValue(e.target.value)}
-                  disabled={!discountType}
-                />
-              </Field>
-              <Field label="Tax %">
-                <Input
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="any"
-                  value={taxRatePercent}
-                  onChange={(e) => setTaxRatePercent(e.target.value)}
-                />
-              </Field>
-            </div>
-            <Field label="Notes / payment details">
-              <Textarea
-                rows={3}
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Bank details, payment terms, thank-you note…"
-              />
-            </Field>
-          </div>
-
-          <div className="ui-invoice-builder__sticky-actions">
-            <p className="ui-muted" style={{ margin: 0, fontSize: 13 }}>
-              Preview total: <strong>{totals.total.toFixed(2)} {currency}</strong>
-            </p>
-            <Button type="submit" disabled={saving || clients.length === 0}>
-              {saving ? "Saving…" : "Save draft & open document"}
-            </Button>
           </div>
         </form>
+      </div>
 
-        <div className="ui-invoice-builder__preview">
-          <div className="ui-invoice-builder__preview-head no-print">
-            <h2>Paper preview</h2>
-            <p className="ui-muted">Printable A4-style document. Save the draft, then use Print / Download PDF.</p>
-          </div>
-          <div className="ui-facture-stage">
-            <InvoiceDocument
-              practice={{
-                practiceName: practice?.practiceName ?? "Your clinic",
-                contactEmail: practice?.contactEmail,
-                contactPhone: practice?.contactPhone,
-                addressLine1: practice?.addressLine1,
-                addressLine2: practice?.addressLine2,
-                city: practice?.city,
-                region: practice?.region,
-                postalCode: practice?.postalCode,
-                country: practice?.country,
-                invoiceFooter: practice?.invoiceFooter,
-              }}
-              invoice={{
-                documentLabel,
-                documentNumber: "DRAFT",
-                clientName: selectedClient
-                  ? `${selectedClient.firstName} ${selectedClient.lastName}`
-                  : "Select a client",
-                issueDate: localDateKey(),
-                dueDate: null,
-                currency,
-                subtotal: totals.subtotal,
-                discountType: discountType || null,
-                discountValue: discountType ? Number(discountValue || 0) : null,
-                discountAmount: totals.discountAmount,
-                taxRatePercent: Number(taxRatePercent || 0),
-                taxAmount: totals.taxAmount,
-                total: totals.total,
-                notes: notes || null,
-                items: previewItems,
-              }}
-            />
+      {previewOpen ? (
+        <div
+          className="ui-invoice-preview"
+          role="dialog"
+          aria-modal="true"
+          aria-label={documentLabel}
+        >
+          <div
+            className="ui-invoice-preview__stage"
+            onClick={(event) => {
+              if (event.target === event.currentTarget) setPreviewOpen(false);
+            }}
+          >
+            <div className="ui-invoice-preview__popup">
+              <button
+                type="button"
+                className="ui-invoice-preview__close"
+                onClick={() => setPreviewOpen(false)}
+                aria-label="Close preview"
+              >
+                ×
+              </button>
+              <InvoiceDocument
+                practice={{
+                  practiceName: practice?.practiceName ?? "Your clinic",
+                  contactEmail: practice?.contactEmail,
+                  contactPhone: practice?.contactPhone,
+                  addressLine1: practice?.addressLine1,
+                  addressLine2: practice?.addressLine2,
+                  city: practice?.city,
+                  region: practice?.region,
+                  postalCode: practice?.postalCode,
+                  country: practice?.country,
+                  invoiceFooter: practice?.invoiceFooter,
+                }}
+                invoice={{
+                  documentLabel,
+                  documentNumber: "DRAFT",
+                  clientName: selectedClient ? clientDisplayName(selectedClient) : "Select a client",
+                  issueDate: localDateKey(),
+                  dueDate: null,
+                  currency,
+                  subtotal: totals.subtotal,
+                  discountType: discountType || null,
+                  discountValue: discountType ? Number(discountValue || 0) : null,
+                  discountAmount: totals.discountAmount,
+                  taxRatePercent: Number(taxRatePercent || 0),
+                  taxAmount: totals.taxAmount,
+                  total: totals.total,
+                  notes: notes || null,
+                  items: previewItems,
+                }}
+              />
+            </div>
           </div>
         </div>
-      </div>
+      ) : null}
     </section>
   );
 }

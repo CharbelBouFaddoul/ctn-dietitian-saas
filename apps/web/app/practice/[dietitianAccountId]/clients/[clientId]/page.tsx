@@ -14,12 +14,9 @@ import {
   Section,
   Skeleton,
   StatusBadge,
-  Table,
   Tabs,
-  Td,
   humanizeLabel,
 } from "@nutrition-saas/ui";
-import { AiPanel } from "../../../../../components/ai-panel";
 import { JoinCodePanel } from "../../../../../components/join-code-panel";
 import { ClientAppointmentsPanel } from "../../../../../components/client-appointments-panel";
 import { ClientAssessmentsPanel } from "../../../../../components/client-assessments-panel";
@@ -30,7 +27,7 @@ import { ClientNutritionPanel } from "../../../../../components/client-nutrition
 import { ClientPrescriptionPanel } from "../../../../../components/client-prescription-panel";
 import type { MealPlanView } from "../../../../../components/client-meal-plan-workspace";
 import { api } from "../../../../../lib/api";
-import { ageInYears, formatDate, formatFullDate, formatMoney } from "../../../../../lib/format";
+import { ageInYears, formatDate, formatFullDate } from "../../../../../lib/format";
 import { errorMessage } from "../../../../../lib/humanize-error";
 import { canManageClients } from "../../../../../lib/practice-access";
 import { portalStatusLabel, statusLabel } from "../../../../../lib/practice-labels";
@@ -45,9 +42,7 @@ type Tab =
   | "prescription"
   | "meal-plan"
   | "tracking"
-  | "invoices"
   | "appointments"
-  | "ai"
   | "settings";
 
 type ChartSection = {
@@ -166,20 +161,6 @@ const chartSections: ChartSection[] = [
     tabs: [{ id: "appointments", label: "Appointments" }],
   },
   {
-    id: "practice",
-    label: "Clinic tools",
-    icon: (
-      <ChartTabIcon>
-        <path d="M12 3l1.6 4.8L18.5 9.5 13.6 11.2 12 16l-1.6-4.8L5.5 9.5l4.9-1.7z" />
-        <path d="M18 15.5l.7 2.1 2.1.7-2.1.7-.7 2.1-.7-2.1-2.1-.7 2.1-.7z" />
-      </ChartTabIcon>
-    ),
-    tabs: [
-      { id: "invoices", label: "Invoices" },
-      { id: "ai", label: "AI" },
-    ],
-  },
-  {
     id: "settings",
     label: "Settings",
     icon: (
@@ -191,15 +172,6 @@ const chartSections: ChartSection[] = [
     tabs: [{ id: "settings", label: "Settings" }],
   },
 ];
-
-function chartSectionsForAi(aiAvailable: boolean): ChartSection[] {
-  if (aiAvailable) return chartSections;
-  return chartSections.map((section) =>
-    section.id === "practice"
-      ? { ...section, tabs: section.tabs.filter((tab) => tab.id !== "ai") }
-      : section,
-  );
-}
 
 function isTab(value: string | null, sections: ChartSection[]): value is Tab {
   return sections.some((section) => section.tabs.some((item) => item.id === value));
@@ -357,15 +329,11 @@ function ClientWorkspacePage() {
   const router = useRouter();
   const practice = usePractice();
   const allowManage = canManageClients(practice.role);
-  const visibleSections = chartSectionsForAi(practice.aiAvailable);
+  const visibleSections = chartSections;
   const base = `/api/v1/dietitian/${dietitianAccountId}/clients/${clientId}`;
   const orgBase = `/api/v1/dietitian/${dietitianAccountId}`;
   const tabFromQuery = searchParams.get("tab");
-  const [tab, setTab] = useState<Tab>(() => {
-    const next = resolveTab(tabFromQuery, chartSectionsForAi(true));
-    if (next === "ai" && !practice.aiAvailable) return "overview";
-    return next;
-  });
+  const [tab, setTab] = useState<Tab>(() => resolveTab(tabFromQuery, chartSections));
 
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -436,9 +404,10 @@ function ClientWorkspacePage() {
     setTrackingDate(next.toISOString().slice(0, 10));
   }
 
-  const [clientInvoices, setClientInvoices] = useState<
-    Array<{ id: string; invoiceNumber: string | null; status: string; dueDate: string | null; total: number; currency: string }>
-  >([]);
+  const [billingSnapshot, setBillingSnapshot] = useState<{
+    unpaid: number;
+    latestLabel: string | null;
+  } | null>(null);
 
   const [timeline, setTimeline] = useState<TimelineRow[]>([]);
   const [timelinePages, setTimelinePages] = useState<TimelineRow[][]>([]);
@@ -465,10 +434,6 @@ function ClientWorkspacePage() {
       return;
     }
     const value = resolveTab(next, visibleSections);
-    if (next === "ai" && !practice.aiAvailable) {
-      setTab("overview");
-      return;
-    }
     setTab(value);
     const params = new URLSearchParams();
     params.set("tab", value);
@@ -505,12 +470,6 @@ function ClientWorkspacePage() {
   }
 
   const activeSection = sectionForTab(tab, visibleSections);
-
-  useEffect(() => {
-    if (tab === "ai" && !practice.aiAvailable) {
-      selectTab("overview");
-    }
-  }, [practice.aiAvailable, tab]);
 
   function applyPortfolio(data: Portfolio) {
     setPortfolio(data);
@@ -593,6 +552,14 @@ function ClientWorkspacePage() {
       router.replace(`/practice/${dietitianAccountId}/messages?clientId=${clientId}`);
       return;
     }
+    if (raw === "invoices") {
+      router.replace(`/practice/${dietitianAccountId}/invoices?clientId=${clientId}`);
+      return;
+    }
+    if (raw === "ai") {
+      router.replace(`/practice/${dietitianAccountId}/ai?clientId=${clientId}`);
+      return;
+    }
     if (raw && LEGACY_TABS[raw]) {
       selectTab(LEGACY_TABS[raw]!);
     }
@@ -631,10 +598,25 @@ function ClientWorkspacePage() {
   }, [tab, trackingDate, base, dietitianAccountId]);
 
   useEffect(() => {
-    if (tab !== "invoices") return;
-    void api<typeof clientInvoices>(`${base}/invoices`)
-      .then(setClientInvoices)
-      .catch((err) => setError(errorMessage(err, "Unable to load invoices")));
+    if (tab !== "overview") return;
+    let cancelled = false;
+    void api<Array<{ invoiceNumber: string | null; status: string }>>(`${base}/invoices`)
+      .then((rows) => {
+        if (cancelled) return;
+        const unpaid = rows.filter((row) => row.status === "ISSUED" || row.status === "SENT" || row.status === "OVERDUE")
+          .length;
+        const latest = rows[0];
+        setBillingSnapshot({
+          unpaid,
+          latestLabel: latest?.invoiceNumber ?? (rows.length > 0 ? "Draft" : null),
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setBillingSnapshot({ unpaid: 0, latestLabel: null });
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [tab, base]);
 
   const client = portfolio?.client ?? null;
@@ -905,6 +887,29 @@ function ClientWorkspacePage() {
                 </span>
                 <span className="ui-client-chart__care-meta">Open chat</span>
               </button>
+              <Link
+                href={`/practice/${dietitianAccountId}/invoices?clientId=${clientId}`}
+                className="ui-client-chart__care-card ui-client-chart__care-card--billing"
+              >
+                <span className="ui-client-chart__metric-label">Billing</span>
+                {billingSnapshot && billingSnapshot.unpaid > 0 ? (
+                  <>
+                    <span className="ui-client-chart__care-value ui-client-chart__care-value--stat">
+                      {billingSnapshot.unpaid}
+                    </span>
+                    <span className="ui-client-chart__care-meta">
+                      Unpaid invoice{billingSnapshot.unpaid === 1 ? "" : "s"}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className="ui-client-chart__care-value">{billingSnapshot?.latestLabel ?? "No invoices"}</span>
+                    <span className="ui-client-chart__care-meta">
+                      {billingSnapshot?.latestLabel ? "Latest invoice" : "Open invoices"}
+                    </span>
+                  </>
+                )}
+              </Link>
             </div>
           </div>
 
@@ -1095,42 +1100,6 @@ function ClientWorkspacePage() {
         </div>
       ) : null}
 
-      {/* ── INVOICES ── */}
-      {tab === "invoices" ? (
-        <Section title="Invoices">
-          {clientInvoices.length === 0 ? (
-            <EmptyState title="No invoices for this client" />
-          ) : (
-            <Table>
-              <thead>
-                <tr>
-                  <th>Invoice</th>
-                  <th>Status</th>
-                  <th>Due date</th>
-                  <th>Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {clientInvoices.map((row) => (
-                  <tr key={row.id}>
-                    <Td label="Invoice">
-                      <Link href={`/practice/${dietitianAccountId}/invoices/${row.id}`} className="ui-link">
-                        {row.invoiceNumber ?? "Draft"}
-                      </Link>
-                    </Td>
-                    <Td label="Status">
-                      <StatusBadge status={row.status} label={humanizeLabel(row.status)} />
-                    </Td>
-                    <Td label="Due date">{row.dueDate ?? "—"}</Td>
-                    <Td label="Total">{formatMoney(row.total, row.currency)}</Td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-          )}
-        </Section>
-      ) : null}
-
       {/* ── APPOINTMENTS ── */}
       {tab === "appointments" ? (
         <div className="ui-client-chart__panel">
@@ -1139,48 +1108,6 @@ function ClientWorkspacePage() {
             clientId={clientId}
             base={base}
             onChanged={() => void loadPortfolio()}
-          />
-        </div>
-      ) : null}
-
-      {/* ── AI ── */}
-      {tab === "ai" && practice.aiAvailable ? (
-        <div className="ui-client-chart__ai">
-          <AiPanel
-            dietitianAccountId={dietitianAccountId}
-            clientId={clientId}
-            action="client-summary"
-            title="Client summary"
-            description="Concise overview from profile, goals, tracking, and meal-plan context."
-          />
-          <AiPanel
-            dietitianAccountId={dietitianAccountId}
-            clientId={clientId}
-            action="meal-plan-assistance"
-            title="Meal plan assistance"
-            description="Suggestions only — review and apply manually in the meal-plan editor."
-          />
-          <AiPanel
-            dietitianAccountId={dietitianAccountId}
-            clientId={clientId}
-            action="nutrition-assistance"
-            title="Nutrition assistance"
-            description="Explain foods using values from your food database."
-            foodQuery
-          />
-          <AiPanel
-            dietitianAccountId={dietitianAccountId}
-            clientId={clientId}
-            action="consultation-summary"
-            title="Consultation summary"
-            description="Draft summary and follow-up questions for your next visit."
-          />
-          <AiPanel
-            dietitianAccountId={dietitianAccountId}
-            clientId={clientId}
-            action="message-draft"
-            title="Message draft"
-            description="Draft only — send manually from Messages when ready."
           />
         </div>
       ) : null}

@@ -205,6 +205,8 @@ export class OrganizationInvoicesController {
     @Query("status") status?: InvoiceStatus,
     @Query("overdue") overdue?: string,
     @Query("search") search?: string,
+    @Query("issuedFrom") issuedFrom?: string,
+    @Query("issuedTo") issuedTo?: string,
     @Query("page") page?: string,
     @Query("limit") limit?: string,
   ) {
@@ -213,6 +215,8 @@ export class OrganizationInvoicesController {
       status,
       overdue: overdue === "true",
       search,
+      issuedFrom,
+      issuedTo,
       page: page ? Number(page) : undefined,
       limit: limit ? Number(limit) : undefined,
     });
