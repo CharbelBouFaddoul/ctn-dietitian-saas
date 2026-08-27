@@ -1583,15 +1583,12 @@ export function ClientMealPlanWorkspace({
         />
       ) : view === "plan" ? (
         <div className="ui-mp__plan">
-          <div className="ui-mp__meals">
+          <div className="ui-mp__meals" aria-label={dayFullLabel(focusedDay)}>
             <div className="ui-mp__day-head">
-              <div>
-                <h3>{dayFullLabel(focusedDay)}</h3>
-                <p className="ui-muted">
-                  {n(presented?.energyKcal)} kcal · {focusedDay.meals.length} meal
-                  {focusedDay.meals.length === 1 ? "" : "s"}
-                </p>
-              </div>
+              <p className="ui-muted">
+                {n(presented?.energyKcal)} kcal · {focusedDay.meals.length} meal
+                {focusedDay.meals.length === 1 ? "" : "s"}
+              </p>
             </div>
 
             {canEdit ? (

@@ -1114,10 +1114,10 @@ function ClientWorkspacePage() {
 
       {/* ── SETTINGS ── */}
       {tab === "settings" ? (
-        <div className="ui-client-chart__panel ui-stack">
+        <div className="ui-client-chart__panel ui-client-settings">
           <JoinCodePanel
             title="Portal connection"
-            description="Portal login is optional. Manage this patient from the chart without them signing in. Generate a join code when they are ready to use the patient app — they create their own account and connect with the code."
+            description="Optional. You can keep working in this chart without the patient signing in."
             connectionStatus={connectionStatus}
             plainJoinCode={plainJoinCode}
             hint={portalAccount?.joinCode?.hint ?? null}
@@ -1156,16 +1156,38 @@ function ClientWorkspacePage() {
 
           {allowManage ? (
             <Section
-              title="Chart status"
+              className="ui-client-settings__card"
+              title="Archive"
               description={
                 client?.status === "ARCHIVED"
-                  ? "This client is archived. Unarchive to make the chart active again."
-                  : "Archive hides the client from the active list. The chart stays in the clinic."
+                  ? "This client is hidden from the active list. Unarchive to show them again."
+                  : "Hide this client from the active list. Their chart stays in the clinic."
+              }
+              actions={
+                <StatusBadge
+                  status={client?.status}
+                  label={statusLabel(client?.status)}
+                  tone={client?.status === "ARCHIVED" ? "warning" : undefined}
+                />
               }
             >
-              <div className="ui-client-chart__toolbar">
+              {client?.status === "ARCHIVED" ? (
+                <ul className="ui-client-settings__facts">
+                  <li>Hidden from the active clients list</li>
+                  <li>Chart and history stay in the clinic</li>
+                  <li>Portal stays off until you generate a new join code</li>
+                </ul>
+              ) : (
+                <ul className="ui-client-settings__facts">
+                  <li>Removed from the active clients list</li>
+                  <li>Chart and history stay in the clinic</li>
+                  <li>Portal access is turned off</li>
+                  <li>Unarchive does not reconnect the portal</li>
+                </ul>
+              )}
+              <div className="ui-client-settings__actions">
                 {client?.status === "ARCHIVED" ? (
-                  <Button variant="secondary" size="sm" onClick={() => setConfirmRestore(true)}>
+                  <Button size="sm" onClick={() => setConfirmRestore(true)}>
                     Unarchive client
                   </Button>
                 ) : (
@@ -1173,9 +1195,6 @@ function ClientWorkspacePage() {
                     Archive client
                   </Button>
                 )}
-                <span className="ui-muted" style={{ fontSize: "0.8rem" }}>
-                  Status: {statusLabel(client?.status)}
-                </span>
               </div>
             </Section>
           ) : null}
@@ -1185,7 +1204,7 @@ function ClientWorkspacePage() {
       <ConfirmDialog
         open={confirmArchive}
         title="Archive this client?"
-        description="The chart stays in the clinic but is no longer active."
+        description="They leave the active list. The chart stays in the clinic, and portal access is turned off."
         confirmLabel="Archive"
         onConfirm={() => {
           void api(`${base}/archive`, { method: "POST" })

@@ -49,20 +49,22 @@ export function JoinCodePanel({
   }
 
   return (
-    <Section title={title}>
-      <p className="ui-muted">{description}</p>
-
+    <Section
+      className="ui-client-settings__card"
+      title={title}
+      description={description}
+      actions={
+        <StatusBadge
+          status={connectionStatus ?? undefined}
+          label={portalStatusLabel(connectionStatus)}
+        />
+      }
+    >
       {leaveRequested ? (
-        <div
-          className="ui-alert ui-alert--warning"
-          style={{ marginTop: 12 }}
-          role="status"
-        >
+        <div className="ui-alert ui-alert--warning ui-client-settings__alert" role="status">
           <strong>Patient asked to leave this clinic</strong>
-          <p className="ui-muted" style={{ margin: "6px 0 0", lineHeight: 1.5 }}>
-            {disconnectRequestNote?.trim()
-              ? `Note: “${disconnectRequestNote.trim()}”. `
-              : null}
+          <p className="ui-muted">
+            {disconnectRequestNote?.trim() ? `Note: “${disconnectRequestNote.trim()}”. ` : null}
             Deactivate portal to approve, or dismiss to keep them connected.
             {disconnectRequestedAt
               ? ` Requested ${new Date(disconnectRequestedAt).toLocaleString()}.`
@@ -71,73 +73,64 @@ export function JoinCodePanel({
         </div>
       ) : null}
 
-      <div className="ui-client-chart__toolbar" style={{ margin: "12px 0 8px" }}>
-        <span className="ui-muted" style={{ fontSize: "0.875rem" }}>
-          Status:
-        </span>
-        <StatusBadge
-          status={connectionStatus ?? undefined}
-          label={portalStatusLabel(connectionStatus)}
-        />
-      </div>
-
       {plainJoinCode ? (
-        <div style={{ margin: "12px 0" }}>
-          <code
-            style={{
-              fontFamily: "monospace",
-              fontSize: "1.375rem",
-              letterSpacing: "0.15em",
-              fontWeight: 700,
-              background: "var(--color-surface-raised, #f5f5f5)",
-              padding: "8px 20px",
-              borderRadius: 8,
-              border: "1px solid var(--color-border)",
-              display: "inline-block",
-            }}
-          >
-            {plainJoinCode}
-          </code>
+        <div className="ui-client-settings__code">
+          <div>
+            <p className="ui-client-settings__kicker">Join code</p>
+            <code className="ui-client-settings__code-value">{plainJoinCode}</code>
+            {expiresAt ? (
+              <p className="ui-hint">Expires {new Date(expiresAt).toLocaleString()}</p>
+            ) : null}
+          </div>
+          {allowManage ? (
+            <Button size="sm" variant="secondary" onClick={() => void handleCopy()}>
+              {copied ? "Copied" : "Copy code"}
+            </Button>
+          ) : null}
         </div>
-      ) : hint ? (
-        <p className="ui-muted" style={{ margin: "8px 0" }}>
-          Active code ending in <strong>{hint}</strong>
-        </p>
-      ) : null}
+      ) : waiting ? (
+        <div className="ui-client-settings__note">
+          <p>
+            A join code ending in <strong>{hint}</strong> is still active.
+            {expiresAt ? ` Expires ${new Date(expiresAt).toLocaleString()}.` : null}
+          </p>
+        </div>
+      ) : connected ? (
+        <ul className="ui-client-settings__facts">
+          <li>This patient can sign in to the app and see their plan.</li>
+          <li>Deactivating signs them out and turns portal access off.</li>
+        </ul>
+      ) : (
+        <ul className="ui-client-settings__facts">
+          <li>You can keep working in this chart without them signing in.</li>
+          <li>When they are ready, generate a code so they can create an account and connect.</li>
+        </ul>
+      )}
 
-      {expiresAt ? (
-        <p className="ui-hint">
-          Expires {new Date(expiresAt).toLocaleString()}
-        </p>
+      {allowManage ? (
+        <div className="ui-client-settings__actions">
+          {!connected ? (
+            <Button size="sm" disabled={portalBusy} onClick={onGenerate}>
+              {waiting ? "Regenerate join code" : "Generate join code"}
+            </Button>
+          ) : null}
+          {waiting && !connected ? (
+            <Button size="sm" variant="ghost" disabled={portalBusy} onClick={onRevoke}>
+              Revoke code
+            </Button>
+          ) : null}
+          {onDeactivate ? (
+            <Button size="sm" variant={leaveRequested ? "danger" : "secondary"} onClick={onDeactivate}>
+              {leaveRequested ? "Approve & deactivate" : "Deactivate portal"}
+            </Button>
+          ) : null}
+          {leaveRequested && onDismissDisconnectRequest ? (
+            <Button size="sm" variant="ghost" disabled={portalBusy} onClick={onDismissDisconnectRequest}>
+              Dismiss request
+            </Button>
+          ) : null}
+        </div>
       ) : null}
-
-      <div className="ui-client-chart__toolbar" style={{ marginTop: 12 }}>
-        {allowManage && !connected ? (
-          <Button size="sm" variant="secondary" disabled={portalBusy} onClick={onGenerate}>
-            {waiting ? "Regenerate join code" : "Generate join code"}
-          </Button>
-        ) : null}
-        {allowManage && plainJoinCode ? (
-          <Button size="sm" variant="secondary" onClick={() => void handleCopy()}>
-            {copied ? "Copied!" : "Copy code"}
-          </Button>
-        ) : null}
-        {allowManage && waiting && !connected ? (
-          <Button size="sm" variant="ghost" disabled={portalBusy} onClick={onRevoke}>
-            Revoke
-          </Button>
-        ) : null}
-        {onDeactivate ? (
-          <Button size="sm" variant="secondary" onClick={onDeactivate}>
-            {leaveRequested ? "Approve & deactivate" : "Deactivate portal"}
-          </Button>
-        ) : null}
-        {leaveRequested && onDismissDisconnectRequest ? (
-          <Button size="sm" variant="secondary" disabled={portalBusy} onClick={onDismissDisconnectRequest}>
-            Dismiss request
-          </Button>
-        ) : null}
-      </div>
     </Section>
   );
 }
