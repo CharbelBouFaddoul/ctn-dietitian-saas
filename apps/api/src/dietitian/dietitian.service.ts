@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, Injectable } from "@nestjs/common";
-import type { DateFormat, HeightUnit, WeightUnit } from "@prisma/client";
+import type { AppointmentStatus, DateFormat, EnergyUnit, HeightUnit, WeightUnit } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { randomBytes } from "node:crypto";
 import { slugify } from "@nutrition-saas/utilities";
 import { PrismaService } from "../prisma/prisma.service";
@@ -7,8 +8,22 @@ import { SecurityEventLogger } from "../auth/security-event.logger";
 import type {
   CreateDietitianDto,
   DietitianSettingsInputDto,
+  UpdateDietitianDto,
   UpdateDietitianSettingsDto,
 } from "./dto/dietitian.dto";
+import {
+  defaultAppointmentReminders,
+  normalizeAppointmentReminders,
+  normalizeEnabledMeasurements,
+  normalizeMealPlanShare,
+  normalizePortalPresets,
+} from "./profile-settings";
+
+function trimOrNull(value: string | null | undefined): string | null {
+  if (value == null) return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
 
 @Injectable()
 export class DietitianService {
@@ -60,6 +75,7 @@ export class DietitianService {
   async listForUser(userId: string) {
     const accounts = await this.prisma.dietitianAccount.findMany({
       where: { userId, status: { not: "ARCHIVED" } },
+      include: { user: true },
       orderBy: { createdAt: "asc" },
     });
     return accounts.map((account) => this.toAccountResponse(account));
@@ -68,12 +84,48 @@ export class DietitianService {
   async getForUser(userId: string, dietitianAccountId: string) {
     const account = await this.prisma.dietitianAccount.findFirst({
       where: { id: dietitianAccountId, userId },
-      include: { settings: true },
+      include: { settings: true, user: true },
     });
     if (!account) {
       return null;
     }
     return this.toAccountResponse(account, account.settings);
+  }
+
+  async updateProfile(dietitianAccountId: string, userId: string, input: UpdateDietitianDto) {
+    const account = await this.prisma.dietitianAccount.findFirst({
+      where: { id: dietitianAccountId, userId },
+    });
+    if (!account) {
+      return null;
+    }
+
+    const accountData: Prisma.DietitianAccountUpdateInput = {};
+    if (input.name !== undefined) accountData.displayName = input.name.trim();
+    if (input.phone !== undefined) accountData.phone = trimOrNull(input.phone);
+    if (input.professionalTitle !== undefined) accountData.professionalTitle = trimOrNull(input.professionalTitle);
+    if (input.specialization !== undefined) accountData.specialization = trimOrNull(input.specialization);
+    if (input.country !== undefined) accountData.country = trimOrNull(input.country);
+    if (input.licenseNumber !== undefined) accountData.licenseNumber = trimOrNull(input.licenseNumber);
+
+    const userData: Prisma.UserUpdateInput = {};
+    if (input.firstName !== undefined) userData.firstName = trimOrNull(input.firstName);
+    if (input.lastName !== undefined) userData.lastName = trimOrNull(input.lastName);
+
+    if (Object.keys(accountData).length === 0 && Object.keys(userData).length === 0) {
+      throw new BadRequestException("No profile fields to update");
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      if (Object.keys(accountData).length > 0) {
+        await tx.dietitianAccount.update({ where: { id: dietitianAccountId }, data: accountData });
+      }
+      if (Object.keys(userData).length > 0) {
+        await tx.user.update({ where: { id: userId }, data: userData });
+      }
+    });
+
+    return this.getForUser(userId, dietitianAccountId);
   }
 
   async updateName(dietitianAccountId: string, name: string) {
@@ -123,7 +175,18 @@ export class DietitianService {
     invoiceFooter: string | null;
     emailFromName: string | null;
     emailReplyTo: string | null;
+    energyUnit?: string;
+    defaultAppointmentStatus?: string;
+    appointmentReminders?: Prisma.JsonValue | null;
+    mealPlanShare?: Prisma.JsonValue | null;
+    enabledMeasurements?: Prisma.JsonValue | null;
+    deduceMeasurements?: boolean;
+    portalPresets?: Prisma.JsonValue | null;
   }) {
+    const reminders = normalizeAppointmentReminders(
+      settings.appointmentReminders,
+      settings.reminderHoursBefore,
+    );
     return {
       timezone: settings.timezone,
       locale: settings.locale,
@@ -143,19 +206,36 @@ export class DietitianService {
       country: settings.country,
       defaultAppointmentMinutes: settings.defaultAppointmentMinutes,
       reminderEmailEnabled: settings.reminderEmailEnabled,
-      reminderHoursBefore: settings.reminderHoursBefore,
+      reminderHoursBefore: reminders[0] ?? settings.reminderHoursBefore,
       invoiceDefaultDueDays: settings.invoiceDefaultDueDays,
-      invoiceDefaultTaxPercent: Number(
-        (settings.invoiceDefaultTaxPercent ?? 0).toString(),
-      ),
+      invoiceDefaultTaxPercent: Number((settings.invoiceDefaultTaxPercent ?? 0).toString()),
       invoiceFooter: settings.invoiceFooter,
       emailFromName: settings.emailFromName,
       emailReplyTo: settings.emailReplyTo,
+      energyUnit: settings.energyUnit ?? "kcal",
+      defaultAppointmentStatus: settings.defaultAppointmentStatus ?? "SCHEDULED",
+      appointmentReminders: reminders,
+      mealPlanShare: normalizeMealPlanShare(settings.mealPlanShare),
+      enabledMeasurements: normalizeEnabledMeasurements(settings.enabledMeasurements),
+      deduceMeasurements: settings.deduceMeasurements ?? true,
+      portalPresets: normalizePortalPresets(settings.portalPresets),
     };
   }
 
   private settingsData(settings: DietitianSettingsInputDto | UpdateDietitianSettingsDto) {
     const update = settings as UpdateDietitianSettingsDto;
+    const reminders =
+      update.appointmentReminders !== undefined
+        ? normalizeAppointmentReminders(update.appointmentReminders, update.reminderHoursBefore ?? 24)
+        : undefined;
+    const enabled =
+      update.enabledMeasurements !== undefined
+        ? normalizeEnabledMeasurements(update.enabledMeasurements)
+        : undefined;
+    const mealPlanShare =
+      update.mealPlanShare !== undefined ? normalizeMealPlanShare(update.mealPlanShare) : undefined;
+    const portalPresets =
+      update.portalPresets !== undefined ? normalizePortalPresets(update.portalPresets) : undefined;
     return {
       timezone: settings.timezone,
       locale: settings.locale,
@@ -177,7 +257,14 @@ export class DietitianService {
         ? { defaultAppointmentMinutes: update.defaultAppointmentMinutes }
         : {}),
       ...(update.reminderEmailEnabled !== undefined ? { reminderEmailEnabled: update.reminderEmailEnabled } : {}),
-      ...(update.reminderHoursBefore !== undefined ? { reminderHoursBefore: update.reminderHoursBefore } : {}),
+      ...(reminders
+        ? { appointmentReminders: reminders, reminderHoursBefore: reminders[0]! }
+        : update.reminderHoursBefore !== undefined
+          ? {
+              reminderHoursBefore: update.reminderHoursBefore,
+              appointmentReminders: defaultAppointmentReminders(update.reminderHoursBefore),
+            }
+          : {}),
       ...(update.invoiceDefaultDueDays !== undefined ? { invoiceDefaultDueDays: update.invoiceDefaultDueDays } : {}),
       ...(update.invoiceDefaultTaxPercent !== undefined
         ? { invoiceDefaultTaxPercent: update.invoiceDefaultTaxPercent }
@@ -185,6 +272,14 @@ export class DietitianService {
       ...(update.invoiceFooter !== undefined ? { invoiceFooter: update.invoiceFooter } : {}),
       ...(update.emailFromName !== undefined ? { emailFromName: update.emailFromName } : {}),
       ...(update.emailReplyTo !== undefined ? { emailReplyTo: update.emailReplyTo } : {}),
+      ...(update.energyUnit !== undefined ? { energyUnit: update.energyUnit as EnergyUnit } : {}),
+      ...(update.defaultAppointmentStatus !== undefined
+        ? { defaultAppointmentStatus: update.defaultAppointmentStatus as AppointmentStatus }
+        : {}),
+      ...(mealPlanShare !== undefined ? { mealPlanShare } : {}),
+      ...(enabled !== undefined ? { enabledMeasurements: enabled === null ? Prisma.DbNull : enabled } : {}),
+      ...(update.deduceMeasurements !== undefined ? { deduceMeasurements: update.deduceMeasurements } : {}),
+      ...(portalPresets !== undefined ? { portalPresets } : {}),
     };
   }
 
@@ -195,33 +290,15 @@ export class DietitianService {
       slug: string;
       status: string;
       createdAt: Date;
+      phone?: string | null;
+      professionalTitle?: string | null;
+      specialization?: string | null;
+      country?: string | null;
+      licenseNumber?: string | null;
+      photoStorageKey?: string | null;
+      user?: { email: string; firstName: string | null; lastName: string | null };
     },
-    settings?: {
-      timezone: string;
-      locale: string;
-      currency: string;
-      weightUnit: string;
-      heightUnit: string;
-      dateFormat: string;
-      practiceName: string | null;
-      logoStorageKey: string | null;
-      contactEmail: string | null;
-      contactPhone: string | null;
-      addressLine1: string | null;
-      addressLine2: string | null;
-      city: string | null;
-      region: string | null;
-      postalCode: string | null;
-      country: string | null;
-      defaultAppointmentMinutes: number;
-      reminderEmailEnabled: boolean;
-      reminderHoursBefore: number;
-      invoiceDefaultDueDays: number;
-      invoiceDefaultTaxPercent?: number | { toString(): string } | null;
-      invoiceFooter: string | null;
-      emailFromName: string | null;
-      emailReplyTo: string | null;
-    } | null,
+    settings?: Parameters<DietitianService["toSettingsResponse"]>[0] | null,
   ) {
     return {
       id: account.id,
@@ -229,6 +306,15 @@ export class DietitianService {
       slug: account.slug,
       status: account.status,
       createdAt: account.createdAt.toISOString(),
+      email: account.user?.email ?? null,
+      firstName: account.user?.firstName ?? null,
+      lastName: account.user?.lastName ?? null,
+      phone: account.phone ?? null,
+      professionalTitle: account.professionalTitle ?? null,
+      specialization: account.specialization ?? null,
+      country: account.country ?? null,
+      licenseNumber: account.licenseNumber ?? null,
+      photoStorageKey: account.photoStorageKey ?? null,
       ...(settings ? { settings: this.toSettingsResponse(settings) } : {}),
     };
   }

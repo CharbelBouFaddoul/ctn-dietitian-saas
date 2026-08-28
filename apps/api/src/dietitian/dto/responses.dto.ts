@@ -73,6 +73,27 @@ export class DietitianSettingsResponseDto {
   @ApiPropertyOptional({ nullable: true, type: String })
   emailReplyTo!: string | null;
 
+  @ApiProperty()
+  energyUnit!: string;
+
+  @ApiProperty()
+  defaultAppointmentStatus!: string;
+
+  @ApiProperty({ type: [Number] })
+  appointmentReminders!: number[];
+
+  @ApiProperty()
+  mealPlanShare!: Record<string, unknown>;
+
+  @ApiPropertyOptional({ type: [String], nullable: true })
+  enabledMeasurements!: string[] | null;
+
+  @ApiProperty()
+  deduceMeasurements!: boolean;
+
+  @ApiProperty()
+  portalPresets!: Record<string, unknown>;
+
   @ApiProperty({
     description:
       "Platform product-email flag. When false, clinic UI should hide reminder/email sender settings.",
@@ -92,6 +113,33 @@ export class DietitianAccountResponseDto {
 
   @ApiProperty({ enum: ["PENDING", "ACTIVE", "SUSPENDED", "ARCHIVED"] })
   status!: string;
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  email?: string | null;
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  firstName?: string | null;
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  lastName?: string | null;
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  phone?: string | null;
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  professionalTitle?: string | null;
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  specialization?: string | null;
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  country?: string | null;
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  licenseNumber?: string | null;
+
+  @ApiPropertyOptional({ nullable: true, type: String })
+  photoStorageKey?: string | null;
 
   @ApiProperty()
   createdAt!: string;

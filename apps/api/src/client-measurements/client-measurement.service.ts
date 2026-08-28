@@ -7,12 +7,37 @@ import type { DietitianTenantContext } from "../dietitian/dietitian.types";
 import { tenantWhere } from "../dietitian/tenant-scope";
 import { TimelineService } from "../timeline/timeline.service";
 import { ClientAccessService } from "../clients/client-access.service";
+import { deduceBodyComposition } from "./body-composition";
+
+const LENGTH_TYPES = new Set<MeasurementType>([
+  "HEIGHT",
+  "WAIST",
+  "HIPS",
+  "NECK",
+  "CHEST",
+  "ABDOMEN",
+  "ARM",
+  "FOREARM",
+  "WRIST",
+  "THIGH",
+  "CALF",
+]);
+
+const MASS_TYPES = new Set<MeasurementType>(["WEIGHT", "MUSCLE_MASS", "FAT_MASS"]);
 
 const INTERNAL_BY_TYPE: Record<MeasurementType, string> = {
   WEIGHT: INTERNAL_UNITS.weight,
   HEIGHT: INTERNAL_UNITS.height,
   WAIST: INTERNAL_UNITS.height,
   HIPS: INTERNAL_UNITS.height,
+  NECK: INTERNAL_UNITS.height,
+  CHEST: INTERNAL_UNITS.height,
+  ABDOMEN: INTERNAL_UNITS.height,
+  ARM: INTERNAL_UNITS.height,
+  FOREARM: INTERNAL_UNITS.height,
+  WRIST: INTERNAL_UNITS.height,
+  THIGH: INTERNAL_UNITS.height,
+  CALF: INTERNAL_UNITS.height,
   BODY_FAT: "%",
   FAT_MASS: INTERNAL_UNITS.weight,
   MUSCLE_MASS: INTERNAL_UNITS.weight,
@@ -122,32 +147,39 @@ export class ClientMeasurementService {
       bmiSeries.push({ at: w.at, value: bmi, unit: "kg/m²" });
     }
 
+    const settings = await this.prisma.dietitianSettings.findUnique({
+      where: { dietitianAccountId },
+      select: { deduceMeasurements: true },
+    });
+    const series =
+      settings?.deduceMeasurements === false ? seriesByType : deduceBodyComposition(seriesByType);
+
     const comparison = {
-      weight: compareEndpoints(seriesByType.WEIGHT ?? []),
-      height: compareEndpoints(seriesByType.HEIGHT ?? []),
+      weight: compareEndpoints(series.WEIGHT ?? []),
+      height: compareEndpoints(series.HEIGHT ?? []),
       bmi: compareEndpoints(bmiSeries.map((p, i) => ({ ...p, id: `bmi-${i}` }))),
-      available: (seriesByType.WEIGHT?.length ?? 0) >= 2 || bmiSeries.length >= 2,
+      available: (series.WEIGHT?.length ?? 0) >= 2 || bmiSeries.length >= 2,
     };
 
     const latestByType: Record<string, { value: number; unit: string; measuredAt: string } | null> = {};
-    for (const type of Object.keys(seriesByType)) {
-      const series = seriesByType[type]!;
-      const last = series[series.length - 1];
+    for (const type of Object.keys(series)) {
+      const points = series[type]!;
+      const last = points[points.length - 1];
       latestByType[type] = last
         ? { value: last.value, unit: last.unit, measuredAt: last.at }
         : null;
     }
     const previousByType: Record<string, { value: number; unit: string; measuredAt: string } | null> = {};
-    for (const type of Object.keys(seriesByType)) {
-      const series = seriesByType[type]!;
-      const prev = series.length >= 2 ? series[series.length - 2] : null;
+    for (const type of Object.keys(series)) {
+      const points = series[type]!;
+      const prev = points.length >= 2 ? points[points.length - 2] : null;
       previousByType[type] = prev
         ? { value: prev.value, unit: prev.unit, measuredAt: prev.at }
         : null;
     }
 
     return {
-      series: seriesByType,
+      series,
       bmiSeries,
       latest: latestByType,
       previous: previousByType,
@@ -228,7 +260,7 @@ export class ClientMeasurementService {
 
   toInternal(type: MeasurementType, value: number, unit: string): number {
     const normalized = unit.toLowerCase();
-    if (type === "WEIGHT" || type === "MUSCLE_MASS" || type === "FAT_MASS") {
+    if (MASS_TYPES.has(type)) {
       if (normalized === "kg") {
         return value;
       }
@@ -236,7 +268,7 @@ export class ClientMeasurementService {
         return value * 0.45359237;
       }
     }
-    if (type === "HEIGHT" || type === "WAIST" || type === "HIPS") {
+    if (LENGTH_TYPES.has(type)) {
       if (normalized === "cm") {
         return value;
       }

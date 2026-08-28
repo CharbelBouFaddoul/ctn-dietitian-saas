@@ -158,6 +158,14 @@ export class SessionService {
     return result.count;
   }
 
+  async revokeOtherSessions(userId: string, exceptSessionId: string): Promise<number> {
+    const result = await this.prisma.session.updateMany({
+      where: { userId, revokedAt: null, id: { not: exceptSessionId } },
+      data: { revokedAt: new Date() },
+    });
+    return result.count;
+  }
+
   toAuthenticatedUser(user: User): AuthenticatedRequestUser {
     return {
       id: user.id,
@@ -167,6 +175,8 @@ export class SessionService {
       platformRole: user.platformRole,
       emailVerifiedAt: user.emailVerifiedAt,
       createdAt: user.createdAt,
+      firstName: user.firstName,
+      lastName: user.lastName,
     };
   }
 

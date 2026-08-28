@@ -16,6 +16,7 @@ import {
   Table,
   TargetBar,
   Td,
+  Tooltip,
 } from "@nutrition-saas/ui";
 import { api } from "../lib/api";
 import { MICRONUTRIENT_DEFS, type ExtraNutrients } from "../lib/micronutrients";
@@ -532,6 +533,7 @@ export function ClientMealPlanWorkspace({
   const [unitDrafts, setUnitDrafts] = useState<Record<string, string>>({});
   const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [foodsPage, setFoodsPage] = useState(0);
   const [foodsSort, setFoodsSort] = useState<{ key: "name" | "energy" | "meal"; dir: "asc" | "desc" }>({
@@ -587,6 +589,7 @@ export function ClientMealPlanWorkspace({
   function applyVersion(loaded: VersionDetail) {
     setVersion(loaded);
     setError(null);
+    if (loaded.status !== "PUBLISHED") setNotice(null);
     const pending = pendingDraftRef.current;
     if (pending) {
       pendingDraftRef.current = null;
@@ -702,6 +705,14 @@ export function ClientMealPlanWorkspace({
 
   const canEdit = version?.status === "DRAFT" && !version.immutable;
   const canStartDraft = Boolean(allowManage && plan && plan.status !== "ARCHIVED" && !canEdit);
+  const viewingPublished = version?.status === "PUBLISHED";
+  const showNotify = Boolean(allowManage && plan && plan.status !== "ARCHIVED");
+  const canNotify = Boolean(showNotify && viewingPublished);
+  const notifyTip = canNotify
+    ? "Send notification to patient"
+    : version?.status === "SUPERSEDED"
+      ? "Send notification from published version"
+      : "Publish first to send notification";
   const weekGroups = version ? groupDaysByWeek(version.snapshot.days) : [];
   const currentWeek = weekGroups.some((g) => g.week === activeWeek)
     ? activeWeek
@@ -721,11 +732,28 @@ export function ClientMealPlanWorkspace({
     if (!version) return;
     setBusy(true);
     setError(null);
+    setNotice(null);
     try {
       await api(`${apiBase}/versions/${version.id}/publish`, { method: "POST" });
       await load(version.id);
+      setNotice("Published. Notify the patient when you’re ready.");
     } catch (err) {
       setError(errorMessage(err, "Publish failed"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function notifyClient() {
+    if (!canNotify) return;
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      await api(`${apiBase}/notify`, { method: "POST" });
+      setNotice("Patient notified about this published plan");
+    } catch (err) {
+      setError(errorMessage(err, "Could not notify the patient"));
     } finally {
       setBusy(false);
     }
@@ -1460,6 +1488,19 @@ export function ClientMealPlanWorkspace({
               Analysis
             </button>
           </div>
+          {showNotify ? (
+            <Tooltip label={notifyTip}>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => void notifyClient()}
+                disabled={busy || !canNotify}
+                aria-label={notifyTip}
+              >
+                Notify
+              </Button>
+            </Tooltip>
+          ) : null}
           {canEdit ? (
             <Button size="sm" onClick={() => void publish()} disabled={busy}>
               Publish
@@ -1472,7 +1513,7 @@ export function ClientMealPlanWorkspace({
         </div>
       </header>
 
-      {error ? <Alert tone="danger">{error}</Alert> : null}
+      {error ? <Alert tone="danger">{error}</Alert> : notice ? <Alert tone="success">{notice}</Alert> : null}
 
       <div className="ui-mp__schedule">
         <div className="ui-mp__weeks" role="tablist" aria-label="Weeks">

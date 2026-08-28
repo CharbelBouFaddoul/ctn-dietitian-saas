@@ -119,6 +119,10 @@ export class AppointmentService {
     const { startAt, endAt } = this.parseRange(input.startAt, input.endAt);
     await this.assertNoOverlap(tenant.dietitianAccountId, startAt, endAt);
 
+    const settings = await this.prisma.dietitianSettings.findUnique({
+      where: { dietitianAccountId: tenant.dietitianAccountId },
+      select: { defaultAppointmentStatus: true },
+    });
     const appointment = await this.prisma.appointment.create({
       data: {
         dietitianAccountId: tenant.dietitianAccountId,
@@ -127,6 +131,7 @@ export class AppointmentService {
         category: (input.category ?? "CONSULTATION") as AppointmentCategory,
         startAt,
         endAt,
+        status: settings?.defaultAppointmentStatus ?? "SCHEDULED",
         assignedUserId: input.assignedUserId ?? tenant.userId,
         notes: input.notes?.trim() ?? null,
         createdById: tenant.userId,

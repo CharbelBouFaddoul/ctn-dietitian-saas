@@ -61,6 +61,12 @@ export class MealPlanController {
     return this.plans.update(tenant, planId, body);
   }
 
+  @Post(":planId/notify")
+  @ApiOperation({ summary: "Notify the client about the current published meal plan (in-app, and email when product email is on)" })
+  notify(@CurrentTenant() tenant: DietitianTenantContext, @Param("planId", ParseUUIDPipe) planId: string) {
+    return this.plans.notifyClient(tenant, planId);
+  }
+
   @Post(":planId/archive")
   archive(@CurrentTenant() tenant: DietitianTenantContext, @Param("planId", ParseUUIDPipe) planId: string) {
     return this.plans.archive(tenant, planId);

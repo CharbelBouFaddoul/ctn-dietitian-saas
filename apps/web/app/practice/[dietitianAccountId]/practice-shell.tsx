@@ -15,6 +15,8 @@ interface PracticeDetail {
   id: string;
   name: string;
   status: string;
+  firstName?: string | null;
+  lastName?: string | null;
   context?: {
     dietitianAccountId: string;
     displayName: string;
@@ -203,6 +205,7 @@ export function PracticeShell({ children }: { children: ReactNode }) {
 
   // Single-owner practices: owner is the only practice role.
   const role = "OWNER";
+  const dietitianName = [practice.firstName, practice.lastName].filter(Boolean).join(" ").trim();
   const base = `/practice/${dietitianAccountId}`;
   const navSections: NavSection[] = [
     {
@@ -243,7 +246,7 @@ export function PracticeShell({ children }: { children: ReactNode }) {
     },
     {
       label: "System",
-      items: [{ href: `${base}/settings`, label: "Settings", icon: PracticeNavIcons.settings }],
+      items: [{ href: `${base}/settings`, label: "Profile", icon: PracticeNavIcons.profile }],
     },
   ];
 
@@ -279,7 +282,7 @@ export function PracticeShell({ children }: { children: ReactNode }) {
       <AppShell
         theme="practice"
         brand={practice.name}
-        meta={roleLabel(role)}
+        meta={dietitianName || roleLabel(role)}
         navSections={navSections}
         pathname={pathname}
         linkComponent={Link}

@@ -190,6 +190,11 @@ enum DateFormat {
   MM_DD_YYYY
 }
 
+enum EnergyUnit {
+  kcal
+  kj
+}
+
 enum DietitianAccountStatus {
   ACTIVE
   SUSPENDED
@@ -206,6 +211,7 @@ model DietitianAccount {
   professionalTitle String?                @map("professional_title")
   specialization    String?
   country           String?
+  licenseNumber     String?                @map("license_number")
   photoStorageKey   String?                @map("photo_storage_key")
   createdAt         DateTime               @default(now()) @map("created_at") @db.Timestamptz
   updatedAt         DateTime               @updatedAt @map("updated_at") @db.Timestamptz
@@ -293,6 +299,13 @@ model DietitianSettings {
   invoiceFooter             String?    @map("invoice_footer") @db.Text
   emailFromName             String?    @map("email_from_name")
   emailReplyTo              String?    @map("email_reply_to")
+  energyUnit                EnergyUnit @default(kcal) @map("energy_unit")
+  defaultAppointmentStatus  AppointmentStatus @default(SCHEDULED) @map("default_appointment_status")
+  appointmentReminders      Json?      @map("appointment_reminders")
+  mealPlanShare             Json?      @map("meal_plan_share")
+  enabledMeasurements       Json?      @map("enabled_measurements")
+  deduceMeasurements        Boolean    @default(true) @map("deduce_measurements")
+  portalPresets             Json?      @map("portal_presets")
   createdAt                 DateTime   @default(now()) @map("created_at") @db.Timestamptz
   updatedAt                 DateTime   @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -490,6 +503,14 @@ enum MeasurementType {
   FAT_MASS
   MUSCLE_MASS
   MUSCLE_MASS_PERCENT
+  NECK
+  CHEST
+  ABDOMEN
+  ARM
+  FOREARM
+  WRIST
+  THIGH
+  CALF
   SKINFOLD_ABDOMINAL
   SKINFOLD_CHEST
   SKINFOLD_FRONT_THIGH

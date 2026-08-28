@@ -25,12 +25,33 @@ import type { DietitianTenantContext } from "../dietitian/dietitian.types";
 import { requireDietitianAccountId, tenantWhere } from "../dietitian/tenant-scope";
 import { TimelineService } from "../timeline/timeline.service";
 import { NotificationService } from "../notifications/notification.service";
+import { EmailService } from "../email/email.service";
+import { PlatformSettingsService } from "../platform-settings/platform-settings.service";
+import { normalizeMealPlanShare } from "../dietitian/profile-settings";
 import { RecipeNutritionService, isFoodQuantityUnit, type EffectiveFood } from "../recipes/recipe-nutrition.service";
 import { RecipeService } from "../recipes/recipe.service";
 
 const DEFAULT_MEALS = ["Breakfast", "Lunch", "Dinner"];
 
 const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"] as const;
+
+const FRIENDLY_TEMPLATE_TOKENS: Array<[string, string]> = [
+  ["[Client_name]", "{{client.displayName}}"],
+  ["[Client_first_name]", "{{client.firstName}}"],
+  ["[Client_last_name]", "{{client.lastName}}"],
+  ["[Dietitian_name]", "{{dietitian.name}}"],
+  ["[Organization_name]", "{{organization.name}}"],
+  ["[Meal_plan_name]", "{{mealPlan.name}}"],
+  ["[Run_date]", "{{run.date}}"],
+];
+
+function renderMealPlanTemplate(template: string, vars: Record<string, string>): string {
+  let text = template;
+  for (const [friendly, api] of FRIENDLY_TEMPLATE_TOKENS) {
+    text = text.split(friendly).join(api);
+  }
+  return text.replace(/\{\{([a-zA-Z0-9_.]+)\}\}/g, (_match, key: string) => vars[key] ?? "").trim();
+}
 
 export type DayLabelMode = "NUMBERED" | "WEEKDAY";
 
@@ -122,6 +143,8 @@ export class MealPlanService {
     private readonly timeline: TimelineService,
     private readonly security: SecurityEventLogger,
     private readonly notifications: NotificationService,
+    private readonly email: EmailService,
+    private readonly platformSettings: PlatformSettingsService,
   ) {}
 
   async list(
@@ -533,28 +556,89 @@ export class MealPlanService {
       targetId: published.next.id,
     });
 
+    return this.getVersion(tenant, planId, versionId);
+  }
+
+  async notifyClient(tenant: DietitianTenantContext, planId: string) {
+    const plan = await this.requirePlan(tenant, planId, "manageRecords");
+    if (plan.status === "ARCHIVED") {
+      throw new BadRequestException("Archived meal plans cannot be notified");
+    }
+    const published = await this.prisma.mealPlanVersion.findFirst({
+      where: { mealPlanId: plan.id, status: "PUBLISHED", ...tenantWhere(tenant.dietitianAccountId) },
+      select: { id: true },
+    });
+    if (!published || plan.status !== "ACTIVE") {
+      throw new BadRequestException("Only a published version can be notified");
+    }
+
     const portalAccount = await this.prisma.clientAccount.findFirst({
       where: {
-        clientId: version.mealPlan.clientId,
+        clientId: plan.clientId,
         dietitianAccountId: tenant.dietitianAccountId,
         status: "ACTIVE",
       },
-      select: { userId: true },
+      include: {
+        user: { select: { id: true, email: true } },
+        client: { select: { firstName: true, lastName: true, displayName: true, email: true } },
+      },
     });
-    if (portalAccount) {
-      await this.notifications.create({
-        dietitianAccountId: tenant.dietitianAccountId,
-        userId: portalAccount.userId,
-        clientId: version.mealPlan.clientId,
-        type: "MEAL_PLAN_PUBLISHED",
-        title: "New meal plan published",
-        body: "Your dietitian published an updated meal plan for you.",
-        targetType: "meal_plan",
-        targetId: version.mealPlanId,
-      });
+    if (!portalAccount) {
+      throw new BadRequestException("This client is not on the portal");
     }
 
-    return this.getVersion(tenant, planId, versionId);
+    const [settingsRow, account] = await Promise.all([
+      this.prisma.dietitianSettings.findUnique({
+        where: { dietitianAccountId: tenant.dietitianAccountId },
+        select: { mealPlanShare: true, practiceName: true },
+      }),
+      this.prisma.dietitianAccount.findUniqueOrThrow({
+        where: { id: tenant.dietitianAccountId },
+        include: { user: { select: { firstName: true, lastName: true } } },
+      }),
+    ]);
+    const share = normalizeMealPlanShare(settingsRow?.mealPlanShare);
+    const clientName =
+      portalAccount.client.displayName?.trim() ||
+      `${portalAccount.client.firstName} ${portalAccount.client.lastName}`.trim();
+    const dietitianName = [account.user.firstName, account.user.lastName].filter(Boolean).join(" ").trim() || account.displayName;
+    const practiceName = settingsRow?.practiceName?.trim() || account.displayName;
+    const vars: Record<string, string> = {
+      "client.firstName": portalAccount.client.firstName,
+      "client.lastName": portalAccount.client.lastName,
+      "client.displayName": clientName,
+      "dietitian.name": dietitianName,
+      "organization.name": practiceName,
+      "mealPlan.name": plan.name,
+      "run.date": new Date().toISOString().slice(0, 10),
+    };
+    const title = renderMealPlanTemplate(share.emailSubject, vars) || "New meal plan";
+    const body = renderMealPlanTemplate(share.emailBody, vars) || "Your meal plan is ready.";
+
+    await this.notifications.create({
+      dietitianAccountId: tenant.dietitianAccountId,
+      userId: portalAccount.user.id,
+      clientId: plan.clientId,
+      type: "MEAL_PLAN_PUBLISHED",
+      title,
+      body,
+      targetType: "meal_plan",
+      targetId: plan.id,
+    });
+
+    const emailEnabled = await this.platformSettings.isEmailNotificationsEnabled();
+    const to = portalAccount.user.email || portalAccount.client.email;
+    let emailSent = false;
+    if (emailEnabled && to) {
+      try {
+        await this.email.sendAutomationMessage(to, title, body);
+        emailSent = true;
+      } catch {
+        emailSent = false;
+      }
+    }
+
+    return { notified: true, inApp: true, emailSent };
   }
 
   async addDay(

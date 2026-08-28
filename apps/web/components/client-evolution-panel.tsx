@@ -77,6 +77,21 @@ export function ClientEvolutionPanel({
   const [multiAt, setMultiAt] = useState(() => localDateKey());
   const [multiValues, setMultiValues] = useState<Record<string, string>>({});
   const [multiSaving, setMultiSaving] = useState(false);
+  const [enabledMetricIds, setEnabledMetricIds] = useState<string[] | null>(null);
+
+  const visibleGroups = useMemo(() => {
+    if (!enabledMetricIds) return MEASUREMENT_GROUPS;
+    const allowed = new Set(enabledMetricIds);
+    return MEASUREMENT_GROUPS.map((group) => ({
+      ...group,
+      metrics: group.metrics.filter((metric) => !metric.stored || allowed.has(metric.id) || metric.id === "BMI"),
+    })).filter((group) => group.metrics.length > 0);
+  }, [enabledMetricIds]);
+
+  const visibleStored = useMemo(
+    () => STORED_MEASUREMENT_METRICS.filter((metric) => !enabledMetricIds || enabledMetricIds.includes(metric.id)),
+    [enabledMetricIds],
+  );
 
   const selected = findMeasurementMetric(metric) ?? ALL_MEASUREMENT_METRICS[0]!;
 
@@ -87,6 +102,14 @@ export function ClientEvolutionPanel({
 
   useEffect(() => {
     void load().catch((err) => onError(errorMessage(err, "Unable to load measurements")));
+  }, [base]);
+
+  useEffect(() => {
+    const dietitianId = /\/dietitian\/([^/]+)\//.exec(base)?.[1];
+    if (!dietitianId) return;
+    void api<{ enabledMeasurements: string[] | null }>(`/api/v1/dietitian/${dietitianId}/settings`)
+      .then((row) => setEnabledMetricIds(row.enabledMeasurements))
+      .catch(() => undefined);
   }, [base]);
 
   useEffect(() => {
@@ -176,7 +199,7 @@ export function ClientEvolutionPanel({
             </Field>
           </div>
           <div className="ui-evo__multi-groups">
-            {MEASUREMENT_GROUPS.map((group) => {
+            {visibleGroups.map((group) => {
               const metrics = group.metrics.filter((m) => m.stored);
               if (metrics.length === 0) return null;
               return (
@@ -223,7 +246,7 @@ export function ClientEvolutionPanel({
               size="sm"
               disabled={multiSaving}
               onClick={() => {
-                const entries = STORED_MEASUREMENT_METRICS.flatMap((m) => {
+                const entries = visibleStored.flatMap((m) => {
                   const raw = multiValues[m.id]?.trim();
                   if (!raw) return [];
                   const value = Number(raw);
@@ -252,7 +275,7 @@ export function ClientEvolutionPanel({
 
       <div className="ui-evo__layout">
         <aside className="ui-evo__nav" aria-label="Measurement types">
-          {MEASUREMENT_GROUPS.map((group) => (
+          {visibleGroups.map((group) => (
             <section key={group.id} className="ui-evo__nav-group">
               <h3>{group.label}</h3>
               <ul>
@@ -284,7 +307,11 @@ export function ClientEvolutionPanel({
           <header className="ui-evo__detail-head">
             <h2>{selected.label}</h2>
             {!selected.stored ? (
-              <p className="ui-muted">Calculated from weight and height readings.</p>
+              <p className="ui-muted">
+                {selected.id === "LEAN_MASS"
+                  ? "Calculated from weight and fat mass or body fat %."
+                  : "Calculated from weight and height readings."}
+              </p>
             ) : null}
           </header>
 

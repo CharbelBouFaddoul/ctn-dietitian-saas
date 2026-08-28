@@ -6,6 +6,9 @@ const EXACT_COPY: Record<string, string> = {
   "Authentication required": "Sign in to continue.",
   "Platform administration is not available": "This area is for platform administrators only.",
   "This client is not available": "This client is no longer available.",
+  "This client is not on the portal": "This client isn’t connected to the portal yet.",
+  "Only a published version can be notified": "Only a published version can be notified.",
+  "Archived meal plans cannot be notified": "Archived meal plans can’t be notified.",
   "This client already has a portal account": "This client already has a connected portal account.",
   "That code didn't work. The code may be expired, revoked, or already used. Please check the code with your dietitian.":
     "That code didn't work. The code may be expired, revoked, or already used. Please check the code with your dietitian.",
@@ -21,6 +24,8 @@ const EXACT_COPY: Record<string, string> = {
   "Client limit reached for this organization":
     "This clinic has reached its client limit. Ask your dietitian to upgrade or free a spot.",
   "Invalid credentials": "Email or password is incorrect.",
+  "Current password is incorrect": "Current password is incorrect.",
+  "This email is already in use": "That email is already used by another account.",
   "Email is not verified": "Verify your email before signing in.",
   "Account is disabled": "This account is no longer active.",
   "Appointment end must be after start": "End time must be after the start time.",

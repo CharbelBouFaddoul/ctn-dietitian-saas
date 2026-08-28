@@ -8,6 +8,8 @@ export interface AuthenticatedRequestUser {
   platformRole: PlatformRole | null;
   emailVerifiedAt: Date | null;
   createdAt: Date;
+  firstName: string | null;
+  lastName: string | null;
 }
 
 export interface AuthenticatedSession {

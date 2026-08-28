@@ -120,14 +120,13 @@ export class DietitianController {
 
   @Patch(":dietitianAccountId")
   @UseGuards(DietitianGuard)
-  @ApiOperation({ summary: "Update practice display name" })
+  @ApiOperation({ summary: "Update professional profile and practice display name" })
   async update(
     @CurrentUser() user: AuthenticatedRequestUser,
     @Param("dietitianAccountId", ParseUUIDPipe) dietitianAccountId: string,
     @Body() body: UpdateDietitianDto,
   ) {
-    await this.dietitians.updateName(dietitianAccountId, body.name);
-    const updated = await this.dietitians.getForUser(user.id, dietitianAccountId);
+    const updated = await this.dietitians.updateProfile(dietitianAccountId, user.id, body);
     if (!updated) {
       throw new ForbiddenException(DIETITIAN_ACCESS_DENIED);
     }

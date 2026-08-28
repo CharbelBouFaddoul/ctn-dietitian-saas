@@ -16,6 +16,7 @@ interface PortalMe {
   practiceName?: string | null;
   dietitianDisplayName?: string | null;
   activeClientId?: string;
+  portalPresets?: { messaging: boolean; tracking: boolean; mealPlans: boolean };
 }
 
 export default function ClientPortalLayout({ children }: { children: ReactNode }) {
@@ -112,6 +113,23 @@ export default function ClientPortalLayout({ children }: { children: ReactNode }
     return () => window.removeEventListener("portal-connection-changed", onConnectionChanged);
   }, [load]);
 
+  const presets = me?.portalPresets ?? { messaging: true, tracking: true, mealPlans: true };
+
+  useEffect(() => {
+    if (state !== "ok" || !pathname) return;
+    if (!presets.mealPlans && pathname.startsWith("/client/plan")) {
+      router.replace("/client");
+      return;
+    }
+    if (!presets.tracking && (pathname.startsWith("/client/tracking") || pathname.startsWith("/client/progress"))) {
+      router.replace("/client");
+      return;
+    }
+    if (!presets.messaging && pathname.startsWith("/client/messages")) {
+      router.replace("/client");
+    }
+  }, [state, pathname, presets.mealPlans, presets.messaging, presets.tracking, router]);
+
   async function onLogout() {
     await logout();
     router.replace(loginPathFor("client"));
@@ -135,16 +153,22 @@ export default function ClientPortalLayout({ children }: { children: ReactNode }
     {
       label: "My nutrition",
       items: [
-        { href: "/client/plan", label: "My Plan", icon: PatientNavIcons.plan },
-        { href: "/client/tracking", label: "Daily log", icon: PatientNavIcons.tracking },
-        { href: "/client/progress", label: "Progress", icon: PatientNavIcons.progress },
+        ...(presets.mealPlans ? [{ href: "/client/plan", label: "My Plan", icon: PatientNavIcons.plan }] : []),
+        ...(presets.tracking
+          ? [
+              { href: "/client/tracking", label: "Daily log", icon: PatientNavIcons.tracking },
+              { href: "/client/progress", label: "Progress", icon: PatientNavIcons.progress },
+            ]
+          : []),
         { href: "/client/assessments", label: "Forms", icon: PatientNavIcons.assessments },
       ],
     },
     {
       label: "Communication",
       items: [
-        { href: "/client/messages", label: "Messages", icon: PatientNavIcons.messages, badge: unreadMessages },
+        ...(presets.messaging
+          ? [{ href: "/client/messages", label: "Messages", icon: PatientNavIcons.messages, badge: unreadMessages }]
+          : []),
         { href: "/client/appointments", label: "Appointments", icon: PatientNavIcons.appointments },
       ],
     },

@@ -12,6 +12,12 @@ export class PublicUserDto {
   @ApiProperty()
   email!: string;
 
+  @ApiProperty({ nullable: true, type: String })
+  firstName!: string | null;
+
+  @ApiProperty({ nullable: true, type: String })
+  lastName!: string | null;
+
   @ApiProperty({ enum: ["PENDING", "ACTIVE", "SUSPENDED", "ARCHIVED"] })
   status!: string;
 

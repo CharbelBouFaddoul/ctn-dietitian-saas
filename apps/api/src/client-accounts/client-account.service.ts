@@ -16,6 +16,7 @@ import { EntitlementService } from "../entitlements/entitlement.service";
 import { SubscriptionLifecycleService } from "../entitlements/subscription-lifecycle.service";
 import type { DietitianTenantContext } from "../dietitian/dietitian.types";
 import { requireDietitianAccountId, tenantWhere } from "../dietitian/tenant-scope";
+import { normalizeEnabledMeasurements, normalizePortalPresets } from "../dietitian/profile-settings";
 import { TimelineService } from "../timeline/timeline.service";
 import { ClientAccessService } from "../clients/client-access.service";
 import { NotificationService } from "../notifications/notification.service";
@@ -304,11 +305,26 @@ export class ClientAccountService {
     });
     const practiceName =
       account.settings?.practiceName?.trim() || account.displayName;
-    const dietitianDisplayName =
+    const dietitian = this.portalDietitian(account);
+    return { practiceName, dietitianDisplayName: dietitian.name, dietitian };
+  }
+
+  private portalDietitian(account: {
+    displayName: string;
+    professionalTitle: string | null;
+    specialization: string | null;
+    user: { firstName: string | null; lastName: string | null };
+  }) {
+    const name =
       [account.user.firstName, account.user.lastName].filter(Boolean).join(" ").trim() ||
       account.professionalTitle?.trim() ||
-      account.displayName;
-    return { practiceName, dietitianDisplayName };
+      account.displayName ||
+      null;
+    return {
+      name,
+      title: account.professionalTitle?.trim() || null,
+      specialization: account.specialization?.trim() || null,
+    };
   }
 
   async portalMe(userId: string, activeClientId?: string | null) {
@@ -327,12 +343,7 @@ export class ClientAccountService {
         where: { userId, clientId: client.id, status: "ACTIVE" },
       }),
     ]);
-    const dietitianDisplayName =
-      account
-        ? [account.user.firstName, account.user.lastName].filter(Boolean).join(" ").trim() ||
-          account.professionalTitle?.trim() ||
-          account.displayName
-        : null;
+    const dietitian = account ? this.portalDietitian(account) : { name: null, title: null, specialization: null };
     return {
       client: {
         id: client.id,
@@ -354,7 +365,10 @@ export class ClientAccountService {
           }
         : null,
       practiceName: await this.practiceNameForAccount(accountId, account),
-      dietitianDisplayName,
+      dietitianDisplayName: dietitian.name,
+      dietitian,
+      portalPresets: normalizePortalPresets(account?.settings?.portalPresets),
+      enabledMeasurements: normalizeEnabledMeasurements(account?.settings?.enabledMeasurements),
       activeClientId: client.id,
       disconnectRequestedAt: portalAccount?.disconnectRequestedAt?.toISOString() ?? null,
       disconnectRequestNote: portalAccount?.disconnectRequestNote ?? null,

@@ -30,6 +30,8 @@ import { AUTH_MESSAGES } from "./auth.messages";
 import { AuthService } from "./auth.service";
 import type { AuthenticatedRequestUser, AuthenticatedSession } from "./auth.types";
 import { CurrentSession, CurrentUser } from "./decorators/current-user.decorator";
+import { ChangeEmailDto } from "./dto/change-email.dto";
+import { ChangePasswordDto } from "./dto/change-password.dto";
 import { EmailDto } from "./dto/email.dto";
 import { LoginDto } from "./dto/login.dto";
 import { RegisterDto } from "./dto/register.dto";
@@ -137,6 +139,8 @@ export class AuthController {
       user: {
         id: user.id,
         email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
         status: user.status,
         platformRole: user.platformRole,
         emailVerifiedAt: user.emailVerifiedAt?.toISOString() ?? null,
@@ -220,6 +224,56 @@ export class AuthController {
     await this.auth.acceptDietitianInvitation(body.token, body.password, this.meta(req));
     clearSessionCookie(res, this.cookieSettings());
     return { message: AUTH_MESSAGES.invitationAccepted };
+  }
+
+  @Post("change-password")
+  @SkipThrottle({ [THROTTLE_NAMES.AUTH]: true })
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(SessionGuard)
+  @ApiCookieAuth()
+  @ApiOperation({ summary: "Change the current user's password" })
+  @ApiOkResponse({ type: MessageResponseDto })
+  async changePassword(
+    @CurrentUser() user: AuthenticatedRequestUser,
+    @Body() body: ChangePasswordDto,
+  ): Promise<MessageResponseDto> {
+    await this.auth.changePassword(user.id, body.currentPassword, body.newPassword);
+    return { message: AUTH_MESSAGES.passwordUpdated };
+  }
+
+  @Post("change-email")
+  @SkipThrottle({ [THROTTLE_NAMES.AUTH]: true })
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(SessionGuard)
+  @ApiCookieAuth()
+  @ApiOperation({
+    summary: "Change the current user's login email",
+    description:
+      "Requires the current password. Does not depend on self-serve registration. The new address is used for sign-in immediately.",
+  })
+  @ApiOkResponse({ type: MessageResponseDto })
+  async changeEmail(
+    @CurrentUser() user: AuthenticatedRequestUser,
+    @Body() body: ChangeEmailDto,
+  ): Promise<MessageResponseDto & { email: string }> {
+    const updated = await this.auth.changeEmail(user.id, body.email, body.currentPassword);
+    return { message: AUTH_MESSAGES.emailUpdated, email: updated.email };
+  }
+
+  @Post("sessions/revoke-others")
+  @SkipThrottle({ [THROTTLE_NAMES.AUTH]: true })
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(SessionGuard)
+  @ApiCookieAuth()
+  @ApiOperation({ summary: "Revoke all sessions except the current one" })
+  @ApiOkResponse({ type: MessageResponseDto })
+  async revokeOthers(
+    @CurrentUser() user: AuthenticatedRequestUser,
+    @CurrentSession() session: AuthenticatedSession,
+    @Req() req: Request,
+  ): Promise<MessageResponseDto> {
+    await this.auth.revokeOtherSessions(user.id, session.id, this.meta(req));
+    return { message: AUTH_MESSAGES.otherSessionsRevoked };
   }
 
   @Post("sessions/revoke-all")

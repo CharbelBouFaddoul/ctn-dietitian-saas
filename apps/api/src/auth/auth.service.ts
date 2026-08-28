@@ -160,6 +160,73 @@ export class AuthService {
     });
   }
 
+  async revokeOtherSessions(userId: string, sessionId: string, meta: RequestMeta = {}): Promise<void> {
+    await this.sessions.revokeOtherSessions(userId, sessionId);
+    await this.security.record({
+      type: "session_revocation",
+      outcome: "success",
+      userId,
+      ipAddress: meta.ipAddress,
+      reason: "revoke_others",
+    });
+  }
+
+  async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {
+    this.passwords.assertPolicy(newPassword);
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new UnauthorizedException(AUTH_MESSAGES.invalidCredentials);
+    }
+    const ok = await this.passwords.verify(currentPassword, user.passwordHash);
+    if (!ok) {
+      throw new UnauthorizedException(AUTH_MESSAGES.currentPasswordIncorrect);
+    }
+    const passwordHash = await this.passwords.hash(newPassword);
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash },
+    });
+    await this.security.record({
+      type: "password_change",
+      outcome: "success",
+      userId,
+    });
+  }
+
+  async changeEmail(userId: string, email: string, currentPassword: string): Promise<{ email: string }> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new UnauthorizedException(AUTH_MESSAGES.invalidCredentials);
+    }
+    const ok = await this.passwords.verify(currentPassword, user.passwordHash);
+    if (!ok) {
+      throw new UnauthorizedException(AUTH_MESSAGES.currentPasswordIncorrect);
+    }
+
+    const nextEmail = email.trim();
+    const emailNormalized = normalizeEmail(nextEmail);
+    if (emailNormalized === user.emailNormalized) {
+      return { email: user.email };
+    }
+
+    const existing = await this.prisma.user.findUnique({ where: { emailNormalized } });
+    if (existing) {
+      throw new BadRequestException(AUTH_MESSAGES.emailInUse);
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: { email: nextEmail, emailNormalized },
+    });
+    await this.security.record({
+      type: "email_change",
+      outcome: "success",
+      userId,
+      emailNormalized,
+    });
+    return { email: updated.email };
+  }
+
   async acceptDietitianInvitation(
     rawToken: string,
     password: string,

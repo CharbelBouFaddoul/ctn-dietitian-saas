@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import {
   DATE_FORMATS,
+  DISPLAY_ENERGY_UNITS,
   DISPLAY_HEIGHT_UNITS,
   DISPLAY_WEIGHT_UNITS,
   SUPPORTED_CURRENCIES,
@@ -12,6 +13,7 @@ import {
   IsIn,
   IsInt,
   IsNumber,
+  IsObject,
   IsOptional,
   IsString,
   Max,
@@ -72,11 +74,54 @@ export class CreateDietitianDto {
 }
 
 export class UpdateDietitianDto {
-  @ApiProperty({ example: "North Clinic" })
+  @ApiPropertyOptional({ example: "North Clinic" })
+  @IsOptional()
   @IsString()
   @MinLength(2)
   @MaxLength(80)
-  name!: string;
+  name?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  firstName?: string | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  lastName?: string | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  phone?: string | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  professionalTitle?: string | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  specialization?: string | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  country?: string | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  licenseNumber?: string | null;
 }
 
 export class UpdateDietitianSettingsDto extends DietitianSettingsInputDto {
@@ -192,4 +237,37 @@ export class UpdateDietitianSettingsDto extends DietitianSettingsInputDto {
   @IsOptional()
   @IsEmail()
   emailReplyTo?: string | null;
+
+  @ApiPropertyOptional({ enum: DISPLAY_ENERGY_UNITS })
+  @IsOptional()
+  @IsIn([...DISPLAY_ENERGY_UNITS])
+  energyUnit?: (typeof DISPLAY_ENERGY_UNITS)[number];
+
+  @ApiPropertyOptional({ enum: ["SCHEDULED"] })
+  @IsOptional()
+  @IsIn(["SCHEDULED"])
+  defaultAppointmentStatus?: "SCHEDULED";
+
+  @ApiPropertyOptional({ type: [Number], example: [1, 24, 72] })
+  @IsOptional()
+  appointmentReminders?: number[];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsObject()
+  mealPlanShare?: Record<string, unknown>;
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  enabledMeasurements?: string[] | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  deduceMeasurements?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsObject()
+  portalPresets?: Record<string, unknown>;
 }

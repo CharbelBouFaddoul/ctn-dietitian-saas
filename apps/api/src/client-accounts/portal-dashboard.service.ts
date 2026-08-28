@@ -45,6 +45,8 @@ export class PortalDashboardService {
         this.mealPlans.portalCurrent(userId, client.id),
       ]);
 
+    const presets = me.portalPresets ?? { messaging: true, tracking: true, mealPlans: true };
+
     return {
       me,
       upcomingAppointment: upcoming
@@ -77,9 +79,9 @@ export class PortalDashboardService {
           }
         : null,
       quickLinks: [
-        { href: "/client/plan", label: "My Plan" },
-        { href: "/client/tracking", label: "Tracking" },
-        { href: "/client/messages", label: "Messages" },
+        ...(presets.mealPlans ? [{ href: "/client/plan", label: "My Plan" }] : []),
+        ...(presets.tracking ? [{ href: "/client/tracking", label: "Tracking" }] : []),
+        ...(presets.messaging ? [{ href: "/client/messages", label: "Messages" }] : []),
         { href: "/client/documents", label: "Documents" },
       ],
     };

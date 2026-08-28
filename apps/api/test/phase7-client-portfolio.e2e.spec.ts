@@ -182,6 +182,38 @@ describe("phase7 client portfolio evolution assessments", () => {
     expect(evo.body.comparison.weight.absolute).toBe(-2);
     expect(evo.body.bmiSeries[0].value).toBeTruthy();
 
+    await request(ctx.app.getHttpServer())
+      .post(`/api/v1/dietitian/${org.id}/clients/${client.id}/measurements`)
+      .set("Cookie", owner.cookie)
+      .send({ type: "BODY_FAT", value: 25, unit: "%", measuredAt: "2026-02-01T12:00:00.000Z" })
+      .expect(201);
+    await request(ctx.app.getHttpServer())
+      .post(`/api/v1/dietitian/${org.id}/clients/${client.id}/measurements`)
+      .set("Cookie", owner.cookie)
+      .send({ type: "NECK", value: 38, unit: "cm", measuredAt: "2026-02-01T12:00:00.000Z" })
+      .expect(201);
+
+    const deduced = await request(ctx.app.getHttpServer())
+      .get(`/api/v1/dietitian/${org.id}/clients/${client.id}/evolution`)
+      .set("Cookie", owner.cookie)
+      .expect(200);
+    expect(deduced.body.series.NECK[0].value).toBe(38);
+    expect(deduced.body.series.FAT_MASS.at(-1).value).toBe(19.5);
+    expect(deduced.body.series.LEAN_MASS.at(-1).value).toBe(58.5);
+
+    await request(ctx.app.getHttpServer())
+      .patch(`/api/v1/dietitian/${org.id}/settings`)
+      .set("Cookie", owner.cookie)
+      .send({ ...SETTINGS, deduceMeasurements: false })
+      .expect(200);
+
+    const raw = await request(ctx.app.getHttpServer())
+      .get(`/api/v1/dietitian/${org.id}/clients/${client.id}/evolution`)
+      .set("Cookie", owner.cookie)
+      .expect(200);
+    expect(raw.body.series.FAT_MASS).toBeUndefined();
+    expect(raw.body.series.LEAN_MASS).toBeUndefined();
+
     const filtered = await request(ctx.app.getHttpServer())
       .get(
         `/api/v1/dietitian/${org.id}/clients/${client.id}/measurements?type=WEIGHT&from=2026-01-15T00:00:00.000Z`,

@@ -7,7 +7,16 @@ export type MeasurementMetricId =
   | "FAT_MASS"
   | "MUSCLE_MASS"
   | "MUSCLE_MASS_PERCENT"
+  | "LEAN_MASS"
   | "BMI"
+  | "NECK"
+  | "CHEST"
+  | "ABDOMEN"
+  | "ARM"
+  | "FOREARM"
+  | "WRIST"
+  | "THIGH"
+  | "CALF"
   | "SKINFOLD_ABDOMINAL"
   | "SKINFOLD_CHEST"
   | "SKINFOLD_FRONT_THIGH"
@@ -62,7 +71,22 @@ export const MEASUREMENT_GROUPS: MeasurementGroup[] = [
         units: ["%"],
         stored: true,
       },
+      { id: "LEAN_MASS", label: "Lean mass", unit: "kg", units: ["kg", "lb"], stored: false },
       { id: "BMI", label: "BMI", unit: "kg/m²", units: [], stored: false },
+    ],
+  },
+  {
+    id: "circumferences",
+    label: "Body measurements",
+    metrics: [
+      { id: "NECK", label: "Neck circumference", unit: "cm", units: ["cm", "in"], stored: true },
+      { id: "CHEST", label: "Chest circumference", unit: "cm", units: ["cm", "in"], stored: true },
+      { id: "ABDOMEN", label: "Abdomen circumference", unit: "cm", units: ["cm", "in"], stored: true },
+      { id: "ARM", label: "Arm circumference", unit: "cm", units: ["cm", "in"], stored: true },
+      { id: "FOREARM", label: "Forearm circumference", unit: "cm", units: ["cm", "in"], stored: true },
+      { id: "WRIST", label: "Wrist circumference", unit: "cm", units: ["cm", "in"], stored: true },
+      { id: "THIGH", label: "Thigh circumference", unit: "cm", units: ["cm", "in"], stored: true },
+      { id: "CALF", label: "Calf circumference", unit: "cm", units: ["cm", "in"], stored: true },
     ],
   },
   {

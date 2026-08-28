@@ -16,6 +16,7 @@ export const INTERNAL_UNITS = {
 
 export const DISPLAY_WEIGHT_UNITS = ["kg", "lb"] as const;
 export const DISPLAY_HEIGHT_UNITS = ["cm", "in"] as const;
+export const DISPLAY_ENERGY_UNITS = ["kcal", "kj"] as const;
 export const DATE_FORMATS = ["YYYY_MM_DD", "DD_MM_YYYY", "MM_DD_YYYY"] as const;
 export const SUPPORTED_CURRENCIES = [
   "USD",

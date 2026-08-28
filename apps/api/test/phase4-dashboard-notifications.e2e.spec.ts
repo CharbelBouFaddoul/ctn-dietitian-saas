@@ -179,7 +179,7 @@ describe("phase4 dashboard + notifications gaps", () => {
     ).toBe(true);
   });
 
-  it("notifies patient on meal plan publish and keeps notification APIs isolated", async () => {
+  it("notifies patient on meal plan notify and keeps notification APIs isolated", async () => {
     const owner = await registerVerifyLogin(email("own"));
     const other = await registerVerifyLogin(email("oth"));
     const org = await createOrg(owner.cookie, "Notify Practice");
@@ -187,6 +187,18 @@ describe("phase4 dashboard + notifications gaps", () => {
     const client = await createClient(owner.cookie, org.id);
     const portalCookie = await connectClientPortal(ctx, owner.cookie, org.id, client);
     const food = await seedFood();
+
+    await request(ctx.app.getHttpServer())
+      .patch(`/api/v1/dietitian/${org.id}/settings`)
+      .set("Cookie", owner.cookie)
+      .send({
+        ...SETTINGS,
+        mealPlanShare: {
+          emailSubject: "Plan ready for [Client_first_name]",
+          emailBody: "Your [Meal_plan_name] is live.",
+        },
+      })
+      .expect(200);
 
     const plan = await request(ctx.app.getHttpServer())
       .post(`/api/v1/dietitian/${org.id}/meal-plans`)
@@ -206,7 +218,30 @@ describe("phase4 dashboard + notifications gaps", () => {
       .expect(201);
 
     await request(ctx.app.getHttpServer())
+      .post(`/api/v1/dietitian/${org.id}/meal-plans/${plan.body.id}/notify`)
+      .set("Cookie", owner.cookie)
+      .expect(400)
+      .expect((res) => {
+        expect(res.body.message).toBe("Only a published version can be notified");
+      });
+
+    await request(ctx.app.getHttpServer())
       .post(`/api/v1/dietitian/${org.id}/meal-plans/${plan.body.id}/versions/${draftId}/publish`)
+      .set("Cookie", owner.cookie)
+      .expect(201);
+
+    const beforeNotify = await request(ctx.app.getHttpServer())
+      .get("/api/v1/portal/notifications")
+      .set("Cookie", portalCookie)
+      .expect(200);
+    expect(
+      beforeNotify.body.find(
+        (row: { type: string }) => row.type === "MEAL_PLAN_PUBLISHED",
+      ),
+    ).toBeFalsy();
+
+    await request(ctx.app.getHttpServer())
+      .post(`/api/v1/dietitian/${org.id}/meal-plans/${plan.body.id}/notify`)
       .set("Cookie", owner.cookie)
       .expect(201);
 
@@ -220,6 +255,8 @@ describe("phase4 dashboard + notifications gaps", () => {
     expect(mealPlanNotif).toBeTruthy();
     expect(mealPlanNotif.targetType).toBe("meal_plan");
     expect(mealPlanNotif.targetId).toBe(plan.body.id);
+    expect(mealPlanNotif.title).toBe("Plan ready for Pat");
+    expect(mealPlanNotif.body).toBe("Your Week 1 is live.");
 
     const unread = await request(ctx.app.getHttpServer())
       .get("/api/v1/portal/notifications/unread-count")

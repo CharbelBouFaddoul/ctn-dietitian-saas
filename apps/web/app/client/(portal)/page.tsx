@@ -18,6 +18,9 @@ interface PortalDashboard {
   me: {
     client: { firstName: string; lastName: string; displayName: string | null };
     practiceName?: string | null;
+    dietitian?: { name: string | null; title: string | null; specialization: string | null };
+    dietitianDisplayName?: string | null;
+    portalPresets?: { messaging: boolean; tracking: boolean; mealPlans: boolean };
   };
   upcomingAppointment: {
     id: string;
@@ -122,6 +125,7 @@ export default function ClientHomePage() {
   const greeting = useMemo(() => greetingForNow(), []);
   const dateLabel = useMemo(() => todayLabel(), []);
   const me = data?.me ?? null;
+  const presets = me?.portalPresets ?? { messaging: true, tracking: true, mealPlans: true };
   const tracking = data?.tracking ?? null;
   const name =
     me?.client.displayName?.trim() ||
@@ -129,6 +133,9 @@ export default function ClientHomePage() {
     "there";
   const firstName = name.split(" ")[0] ?? name;
   const latestMessage = data?.messages.preview[data.messages.preview.length - 1];
+  const dietitian = me?.dietitian ?? null;
+  const dietitianName = dietitian?.name?.trim() || me?.dietitianDisplayName?.trim() || "";
+  const dietitianMeta = [dietitian?.title, dietitian?.specialization].filter(Boolean).join(" · ");
 
   const metrics = [
     {
@@ -177,15 +184,26 @@ export default function ClientHomePage() {
             {greeting}, {firstName}
           </h1>
           <p>
-            {me?.practiceName
-              ? `Your nutrition day with ${me.practiceName} — plan, tracking, and messages in one place.`
-              : "Your nutrition day — plan, tracking, and messages in one place."}
+            {dietitianName
+              ? `Your nutrition day with ${dietitianName}.`
+              : me?.practiceName
+                ? `Your nutrition day with ${me.practiceName}.`
+                : "Your nutrition day — plan, tracking, and messages in one place."}
           </p>
         </div>
         <div className="ui-client-welcome__orb" aria-hidden="true" />
       </header>
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
+
+      {dietitianName ? (
+        <Section title="Your dietitian">
+          <div className="ui-client-dietitian">
+            <strong>{dietitianName}</strong>
+            {dietitianMeta ? <p className="ui-muted">{dietitianMeta}</p> : null}
+          </div>
+        </Section>
+      ) : null}
 
       <Section
         title="Upcoming appointment"
@@ -209,6 +227,7 @@ export default function ClientHomePage() {
         )}
       </Section>
 
+      {presets.tracking ? (
       <Section title="Today’s tracking" description="A quick pulse on what you’ve logged so far." tone="mint">
         {loading ? (
           <div className="ui-client-metrics">
@@ -238,12 +257,13 @@ export default function ClientHomePage() {
           </>
         )}
       </Section>
+      ) : null}
 
       <nav className="ui-client-quick" aria-label="Quick links">
         {(data?.quickLinks ?? [
-          { href: "/client/plan", label: "My Plan" },
-          { href: "/client/tracking", label: "Daily log" },
-          { href: "/client/messages", label: "Messages" },
+          ...(presets.mealPlans ? [{ href: "/client/plan", label: "My Plan" }] : []),
+          ...(presets.tracking ? [{ href: "/client/tracking", label: "Daily log" }] : []),
+          ...(presets.messaging ? [{ href: "/client/messages", label: "Messages" }] : []),
           { href: "/client/documents", label: "Documents" },
         ]).map((link) => (
           <Link
@@ -269,6 +289,7 @@ export default function ClientHomePage() {
       </nav>
 
       <div className="ui-client-home__grid">
+        {presets.mealPlans ? (
         <Section
           title="My current plan"
           actions={
@@ -295,7 +316,9 @@ export default function ClientHomePage() {
             </EmptyState>
           )}
         </Section>
+        ) : null}
 
+        {presets.messaging ? (
         <Section
           title="Messages"
           description={
@@ -324,6 +347,7 @@ export default function ClientHomePage() {
             </EmptyState>
           )}
         </Section>
+        ) : null}
 
         <Section
           title="Notifications"
