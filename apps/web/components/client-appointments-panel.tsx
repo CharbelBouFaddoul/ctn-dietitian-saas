@@ -442,9 +442,8 @@ export function ClientAppointmentsPanel({
     setSaving(true);
     setFormError(null);
     try {
-      await api(`/api/v1/dietitian/${dietitianAccountId}/tasks/${selectedTask.id}/archive`, {
-        method: "POST",
-        body: JSON.stringify({}),
+      await api(`/api/v1/dietitian/${dietitianAccountId}/tasks/${selectedTask.id}`, {
+        method: "DELETE",
       });
       closeTask();
       await refresh();

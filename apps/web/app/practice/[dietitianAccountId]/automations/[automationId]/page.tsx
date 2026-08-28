@@ -1,14 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
-  Breadcrumbs,
   EmptyState,
   ErrorState,
   LoadingState,
   PageHeader,
-  Section,
   StatusBadge,
   Table,
   Td,
@@ -62,6 +61,7 @@ function configRecipient(configuration: AutomationRule["configuration"]): string
 export default function AutomationDetailPage() {
   const params = useParams<{ dietitianAccountId: string; automationId: string }>();
   const { dietitianAccountId, automationId } = params;
+  const automationsHref = `/practice/${dietitianAccountId}/automations`;
   const [rule, setRule] = useState<AutomationRule | null>(null);
   const [runs, setRuns] = useState<AutomationRun[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -80,20 +80,37 @@ export default function AutomationDetailPage() {
       .finally(() => setLoading(false));
   }, [dietitianAccountId, automationId]);
 
+  const backButton = (
+    <Link href={automationsHref} className="ui-btn ui-btn--secondary">
+      Back
+    </Link>
+  );
+
   if (loading) {
-    return <LoadingState>Loading automation…</LoadingState>;
+    return (
+      <section className="ui-automations">
+        <PageHeader title="Rule runs" description="History for this automation." actions={backButton} />
+        <LoadingState>Loading runs…</LoadingState>
+      </section>
+    );
   }
 
   if (error) {
     return (
-      <ErrorState title="Unable to load automation">
-        {error}
-      </ErrorState>
+      <section className="ui-automations">
+        <PageHeader title="Rule runs" description="History for this automation." actions={backButton} />
+        <ErrorState title="Unable to load automation">{error}</ErrorState>
+      </section>
     );
   }
 
   if (!rule) {
-    return <ErrorState title="Automation not found" />;
+    return (
+      <section className="ui-automations">
+        <PageHeader title="Rule runs" description="History for this automation." actions={backButton} />
+        <ErrorState title="Automation not found" />
+      </section>
+    );
   }
 
   const successCount = runs.filter(
@@ -113,53 +130,34 @@ export default function AutomationDetailPage() {
 
   return (
     <section className="ui-automations">
-      <Breadcrumbs
-        items={[
-          { href: `/practice/${dietitianAccountId}/automations`, label: "Automations" },
-          { label: rule.name },
-        ]}
-      />
-
       <PageHeader
         title={rule.name}
         description={`When ${automationTriggerLabel(rule.triggerType).toLowerCase()} → ${automationActionLabel(rule.actionType).toLowerCase()}`}
-        actions={<StatusBadge status={rule.status} label={humanizeLabel(rule.status)} />}
+        actions={
+          <div className="ui-row">
+            {backButton}
+            <Link href={`${automationsHref}?edit=${rule.id}`} className="ui-btn ui-btn--secondary">
+              Edit
+            </Link>
+          </div>
+        }
       />
 
-      <Section title="Rule details" tone="mint">
-        <dl className="ui-automations__detail-grid">
-          <dt>When</dt>
-          <dd>{automationTriggerLabel(rule.triggerType)}</dd>
-          <dt>Then</dt>
-          <dd>{automationActionLabel(rule.actionType)}</dd>
-          {showWho ? (
-            <>
-              <dt>Who</dt>
-              <dd>{automationRecipientLabel(recipient)}</dd>
-            </>
-          ) : null}
-          <dt>Apply to</dt>
-          <dd>{scopeText}</dd>
-          <dt>Status</dt>
-          <dd>
-            <StatusBadge status={rule.status} label={humanizeLabel(rule.status)} />
-          </dd>
-        </dl>
-      </Section>
+      <div className="ui-automations__chips">
+        <span className="ui-automations__chip">{humanizeLabel(rule.status)}</span>
+        <span className="ui-automations__chip">{scopeText}</span>
+        {showWho ? <span className="ui-automations__chip">{automationRecipientLabel(recipient)}</span> : null}
+        <span className="ui-automations__chip">{runs.length} runs</span>
+        <span className="ui-automations__chip">{successCount} succeeded</span>
+        <span className={`ui-automations__chip${failCount > 0 ? " is-warn" : ""}`}>{failCount} failed</span>
+      </div>
 
-      <Section
-        title="Recent runs"
-        description={
-          runs.length
-            ? `${runs.length} run${runs.length !== 1 ? "s" : ""} · ${successCount} succeeded · ${failCount} failed`
-            : undefined
-        }
-      >
-        {runs.length === 0 ? (
-          <EmptyState title="No runs recorded">
-            This rule has not triggered yet. Runs appear here after the first execution.
-          </EmptyState>
-        ) : (
+      {runs.length === 0 ? (
+        <EmptyState title="No runs recorded">
+          This rule has not triggered yet. Executions for this automation appear here.
+        </EmptyState>
+      ) : (
+        <div className="ui-automation-card ui-automation-runs">
           <Table>
             <thead>
               <tr>
@@ -186,14 +184,14 @@ export default function AutomationDetailPage() {
                   <Td label="Duration">{runDuration(run)}</Td>
                   <Td label="Retries">
                     {run.retryCount > 0 ? (
-                      <span style={{ color: "var(--color-warning)" }}>{run.retryCount}</span>
+                      <span className="ui-automation-runs__error">{run.retryCount}</span>
                     ) : (
                       run.retryCount
                     )}
                   </Td>
                   <Td label="Failure reason">
                     {run.errorMessage ? (
-                      <span className="ui-muted">{run.errorMessage}</span>
+                      <span className="ui-automation-runs__error">{run.errorMessage}</span>
                     ) : (
                       <span className="ui-muted">—</span>
                     )}
@@ -202,8 +200,8 @@ export default function AutomationDetailPage() {
               ))}
             </tbody>
           </Table>
-        )}
-      </Section>
+        </div>
+      )}
     </section>
   );
 }

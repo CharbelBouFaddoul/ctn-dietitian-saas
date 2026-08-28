@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseUUIDPipe,
@@ -165,9 +166,9 @@ export class TasksController {
     return this.tasks.cancel(tenant, taskId);
   }
 
-  @Post(":taskId/archive")
-  archive(@CurrentTenant() tenant: DietitianTenantContext, @Param("taskId", ParseUUIDPipe) taskId: string) {
-    return this.tasks.archive(tenant, taskId);
+  @Delete(":taskId")
+  remove(@CurrentTenant() tenant: DietitianTenantContext, @Param("taskId", ParseUUIDPipe) taskId: string) {
+    return this.tasks.remove(tenant, taskId);
   }
 }
 

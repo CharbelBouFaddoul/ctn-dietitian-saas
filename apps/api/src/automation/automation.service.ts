@@ -216,26 +216,26 @@ export class AutomationService {
     return this.toResponse(rule);
   }
 
-  async archive(tenant: DietitianTenantContext, automationId: string) {
+  async remove(tenant: DietitianTenantContext, automationId: string) {
     this.assertCanManage(tenant);
     await this.findRule(tenant.dietitianAccountId, automationId);
-    const rule = await this.prisma.automationRule.update({
-      where: { id: automationId },
-      data: {
-        status: "ARCHIVED",
-        archivedAt: new Date(),
-        updatedById: tenant.userId,
-      },
-    });
+    await this.prisma.$transaction([
+      this.prisma.automationRun.deleteMany({
+        where: { ...tenantWhere(tenant.dietitianAccountId), automationRuleId: automationId },
+      }),
+      this.prisma.automationRule.deleteMany({
+        where: { id: automationId, ...tenantWhere(tenant.dietitianAccountId) },
+      }),
+    ]);
     await this.security.record({
-      type: "automation_rule_archived",
+      type: "automation_rule_deleted",
       outcome: "success",
       userId: tenant.userId,
       dietitianAccountId: tenant.dietitianAccountId,
       targetType: "automation_rule",
-      targetId: rule.id,
+      targetId: automationId,
     });
-    return this.toResponse(rule);
+    return { id: automationId, deleted: true };
   }
 
   async listRunsForRule(tenant: DietitianTenantContext, automationId: string, limit = 50) {

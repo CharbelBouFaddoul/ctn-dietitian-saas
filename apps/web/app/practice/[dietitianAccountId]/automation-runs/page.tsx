@@ -4,19 +4,17 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
-  Badge,
-  Breadcrumbs,
   EmptyState,
   ErrorState,
   LoadingState,
   PageHeader,
-  Section,
   StatusBadge,
   Table,
   Td,
   humanizeLabel,
 } from "@nutrition-saas/ui";
 import { api } from "../../../../lib/api";
+import { automationActionLabel, automationTriggerLabel } from "../../../../lib/automation-labels";
 import { errorMessage } from "../../../../lib/humanize-error";
 
 interface AutomationRun {
@@ -35,34 +33,10 @@ interface AutomationRun {
   createdAt: string;
 }
 
-const TRIGGERS: Record<string, string> = {
-  APPOINTMENT_UPCOMING: "Appointment approaching",
-  CLIENT_INACTIVE: "Client inactive",
-  INVOICE_OVERDUE: "Invoice overdue",
-  TASK_DUE: "Task due",
-  MEAL_PLAN_ENDING: "Meal plan ending",
-  CLIENT_CHECKIN_DUE: "Check-in due",
-};
-
-const ACTIONS: Record<string, string> = {
-  SEND_IN_APP_NOTIFICATION: "Notification",
-  SEND_EMAIL: "Email",
-  CREATE_TASK: "Task created",
-  CREATE_CLIENT_NOTIFICATION: "Notification",
-  SEND_MESSAGE: "Message",
-};
-
-function triggerLabel(value: string): string {
-  return TRIGGERS[value] ?? humanizeLabel(value);
-}
-
-function actionLabel(value: string): string {
-  return ACTIONS[value] ?? humanizeLabel(value);
-}
-
 export default function AutomationRunsPage() {
   const params = useParams<{ dietitianAccountId: string }>();
   const dietitianAccountId = params.dietitianAccountId;
+  const automationsHref = `/practice/${dietitianAccountId}/automations`;
   const [runs, setRuns] = useState<AutomationRun[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -75,51 +49,52 @@ export default function AutomationRunsPage() {
   }, [dietitianAccountId]);
 
   const failedCount = runs.filter((r) => r.status === "FAILED" || r.status === "ERROR").length;
-  const successCount = runs.filter((r) => r.status === "COMPLETED" || r.status === "SUCCESS").length;
+  const successCount = runs.filter((r) => r.status === "COMPLETED" || r.status === "SUCCESS" || r.status === "SUCCEEDED").length;
+
+  const backButton = (
+    <Link href={automationsHref} className="ui-btn ui-btn--secondary">
+      Back
+    </Link>
+  );
 
   if (loading) {
-    return <LoadingState>Loading run history…</LoadingState>;
+    return (
+      <section className="ui-automations">
+        <PageHeader title="Run history" description="Every time a rule ran — most recent first." actions={backButton} />
+        <LoadingState>Loading run history…</LoadingState>
+      </section>
+    );
   }
 
   if (error) {
-    return <ErrorState title="Unable to load runs">{error}</ErrorState>;
+    return (
+      <section className="ui-automations">
+        <PageHeader title="Run history" description="Every time a rule ran — most recent first." actions={backButton} />
+        <ErrorState title="Unable to load runs">{error}</ErrorState>
+      </section>
+    );
   }
 
   return (
-    <section>
-      <Breadcrumbs
-        items={[
-          { href: `/practice/${dietitianAccountId}/automations`, label: "Automations" },
-          { label: "Run history" },
-        ]}
+    <section className="ui-automations">
+      <PageHeader
+        title="Run history"
+        description="Every time a rule ran — most recent first."
+        actions={backButton}
       />
 
-      <PageHeader
-        title="Automation runs"
-        description="A log of every automation execution — most recent first."
-        actions={
-          runs.length > 0 ? (
-            <div className="ui-row">
-              <Badge tone="success">{successCount} succeeded</Badge>
-              <Badge tone={failedCount > 0 ? "danger" : "neutral"}>{failedCount} failed</Badge>
-            </div>
-          ) : undefined
-        }
-      />
+      {runs.length > 0 ? (
+        <div className="ui-automations__chips">
+          <span className="ui-automations__chip">{runs.length} runs</span>
+          <span className="ui-automations__chip">{successCount} succeeded</span>
+          <span className={`ui-automations__chip${failedCount > 0 ? " is-warn" : ""}`}>{failedCount} failed</span>
+        </div>
+      ) : null}
 
       {runs.length === 0 ? (
-        <EmptyState
-          title="No runs recorded"
-          action={
-            <Link href={`/practice/${dietitianAccountId}/automations`} className="ui-btn ui-btn--secondary">
-              Back to automations
-            </Link>
-          }
-        >
-          Runs appear here after an automation rule triggers for the first time.
-        </EmptyState>
+        <EmptyState title="No runs recorded">Runs appear here after a rule triggers for the first time.</EmptyState>
       ) : (
-        <Section>
+        <div className="ui-automation-card ui-automation-runs">
           <Table>
             <thead>
               <tr>
@@ -135,10 +110,7 @@ export default function AutomationRunsPage() {
               {runs.map((run) => (
                 <tr key={run.id}>
                   <Td label="Rule">
-                    <Link
-                      href={`/practice/${dietitianAccountId}/automations/${run.automationRuleId}`}
-                      className="ui-link"
-                    >
+                    <Link href={`${automationsHref}/${run.automationRuleId}`} className="ui-link">
                       {run.ruleName}
                     </Link>
                   </Td>
@@ -146,14 +118,10 @@ export default function AutomationRunsPage() {
                     <StatusBadge status={run.status} label={humanizeLabel(run.status)} />
                   </Td>
                   <Td label="Trigger">
-                    <span className="ui-muted" style={{ fontSize: "0.875rem" }}>
-                      {triggerLabel(run.triggerType)}
-                    </span>
+                    <span className="ui-muted ui-automation-runs__cell">{automationTriggerLabel(run.triggerType)}</span>
                   </Td>
                   <Td label="Action">
-                    <span className="ui-muted" style={{ fontSize: "0.875rem" }}>
-                      {actionLabel(run.actionType)}
-                    </span>
+                    <span className="ui-muted ui-automation-runs__cell">{automationActionLabel(run.actionType)}</span>
                   </Td>
                   <Td label="Started">
                     {run.startedAt ? (
@@ -164,9 +132,7 @@ export default function AutomationRunsPage() {
                   </Td>
                   <Td label="Failure reason">
                     {run.errorMessage ? (
-                      <span style={{ color: "var(--color-danger)", fontSize: "0.875rem" }}>
-                        {run.errorMessage}
-                      </span>
+                      <span className="ui-automation-runs__error">{run.errorMessage}</span>
                     ) : (
                       <span className="ui-muted">—</span>
                     )}
@@ -175,7 +141,7 @@ export default function AutomationRunsPage() {
               ))}
             </tbody>
           </Table>
-        </Section>
+        </div>
       )}
     </section>
   );

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseUUIDPipe,
@@ -176,12 +177,12 @@ export class AutomationsController {
     return this.automation.pause(tenant, automationId);
   }
 
-  @Post(":automationId/archive")
-  archive(
+  @Delete(":automationId")
+  remove(
     @CurrentTenant() tenant: DietitianTenantContext,
     @Param("automationId", ParseUUIDPipe) automationId: string,
   ) {
-    return this.automation.archive(tenant, automationId);
+    return this.automation.remove(tenant, automationId);
   }
 
   @Get(":automationId/runs")

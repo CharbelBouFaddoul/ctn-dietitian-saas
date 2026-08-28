@@ -212,14 +212,13 @@ export default function TasksPage() {
     }
   }
 
-  async function archive() {
+  async function deleteTask() {
     if (!pendingDelete) return;
     setDeleteBusy(true);
     setError(null);
     try {
-      await api(`/api/v1/dietitian/${dietitianAccountId}/tasks/${pendingDelete.id}/archive`, {
-        method: "POST",
-        body: JSON.stringify({}),
+      await api(`/api/v1/dietitian/${dietitianAccountId}/tasks/${pendingDelete.id}`, {
+        method: "DELETE",
       });
       setPendingDelete(null);
       await load();
@@ -432,7 +431,7 @@ export default function TasksPage() {
         confirmLabel="Delete task"
         danger
         pending={deleteBusy}
-        onConfirm={() => void archive()}
+        onConfirm={() => void deleteTask()}
         onCancel={() => setPendingDelete(null)}
       />
     </section>

@@ -2,307 +2,138 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   Alert,
-  Badge,
   Button,
-  Checkbox,
+  ConfirmDialog,
   EmptyState,
-  Field,
-  Input,
+  LoadingState,
   PageHeader,
-  Section,
-  Select,
-  StatCard,
   StatusBadge,
-  Table,
-  Td,
-  Textarea,
+  Switch,
   humanizeLabel,
 } from "@nutrition-saas/ui";
+import { AutomationRuleDialog } from "../../../../components/automation-rule-dialog";
 import { api } from "../../../../lib/api";
 import {
-  automationActionLabel,
-  automationRecipientLabel,
-  automationTriggerLabel,
-  defaultRecipientForAction,
-  recipientModeForAction,
-} from "../../../../lib/automation-labels";
+  humanRuleSummary,
+  type AutomationClientOption,
+  type AutomationRuleRecord,
+  type AutomationUsageSummary,
+} from "../../../../lib/automation-rule-form";
 import { errorMessage } from "../../../../lib/humanize-error";
-
-interface AutomationRule {
-  id: string;
-  name: string;
-  status: string;
-  triggerType: string;
-  actionType: string;
-  summary: string;
-  lastRunAt: string | null;
-  configuration?: {
-    clientScope?: string;
-    clientIds?: string[];
-  };
-}
-
-interface ClientOption {
-  id: string;
-  firstName: string;
-  lastName: string;
-  displayName: string | null;
-}
-
-interface UsageSummary {
-  enabled: boolean;
-  productEmailEnabled: boolean;
-  ruleLimit: number | null;
-  activeRules: number;
-  rulesRemaining: number | null;
-  executionLimit: number | null;
-  executionCount: number;
-  executionsRemaining: number | null;
-}
-
-const TRIGGERS = [
-  { value: "APPOINTMENT_UPCOMING", label: "Appointment is approaching", timingKey: "daysBefore", timingDefault: 1 },
-  { value: "CLIENT_INACTIVE", label: "Client has no recent activity", timingKey: "daysInactive", timingDefault: 3 },
-  { value: "INVOICE_OVERDUE", label: "Invoice is overdue", timingKey: null, timingDefault: null },
-  { value: "TASK_DUE", label: "Task is due today", timingKey: null, timingDefault: null },
-  { value: "MEAL_PLAN_ENDING", label: "Meal plan is ending soon", timingKey: "daysUntilEnd", timingDefault: 3 },
-  { value: "CLIENT_CHECKIN_DUE", label: "Client check-in is due", timingKey: "intervalDays", timingDefault: 7 },
-] as const;
-
-const ALL_ACTIONS = [
-  {
-    value: "SEND_IN_APP_NOTIFICATION",
-    label: "Send notification",
-    hint: "Bell notification in the clinic, the client portal, or both.",
-  },
-  { value: "SEND_EMAIL", label: "Send email", hint: "Email subject and body to you or the client." },
-  { value: "CREATE_TASK", label: "Create follow-up task", hint: "Adds a task on your clinic Tasks list." },
-  {
-    value: "SEND_MESSAGE",
-    label: "Send message",
-    hint: "Posts in the Messages thread with this client.",
-  },
-] as const;
-
-const CLIENT_NAME_TOKEN = "{{client.displayName}}";
-const CLIENT_NAME_FRIENDLY = "[Client name]";
-
-function toFriendlyTemplate(value: string): string {
-  return value.split(CLIENT_NAME_TOKEN).join(CLIENT_NAME_FRIENDLY);
-}
-
-function toApiTemplate(value: string): string {
-  return value.split(CLIENT_NAME_FRIENDLY).join(CLIENT_NAME_TOKEN);
-}
-
-function humanRuleSummary(rule: AutomationRule): string {
-  const scope =
-    rule.configuration?.clientScope === "SELECTED" && rule.configuration.clientIds?.length
-      ? ` · ${rule.configuration.clientIds.length} client${rule.configuration.clientIds.length === 1 ? "" : "s"}`
-      : " · all clients";
-  return `When ${automationTriggerLabel(rule.triggerType).toLowerCase()} → ${automationActionLabel(rule.actionType).toLowerCase()}${scope}`;
-}
-
-function clientLabel(client: ClientOption): string {
-  return client.displayName?.trim() || `${client.firstName} ${client.lastName}`;
-}
 
 export default function AutomationsPage() {
   const params = useParams<{ dietitianAccountId: string }>();
   const dietitianAccountId = params.dietitianAccountId;
-  const [rules, setRules] = useState<AutomationRule[]>([]);
-  const [usage, setUsage] = useState<UsageSummary | null>(null);
-  const [clients, setClients] = useState<ClientOption[]>([]);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const editId = searchParams.get("edit");
+
+  const [rules, setRules] = useState<AutomationRuleRecord[]>([]);
+  const [usage, setUsage] = useState<AutomationUsageSummary | null>(null);
+  const [clients, setClients] = useState<AutomationClientOption[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [showBuilder, setShowBuilder] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
+  const [editingRule, setEditingRule] = useState<AutomationRuleRecord | null>(null);
+  const [initialTemplateId, setInitialTemplateId] = useState<string | null>(null);
+  const [archiveId, setArchiveId] = useState<string | null>(null);
+  const [archiving, setArchiving] = useState(false);
 
-  const [name, setName] = useState("");
-  const [triggerType, setTriggerType] = useState("CLIENT_INACTIVE");
-  const [actionType, setActionType] = useState("CREATE_TASK");
-  const [timingValue, setTimingValue] = useState(3);
-  const [recipient, setRecipient] = useState<"ASSIGNED_DIETITIAN" | "CLIENT" | "BOTH">("ASSIGNED_DIETITIAN");
-  const [clientScope, setClientScope] = useState<"ALL" | "SELECTED">("ALL");
-  const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
-  const [clientFilter, setClientFilter] = useState("");
-  const [taskTitle, setTaskTitle] = useState(`Follow up with ${CLIENT_NAME_FRIENDLY}`);
-  const [notificationTitle, setNotificationTitle] = useState("Automation reminder");
-  const [notificationBody, setNotificationBody] = useState(
-    `Review ${CLIENT_NAME_FRIENDLY} — generated by automation.`,
+  const visibleRules = useMemo(() => rules.filter((rule) => rule.status !== "ARCHIVED"), [rules]);
+  const editingFromQuery = useMemo(
+    () => (editId ? rules.find((rule) => rule.id === editId) ?? null : null),
+    [editId, rules],
   );
-
-  const availableActions = useMemo(() => {
-    if (!usage?.productEmailEnabled) {
-      return ALL_ACTIONS.filter((action) => action.value !== "SEND_EMAIL");
-    }
-    return ALL_ACTIONS;
-  }, [usage]);
-
-  const filteredClients = useMemo(() => {
-    const q = clientFilter.trim().toLowerCase();
-    if (!q) return clients;
-    return clients.filter((client) => clientLabel(client).toLowerCase().includes(q));
-  }, [clients, clientFilter]);
-
-  const selectedTrigger = TRIGGERS.find((t) => t.value === triggerType);
-  const selectedAction = availableActions.find((a) => a.value === actionType) ?? ALL_ACTIONS.find((a) => a.value === actionType);
-  const whoMode = recipientModeForAction(actionType);
-  const effectiveRecipient = whoMode === "locked-client" ? "CLIENT" : whoMode === "hidden" ? "ASSIGNED_DIETITIAN" : recipient;
+  const atRuleLimit = usage != null && usage.rulesRemaining === 0;
+  const canAdd = Boolean(usage?.enabled) && !atRuleLimit;
 
   async function load() {
     const [ruleList, usageSummary, clientPage] = await Promise.all([
-      api<AutomationRule[]>(`/api/v1/dietitian/${dietitianAccountId}/automations`),
-      api<UsageSummary>(`/api/v1/dietitian/${dietitianAccountId}/automations/usage/summary`),
-      api<{ items: ClientOption[] }>(`/api/v1/dietitian/${dietitianAccountId}/clients?pageSize=50`),
+      api<AutomationRuleRecord[]>(`/api/v1/dietitian/${dietitianAccountId}/automations`),
+      api<AutomationUsageSummary>(`/api/v1/dietitian/${dietitianAccountId}/automations/usage/summary`),
+      api<{ items: AutomationClientOption[] }>(`/api/v1/dietitian/${dietitianAccountId}/clients?pageSize=50`),
     ]);
     setRules(ruleList);
     setUsage(usageSummary);
     setClients(clientPage.items);
-    if (!usageSummary.productEmailEnabled && actionType === "SEND_EMAIL") {
-      setActionType("CREATE_TASK");
-      setRecipient(defaultRecipientForAction("CREATE_TASK"));
-    }
   }
 
   useEffect(() => {
-    void load().catch((err) => setError(errorMessage(err, "Unable to load automations")));
+    setLoading(true);
+    void load()
+      .catch((err) => setError(errorMessage(err, "Unable to load automations")))
+      .finally(() => setLoading(false));
   }, [dietitianAccountId]);
 
-  function onActionChange(next: string) {
-    setActionType(next);
-    const mode = recipientModeForAction(next);
-    if (mode === "locked-client") setRecipient("CLIENT");
-    else if (mode === "hidden") setRecipient("ASSIGNED_DIETITIAN");
-    else if (recipient !== "ASSIGNED_DIETITIAN" && recipient !== "CLIENT" && recipient !== "BOTH") {
-      setRecipient(defaultRecipientForAction(next));
-    } else if (next === "SEND_EMAIL" && recipient === "BOTH") {
-      setRecipient("ASSIGNED_DIETITIAN");
-    }
+  useEffect(() => {
+    if (!editId || !editingFromQuery) return;
+    setDialogMode("edit");
+    setEditingRule(editingFromQuery);
+    setInitialTemplateId(null);
+    setDialogOpen(true);
+  }, [editId, editingFromQuery]);
+
+  function openCreate() {
+    if (editId) router.replace(`/practice/${dietitianAccountId}/automations`);
+    setDialogMode("create");
+    setEditingRule(null);
+    setInitialTemplateId(null);
+    setDialogOpen(true);
   }
 
-  function toggleClient(id: string) {
-    setSelectedClientIds((current) =>
-      current.includes(id) ? current.filter((value) => value !== id) : [...current, id],
-    );
+  function openEdit(rule: AutomationRuleRecord) {
+    setDialogMode("edit");
+    setEditingRule(rule);
+    setInitialTemplateId(null);
+    setDialogOpen(true);
+    router.replace(`/practice/${dietitianAccountId}/automations?edit=${rule.id}`);
   }
 
-  function buildConfiguration() {
-    const timing: Record<string, number> = {};
-    if (selectedTrigger?.timingKey) {
-      timing[selectedTrigger.timingKey] = timingValue;
-    }
-    const configuration: Record<string, unknown> = {
-      recipient: effectiveRecipient,
-      timing: Object.keys(timing).length ? timing : undefined,
-      clientScope,
-      clientIds: clientScope === "SELECTED" ? selectedClientIds : undefined,
-    };
-    if (actionType === "CREATE_TASK") {
-      configuration.taskTitle = toApiTemplate(taskTitle);
-      configuration.taskPriority = "HIGH";
-    }
-    if (actionType === "SEND_IN_APP_NOTIFICATION" || actionType === "CREATE_CLIENT_NOTIFICATION") {
-      configuration.notificationTitle = toApiTemplate(notificationTitle);
-      configuration.notificationBody = toApiTemplate(notificationBody);
-    }
-    if (actionType === "SEND_EMAIL") {
-      configuration.emailSubject = toApiTemplate(notificationTitle);
-      configuration.emailBody = toApiTemplate(notificationBody);
-    }
-    if (actionType === "SEND_MESSAGE") {
-      configuration.messageBody = toApiTemplate(notificationBody);
-    }
-    return configuration;
+  function closeDialog() {
+    setDialogOpen(false);
+    setEditingRule(null);
+    setInitialTemplateId(null);
+    if (editId) router.replace(`/practice/${dietitianAccountId}/automations`);
   }
 
-  function resetBuilder() {
-    setName("");
-    setTriggerType("CLIENT_INACTIVE");
-    setActionType("CREATE_TASK");
-    setTimingValue(3);
-    setRecipient("ASSIGNED_DIETITIAN");
-    setClientScope("ALL");
-    setSelectedClientIds([]);
-    setClientFilter("");
-    setTaskTitle(`Follow up with ${CLIENT_NAME_FRIENDLY}`);
-    setNotificationTitle("Automation reminder");
-    setNotificationBody(`Review ${CLIENT_NAME_FRIENDLY} — generated by automation.`);
-  }
-
-  async function createRule(activate: boolean) {
-    if (clientScope === "SELECTED" && selectedClientIds.length === 0) {
-      setError("Select at least one client, or choose All clients.");
-      return;
-    }
-    setSaving(true);
-    setError(null);
-    try {
-      const created = await api<AutomationRule>(`/api/v1/dietitian/${dietitianAccountId}/automations`, {
-        method: "POST",
-        body: JSON.stringify({
-          name: name || "New automation rule",
-          triggerType,
-          actionType,
-          configuration: buildConfiguration(),
-          conditions: triggerType === "CLIENT_INACTIVE" ? { clientStatus: "ACTIVE" } : undefined,
-        }),
-      });
-      if (activate) {
-        await api(`/api/v1/dietitian/${dietitianAccountId}/automations/${created.id}/activate`, {
-          method: "POST",
-        });
-      }
-      setShowBuilder(false);
-      resetBuilder();
-      await load();
-    } catch (err) {
-      setError(errorMessage(err, "Unable to create rule"));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function setStatus(id: string, action: "activate" | "pause" | "archive") {
+  async function setStatus(id: string, action: "activate" | "pause") {
     try {
       await api(`/api/v1/dietitian/${dietitianAccountId}/automations/${id}/${action}`, { method: "POST" });
       await load();
+      return true;
     } catch (err) {
       setError(errorMessage(err, "Unable to update rule"));
+      return false;
     }
   }
 
-  const whoLabel =
-    whoMode === "hidden"
-      ? "Clinic tasks"
-      : automationRecipientLabel(effectiveRecipient);
-
-  const scopeLabel =
-    clientScope === "SELECTED"
-      ? `${selectedClientIds.length} client${selectedClientIds.length === 1 ? "" : "s"}`
-      : "all clients";
-
-  const previewSummary = `When ${automationTriggerLabel(triggerType).toLowerCase()} → ${automationActionLabel(actionType).toLowerCase()}${
-    whoMode === "hidden" ? "" : ` → ${whoLabel.toLowerCase()}`
-  } · ${scopeLabel}`;
+  async function deleteRule(id: string) {
+    try {
+      await api(`/api/v1/dietitian/${dietitianAccountId}/automations/${id}`, { method: "DELETE" });
+      await load();
+      return true;
+    } catch (err) {
+      setError(errorMessage(err, "Unable to delete rule"));
+      return false;
+    }
+  }
 
   return (
     <section className="ui-automations">
       <PageHeader
         title="Automations"
-        description="When something happens in the clinic, trigger a task, message, or reminder — you stay in control of every action."
+        description="When something happens in the clinic, send a reminder, message, or task — you stay in control of every action."
         actions={
           <div className="ui-row">
             <Link href={`/practice/${dietitianAccountId}/automation-runs`} className="ui-btn ui-btn--secondary">
               Run history
             </Link>
-            <Button
-              variant={showBuilder ? "secondary" : "primary"}
-              onClick={() => setShowBuilder((v) => !v)}
-            >
-              {showBuilder ? "Close" : "New rule"}
+            <Button disabled={!canAdd} onClick={() => openCreate()}>
+              Add automation
             </Button>
           </div>
         }
@@ -315,374 +146,107 @@ export default function AutomationsPage() {
       ) : null}
 
       {usage ? (
-        <div className="ui-automations__stats ui-grid">
-          <StatCard label="Feature" value={usage.enabled ? "Enabled" : "Disabled"} />
-          <StatCard
-            label="Active rules"
-            value={`${usage.activeRules}${usage.ruleLimit != null ? ` / ${usage.ruleLimit}` : ""}`}
-            hint={usage.rulesRemaining != null ? `${usage.rulesRemaining} slots remaining` : undefined}
-          />
-          <StatCard
-            label="Runs this month"
-            value={`${usage.executionCount}${usage.executionLimit != null ? ` / ${usage.executionLimit}` : ""}`}
-            hint={usage.executionsRemaining != null ? `${usage.executionsRemaining} remaining` : undefined}
-          />
+        <div className="ui-automations__chips">
+          <span className={`ui-automations__chip${!usage.enabled ? " is-warn" : ""}`}>
+            {usage.enabled ? "Automations on" : "Not on this plan"}
+          </span>
+          <span className="ui-automations__chip">
+            Active rules {usage.activeRules}
+            {usage.ruleLimit != null ? ` / ${usage.ruleLimit}` : ""}
+          </span>
+          <span className="ui-automations__chip">
+            Runs this month {usage.executionCount}
+            {usage.executionLimit != null ? ` / ${usage.executionLimit}` : ""}
+          </span>
         </div>
       ) : null}
 
-      {showBuilder ? (
-        <Section
-          title="New rule"
-          description={previewSummary}
-          tone="mint"
-          className="ui-automations__builder"
-        >
-          <div className="ui-rule-builder">
-            <Field label="Rule name">
-              <Input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Inactive client follow-up"
-              />
-            </Field>
-
-            <div className="ui-rule-scope">
-              <p className="ui-rule-step__label">Apply to</p>
-              <div className="ui-rule-scope__options">
-                <label className={`ui-rule-scope__option${clientScope === "ALL" ? " is-active" : ""}`}>
-                  <input
-                    type="radio"
-                    name="clientScope"
-                    checked={clientScope === "ALL"}
-                    onChange={() => setClientScope("ALL")}
-                  />
-                  <span>
-                    <strong>All clients</strong>
-                    <span className="ui-muted">Runs for every matching client in the clinic</span>
-                  </span>
-                </label>
-                <label className={`ui-rule-scope__option${clientScope === "SELECTED" ? " is-active" : ""}`}>
-                  <input
-                    type="radio"
-                    name="clientScope"
-                    checked={clientScope === "SELECTED"}
-                    onChange={() => setClientScope("SELECTED")}
-                  />
-                  <span>
-                    <strong>Selected clients</strong>
-                    <span className="ui-muted">Limit this rule to one or more people</span>
-                  </span>
-                </label>
-              </div>
-
-              {clientScope === "SELECTED" ? (
-                <div className="ui-rule-scope__picker">
-                  <div className="ui-rule-scope__picker-toolbar">
-                    <Input
-                      value={clientFilter}
-                      onChange={(e) => setClientFilter(e.target.value)}
-                      placeholder="Search clients…"
-                      aria-label="Search clients"
-                    />
-                    <span className="ui-muted ui-rule-scope__count">
-                      {selectedClientIds.length} selected
-                    </span>
-                  </div>
-                  {clients.length === 0 ? (
-                    <p className="ui-muted" style={{ margin: 0 }}>
-                      No clients yet. Invite or create a client first.
-                    </p>
-                  ) : filteredClients.length === 0 ? (
-                    <p className="ui-muted" style={{ margin: 0 }}>
-                      No clients match that search.
-                    </p>
-                  ) : (
-                    <ul className="ui-rule-scope__list">
-                      {filteredClients.map((client) => (
-                        <li key={client.id}>
-                          <Checkbox
-                            label={clientLabel(client)}
-                            checked={selectedClientIds.includes(client.id)}
-                            onChange={() => toggleClient(client.id)}
-                          />
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              ) : null}
-            </div>
-
-            <div className={`ui-rule-builder__steps${whoMode === "hidden" ? " ui-rule-builder__steps--two" : ""}`}>
-              <div className="ui-rule-step">
-                <p className="ui-rule-step__label">When</p>
-                <Field label="Trigger">
-                  <Select value={triggerType} onChange={(e) => setTriggerType(e.target.value)}>
-                    {TRIGGERS.map((t) => (
-                      <option key={t.value} value={t.value}>
-                        {t.label}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-                {selectedTrigger?.timingKey ? (
-                  <Field label="After how many days?">
-                    <Input
-                      type="number"
-                      min={1}
-                      value={timingValue}
-                      onChange={(e) => setTimingValue(Number(e.target.value))}
-                    />
-                  </Field>
-                ) : (
-                  <p className="ui-muted ui-rule-step__hint">Runs as soon as this event happens.</p>
-                )}
-              </div>
-
-              <div className="ui-rule-step">
-                <p className="ui-rule-step__label">Then</p>
-                <Field label="Action">
-                  <Select value={actionType} onChange={(e) => onActionChange(e.target.value)}>
-                    {availableActions.map((a) => (
-                      <option key={a.value} value={a.value}>
-                        {a.label}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-                {selectedAction?.hint ? <p className="ui-muted ui-rule-step__hint">{selectedAction.hint}</p> : null}
-              </div>
-
-              {whoMode !== "hidden" ? (
-                <div className="ui-rule-step">
-                  <p className="ui-rule-step__label">Who</p>
-                  {whoMode === "locked-client" ? (
-                    <>
-                      <div className="ui-rule-who-lock">
-                        <span className="ui-rule-who-lock__chip">{automationRecipientLabel("CLIENT")}</span>
-                      </div>
-                      <p className="ui-muted ui-rule-step__hint">
-                        This action always goes to the client’s portal account.
-                      </p>
-                    </>
-                  ) : (
-                    <Field label="Recipient">
-                      <Select
-                        value={recipient}
-                        onChange={(e) =>
-                          setRecipient(e.target.value as "ASSIGNED_DIETITIAN" | "CLIENT" | "BOTH")
-                        }
-                      >
-                        <option value="ASSIGNED_DIETITIAN">You (clinic)</option>
-                        <option value="CLIENT">Client (portal)</option>
-                        {actionType === "SEND_IN_APP_NOTIFICATION" ? (
-                          <option value="BOTH">Clinic and client</option>
-                        ) : null}
-                      </Select>
-                    </Field>
-                  )}
-                  {actionType === "SEND_IN_APP_NOTIFICATION" && recipient === "BOTH" ? (
-                    <p className="ui-muted ui-rule-step__hint">
-                      Creates the same notification in your clinic bell and the client’s portal.
-                    </p>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
-
-            <div className="ui-rule-builder__details">
-              {actionType === "CREATE_TASK" ? (
-                <Field
-                  label="Task title"
-                  hint={`Use ${CLIENT_NAME_FRIENDLY} where the client's name should appear.`}
-                >
-                  <Input
-                    value={toFriendlyTemplate(taskTitle)}
-                    onChange={(e) => setTaskTitle(toFriendlyTemplate(e.target.value))}
-                    placeholder={`Follow up with ${CLIENT_NAME_FRIENDLY}`}
-                  />
-                  <div className="ui-token-chip">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setTaskTitle((current) =>
-                          current.includes(CLIENT_NAME_FRIENDLY)
-                            ? current
-                            : `${current.trim()} ${CLIENT_NAME_FRIENDLY}`.trim(),
-                        )
-                      }
-                    >
-                      Insert client name
-                    </button>
-                  </div>
-                </Field>
-              ) : actionType === "SEND_MESSAGE" ? (
-                <Field
-                  label="Message"
-                  hint={`Use ${CLIENT_NAME_FRIENDLY} to insert the client's name automatically.`}
-                >
-                  <Textarea
-                    value={toFriendlyTemplate(notificationBody)}
-                    onChange={(e) => setNotificationBody(toFriendlyTemplate(e.target.value))}
-                    style={{ minHeight: 100 }}
-                  />
-                  <div className="ui-token-chip">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setNotificationBody((current) =>
-                          current.includes(CLIENT_NAME_FRIENDLY)
-                            ? current
-                            : `${current.trim()} ${CLIENT_NAME_FRIENDLY}`.trim(),
-                        )
-                      }
-                    >
-                      Insert client name
-                    </button>
-                  </div>
-                </Field>
-              ) : (
-                <>
-                  <Field label={actionType === "SEND_EMAIL" ? "Subject" : "Title"}>
-                    <Input
-                      value={toFriendlyTemplate(notificationTitle)}
-                      onChange={(e) => setNotificationTitle(toFriendlyTemplate(e.target.value))}
-                    />
-                  </Field>
-                  <Field
-                    label="Message"
-                    hint={`Use ${CLIENT_NAME_FRIENDLY} to insert the client's name automatically.`}
-                  >
-                    <Textarea
-                      value={toFriendlyTemplate(notificationBody)}
-                      onChange={(e) => setNotificationBody(toFriendlyTemplate(e.target.value))}
-                      style={{ minHeight: 80 }}
-                    />
-                    <div className="ui-token-chip">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setNotificationBody((current) =>
-                            current.includes(CLIENT_NAME_FRIENDLY)
-                              ? current
-                              : `${current.trim()} ${CLIENT_NAME_FRIENDLY}`.trim(),
-                          )
-                        }
-                      >
-                        Insert client name
-                      </button>
-                    </div>
-                  </Field>
-                </>
-              )}
-            </div>
-
-            <div className="ui-row ui-automations__builder-actions">
-              <Button disabled={saving} variant="ghost" onClick={() => setShowBuilder(false)}>
-                Cancel
-              </Button>
-              <Button disabled={saving} variant="secondary" onClick={() => void createRule(false)}>
-                {saving ? "Saving…" : "Save as paused"}
-              </Button>
-              <Button disabled={saving} onClick={() => void createRule(true)}>
-                {saving ? "Saving…" : "Save & activate"}
-              </Button>
-            </div>
-          </div>
-        </Section>
+      {usage && !usage.enabled ? (
+        <Alert tone="warning">Automations are not included on this plan. Upgrade to add rules.</Alert>
+      ) : usage && atRuleLimit ? (
+        <Alert tone="warning">You have used all rule slots on this plan.</Alert>
       ) : null}
 
-      <Section
-        title="Rules"
-        description={rules.length > 0 ? `${rules.length} rule${rules.length === 1 ? "" : "s"}` : undefined}
-        actions={
-          rules.length > 0 ? (
-            <div className="ui-row">
-              <Badge tone="success">{rules.filter((r) => r.status === "ACTIVE").length} active</Badge>
-              <Badge tone="neutral">{rules.filter((r) => r.status === "PAUSED").length} paused</Badge>
-            </div>
-          ) : undefined
-        }
-      >
-        {rules.length === 0 ? (
-          <EmptyState
-            title="No automation rules yet"
-            action={
-              <Button size="sm" onClick={() => setShowBuilder(true)}>
-                Create your first rule
-              </Button>
-            }
-          >
-            Build a rule when you want the clinic to follow up automatically — tasks, messages, or notifications.
-          </EmptyState>
-        ) : (
-          <Table>
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Status</th>
-                <th>Rule</th>
-                <th>Last run</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rules.map((rule) => (
-                <tr key={rule.id}>
-                  <Td label="Name">
-                    <Link href={`/practice/${dietitianAccountId}/automations/${rule.id}`} className="ui-link">
-                      {rule.name}
-                    </Link>
-                  </Td>
-                  <Td label="Status">
-                    <StatusBadge status={rule.status} label={humanizeLabel(rule.status)} />
-                  </Td>
-                  <Td label="Rule">
-                    <span className="ui-muted ui-automations__rule-summary">{humanRuleSummary(rule)}</span>
-                  </Td>
-                  <Td label="Last run">
-                    {rule.lastRunAt ? (
-                      <time dateTime={rule.lastRunAt}>{new Date(rule.lastRunAt).toLocaleDateString()}</time>
-                    ) : (
-                      <span className="ui-muted">Never</span>
-                    )}
-                  </Td>
-                  <Td label="Actions">
-                    <div className="ui-row">
-                      {rule.status !== "ACTIVE" ? (
-                        <button
-                          type="button"
-                          className="ui-btn ui-btn--secondary ui-btn--sm"
-                          onClick={() => void setStatus(rule.id, "activate")}
-                        >
-                          Activate
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          className="ui-btn ui-btn--secondary ui-btn--sm"
-                          onClick={() => void setStatus(rule.id, "pause")}
-                        >
-                          Pause
-                        </button>
-                      )}
-                      {rule.status !== "ARCHIVED" ? (
-                        <button
-                          type="button"
-                          className="ui-btn ui-btn--ghost ui-btn--sm"
-                          onClick={() => void setStatus(rule.id, "archive")}
-                        >
-                          Archive
-                        </button>
-                      ) : null}
-                    </div>
-                  </Td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
-        )}
-      </Section>
+      {loading ? (
+        <LoadingState>Loading automations…</LoadingState>
+      ) : visibleRules.length === 0 ? (
+        <EmptyState title="No automations yet">
+          Use Add automation to create a reminder, follow-up, or check-in.
+        </EmptyState>
+      ) : (
+        <ul className="ui-automation-cards">
+          {visibleRules.map((rule) => (
+            <li key={rule.id} className="ui-automation-card">
+              <div className="ui-automation-card__top">
+                <div>
+                  <Link href={`/practice/${dietitianAccountId}/automations/${rule.id}`} className="ui-automation-card__name">
+                    {rule.name}
+                  </Link>
+                  <p className="ui-muted ui-automation-card__summary">{humanRuleSummary(rule)}</p>
+                </div>
+                <StatusBadge status={rule.status} label={humanizeLabel(rule.status)} />
+              </div>
+              <div className="ui-automation-card__meta">
+                <span>
+                  Last run{" "}
+                  {rule.lastRunAt ? (
+                    <time dateTime={rule.lastRunAt}>{new Date(rule.lastRunAt).toLocaleDateString()}</time>
+                  ) : (
+                    "Never"
+                  )}
+                </span>
+                <Switch
+                  checked={rule.status === "ACTIVE"}
+                  label={rule.status === "ACTIVE" ? "On" : "Off"}
+                  onCheckedChange={(next) => void setStatus(rule.id, next ? "activate" : "pause")}
+                />
+              </div>
+              <div className="ui-automation-card__actions">
+                <Button size="sm" variant="secondary" onClick={() => openEdit(rule)}>
+                  Edit
+                </Button>
+                <Link href={`/practice/${dietitianAccountId}/automations/${rule.id}`} className="ui-btn ui-btn--ghost ui-btn--sm">
+                  View runs
+                </Link>
+                <Button size="sm" variant="ghost" onClick={() => setArchiveId(rule.id)}>
+                  Delete
+                </Button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <AutomationRuleDialog
+        open={dialogOpen}
+        mode={dialogMode}
+        dietitianAccountId={dietitianAccountId}
+        rule={editingRule}
+        usage={usage}
+        clients={clients}
+        initialTemplateId={initialTemplateId}
+        onClose={closeDialog}
+        onSaved={() => load()}
+      />
+
+      <ConfirmDialog
+        open={archiveId != null}
+        title="Delete this automation?"
+        description="This cannot be undone. The rule and its run history will be removed."
+        confirmLabel="Delete"
+        danger
+        pending={archiving}
+        onCancel={() => setArchiveId(null)}
+        onConfirm={() => {
+          if (!archiveId) return;
+          setArchiving(true);
+          void deleteRule(archiveId)
+            .then((ok) => {
+              if (ok) setArchiveId(null);
+            })
+            .finally(() => setArchiving(false));
+        }}
+      />
     </section>
   );
 }

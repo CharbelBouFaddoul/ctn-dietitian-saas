@@ -320,29 +320,21 @@ export class TaskService {
     return this.toResponse(task);
   }
 
-  async archive(tenant: DietitianTenantContext, taskId: string) {
+  async remove(tenant: DietitianTenantContext, taskId: string) {
     const existing = await this.findTask(tenant, taskId);
     if (existing.clientId) {
       await this.access.assertCanAccess(tenant, existing.clientId, "manageRecords");
     }
-    const task = await this.prisma.task.update({
-      where: { id: taskId },
-      data: { archivedAt: new Date() },
-      include: {
-        client: true,
-        assignedUser: true,
-        createdBy: true,
-      },
-    });
+    await this.prisma.task.delete({ where: { id: taskId } });
     await this.security.record({
-      type: "task_archived",
+      type: "task_deleted",
       outcome: "success",
       userId: tenant.userId,
       dietitianAccountId: tenant.dietitianAccountId,
       targetType: "task",
-      targetId: task.id,
+      targetId: taskId,
     });
-    return this.toResponse(task);
+    return { id: taskId, deleted: true };
   }
 
   async createFromAutomation(input: {

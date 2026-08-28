@@ -619,8 +619,234 @@
   margin: 0;
 }
 
-.ui-automations__stats {
+.ui-automations__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.ui-automations__chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.28rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: #fff;
+  font-size: 0.78rem;
+  font-weight: 650;
+  color: var(--color-text);
+}
+
+.ui-automations__chip.is-warn {
+  border-color: rgb(217 119 6 / 28%);
+  background: rgb(245 158 11 / 10%);
+  color: #b45309;
+}
+
+.ui-automation-cards {
+  list-style: none;
   margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.9rem;
+}
+
+.ui-automation-card {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1.05rem 1.15rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, #fff, #fbfcfc);
+}
+
+.ui-automation-card__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.85rem;
+}
+
+.ui-automation-card__name {
+  font-weight: 700;
+  font-size: 1.02rem;
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.ui-automation-card__name:hover {
+  color: var(--practice-deep-teal, var(--color-accent));
+}
+
+.ui-automation-card__summary {
+  margin: 0.25rem 0 0;
+  font-size: 0.85rem;
+}
+
+.ui-automation-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem 1rem;
+  font-size: 0.8rem;
+  color: var(--color-muted);
+}
+
+.ui-automation-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.ui-automation-empty-templates {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.45rem;
+  margin-top: 0.35rem;
+}
+
+.ui-dialog.ui-automation-dialog {
+  max-height: min(94vh, 54rem);
+}
+
+.ui-automation-dialog .ui-dialog__body {
+  display: grid;
+  gap: 1rem;
+}
+
+.ui-automation-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.ui-automation-steps__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.22rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 650;
+  color: var(--color-muted);
+  background: rgb(15 23 42 / 5%);
+}
+
+.ui-automation-steps__item span {
+  display: inline-grid;
+  place-items: center;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 999px;
+  background: #fff;
+  font-size: 0.68rem;
+}
+
+.ui-automation-steps__item.is-active {
+  color: var(--practice-deep-teal, var(--color-accent));
+  background: rgb(13 148 136 / 12%);
+}
+
+.ui-automation-steps__item.is-done {
+  color: var(--color-text);
+}
+
+.ui-automation-templates {
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 640px) {
+  .ui-automation-templates {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.ui-automation-template {
+  appearance: none;
+  text-align: left;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: #fff;
+  padding: 0.85rem 0.95rem;
+  cursor: pointer;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.ui-automation-template:hover,
+.ui-automation-template.is-selected {
+  border-color: var(--practice-deep-teal, var(--color-accent));
+  background: rgb(13 148 136 / 6%);
+}
+
+.ui-automation-template strong {
+  font-size: 0.9rem;
+}
+
+.ui-automation-template span {
+  font-size: 0.78rem;
+  color: var(--color-muted);
+  line-height: 1.35;
+}
+
+.ui-automation-dialog__fields {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.ui-automation-dialog__fields .ui-field {
+  margin-bottom: 0;
+}
+
+.ui-automation-dialog__message {
+  min-height: 5rem;
+}
+
+.ui-automation-dialog__preview {
+  margin: 0;
+  padding: 0.75rem 0.85rem;
+  border-radius: 10px;
+  background: rgb(13 148 136 / 8%);
+  border: 1px solid rgb(13 148 136 / 16%);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.ui-automation-dialog__actions {
+  justify-content: flex-start;
+  align-items: center;
+  padding-top: 0.25rem;
+}
+
+.ui-automation-dialog__actions-spacer {
+  flex: 1;
+}
+
+.ui-automation-runs {
+  padding: 0.35rem 0.35rem 0.5rem;
+  overflow: auto;
+}
+
+.ui-automation-runs .ui-table-wrap {
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.ui-automation-runs__cell {
+  font-size: 0.875rem;
+}
+
+.ui-automation-runs__error {
+  color: var(--color-danger);
+  font-size: 0.875rem;
 }
 
 .ui-automations__builder {
@@ -843,6 +1069,11 @@
 .ui-dialog__body {
   padding: 1.1rem 1.15rem 1.2rem;
   overflow: auto;
+}
+
+.ui-dialog--wide {
+  width: min(40rem, calc(100vw - 2rem));
+  max-height: min(92vh, 44rem);
 }
 
 .ui-dialog.ui-food-nutri {

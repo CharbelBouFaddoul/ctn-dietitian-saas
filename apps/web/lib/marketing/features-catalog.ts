@@ -236,7 +236,7 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     category: "Automations",
     title: "Workflow automations",
     summary:
-      "Optional plan capability for rules on appointments, inactivity, overdue invoices, tasks, meal-plan endings, and check-ins.",
+      "Rules that send reminders, messages, or tasks for appointments, inactivity, overdue invoices, meal plans, and check-ins.",
     entitlementKey: "AUTOMATION",
   },
 

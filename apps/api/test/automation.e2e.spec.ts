@@ -142,6 +142,34 @@ describe("Phase 12 automation", () => {
       .expect(404);
   });
 
+  it("hard-deletes a rule and its runs", async () => {
+    const owner = await registerVerifyLogin();
+    const org = await createOrg(owner.cookie, "Delete Org", "pro");
+    const created = await createRule(owner.cookie, org.id).expect(201);
+
+    await ctx.prisma.automationRun.create({
+      data: {
+        dietitianAccountId: org.id,
+        automationRuleId: created.body.id,
+        triggerKey: `delete-test:${created.body.id}`,
+        status: "SUCCEEDED",
+      },
+    });
+
+    await request(ctx.app.getHttpServer())
+      .delete(`/api/v1/dietitian/${org.id}/automations/${created.body.id}`)
+      .set("Cookie", owner.cookie)
+      .expect(200);
+
+    expect(await ctx.prisma.automationRule.findUnique({ where: { id: created.body.id } })).toBeNull();
+    expect(await ctx.prisma.automationRun.count({ where: { automationRuleId: created.body.id } })).toBe(0);
+
+    await request(ctx.app.getHttpServer())
+      .get(`/api/v1/dietitian/${org.id}/automations/${created.body.id}`)
+      .set("Cookie", owner.cookie)
+      .expect(404);
+  });
+
   it("executes inactive-client automation and enforces idempotency", async () => {
     const owner = await registerVerifyLogin();
     const org = await createOrg(owner.cookie, "Automation Org", "pro");
