@@ -26,7 +26,7 @@ export const AUTOMATION_TEMPLATES: AutomationTemplate[] = [
     name: "Appointment reminder",
     taskTitle: `Follow up with ${CLIENT_NAME_FRIENDLY}`,
     notificationTitle: "Upcoming appointment",
-    notificationBody: `Hi ${CLIENT_NAME_FRIENDLY}, a reminder that you have an appointment coming up.`,
+    notificationBody: `Hi ${CLIENT_NAME_FRIENDLY}, a reminder that you have [Appointment_title] on [Appointment_date] at [Appointment_time].`,
   },
   {
     id: "missed-appointment",
@@ -37,7 +37,7 @@ export const AUTOMATION_TEMPLATES: AutomationTemplate[] = [
     timingValue: 1,
     recipient: "ASSIGNED_DIETITIAN",
     name: "Missed appointment follow-up",
-    taskTitle: `Follow up after missed appointment — ${CLIENT_NAME_FRIENDLY}`,
+    taskTitle: `Follow up after missed appointment — ${CLIENT_NAME_FRIENDLY} ([Appointment_date])`,
     notificationTitle: "Missed appointment",
     notificationBody: `Follow up with ${CLIENT_NAME_FRIENDLY} after a missed appointment.`,
   },
@@ -52,7 +52,7 @@ export const AUTOMATION_TEMPLATES: AutomationTemplate[] = [
     name: "Inactive client alert",
     taskTitle: `Check in with ${CLIENT_NAME_FRIENDLY}`,
     notificationTitle: "Client inactive",
-    notificationBody: `${CLIENT_NAME_FRIENDLY} has not logged recently.`,
+    notificationBody: `${CLIENT_NAME_FRIENDLY} has not logged since [Last_activity_date].`,
   },
   {
     id: "invoice-overdue",
@@ -65,7 +65,7 @@ export const AUTOMATION_TEMPLATES: AutomationTemplate[] = [
     name: "Overdue invoice notice",
     taskTitle: `Follow up on overdue invoice — ${CLIENT_NAME_FRIENDLY}`,
     notificationTitle: "Invoice overdue",
-    notificationBody: `Hi ${CLIENT_NAME_FRIENDLY}, you have an overdue invoice. Please review it in the portal.`,
+    notificationBody: `Hi ${CLIENT_NAME_FRIENDLY}, invoice [Invoice_number] for [Invoice_amount] was due on [Invoice_due_date]. Please review it in the portal.`,
   },
   {
     id: "task-due",
@@ -78,7 +78,7 @@ export const AUTOMATION_TEMPLATES: AutomationTemplate[] = [
     name: "Task due today",
     taskTitle: `Task due for ${CLIENT_NAME_FRIENDLY}`,
     notificationTitle: "Task due today",
-    notificationBody: `A task related to ${CLIENT_NAME_FRIENDLY} is due today.`,
+    notificationBody: `Task “[Task_title]” is due [Task_due_date].`,
   },
   {
     id: "meal-plan-ending",
@@ -89,9 +89,9 @@ export const AUTOMATION_TEMPLATES: AutomationTemplate[] = [
     timingValue: 3,
     recipient: "ASSIGNED_DIETITIAN",
     name: "Meal plan ending",
-    taskTitle: `Renew meal plan for ${CLIENT_NAME_FRIENDLY}`,
+    taskTitle: `Renew meal plan for ${CLIENT_NAME_FRIENDLY} — ends [Meal_plan_end_date]`,
     notificationTitle: "Meal plan ending soon",
-    notificationBody: `${CLIENT_NAME_FRIENDLY}'s meal plan is ending soon.`,
+    notificationBody: `${CLIENT_NAME_FRIENDLY}'s meal plan “[Meal_plan_name]” ends on [Meal_plan_end_date] (last updated [Meal_plan_last_update_date]).`,
   },
   {
     id: "weekly-checkin",

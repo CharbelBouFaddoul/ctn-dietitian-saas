@@ -3,7 +3,7 @@ import { validateTemplateVariables } from "../src/automation/automation-catalog"
 
 describe("automation template validation", () => {
   it("accepts known variables", () => {
-    expect(validateTemplateVariables("Hello {{client.firstName}} from {{organization.name}}")).toEqual([]);
+    expect(validateTemplateVariables("Due {{invoice.dueDate}} {{mealPlan.lastUpdateDate}} {{run.date}}")).toEqual([]);
   });
 
   it("rejects unknown variables", () => {

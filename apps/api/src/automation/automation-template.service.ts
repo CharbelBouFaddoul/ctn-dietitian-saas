@@ -2,14 +2,20 @@ import { Injectable } from "@nestjs/common";
 import { TEMPLATE_VAR_PATTERN } from "./automation-catalog";
 
 export interface TemplateContext {
-  client?: { firstName: string; lastName: string; displayName: string };
+  client?: {
+    firstName: string;
+    lastName: string;
+    displayName: string;
+    lastActivityDate?: string;
+  };
   dietitian?: { name: string };
-  appointment?: { date: string; time: string };
+  appointment?: { date: string; time: string; title?: string };
   organization?: { name: string };
-  invoice?: { number: string };
-  task?: { title: string };
-  mealPlan?: { name: string };
+  invoice?: { number: string; amount?: string; dueDate?: string };
+  task?: { title: string; dueDate?: string };
+  mealPlan?: { name: string; endDate?: string; lastUpdateDate?: string };
   rule?: { name: string };
+  run?: { date: string };
 }
 
 @Injectable()

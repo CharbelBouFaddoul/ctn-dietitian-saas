@@ -14,14 +14,22 @@ export const TEMPLATE_VARIABLES = [
   "client.firstName",
   "client.lastName",
   "client.displayName",
+  "client.lastActivityDate",
   "dietitian.name",
   "appointment.date",
   "appointment.time",
+  "appointment.title",
   "organization.name",
   "invoice.number",
+  "invoice.amount",
+  "invoice.dueDate",
   "task.title",
+  "task.dueDate",
   "mealPlan.name",
+  "mealPlan.endDate",
+  "mealPlan.lastUpdateDate",
   "rule.name",
+  "run.date",
 ] as const;
 
 export type TemplateVariable = (typeof TEMPLATE_VARIABLES)[number];

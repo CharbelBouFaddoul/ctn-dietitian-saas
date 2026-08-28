@@ -585,8 +585,84 @@
   }
 }
 
+.ui-automation-insert-wrap {
+  position: relative;
+}
+
+.ui-automation-insert__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.ui-automation-insert__btn {
+  appearance: none;
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0.1rem 0.35rem;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.ui-automation-insert__btn:hover,
+.ui-automation-insert__btn.is-open {
+  color: var(--practice-deep-teal, #0f766e);
+  background: rgb(15 23 42 / 5%);
+}
+
+.ui-automation-insert__menu {
+  position: absolute;
+  right: 0;
+  top: 2rem;
+  z-index: 12;
+  min-width: 13.75rem;
+  max-height: 15.5rem;
+  overflow: auto;
+  padding: 0.35rem;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 14px 36px rgb(15 23 42 / 14%);
+}
+
+.ui-automation-insert__item {
+  appearance: none;
+  display: grid;
+  gap: 0.08rem;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  border-radius: 8px;
+  padding: 0.45rem 0.55rem;
+  cursor: pointer;
+}
+
+.ui-automation-insert__item:hover {
+  background: rgb(13 148 136 / 8%);
+}
+
+.ui-automation-insert__item strong {
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.ui-automation-insert__item span {
+  font-size: 0.72rem;
+  color: var(--color-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
 .ui-token-chip {
-  display: inline-flex;
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.35rem;
   margin-top: 0.45rem;
@@ -709,11 +785,13 @@
 
 .ui-dialog.ui-automation-dialog {
   max-height: min(94vh, 54rem);
+  overflow: visible;
 }
 
 .ui-automation-dialog .ui-dialog__body {
   display: grid;
-  gap: 1rem;
+  gap: 1.5rem;
+  overflow: visible;
 }
 
 .ui-automation-steps {
@@ -798,11 +876,21 @@
 
 .ui-automation-dialog__fields {
   display: grid;
-  gap: 0.85rem;
+  gap: 1.45rem;
 }
 
 .ui-automation-dialog__fields .ui-field {
   margin-bottom: 0;
+  gap: 0.5rem;
+}
+
+.ui-automation-dialog__fields > .ui-rule-step__hint {
+  margin-top: -0.55rem;
+}
+
+.ui-automation-dialog__fields > .ui-rule-step__hint:first-child {
+  margin-top: 0;
+  margin-bottom: 0.15rem;
 }
 
 .ui-automation-dialog__message {
@@ -822,7 +910,8 @@
 .ui-automation-dialog__actions {
   justify-content: flex-start;
   align-items: center;
-  padding-top: 0.25rem;
+  padding-top: 0.35rem;
+  margin-top: 0.15rem;
 }
 
 .ui-automation-dialog__actions-spacer {
@@ -885,7 +974,7 @@
 
 .ui-rule-scope {
   display: grid;
-  gap: 0.75rem;
+  gap: 1.15rem;
   padding: 1rem 1.1rem;
   border-radius: 14px;
   border: 1px solid rgb(13 148 136 / 14%);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Alert,
   Button,
@@ -14,7 +14,7 @@ import {
 import { api } from "../lib/api";
 import {
   AUTOMATION_ACTIONS,
-  CLIENT_NAME_FRIENDLY,
+  tokensForTrigger,
   buildAutomationConfiguration,
   clientLabel,
   defaultActionCopy,
@@ -83,6 +83,7 @@ export function AutomationRuleDialog({
   const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
   const [clientFilter, setClientFilter] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [insertPicker, setInsertPicker] = useState<string | null>(null);
   const [taskTitle, setTaskTitle] = useState(defaultActionCopy("CREATE_TASK").taskTitle);
   const [notificationTitle, setNotificationTitle] = useState(defaultActionCopy("CREATE_TASK").notificationTitle);
   const [notificationBody, setNotificationBody] = useState(defaultActionCopy("CREATE_TASK").notificationBody);
@@ -115,6 +116,7 @@ export function AutomationRuleDialog({
     setSelectedClientIds([]);
     setClientFilter("");
     setError(null);
+    setInsertPicker(null);
     setStep(template ? "then" : "when");
   }
 
@@ -138,6 +140,7 @@ export function AutomationRuleDialog({
       setSelectedTemplateId(
         AUTOMATION_TEMPLATES.find((row) => row.triggerType === hydrated.triggerType)?.id ?? null,
       );
+      setInsertPicker(null);
       setStep("then");
       return;
     }
@@ -217,20 +220,91 @@ export function AutomationRuleDialog({
     };
   }
 
-  function insertClientName(id: string, current: string, setter: (next: string) => void) {
+  function insertToken(id: string, current: string, setter: (next: string) => void, token: string) {
     const field = document.querySelector<HTMLInputElement | HTMLTextAreaElement>(`[data-token-field="${id}"]`);
     const saved = caretByField.current[id];
     const live = field != null && document.activeElement === field;
     const start = live ? (field.selectionStart ?? current.length) : (saved?.start ?? current.length);
     const end = live ? (field.selectionEnd ?? current.length) : (saved?.end ?? current.length);
-    const next = `${current.slice(0, start)}${CLIENT_NAME_FRIENDLY}${current.slice(end)}`;
+    const next = `${current.slice(0, start)}${token}${current.slice(end)}`;
     setter(next);
-    caretByField.current[id] = { start: start + CLIENT_NAME_FRIENDLY.length, end: start + CLIENT_NAME_FRIENDLY.length };
-    const caret = start + CLIENT_NAME_FRIENDLY.length;
+    caretByField.current[id] = { start: start + token.length, end: start + token.length };
+    const caret = start + token.length;
     window.setTimeout(() => {
       field?.focus();
       field?.setSelectionRange(caret, caret);
     }, 0);
+  }
+
+  const insertableTokens = tokensForTrigger(triggerType);
+
+  useEffect(() => {
+    if (!insertPicker) return;
+    function onPointer(event: MouseEvent) {
+      const target = event.target as Element | null;
+      if (!target?.closest?.(".ui-automation-insert-wrap")) setInsertPicker(null);
+    }
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setInsertPicker(null);
+    }
+    document.addEventListener("mousedown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [insertPicker]);
+
+  function copyField(
+    label: string,
+    fieldId: string,
+    current: string,
+    setter: (next: string) => void,
+    control: ReactNode,
+  ) {
+    const menuOpen = insertPicker === fieldId;
+    return (
+      <div className="ui-field ui-automation-insert-wrap">
+        <div className="ui-automation-insert__bar">
+          <span className="ui-label">{label}</span>
+          <button
+            type="button"
+            className={`ui-automation-insert__btn${menuOpen ? " is-open" : ""}`}
+            aria-expanded={menuOpen}
+            aria-haspopup="listbox"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => setInsertPicker(menuOpen ? null : fieldId)}
+          >
+            Insert
+          </button>
+        </div>
+        {control}
+        {menuOpen ? (
+          <div
+            className="ui-automation-insert__menu"
+            role="listbox"
+            aria-label="Fields to insert"
+            onMouseDown={(event) => event.preventDefault()}
+          >
+            {insertableTokens.map((token) => (
+              <button
+                key={token.friendly}
+                type="button"
+                role="option"
+                className="ui-automation-insert__item"
+                onClick={() => {
+                  insertToken(fieldId, current, setter, token.friendly);
+                  setInsertPicker(null);
+                }}
+              >
+                <strong>{token.label}</strong>
+                <span>{token.friendly}</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    );
   }
 
   function canContinue(): boolean {
@@ -418,74 +492,55 @@ export function AutomationRuleDialog({
           )}
 
           {actionType === "CREATE_TASK" ? (
-            <Field
-              label="Task title"
-              hint="Adds the client's name at the cursor."
-            >
+            copyField(
+              "Task title",
+              "taskTitle",
+              taskTitle,
+              setTaskTitle,
               <Input
                 value={toFriendlyTemplate(taskTitle)}
                 onChange={(event) => setTaskTitle(toFriendlyTemplate(event.target.value))}
                 {...tokenFieldProps("taskTitle")}
-              />
-              <div className="ui-token-chip">
-                <button
-                  type="button"
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => insertClientName("taskTitle", taskTitle, setTaskTitle)}
-                >
-                  Insert client name
-                </button>
-              </div>
-            </Field>
+              />,
+            )
           ) : actionType === "SEND_MESSAGE" ? (
-            <Field
-              label="Message"
-              hint="Adds the client's name at the cursor."
-            >
+            copyField(
+              "Message",
+              "notificationBody",
+              notificationBody,
+              setNotificationBody,
               <Textarea
                 value={toFriendlyTemplate(notificationBody)}
                 onChange={(event) => setNotificationBody(toFriendlyTemplate(event.target.value))}
                 className="ui-automation-dialog__message"
                 {...tokenFieldProps("notificationBody")}
-              />
-              <div className="ui-token-chip">
-                <button
-                  type="button"
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => insertClientName("notificationBody", notificationBody, setNotificationBody)}
-                >
-                  Insert client name
-                </button>
-              </div>
-            </Field>
+              />,
+            )
           ) : (
             <>
-              <Field label={actionType === "SEND_EMAIL" ? "Subject" : "Title"}>
+              {copyField(
+                actionType === "SEND_EMAIL" ? "Subject" : "Title",
+                "notificationTitle",
+                notificationTitle,
+                setNotificationTitle,
                 <Input
                   value={toFriendlyTemplate(notificationTitle)}
                   onChange={(event) => setNotificationTitle(toFriendlyTemplate(event.target.value))}
-                />
-              </Field>
-              <Field
-                label="Message"
-                hint="Adds the client's name at the cursor."
-              >
+                  {...tokenFieldProps("notificationTitle")}
+                />,
+              )}
+              {copyField(
+                "Message",
+                "notificationBody",
+                notificationBody,
+                setNotificationBody,
                 <Textarea
                   value={toFriendlyTemplate(notificationBody)}
                   onChange={(event) => setNotificationBody(toFriendlyTemplate(event.target.value))}
                   className="ui-automation-dialog__message"
                   {...tokenFieldProps("notificationBody")}
-                />
-                <div className="ui-token-chip">
-                  <button
-                    type="button"
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => insertClientName("notificationBody", notificationBody, setNotificationBody)}
-                  >
-                    Insert client name
-                  </button>
-                </div>
-              </Field>
+                />,
+              )}
             </>
           )}
         </div>

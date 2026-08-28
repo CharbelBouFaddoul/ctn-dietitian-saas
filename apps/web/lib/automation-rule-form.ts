@@ -7,7 +7,55 @@ import {
 } from "./automation-labels";
 
 export const CLIENT_NAME_TOKEN = "{{client.displayName}}";
-export const CLIENT_NAME_FRIENDLY = "[Client name]";
+export const CLIENT_NAME_FRIENDLY = "[Client_name]";
+
+export type AutomationTemplateToken = {
+  api: string;
+  friendly: string;
+  label: string;
+  triggers?: string[];
+};
+
+export const AUTOMATION_TEMPLATE_TOKENS: AutomationTemplateToken[] = [
+  { api: "client.displayName", friendly: "[Client_name]", label: "Client name" },
+  { api: "client.firstName", friendly: "[Client_first_name]", label: "First name" },
+  { api: "client.lastName", friendly: "[Client_last_name]", label: "Last name" },
+  { api: "dietitian.name", friendly: "[Dietitian_name]", label: "Dietitian name" },
+  { api: "organization.name", friendly: "[Clinic_name]", label: "Clinic name" },
+  { api: "run.date", friendly: "[Today]", label: "Today’s date" },
+  { api: "appointment.date", friendly: "[Appointment_date]", label: "Appointment date", triggers: ["APPOINTMENT_UPCOMING", "APPOINTMENT_MISSED"] },
+  { api: "appointment.time", friendly: "[Appointment_time]", label: "Appointment time", triggers: ["APPOINTMENT_UPCOMING", "APPOINTMENT_MISSED"] },
+  { api: "appointment.title", friendly: "[Appointment_title]", label: "Appointment title", triggers: ["APPOINTMENT_UPCOMING", "APPOINTMENT_MISSED"] },
+  { api: "invoice.number", friendly: "[Invoice_number]", label: "Invoice number", triggers: ["INVOICE_OVERDUE"] },
+  { api: "invoice.amount", friendly: "[Invoice_amount]", label: "Invoice amount", triggers: ["INVOICE_OVERDUE"] },
+  { api: "invoice.dueDate", friendly: "[Invoice_due_date]", label: "Invoice due date", triggers: ["INVOICE_OVERDUE"] },
+  { api: "mealPlan.name", friendly: "[Meal_plan_name]", label: "Meal plan name", triggers: ["MEAL_PLAN_ENDING"] },
+  { api: "mealPlan.endDate", friendly: "[Meal_plan_end_date]", label: "Meal plan end date", triggers: ["MEAL_PLAN_ENDING"] },
+  { api: "mealPlan.lastUpdateDate", friendly: "[Meal_plan_last_update_date]", label: "Meal plan last update", triggers: ["MEAL_PLAN_ENDING"] },
+  { api: "task.title", friendly: "[Task_title]", label: "Task title", triggers: ["TASK_DUE"] },
+  { api: "task.dueDate", friendly: "[Task_due_date]", label: "Task due date", triggers: ["TASK_DUE"] },
+  { api: "client.lastActivityDate", friendly: "[Last_activity_date]", label: "Last activity date", triggers: ["CLIENT_INACTIVE"] },
+];
+
+export function tokensForTrigger(triggerType: string): AutomationTemplateToken[] {
+  return AUTOMATION_TEMPLATE_TOKENS.filter((token) => !token.triggers || token.triggers.includes(triggerType));
+}
+
+export function toFriendlyTemplate(value: string): string {
+  let next = value.split("[Client name]").join(CLIENT_NAME_FRIENDLY);
+  for (const token of AUTOMATION_TEMPLATE_TOKENS) {
+    next = next.split(`{{${token.api}}}`).join(token.friendly);
+  }
+  return next;
+}
+
+export function toApiTemplate(value: string): string {
+  let next = value.split("[Client name]").join(CLIENT_NAME_FRIENDLY);
+  for (const token of AUTOMATION_TEMPLATE_TOKENS) {
+    next = next.split(token.friendly).join(`{{${token.api}}}`);
+  }
+  return next;
+}
 
 export type AutomationRecipientChoice = "ASSIGNED_DIETITIAN" | "CLIENT" | "BOTH";
 export type ClientScope = "ALL" | "SELECTED";
@@ -79,14 +127,6 @@ export const AUTOMATION_ACTIONS = [
     hint: "Posts in the Messages thread with this client.",
   },
 ] as const;
-
-export function toFriendlyTemplate(value: string): string {
-  return value.split(CLIENT_NAME_TOKEN).join(CLIENT_NAME_FRIENDLY);
-}
-
-export function toApiTemplate(value: string): string {
-  return value.split(CLIENT_NAME_FRIENDLY).join(CLIENT_NAME_TOKEN);
-}
 
 export function clientLabel(client: AutomationClientOption): string {
   return client.displayName?.trim() || `${client.firstName} ${client.lastName}`;

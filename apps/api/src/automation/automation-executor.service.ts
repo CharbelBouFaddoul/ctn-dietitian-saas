@@ -253,6 +253,7 @@ export class AutomationExecutorService {
     const context: TemplateContext = {
       organization: { name: organizationName },
       rule: { name: rule.name },
+      run: { date: localDateKey(new Date(), timezone) },
     };
 
     const owner = await this.prisma.user.findUniqueOrThrow({ where: { id: accountUserId } });
@@ -268,6 +269,10 @@ export class AutomationExecutorService {
         lastName: client.lastName,
         displayName: client.displayName ?? `${client.firstName} ${client.lastName}`,
       };
+      if (rule.triggerType === "CLIENT_INACTIVE") {
+        const lastActivity = await this.lastClientActivity(dietitianAccountId, candidate.clientId);
+        context.client.lastActivityDate = lastActivity ? localDateKey(lastActivity, timezone) : "";
+      }
     }
 
     if (candidate.appointmentId) {
@@ -281,22 +286,55 @@ export class AutomationExecutorService {
           hour: "2-digit",
           minute: "2-digit",
         }),
+        title: appointment.title,
       };
     }
 
     if (candidate.invoiceId) {
       const invoice = await this.prisma.invoice.findUniqueOrThrow({ where: { id: candidate.invoiceId } });
-      context.invoice = { number: invoice.invoiceNumber ?? invoice.id.slice(0, 8) };
+      context.invoice = {
+        number: invoice.invoiceNumber ?? invoice.id.slice(0, 8),
+        amount: `${invoice.currency} ${Number(invoice.total).toFixed(2)}`,
+        dueDate: invoice.dueDate ? localDateKey(invoice.dueDate, timezone) : "",
+      };
     }
 
     if (candidate.taskId) {
       const task = await this.prisma.task.findUniqueOrThrow({ where: { id: candidate.taskId } });
-      context.task = { title: task.title };
+      context.task = {
+        title: task.title,
+        dueDate: task.dueAt ? localDateKey(task.dueAt, timezone) : "",
+      };
     }
 
     if (candidate.mealPlanId) {
-      const mealPlan = await this.prisma.mealPlan.findUniqueOrThrow({ where: { id: candidate.mealPlanId } });
-      context.mealPlan = { name: mealPlan.name };
+      const mealPlan = await this.prisma.mealPlan.findUniqueOrThrow({
+        where: { id: candidate.mealPlanId },
+        include: {
+          versions: {
+            where: { status: "PUBLISHED", archivedAt: null },
+            include: { days: { select: { dayNumber: true } } },
+            orderBy: { versionNumber: "desc" },
+            take: 1,
+          },
+        },
+      });
+      const version = mealPlan.versions[0];
+      let endDate = "";
+      if (version?.publishedAt) {
+        const maxDay = version.days.reduce((max, day) => Math.max(max, day.dayNumber), 0);
+        if (maxDay > 0) {
+          const publishedKey = localDateKey(version.publishedAt, timezone);
+          const end = new Date(`${publishedKey}T00:00:00.000Z`);
+          end.setUTCDate(end.getUTCDate() + maxDay - 1);
+          endDate = localDateKey(end, "UTC");
+        }
+      }
+      context.mealPlan = {
+        name: mealPlan.name,
+        lastUpdateDate: localDateKey(mealPlan.updatedAt, timezone),
+        endDate,
+      };
     }
 
     const recipient =
@@ -307,6 +345,41 @@ export class AutomationExecutorService {
           }
         : await this.resolveRecipient(rule, configuration, candidate, assignedUserId, owner);
     return { ...context, ...recipient, assignedUserId };
+  }
+
+  private async lastClientActivity(dietitianAccountId: string, clientId: string): Promise<Date | null> {
+    const [food, water, exercise, sleep, habit] = await Promise.all([
+      this.prisma.foodLog.findFirst({
+        where: { dietitianAccountId, clientId, status: "ACTIVE" },
+        orderBy: { consumedAt: "desc" },
+        select: { consumedAt: true },
+      }),
+      this.prisma.waterLog.findFirst({
+        where: { dietitianAccountId, clientId, status: "ACTIVE" },
+        orderBy: { loggedAt: "desc" },
+        select: { loggedAt: true },
+      }),
+      this.prisma.exerciseLog.findFirst({
+        where: { dietitianAccountId, clientId, status: "ACTIVE" },
+        orderBy: { performedAt: "desc" },
+        select: { performedAt: true },
+      }),
+      this.prisma.sleepLog.findFirst({
+        where: { dietitianAccountId, clientId, status: "ACTIVE" },
+        orderBy: { createdAt: "desc" },
+        select: { createdAt: true },
+      }),
+      this.prisma.habitLog.findFirst({
+        where: { dietitianAccountId, clientId, status: "ACTIVE", completed: true },
+        orderBy: { createdAt: "desc" },
+        select: { createdAt: true },
+      }),
+    ]);
+    const dates = [food?.consumedAt, water?.loggedAt, exercise?.performedAt, sleep?.createdAt, habit?.createdAt].filter(
+      Boolean,
+    ) as Date[];
+    if (!dates.length) return null;
+    return new Date(Math.max(...dates.map((d) => d.getTime())));
   }
 
   /** User IDs that should receive an in-app / portal notification for this run. */
