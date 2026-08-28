@@ -437,10 +437,11 @@ Create/update draft body may include: `discountType`, `discountValue`, `taxRateP
 
 | Method | Path | Query | Description |
 |---|---|---|---|
-| GET | `/overview` | `period`, `startDate`, `endDate` | Practice KPIs |
+| GET | `/overview` | `period`, `startDate`, `endDate` | Practice KPIs. Adds period rates (`collectionRate`, `loggingCoverage`), `activityVolume`, `clientsLogged`, `appointmentsByStatus`, `appointmentCompletionRate` (completed ÷ completed+cancelled+no-show), and a `previous` block (`collectionRate`, `loggingCoverage`, `appointments`, `activityVolume`) for the equal-length prior window |
 | GET | `/clients` | same | Activity + needs-attention (transparent reasons) |
-| GET | `/activity` | same | Tracking log counts |
-| GET | `/financial` | same | Invoice aggregates |
+| GET | `/activity` | same | Tracking log counts + `clientsLogged`, `activeClients`, and `byType: [{ type, logs, clients }]` |
+| GET | `/financial` | same | Invoice aggregates. `outstandingByStatus` lists open-invoice totals (`ISSUED`/`SENT`/`OVERDUE`) for the mix donut |
+| GET | `/series` | same | Time series bucketed in clinic timezone. `grain` is `day` (≤ 45 days) or `week`; returns `revenue: [{ at, invoiced, paid }]` and `activity: [{ at, foodLogs, waterLogs, exerciseLogs, sleepLogs, habitLogs }]` |
 
 Periods: `today`, `this_week`, `this_month`, `last_30_days`, `last_90_days`, `custom`.
 

@@ -39,6 +39,10 @@ export type {
 } from "./marketing";
 export { LineChart } from "./line-chart";
 export type { LineChartPoint, LineChartProps } from "./line-chart";
+export { TrendChart } from "./trend-chart";
+export type { TrendPoint, TrendChartProps } from "./trend-chart";
+export { BarList } from "./bar-list";
+export type { BarListRow, BarListProps } from "./bar-list";
 export { DonutChart } from "./donut-chart";
 export type { DonutSlice, DonutChartProps } from "./donut-chart";
 export { TargetBar } from "./target-bar";

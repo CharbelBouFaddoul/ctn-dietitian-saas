@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
-import { localDateKey } from "@nutrition-saas/utilities";
+import { localDateKey, parseLocalDate } from "@nutrition-saas/utilities";
 import { ClientAccessService } from "../clients/client-access.service";
 import { PrismaService } from "../prisma/prisma.service";
 import type { DietitianTenantContext } from "../dietitian/dietitian.types";
@@ -29,19 +29,20 @@ export class AnalyticsService {
     });
     const visible = this.access.visibleWhere(tenant);
     const now = new Date();
+    const { prevStart, prevEnd } = this.previousWindow(range);
 
     const [
       activeClients,
       newClients,
       inactiveClients,
       activeMealPlans,
-      appointments,
       unpaidInvoices,
       overdueInvoices,
-      invoicedAmount,
-      paidAmount,
       tasksDue,
       tasksOverdue,
+      current,
+      previous,
+      appointmentGroups,
     ] = await Promise.all([
       this.prisma.client.count({ where: { ...visible, status: "ACTIVE" } }),
       this.prisma.client.count({
@@ -53,12 +54,6 @@ export class AnalyticsService {
       this.prisma.mealPlan.count({
         where: { ...tenantWhere(tenant.dietitianAccountId),
           status: "ACTIVE",
-          client: visible,
-        },
-      }),
-      this.prisma.appointment.count({
-        where: { ...tenantWhere(tenant.dietitianAccountId),
-          startAt: { gte: range.start, lte: range.end },
           client: visible,
         },
       }),
@@ -76,24 +71,6 @@ export class AnalyticsService {
           client: visible,
         },
       }),
-      this.prisma.invoice.aggregate({
-        where: { ...tenantWhere(tenant.dietitianAccountId),
-          archivedAt: null,
-          issueDate: { gte: this.toDateOnly(range.start), lte: this.toDateOnly(range.end) },
-          status: { not: "CANCELLED" },
-          client: visible,
-        },
-        _sum: { total: true },
-      }),
-      this.prisma.invoice.aggregate({
-        where: { ...tenantWhere(tenant.dietitianAccountId),
-          archivedAt: null,
-          paidAt: { gte: range.start, lte: range.end },
-          status: "PAID",
-          client: visible,
-        },
-        _sum: { total: true },
-      }),
       this.prisma.task.count({
         where: this.taskVisibleWhere(tenant, visible, {
           dueAt: { gte: now, lte: this.endOfDay(now) },
@@ -106,7 +83,34 @@ export class AnalyticsService {
           status: { in: ["TODO", "IN_PROGRESS"] },
         }),
       }),
+      this.kpiMetrics(tenant, visible, range.start, range.end),
+      this.kpiMetrics(tenant, visible, prevStart, prevEnd),
+      this.prisma.appointment.groupBy({
+        by: ["status"],
+        where: {
+          ...tenantWhere(tenant.dietitianAccountId),
+          startAt: { gte: range.start, lte: range.end },
+          client: visible,
+        },
+        _count: true,
+      }),
     ]);
+
+    const appointmentsByStatus = appointmentGroups
+      .map((row) => ({ status: row.status, count: row._count }))
+      .filter((row) => row.count > 0);
+    const completed = appointmentsByStatus.find((row) => row.status === "COMPLETED")?.count ?? 0;
+    const cancelled = appointmentsByStatus.find((row) => row.status === "CANCELLED")?.count ?? 0;
+    const noShow = appointmentsByStatus.find((row) => row.status === "NO_SHOW")?.count ?? 0;
+    const decided = completed + cancelled + noShow;
+    const appointmentCompletionRate = decided > 0 ? completed / decided : null;
+
+    const collectionRate =
+      current.invoicedAmount > 0 ? current.paidAmount / current.invoicedAmount : null;
+    const loggingCoverage = activeClients > 0 ? current.clientsLogged / activeClients : null;
+    const prevCollectionRate =
+      previous.invoicedAmount > 0 ? previous.paidAmount / previous.invoicedAmount : null;
+    const prevLoggingCoverage = activeClients > 0 ? previous.clientsLogged / activeClients : null;
 
     return {
       period: range.period,
@@ -117,13 +121,25 @@ export class AnalyticsService {
       newClients,
       inactiveClients,
       activeMealPlans,
-      appointments,
+      appointments: current.appointments,
+      appointmentsByStatus,
+      appointmentCompletionRate,
       unpaidInvoices,
       overdueInvoices,
-      invoicedAmount: Number(invoicedAmount._sum.total ?? 0),
-      paidAmount: Number(paidAmount._sum.total ?? 0),
+      invoicedAmount: current.invoicedAmount,
+      paidAmount: current.paidAmount,
       tasksDue,
       tasksOverdue,
+      collectionRate,
+      loggingCoverage,
+      activityVolume: current.activityVolume,
+      clientsLogged: current.clientsLogged,
+      previous: {
+        collectionRate: prevCollectionRate,
+        loggingCoverage: prevLoggingCoverage,
+        appointments: previous.appointments,
+        activityVolume: previous.activityVolume,
+      },
     };
   }
 
@@ -283,15 +299,24 @@ export class AnalyticsService {
       client: visible,
     };
 
-    const [foodLogs, waterLogs, exerciseLogs, sleepLogs, habitLogs] = await Promise.all([
-      this.prisma.foodLog.count({ where: { ...base, createdAt: { gte: range.start, lte: range.end } } }),
-      this.prisma.waterLog.count({ where: { ...base, createdAt: { gte: range.start, lte: range.end } } }),
-      this.prisma.exerciseLog.count({ where: { ...base, createdAt: { gte: range.start, lte: range.end } } }),
-      this.prisma.sleepLog.count({ where: { ...base, createdAt: { gte: range.start, lte: range.end } } }),
-      this.prisma.habitLog.count({
-        where: { ...base, logDate: { gte: this.toDateOnly(range.start), lte: this.toDateOnly(range.end) } },
-      }),
-    ]);
+    const [foodLogs, waterLogs, exerciseLogs, sleepLogs, habitLogs, foodIds, waterIds, exerciseIds, sleepIds, habitIds, activeClients] =
+      await Promise.all([
+        this.prisma.foodLog.count({ where: { ...base, createdAt: { gte: range.start, lte: range.end } } }),
+        this.prisma.waterLog.count({ where: { ...base, createdAt: { gte: range.start, lte: range.end } } }),
+        this.prisma.exerciseLog.count({ where: { ...base, createdAt: { gte: range.start, lte: range.end } } }),
+        this.prisma.sleepLog.count({ where: { ...base, createdAt: { gte: range.start, lte: range.end } } }),
+        this.prisma.habitLog.count({
+          where: { ...base, logDate: { gte: this.toDateOnly(range.start), lte: this.toDateOnly(range.end) } },
+        }),
+        this.clientIdsFor(tenant, visible, "food", range.start, range.end),
+        this.clientIdsFor(tenant, visible, "water", range.start, range.end),
+        this.clientIdsFor(tenant, visible, "exercise", range.start, range.end),
+        this.clientIdsFor(tenant, visible, "sleep", range.start, range.end),
+        this.clientIdsFor(tenant, visible, "habit", range.start, range.end),
+        this.prisma.client.count({ where: { ...visible, status: "ACTIVE" } }),
+      ]);
+
+    const uniqueLogged = new Set([...foodIds, ...waterIds, ...exerciseIds, ...sleepIds, ...habitIds]);
 
     return {
       period: range.period,
@@ -303,6 +328,15 @@ export class AnalyticsService {
       exerciseLogs,
       sleepLogs,
       habitLogs,
+      clientsLogged: uniqueLogged.size,
+      activeClients,
+      byType: [
+        { type: "food", logs: foodLogs, clients: foodIds.length },
+        { type: "water", logs: waterLogs, clients: waterIds.length },
+        { type: "exercise", logs: exerciseLogs, clients: exerciseIds.length },
+        { type: "sleep", logs: sleepLogs, clients: sleepIds.length },
+        { type: "habit", logs: habitLogs, clients: habitIds.length },
+      ],
     };
   }
 
@@ -324,7 +358,8 @@ export class AnalyticsService {
       client: visible,
     };
 
-    const [outstanding, overdue, paidThisPeriod, invoicedThisPeriod, byStatus] = await Promise.all([
+    const [outstanding, overdue, paidThisPeriod, invoicedThisPeriod, byStatus, outstandingGroups] =
+      await Promise.all([
       this.prisma.invoice.aggregate({
         where: { ...base, status: { in: ["ISSUED", "SENT", "OVERDUE"] } },
         _sum: { total: true },
@@ -352,6 +387,12 @@ export class AnalyticsService {
       this.prisma.invoice.groupBy({
         by: ["status"],
         where: base,
+        _sum: { total: true },
+        _count: true,
+      }),
+      this.prisma.invoice.groupBy({
+        by: ["status"],
+        where: { ...base, status: { in: ["ISSUED", "SENT", "OVERDUE"] } },
         _sum: { total: true },
         _count: true,
       }),
@@ -384,6 +425,137 @@ export class AnalyticsService {
         count: row._count,
         total: Number(row._sum.total ?? 0),
       })),
+      outstandingByStatus: outstandingGroups
+        .map((row) => ({
+          status: row.status,
+          count: row._count,
+          total: Number(row._sum.total ?? 0),
+        }))
+        .filter((row) => row.total > 0),
+    };
+  }
+
+  async series(
+    tenant: DietitianTenantContext,
+    input: { period?: AnalyticsPeriod; startDate?: string; endDate?: string },
+  ) {
+    const settings = await this.requireSettings(tenant.dietitianAccountId);
+    const range = resolveAnalyticsRange({
+      period: input.period,
+      timezone: settings.timezone,
+      startDate: input.startDate,
+      endDate: input.endDate,
+    });
+    const tz = settings.timezone;
+    const visible = this.access.visibleWhere(tenant);
+    const base = {
+      ...tenantWhere(tenant.dietitianAccountId),
+      client: visible,
+    };
+
+    const startKey = localDateKey(range.start, tz);
+    const endKey = localDateKey(range.end, tz);
+    const dayMs = 24 * 60 * 60 * 1000;
+    const days: string[] = [];
+    let cursor = parseLocalDate(startKey);
+    const endDate = parseLocalDate(endKey);
+    while (cursor.getTime() <= endDate.getTime()) {
+      days.push(cursor.toISOString().slice(0, 10));
+      cursor = new Date(cursor.getTime() + dayMs);
+    }
+    const grain: "day" | "week" = days.length > 45 ? "week" : "day";
+    const bucketKey = (dayKey: string) => (grain === "day" ? dayKey : this.mondayOf(dayKey));
+
+    const order: string[] = [];
+    const seen = new Set<string>();
+    for (const day of days) {
+      const key = bucketKey(day);
+      if (!seen.has(key)) {
+        seen.add(key);
+        order.push(key);
+      }
+    }
+    const revenue = new Map(order.map((key) => [key, { invoiced: 0, paid: 0 }]));
+    const activity = new Map(
+      order.map((key) => [key, { foodLogs: 0, waterLogs: 0, exerciseLogs: 0, sleepLogs: 0, habitLogs: 0 }]),
+    );
+
+    const [invoiced, paid, food, water, exercise, sleep, habit] = await Promise.all([
+      this.prisma.invoice.findMany({
+        where: {
+          ...base,
+          archivedAt: null,
+          status: { not: "CANCELLED" },
+          issueDate: { gte: this.toDateOnly(range.start), lte: this.toDateOnly(range.end) },
+        },
+        select: { issueDate: true, total: true },
+      }),
+      this.prisma.invoice.findMany({
+        where: { ...base, archivedAt: null, status: "PAID", paidAt: { gte: range.start, lte: range.end } },
+        select: { paidAt: true, total: true },
+      }),
+      this.prisma.foodLog.findMany({
+        where: { ...base, createdAt: { gte: range.start, lte: range.end } },
+        select: { createdAt: true },
+      }),
+      this.prisma.waterLog.findMany({
+        where: { ...base, createdAt: { gte: range.start, lte: range.end } },
+        select: { createdAt: true },
+      }),
+      this.prisma.exerciseLog.findMany({
+        where: { ...base, createdAt: { gte: range.start, lte: range.end } },
+        select: { createdAt: true },
+      }),
+      this.prisma.sleepLog.findMany({
+        where: { ...base, createdAt: { gte: range.start, lte: range.end } },
+        select: { createdAt: true },
+      }),
+      this.prisma.habitLog.findMany({
+        where: { ...base, logDate: { gte: this.toDateOnly(range.start), lte: this.toDateOnly(range.end) } },
+        select: { logDate: true },
+      }),
+    ]);
+
+    for (const row of invoiced) {
+      if (!row.issueDate) continue;
+      const bucket = revenue.get(bucketKey(row.issueDate.toISOString().slice(0, 10)));
+      if (bucket) bucket.invoiced += Number(row.total ?? 0);
+    }
+    for (const row of paid) {
+      if (!row.paidAt) continue;
+      const bucket = revenue.get(bucketKey(localDateKey(row.paidAt, tz)));
+      if (bucket) bucket.paid += Number(row.total ?? 0);
+    }
+    for (const row of food) {
+      const bucket = activity.get(bucketKey(localDateKey(row.createdAt, tz)));
+      if (bucket) bucket.foodLogs += 1;
+    }
+    for (const row of water) {
+      const bucket = activity.get(bucketKey(localDateKey(row.createdAt, tz)));
+      if (bucket) bucket.waterLogs += 1;
+    }
+    for (const row of exercise) {
+      const bucket = activity.get(bucketKey(localDateKey(row.createdAt, tz)));
+      if (bucket) bucket.exerciseLogs += 1;
+    }
+    for (const row of sleep) {
+      const bucket = activity.get(bucketKey(localDateKey(row.createdAt, tz)));
+      if (bucket) bucket.sleepLogs += 1;
+    }
+    for (const row of habit) {
+      if (!row.logDate) continue;
+      const bucket = activity.get(bucketKey(row.logDate.toISOString().slice(0, 10)));
+      if (bucket) bucket.habitLogs += 1;
+    }
+
+    return {
+      period: range.period,
+      start: range.start.toISOString(),
+      end: range.end.toISOString(),
+      timezone: tz,
+      grain,
+      revenue: order.map((at) => ({ at, ...revenue.get(at)! })),
+      activity: order.map((at) => ({ at, ...activity.get(at)! })),
     };
   }
 
@@ -414,6 +586,137 @@ export class AnalyticsService {
 
   private toDateOnly(value: Date): Date {
     return new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()));
+  }
+
+  /** Equal-length window immediately before `range.start`, for vs-prior deltas. */
+  private previousWindow(range: { start: Date; end: Date }): { prevStart: Date; prevEnd: Date } {
+    const span = range.end.getTime() - range.start.getTime();
+    const prevEnd = new Date(range.start.getTime() - 1);
+    const prevStart = new Date(range.start.getTime() - 1 - span);
+    return { prevStart, prevEnd };
+  }
+
+  /** Monday (ISO week start) for a YYYY-MM-DD key, returned as YYYY-MM-DD. */
+  private mondayOf(dayKey: string): string {
+    const date = parseLocalDate(dayKey);
+    const weekday = date.getUTCDay();
+    const offset = weekday === 0 ? 6 : weekday - 1;
+    date.setUTCDate(date.getUTCDate() - offset);
+    return date.toISOString().slice(0, 10);
+  }
+
+  /** KPI inputs (revenue, appointments, tracking) for a single window. */
+  private async kpiMetrics(
+    tenant: DietitianTenantContext,
+    visible: Prisma.ClientWhereInput,
+    start: Date,
+    end: Date,
+  ): Promise<{
+    invoicedAmount: number;
+    paidAmount: number;
+    appointments: number;
+    activityVolume: number;
+    clientsLogged: number;
+  }> {
+    const base = { ...tenantWhere(tenant.dietitianAccountId), client: visible };
+    const [invoiced, paid, appointments, food, water, exercise, sleep, habit, clientsLogged] =
+      await Promise.all([
+        this.prisma.invoice.aggregate({
+          where: {
+            ...base,
+            archivedAt: null,
+            status: { not: "CANCELLED" },
+            issueDate: { gte: this.toDateOnly(start), lte: this.toDateOnly(end) },
+          },
+          _sum: { total: true },
+        }),
+        this.prisma.invoice.aggregate({
+          where: { ...base, archivedAt: null, status: "PAID", paidAt: { gte: start, lte: end } },
+          _sum: { total: true },
+        }),
+        this.prisma.appointment.count({ where: { ...base, startAt: { gte: start, lte: end } } }),
+        this.prisma.foodLog.count({ where: { ...base, createdAt: { gte: start, lte: end } } }),
+        this.prisma.waterLog.count({ where: { ...base, createdAt: { gte: start, lte: end } } }),
+        this.prisma.exerciseLog.count({ where: { ...base, createdAt: { gte: start, lte: end } } }),
+        this.prisma.sleepLog.count({ where: { ...base, createdAt: { gte: start, lte: end } } }),
+        this.prisma.habitLog.count({
+          where: { ...base, logDate: { gte: this.toDateOnly(start), lte: this.toDateOnly(end) } },
+        }),
+        this.clientsLoggedCount(tenant, visible, start, end),
+      ]);
+    return {
+      invoicedAmount: Number(invoiced._sum.total ?? 0),
+      paidAmount: Number(paid._sum.total ?? 0),
+      appointments,
+      activityVolume: food + water + exercise + sleep + habit,
+      clientsLogged,
+    };
+  }
+
+  /** Distinct clients with any tracking log in the window (for coverage). */
+  private async clientsLoggedCount(
+    tenant: DietitianTenantContext,
+    visible: Prisma.ClientWhereInput,
+    start: Date,
+    end: Date,
+  ): Promise<number> {
+    const [food, water, exercise, sleep, habit] = await Promise.all([
+      this.clientIdsFor(tenant, visible, "food", start, end),
+      this.clientIdsFor(tenant, visible, "water", start, end),
+      this.clientIdsFor(tenant, visible, "exercise", start, end),
+      this.clientIdsFor(tenant, visible, "sleep", start, end),
+      this.clientIdsFor(tenant, visible, "habit", start, end),
+    ]);
+    return new Set([...food, ...water, ...exercise, ...sleep, ...habit]).size;
+  }
+
+  private async clientIdsFor(
+    tenant: DietitianTenantContext,
+    visible: Prisma.ClientWhereInput,
+    kind: "food" | "water" | "exercise" | "sleep" | "habit",
+    start: Date,
+    end: Date,
+  ): Promise<string[]> {
+    const base = { ...tenantWhere(tenant.dietitianAccountId), client: visible };
+    if (kind === "habit") {
+      const rows = await this.prisma.habitLog.findMany({
+        where: { ...base, logDate: { gte: this.toDateOnly(start), lte: this.toDateOnly(end) } },
+        select: { clientId: true },
+        distinct: ["clientId"],
+      });
+      return rows.map((row) => row.clientId);
+    }
+    const inWindow = { createdAt: { gte: start, lte: end } };
+    if (kind === "food") {
+      const rows = await this.prisma.foodLog.findMany({
+        where: { ...base, ...inWindow },
+        select: { clientId: true },
+        distinct: ["clientId"],
+      });
+      return rows.map((row) => row.clientId);
+    }
+    if (kind === "water") {
+      const rows = await this.prisma.waterLog.findMany({
+        where: { ...base, ...inWindow },
+        select: { clientId: true },
+        distinct: ["clientId"],
+      });
+      return rows.map((row) => row.clientId);
+    }
+    if (kind === "exercise") {
+      const rows = await this.prisma.exerciseLog.findMany({
+        where: { ...base, ...inWindow },
+        select: { clientId: true },
+        distinct: ["clientId"],
+      });
+      return rows.map((row) => row.clientId);
+    }
+    const rows = await this.prisma.sleepLog.findMany({
+      where: { ...base, ...inWindow },
+      select: { clientId: true },
+      distinct: ["clientId"],
+    });
+    return rows.map((row) => row.clientId);
   }
 
   private async latestByClient(

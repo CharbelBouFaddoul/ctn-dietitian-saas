@@ -261,6 +261,30 @@ describe("Phase 10 invoices, tasks, and analytics", () => {
 
     expect(overviewA.body.activeClients).toBeGreaterThanOrEqual(1);
     expect(overviewA.body.paidAmount).toBeGreaterThanOrEqual(120);
+    expect(overviewA.body.collectionRate).toBe(1);
+    expect(overviewA.body.previous).toHaveProperty("collectionRate");
+    expect(overviewA.body.previous.appointments).toEqual(expect.any(Number));
+    expect(Array.isArray(overviewA.body.appointmentsByStatus)).toBe(true);
+    expect(overviewA.body).toHaveProperty("appointmentCompletionRate");
+
+    const financialA = await request(ctx.app.getHttpServer())
+      .get(`/api/v1/dietitian/${orgA.id}/analytics/financial?period=this_month`)
+      .set("Cookie", ownerA.cookie)
+      .expect(200);
+    expect(Array.isArray(financialA.body.outstandingByStatus)).toBe(true);
+
+    const seriesA = await request(ctx.app.getHttpServer())
+      .get(`/api/v1/dietitian/${orgA.id}/analytics/series?period=this_month`)
+      .set("Cookie", ownerA.cookie)
+      .expect(200);
+    expect(seriesA.body.grain).toBe("day");
+    expect(Array.isArray(seriesA.body.revenue)).toBe(true);
+    expect(seriesA.body.revenue.length).toBeGreaterThan(0);
+    const paidTotal = seriesA.body.revenue.reduce(
+      (sum: number, point: { paid: number }) => sum + point.paid,
+      0,
+    );
+    expect(paidTotal).toBe(120);
 
     const overviewB = await request(ctx.app.getHttpServer())
       .get(`/api/v1/dietitian/${orgB.id}/analytics/overview?period=this_month`)
@@ -268,5 +292,30 @@ describe("Phase 10 invoices, tasks, and analytics", () => {
       .expect(200);
 
     expect(overviewB.body.paidAmount).toBe(0);
+
+    const seriesB = await request(ctx.app.getHttpServer())
+      .get(`/api/v1/dietitian/${orgB.id}/analytics/series?period=this_month`)
+      .set("Cookie", ownerB.cookie)
+      .expect(200);
+    const paidTotalB = seriesB.body.revenue.reduce(
+      (sum: number, point: { paid: number }) => sum + point.paid,
+      0,
+    );
+    expect(paidTotalB).toBe(0);
+  });
+
+  it("aggregates series into weekly buckets over long ranges", async () => {
+    const owner = await registerVerifyLogin();
+    const org = await createOrg(owner.cookie, "Series weeks");
+    await createClient(owner.cookie, org.id);
+
+    const series = await request(ctx.app.getHttpServer())
+      .get(`/api/v1/dietitian/${org.id}/analytics/series?period=last_90_days`)
+      .set("Cookie", owner.cookie)
+      .expect(200);
+
+    expect(series.body.grain).toBe("week");
+    expect(series.body.revenue.length).toBeLessThanOrEqual(14);
+    expect(series.body.activity.length).toBe(series.body.revenue.length);
   });
 });

@@ -214,7 +214,7 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     audience: "dietitian",
     category: "Analytics",
     title: "Practice analytics",
-    summary: "Review overview metrics, financial summaries, clients needing attention, and activity.",
+    summary: "Track period rates, revenue trends, invoice mix, and client tracking activity with vs-prior-period deltas.",
   },
 
   // AI — catalog feature is seeded INACTIVE (hidden on /features until re-enabled).

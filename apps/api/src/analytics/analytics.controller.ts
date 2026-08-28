@@ -53,4 +53,14 @@ export class AnalyticsController {
   ) {
     return this.analytics.financial(tenant, { period: period as AnalyticsPeriod | undefined, startDate, endDate });
   }
+
+  @Get("series")
+  series(
+    @CurrentTenant() tenant: DietitianTenantContext,
+    @Query("period") period?: string,
+    @Query("startDate") startDate?: string,
+    @Query("endDate") endDate?: string,
+  ) {
+    return this.analytics.series(tenant, { period: period as AnalyticsPeriod | undefined, startDate, endDate });
+  }
 }

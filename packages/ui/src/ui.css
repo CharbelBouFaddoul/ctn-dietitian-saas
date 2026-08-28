@@ -7523,6 +7523,334 @@
   line-height: 1;
 }
 
+/* Trend chart — extends .ui-line-chart tokens with a second (compare) series. */
+.ui-trend .ui-line-chart__svg {
+  min-height: 9rem;
+}
+
+.ui-trend__primary {
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.ui-trend__area {
+  pointer-events: none;
+}
+
+.ui-trend__compare {
+  stroke: #94a3b8;
+  stroke-width: 2.1;
+  stroke-dasharray: 5 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.ui-trend__dot-compare {
+  fill: #94a3b8;
+  stroke: #fff;
+  stroke-width: 1.75;
+}
+
+.ui-trend__dot-muted {
+  opacity: 0.55;
+}
+
+.ui-trend__cursor {
+  stroke: rgb(15 23 42 / 16%);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.ui-trend__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+  padding: 0 0.25rem 0.1rem;
+}
+
+.ui-trend__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-muted);
+}
+
+.ui-trend__swatch {
+  width: 0.85rem;
+  height: 0.3rem;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+.ui-trend__swatch--primary {
+  background: var(--color-accent);
+}
+
+.ui-trend__swatch--compare {
+  background: #94a3b8;
+}
+
+.ui-trend__tip-badge--compare {
+  background: rgb(148 163 184 / 18%);
+  color: #475569;
+}
+
+/* Bar list — label + value with a fill scaled to the largest value. */
+.ui-bar-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.7rem;
+}
+
+.ui-bar-list__empty {
+  margin: 0;
+}
+
+.ui-bar-list__row {
+  display: grid;
+  grid-template-columns: 7rem 1fr auto;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.ui-bar-list__label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.ui-bar-list__track {
+  height: 0.55rem;
+  border-radius: 999px;
+  background: rgb(15 23 42 / 7%);
+  overflow: hidden;
+}
+
+.ui-bar-list__fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  transition: width 0.25s ease;
+}
+
+.ui-bar-list__value {
+  font-size: 0.82rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+  min-width: 2.5rem;
+  text-align: right;
+}
+
+/* Analytics page — period report layout (distinct from the home dashboard). */
+.ui-analytics {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.ui-analytics__caption {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.85rem;
+}
+
+.ui-segment {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+  padding: 0.2rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface-muted, #f8fafc);
+}
+
+.ui-segment__btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-muted);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.ui-segment__btn:hover {
+  color: var(--color-text);
+}
+
+.ui-segment__btn.is-active {
+  background: #fff;
+  color: var(--practice-deep-teal, var(--color-accent));
+  box-shadow: 0 1px 2px rgb(15 23 42 / 10%);
+}
+
+.ui-kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.ui-kpi-strip--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.ui-kpi {
+  display: grid;
+  gap: 0.35rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, #fff, #fbfcfc);
+}
+
+.ui-kpi__label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.ui-kpi__value {
+  font-size: 1.55rem;
+  font-weight: 750;
+  line-height: 1.1;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.ui-kpi__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  color: var(--color-muted);
+}
+
+.ui-kpi__delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  background: rgb(15 23 42 / 6%);
+  color: var(--color-muted);
+}
+
+.ui-kpi__delta.is-up {
+  background: rgb(22 163 74 / 12%);
+  color: #15803d;
+}
+
+.ui-kpi__delta.is-down {
+  background: rgb(220 38 38 / 12%);
+  color: #b91c1c;
+}
+
+.ui-kpi.ui-tooltip[data-tip]::after {
+  white-space: normal;
+  max-width: 13.5rem;
+  text-align: center;
+  line-height: 1.35;
+  z-index: 6;
+  box-shadow: 0 6px 16px rgb(15 23 42 / 18%);
+}
+
+.ui-tracking-mix {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.85rem;
+}
+
+.ui-tracking-mix__row {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.ui-tracking-mix__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.35rem 0.75rem;
+}
+
+.ui-tracking-mix__label {
+  font-size: 0.85rem;
+  font-weight: 650;
+  color: var(--color-text);
+}
+
+.ui-tracking-mix__stats {
+  font-size: 0.78rem;
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.ui-tracking-mix__stats strong {
+  color: var(--color-text);
+  font-weight: 700;
+}
+
+.ui-tracking-mix__track {
+  height: 0.5rem;
+  border-radius: 999px;
+  background: rgb(15 23 42 / 7%);
+  overflow: hidden;
+}
+
+.ui-tracking-mix__fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.ui-analytics__charts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.1rem;
+}
+
+.ui-analytics__charts > .ui-analytics__wide {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 900px) {
+  .ui-kpi-strip,
+  .ui-kpi-strip--3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ui-analytics__charts {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .ui-kpi-strip,
+  .ui-kpi-strip--3 {
+    grid-template-columns: 1fr;
+  }
+
+  .ui-bar-list__row {
+    grid-template-columns: 5.5rem 1fr auto;
+  }
+}
+
 .ui-assessment-form {
   display: grid;
   gap: 1.1rem;
