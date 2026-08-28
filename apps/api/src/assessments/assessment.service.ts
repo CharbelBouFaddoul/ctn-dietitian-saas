@@ -31,19 +31,14 @@ export class AssessmentService {
     return this.prisma.assessmentTemplate.findMany({
       where: {
         ...tenantWhere(tenant.dietitianAccountId),
-        ...(includeInactive ? {} : { status: "ACTIVE" }),
+        status: includeInactive ? { not: "ARCHIVED" } : "ACTIVE",
       },
       orderBy: { name: "asc" },
     });
   }
 
   async getTemplate(tenant: DietitianTenantContext, templateId: string) {
-    const template = await this.prisma.assessmentTemplate.findFirst({
-      where: { id: templateId, ...tenantWhere(tenant.dietitianAccountId) },
-    });
-    if (!template) {
-      throw new NotFoundException("Template not found");
-    }
+    const template = await this.requireTemplate(tenant.dietitianAccountId, templateId);
     return {
       ...template,
       schema: parseAssessmentSchema(template.schema),
@@ -79,12 +74,7 @@ export class AssessmentService {
       status?: "ACTIVE" | "INACTIVE" | "ARCHIVED";
     },
   ) {
-    const template = await this.prisma.assessmentTemplate.findFirst({
-      where: { id: templateId, ...tenantWhere(tenant.dietitianAccountId) },
-    });
-    if (!template) {
-      throw new NotFoundException("Template not found");
-    }
+    const template = await this.requireTemplate(tenant.dietitianAccountId, templateId);
     const bumpVersion = input.schema !== undefined;
     const schema = input.schema !== undefined ? toPrismaSchema(parseAssessmentSchema(input.schema)) : undefined;
     return this.prisma.assessmentTemplate.update({
@@ -126,6 +116,30 @@ export class AssessmentService {
         version: template.version + 1,
       },
     });
+  }
+
+  async deleteTemplate(tenant: DietitianTenantContext, templateId: string) {
+    const template = await this.requireTemplate(tenant.dietitianAccountId, templateId);
+    const assigned = await this.prisma.assessment.count({
+      where: { templateId, ...tenantWhere(tenant.dietitianAccountId) },
+    });
+    if (assigned > 0) {
+      await this.prisma.assessmentTemplate.update({
+        where: { id: templateId },
+        data: { status: "ARCHIVED" },
+      });
+    } else {
+      await this.prisma.assessmentTemplate.delete({ where: { id: templateId } });
+    }
+    await this.security.record({
+      type: "assessment_template_deleted",
+      outcome: "success",
+      userId: tenant.userId,
+      dietitianAccountId: tenant.dietitianAccountId,
+      targetType: "assessment_template",
+      targetId: templateId,
+    });
+    return { id: templateId, deleted: true };
   }
 
   async reorderTemplateQuestions(
@@ -369,7 +383,11 @@ export class AssessmentService {
 
   private async requireTemplate(dietitianAccountId: string, templateId: string) {
     const template = await this.prisma.assessmentTemplate.findFirst({
-      where: { id: templateId, ...tenantWhere(dietitianAccountId) },
+      where: {
+        id: templateId,
+        status: { not: "ARCHIVED" },
+        ...tenantWhere(dietitianAccountId),
+      },
     });
     if (!template) {
       throw new NotFoundException("Template not found");

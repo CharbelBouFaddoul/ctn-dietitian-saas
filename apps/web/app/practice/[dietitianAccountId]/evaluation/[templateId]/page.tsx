@@ -354,6 +354,9 @@ export default function EvaluationFormEditorPage() {
         description={questionCount === 1 ? "1 question" : `${questionCount} questions`}
         actions={
           <div className="ui-row" style={{ gap: 10 }}>
+            <Link href={listHref} className="ui-btn ui-btn--secondary">
+              Back
+            </Link>
             {clientEvalsHref ? (
               <Link href={clientEvalsHref} className="ui-btn ui-btn--secondary">
                 Back to client

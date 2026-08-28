@@ -175,6 +175,64 @@ describe("assessment evaluation hardening", () => {
       .expect(403);
   });
 
+  it("deletes unused templates and archives templates that already have evaluations", async () => {
+    const owner = await registerVerifyLogin(email("del"));
+    const org = await createOrg(owner.cookie, "Delete Clinic");
+    const client = await createClient(owner.cookie, org.id);
+
+    const unused = await request(ctx.app.getHttpServer())
+      .post(`/api/v1/dietitian/${org.id}/assessment-templates`)
+      .set("Cookie", owner.cookie)
+      .send({ name: "Unused form", schema: richSchema })
+      .expect(201);
+
+    await request(ctx.app.getHttpServer())
+      .delete(`/api/v1/dietitian/${org.id}/assessment-templates/${unused.body.id}`)
+      .set("Cookie", owner.cookie)
+      .expect(200);
+
+    await request(ctx.app.getHttpServer())
+      .get(`/api/v1/dietitian/${org.id}/assessment-templates/${unused.body.id}`)
+      .set("Cookie", owner.cookie)
+      .expect(404);
+
+    const assigned = await request(ctx.app.getHttpServer())
+      .post(`/api/v1/dietitian/${org.id}/assessment-templates`)
+      .set("Cookie", owner.cookie)
+      .send({ name: "Assigned form", schema: richSchema })
+      .expect(201);
+
+    const started = await request(ctx.app.getHttpServer())
+      .post(`/api/v1/dietitian/${org.id}/clients/${client.id}/assessments`)
+      .set("Cookie", owner.cookie)
+      .send({ templateId: assigned.body.id })
+      .expect(201);
+
+    await request(ctx.app.getHttpServer())
+      .delete(`/api/v1/dietitian/${org.id}/assessment-templates/${assigned.body.id}`)
+      .set("Cookie", owner.cookie)
+      .expect(200);
+
+    const listed = await request(ctx.app.getHttpServer())
+      .get(`/api/v1/dietitian/${org.id}/assessment-templates?includeInactive=true`)
+      .set("Cookie", owner.cookie)
+      .expect(200);
+    expect(listed.body.map((row: { id: string }) => row.id)).not.toContain(assigned.body.id);
+
+    await request(ctx.app.getHttpServer())
+      .get(`/api/v1/dietitian/${org.id}/assessment-templates/${assigned.body.id}`)
+      .set("Cookie", owner.cookie)
+      .expect(404);
+
+    await request(ctx.app.getHttpServer())
+      .get(`/api/v1/dietitian/${org.id}/clients/${client.id}/assessments/${started.body.id}`)
+      .set("Cookie", owner.cookie)
+      .expect(200);
+
+    const stored = await ctx.prisma.assessmentTemplate.findUniqueOrThrow({ where: { id: assigned.body.id } });
+    expect(stored.status).toBe("ARCHIVED");
+  });
+
   it("validates answers, enforces immutability, and freezes snapshot after template edits", async () => {
     const owner = await registerVerifyLogin(email("val"));
     const org = await createOrg(owner.cookie, "Validation Clinic");

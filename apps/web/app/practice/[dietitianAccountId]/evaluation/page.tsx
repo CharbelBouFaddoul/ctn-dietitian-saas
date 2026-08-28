@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   Alert,
   Button,
+  ConfirmDialog,
   Dialog,
   EmptyState,
   Field,
@@ -56,6 +57,8 @@ export default function EvaluationFormsPage() {
   const [newName, setNewName] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [createError, setCreateError] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<EvaluationTemplate | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   async function load() {
     const rows = await api<EvaluationTemplate[]>(`${apiBase}/assessment-templates?includeInactive=true`);
@@ -81,6 +84,7 @@ export default function EvaluationFormsPage() {
     const query = search.trim().toLowerCase();
     return allTemplates.filter((row) => {
       const rowStatus = row.status ?? "ACTIVE";
+      if (rowStatus === "ARCHIVED") return false;
       if (view === "active" && rowStatus !== "ACTIVE") return false;
       if (view === "inactive" && rowStatus === "ACTIVE") return false;
       if (!query) return true;
@@ -149,6 +153,22 @@ export default function EvaluationFormsPage() {
       setError(errorMessage(err, "Unable to update form"));
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function deleteForm() {
+    if (!pendingDelete) return;
+    setDeleteBusy(true);
+    setError(null);
+    try {
+      await api(`${apiBase}/assessment-templates/${pendingDelete.id}`, { method: "DELETE" });
+      setPendingDelete(null);
+      await load();
+    } catch (err) {
+      setError(errorMessage(err, "Unable to delete form"));
+      setPendingDelete(null);
+    } finally {
+      setDeleteBusy(false);
     }
   }
 
@@ -247,7 +267,7 @@ export default function EvaluationFormsPage() {
                         {rowStatus === "ACTIVE" ? (
                           <button
                             type="button"
-                            className="ui-list-cards__action is-danger"
+                            className="ui-list-cards__action"
                             disabled={busy}
                             onClick={() => void setTemplateStatus(row.id, "INACTIVE")}
                           >
@@ -263,6 +283,14 @@ export default function EvaluationFormsPage() {
                             Activate
                           </button>
                         )}
+                        <button
+                          type="button"
+                          className="ui-list-cards__action is-danger"
+                          disabled={busy || deleteBusy}
+                          onClick={() => setPendingDelete(row)}
+                        >
+                          Delete
+                        </button>
                       </div>
                     </div>
                   </article>
@@ -309,6 +337,21 @@ export default function EvaluationFormsPage() {
           </div>
         </form>
       </Dialog>
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title="Delete this form?"
+        description={
+          pendingDelete
+            ? `“${pendingDelete.name}” will be removed from the library. Existing client evaluations keep their answers.`
+            : undefined
+        }
+        confirmLabel="Delete form"
+        danger
+        pending={deleteBusy}
+        onConfirm={() => void deleteForm()}
+        onCancel={() => setPendingDelete(null)}
+      />
     </section>
   );
 }

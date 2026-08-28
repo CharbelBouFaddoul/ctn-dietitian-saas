@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseUUIDPipe,
@@ -197,6 +198,14 @@ export class AssessmentController {
       ...body,
       schema: body.schema as Prisma.InputJsonValue | undefined,
     });
+  }
+
+  @Delete("assessment-templates/:templateId")
+  deleteTemplate(
+    @CurrentTenant() tenant: DietitianTenantContext,
+    @Param("templateId", ParseUUIDPipe) templateId: string,
+  ) {
+    return this.assessments.deleteTemplate(tenant, templateId);
   }
 
   @Post("assessment-templates/:templateId/questions")
