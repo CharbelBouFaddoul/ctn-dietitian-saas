@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
+import { FormEvent, Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import {
@@ -8,17 +8,14 @@ import {
   Button,
   EmptyState,
   Field,
-  FilterBar,
   Input,
   PageHeader,
-  SearchInput,
   Section,
   Select,
   StatusBadge,
-  Table,
-  Td,
   Textarea,
 } from "@nutrition-saas/ui";
+import { FilterPopover, ListFilters, LIST_SEARCH_DEBOUNCE_MS } from "../../../../components/list-filters";
 import { api } from "../../../../lib/api";
 import { errorMessage } from "../../../../lib/humanize-error";
 import { statusLabel } from "../../../../lib/practice-labels";
@@ -48,6 +45,13 @@ function clientLabel(client: ClientRow): string {
   return client.displayName ?? `${client.firstName} ${client.lastName}`;
 }
 
+const STATUS_FILTERS = [
+  { id: "", label: "Active & drafts" },
+  { id: "DRAFT", label: "Draft" },
+  { id: "ACTIVE", label: "Active" },
+  { id: "ARCHIVED", label: "Archived" },
+] as const;
+
 export default function MealPlansRoute() {
   return (
     <Suspense fallback={<LoadingMealPlans />}>
@@ -58,7 +62,7 @@ export default function MealPlansRoute() {
 
 function LoadingMealPlans() {
   return (
-    <section className="ui-stack" style={{ gap: 24 }}>
+    <section className="ui-list-page">
       <PageHeader eyebrow="Nutrition" title="Meal plans" description="Loading…" />
     </section>
   );
@@ -66,7 +70,7 @@ function LoadingMealPlans() {
 
 function MealPlansPage() {
   const params = useParams<{ dietitianAccountId: string }>();
-  const search = useSearchParams();
+  const searchParams = useSearchParams();
   const dietitianAccountId = params.dietitianAccountId;
   const [data, setData] = useState<ListResponse | null>(null);
   const [clients, setClients] = useState<ClientRow[]>([]);
@@ -75,8 +79,9 @@ function MealPlansPage() {
   const [dayLabelMode, setDayLabelMode] = useState<"NUMBERED" | "WEEKDAY">("NUMBERED");
   const [clientId, setClientId] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const [filterClientId, setFilterClientId] = useState(() => search.get("clientId") ?? "");
-  const [nameQuery, setNameQuery] = useState("");
+  const [filterClientId, setFilterClientId] = useState(() => searchParams.get("clientId") ?? "");
+  const [searchDraft, setSearchDraft] = useState("");
+  const [search, setSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -86,7 +91,7 @@ function MealPlansPage() {
     const qs = new URLSearchParams();
     if (statusFilter) qs.set("status", statusFilter);
     if (filterClientId) qs.set("clientId", filterClientId);
-    if (nameQuery.trim()) qs.set("q", nameQuery.trim());
+    if (search) qs.set("q", search);
     const query = qs.toString() ? `?${qs.toString()}` : "";
     const [plans, clientList] = await Promise.all([
       api<ListResponse>(`/api/v1/dietitian/${dietitianAccountId}/meal-plans${query}`),
@@ -101,11 +106,15 @@ function MealPlansPage() {
   }
 
   useEffect(() => {
-    const handle = window.setTimeout(() => {
-      void load().catch((err) => setError(errorMessage(err, "Unable to load meal plans")));
-    }, nameQuery.trim() ? 250 : 0);
-    return () => window.clearTimeout(handle);
-  }, [dietitianAccountId, statusFilter, filterClientId, nameQuery]);
+    const next = searchDraft.trim();
+    if (next === search) return;
+    const timer = window.setTimeout(() => setSearch(next), LIST_SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [search, searchDraft]);
+
+  useEffect(() => {
+    void load().catch((err) => setError(errorMessage(err, "Unable to load meal plans")));
+  }, [dietitianAccountId, statusFilter, filterClientId, search]);
 
   async function create(event: FormEvent) {
     event.preventDefault();
@@ -148,15 +157,19 @@ function MealPlansPage() {
   }
 
   const items = data?.items ?? [];
-  const hasFilters = Boolean(statusFilter || filterClientId || nameQuery.trim());
-  const filterDescription = useMemo(() => {
-    if (!data) return "Loading…";
-    const count = `${data.total} plan${data.total !== 1 ? "s" : ""}`;
-    return hasFilters ? `${count} matching filters` : count;
-  }, [data, hasFilters]);
+  const hasFilters = Boolean(statusFilter || filterClientId || search);
+  const selectedClient = clients.find((client) => client.id === filterClientId);
+  const statusTrigger = STATUS_FILTERS.find((item) => item.id === statusFilter)?.label;
+
+  function clearFilters() {
+    setSearchDraft("");
+    setSearch("");
+    setFilterClientId("");
+    setStatusFilter("");
+  }
 
   return (
-    <section className="ui-stack" style={{ gap: 24 }}>
+    <section className="ui-list-page">
       <PageHeader
         eyebrow="Nutrition"
         title="Meal plans"
@@ -227,73 +240,57 @@ function MealPlansPage() {
         </Section>
       ) : null}
 
-      <Section title="Find plans" description="Narrow by name, client, or status." tone="muted">
-        <FilterBar>
-          <div className="ui-filter-bar__field ui-filter-bar__field--grow">
-            <p className="ui-filter-bar__label">Plan name</p>
-            <SearchInput
-              value={nameQuery}
-              onChange={setNameQuery}
-              placeholder="Search plans…"
-              aria-label="Search meal plans by name"
-            />
-          </div>
-          <div className="ui-filter-bar__field">
-            <p className="ui-filter-bar__label">Client</p>
-            <Select
-              value={filterClientId}
-              onChange={(event) => setFilterClientId(event.target.value)}
-              aria-label="Filter by client"
-              className="ui-filter-bar__select"
-            >
-              <option value="">All clients</option>
-              {clients.map((client) => (
-                <option key={client.id} value={client.id}>
-                  {clientLabel(client)}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div className="ui-filter-bar__field">
-            <p className="ui-filter-bar__label">Status</p>
-            <Select
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value)}
-              aria-label="Filter by status"
-              className="ui-filter-bar__select"
-            >
-              <option value="">Active & drafts</option>
-              <option value="DRAFT">Draft plans</option>
-              <option value="ACTIVE">Active (published)</option>
-              <option value="ARCHIVED">Archived</option>
-            </Select>
-          </div>
-          {hasFilters ? (
-            <div className="ui-filter-bar__actions">
-              <button
-                type="button"
-                className="ui-filter-bar__clear"
-                onClick={() => {
-                  setNameQuery("");
-                  setFilterClientId("");
-                  setStatusFilter("");
-                }}
-              >
-                Clear filters
-              </button>
-            </div>
-          ) : null}
-        </FilterBar>
-      </Section>
+      <ListFilters
+        search={searchDraft}
+        onSearchChange={setSearchDraft}
+        searchPlaceholder="Search plans"
+        hasFilters={hasFilters}
+        onClear={clearFilters}
+        count={data?.total ?? 0}
+        countNoun="plan"
+        loading={!data && !error}
+      >
+        <FilterPopover
+          label="Filter by client"
+          value={filterClientId ? (selectedClient ? clientLabel(selectedClient) : "Client") : "Client"}
+          active={Boolean(filterClientId)}
+          searchPlaceholder="Search clients"
+          onSelect={setFilterClientId}
+          items={[
+            { id: "", label: "All clients", active: !filterClientId },
+            ...clients.map((client) => ({
+              id: client.id,
+              label: clientLabel(client),
+              active: filterClientId === client.id,
+            })),
+          ]}
+        />
+        <FilterPopover
+          label="Filter by status"
+          value={statusFilter ? statusTrigger ?? "Status" : "Status"}
+          active={Boolean(statusFilter)}
+          searchPlaceholder="Search status"
+          onSelect={setStatusFilter}
+          items={STATUS_FILTERS.map((item) => ({
+            id: item.id,
+            label: item.id ? item.label : "Active & drafts",
+            active: statusFilter === item.id,
+          }))}
+        />
+      </ListFilters>
 
-      <Section title="All plans" description={filterDescription}>
+      <div className="ui-list-results">
         {items.length === 0 ? (
           <EmptyState
             title={hasFilters ? "No meal plans match" : "No meal plans yet"}
             action={
               !hasFilters ? (
                 <Button onClick={() => setShowCreate(true)}>Create first plan</Button>
-              ) : undefined
+              ) : (
+                <Button variant="secondary" onClick={clearFilters}>
+                  Clear filters
+                </Button>
+              )
             }
           >
             {hasFilters
@@ -301,63 +298,48 @@ function MealPlansPage() {
               : "Create a draft, add foods and reusable meals to each day, then publish for the client."}
           </EmptyState>
         ) : (
-          <Table>
-            <thead>
-              <tr>
-                <th>Plan</th>
-                <th>Client</th>
-                <th>Status</th>
-                <th>Versions</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((row) => (
-                <tr key={row.id}>
-                  <Td label="Plan">
-                    <Link href={`/practice/${dietitianAccountId}/meal-plans/${row.id}`} className="ui-link">
+          <ul className="ui-list-cards">
+            {items.map((row) => {
+              const clientName = row.client.displayName ?? `${row.client.firstName} ${row.client.lastName}`;
+              const versions = [
+                row.draftVersion ? `Draft v${row.draftVersion}` : "No draft",
+                row.currentPublishedVersion ? `Published v${row.currentPublishedVersion}` : "Not published",
+              ].join(" · ");
+              return (
+                <li key={row.id}>
+                  <article className="ui-list-cards__item">
+                    <Link
+                      href={`/practice/${dietitianAccountId}/meal-plans/${row.id}`}
+                      className="ui-list-cards__main"
+                      title={`${row.name} · ${clientName}`}
+                    >
                       <strong>{row.name}</strong>
+                      <p>
+                        {clientName} · {versions}
+                      </p>
                     </Link>
-                  </Td>
-                  <Td label="Client">
-                    {row.client.displayName ?? `${row.client.firstName} ${row.client.lastName}`}
-                  </Td>
-                  <Td label="Status">
-                    <StatusBadge status={row.status} label={statusLabel(row.status)} />
-                  </Td>
-                  <Td label="Versions">
-                    <span className="ui-muted" style={{ fontSize: 13 }}>
-                      {row.draftVersion ? `Draft v${row.draftVersion}` : "No draft"}
-                      {" · "}
-                      {row.currentPublishedVersion ? `Published v${row.currentPublishedVersion}` : "Not published"}
-                    </span>
-                  </Td>
-                  <Td label="Actions">
-                    <div className="ui-row" style={{ gap: 8, justifyContent: "flex-end" }}>
-                      <Link
-                        href={`/practice/${dietitianAccountId}/meal-plans/${row.id}`}
-                        className="ui-btn ui-btn--secondary ui-btn--sm"
-                      >
-                        Open
-                      </Link>
+                    <div className="ui-list-cards__aside">
+                      <StatusBadge status={row.status} label={statusLabel(row.status)} />
                       {row.status !== "ARCHIVED" ? (
-                        <Button
-                          variant="danger"
-                          size="sm"
-                          disabled={busyId === row.id}
-                          onClick={() => void archivePlan(row.id, row.name)}
-                        >
-                          Delete
-                        </Button>
+                        <div className="ui-list-cards__actions">
+                          <button
+                            type="button"
+                            className="ui-list-cards__action is-danger"
+                            disabled={busyId === row.id}
+                            onClick={() => void archivePlan(row.id, row.name)}
+                          >
+                            Delete
+                          </button>
+                        </div>
                       ) : null}
                     </div>
-                  </Td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
+                  </article>
+                </li>
+              );
+            })}
+          </ul>
         )}
-      </Section>
+      </div>
     </section>
   );
 }

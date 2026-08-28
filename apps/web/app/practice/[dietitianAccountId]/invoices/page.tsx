@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useEffect, useRef, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   Alert,
@@ -11,6 +11,7 @@ import {
   PageHeader,
   StatusBadge,
 } from "@nutrition-saas/ui";
+import { FilterPopover, ListFilters, LIST_SEARCH_DEBOUNCE_MS } from "../../../../components/list-filters";
 import { api } from "../../../../lib/api";
 import { clientDisplayName } from "../../../../lib/client-identity";
 import { addLocalDays, localDateKey } from "../../../../lib/local-date";
@@ -103,125 +104,6 @@ function issuedSummary(issuedFrom: string, issuedTo: string, preset: DatePreset)
   return "Issued";
 }
 
-function SearchIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <circle cx="11" cy="11" r="6.5" stroke="currentColor" strokeWidth="1.8" />
-      <path d="M16.2 16.2L20 20" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function FilterPopover({
-  label,
-  value,
-  active = false,
-  items,
-  searchPlaceholder,
-  onSelect,
-  children,
-}: {
-  label: string;
-  value: string;
-  active?: boolean;
-  items?: Array<{ id: string; label: string; active?: boolean }>;
-  searchPlaceholder?: string;
-  onSelect?: (id: string) => void;
-  children?: (close: () => void) => ReactNode;
-}) {
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const rootRef = useRef<HTMLDivElement>(null);
-  const searchRef = useRef<HTMLInputElement>(null);
-  const searchable = Boolean(items);
-
-  useEffect(() => {
-    if (!open) {
-      setQuery("");
-      return;
-    }
-    function onPointer(event: MouseEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
-    }
-    function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpen(false);
-    }
-    document.addEventListener("mousedown", onPointer);
-    document.addEventListener("keydown", onKey);
-    const frame = window.requestAnimationFrame(() => searchRef.current?.focus());
-    return () => {
-      document.removeEventListener("mousedown", onPointer);
-      document.removeEventListener("keydown", onKey);
-      window.cancelAnimationFrame(frame);
-    };
-  }, [open]);
-
-  const needle = query.trim().toLowerCase();
-  const visibleItems =
-    items?.filter((item) => !needle || item.label.toLowerCase().includes(needle)) ?? [];
-
-  function close() {
-    setOpen(false);
-  }
-
-  return (
-    <div className="ui-invoice-filters__cell" ref={rootRef}>
-      <button
-        type="button"
-        className={`ui-invoice-filters__trigger${active ? " is-set" : ""}${open ? " is-open" : ""}`}
-        aria-label={label}
-        aria-expanded={open}
-        aria-haspopup="listbox"
-        onClick={() => setOpen((current) => !current)}
-      >
-        <span>{value}</span>
-      </button>
-      {open ? (
-        <div className="ui-invoice-filters__menu" role="listbox" aria-label={label}>
-          {searchable ? (
-            <>
-              <label className="ui-invoice-filters__menu-search">
-                <SearchIcon />
-                <input
-                  ref={searchRef}
-                  type="search"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder={searchPlaceholder ?? "Search"}
-                  aria-label={searchPlaceholder ?? `Search ${label}`}
-                  onClick={(event) => event.stopPropagation()}
-                  onKeyDown={(event) => event.stopPropagation()}
-                />
-              </label>
-              <div className="ui-invoice-filters__menu-list">
-                {visibleItems.length === 0 ? (
-                  <p className="ui-invoice-filters__empty">No matches</p>
-                ) : (
-                  visibleItems.map((item) => (
-                    <button
-                      key={item.id || "all"}
-                      type="button"
-                      className={`ui-invoice-filters__option${item.active ? " is-active" : ""}`}
-                      onClick={() => {
-                        onSelect?.(item.id);
-                        close();
-                      }}
-                    >
-                      {item.label}
-                    </button>
-                  ))
-                )}
-              </div>
-            </>
-          ) : (
-            <div className="ui-invoice-filters__menu-list">{children?.(close)}</div>
-          )}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
 function IssuedRangeMenu({
   issuedFrom,
   issuedTo,
@@ -244,7 +126,7 @@ function IssuedRangeMenu({
         <>
           <button
             type="button"
-            className={`ui-invoice-filters__option${!active ? " is-active" : ""}`}
+            className={`ui-list-filters__option${!active ? " is-active" : ""}`}
             onClick={() => {
               onPreset("");
               close();
@@ -256,7 +138,7 @@ function IssuedRangeMenu({
             <button
               key={preset.id}
               type="button"
-              className={`ui-invoice-filters__option${currentPreset === preset.id ? " is-active" : ""}`}
+              className={`ui-list-filters__option${currentPreset === preset.id ? " is-active" : ""}`}
               onClick={() => {
                 onPreset(preset.id);
                 close();
@@ -265,7 +147,7 @@ function IssuedRangeMenu({
               {preset.label}
             </button>
           ))}
-          <div className="ui-invoice-filters__custom">
+          <div className="ui-list-filters__custom">
             <label>
               From
               <Input
@@ -326,7 +208,7 @@ function InvoicesPageInner() {
     const timer = window.setTimeout(() => {
       setSearch(next);
       setPage(1);
-    }, 280);
+    }, LIST_SEARCH_DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
   }, [search, searchDraft]);
 
@@ -436,88 +318,67 @@ function InvoicesPageInner() {
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
 
-      <div className="ui-invoice-filters">
-        <div className="ui-invoice-filters__bar">
-          <label className="ui-invoice-filters__search">
-            <SearchIcon />
-            <input
-              className="ui-invoice-filters__query"
-              type="search"
-              value={searchDraft}
-              onChange={(event) => setSearchDraft(event.target.value)}
-              placeholder="Search invoices"
-              aria-label="Search invoices"
-            />
-          </label>
-          <div className="ui-invoice-filters__group">
-            <FilterPopover
-              label="Filter by client"
-              value={filterClientId ? selectedClientName ?? "Client" : "Client"}
-              active={Boolean(filterClientId)}
-              searchPlaceholder="Search clients"
-              onSelect={(id) => {
-                setFilterClientId(id);
-                setPage(1);
-              }}
-              items={[
-                { id: "", label: "All clients", active: !filterClientId },
-                ...(filterClientId && !clients.some((client) => client.id === filterClientId)
-                  ? [{ id: filterClientId, label: selectedClientName ?? "Selected client", active: true }]
-                  : []),
-                ...clients.map((client) => ({
-                  id: client.id,
-                  label: clientDisplayName(client),
-                  active: filterClientId === client.id,
-                })),
-              ]}
-            />
-            <FilterPopover
-              label="Filter by status"
-              value={status ? statusLabel(status) : "Status"}
-              active={Boolean(status)}
-              searchPlaceholder="Search status"
-              onSelect={(id) => {
-                setStatus(id);
-                setPage(1);
-              }}
-              items={STATUS_CHIPS.map((chip) => ({
-                id: chip.value,
-                label: chip.value ? chip.label : "All statuses",
-                active: status === chip.value,
-              }))}
-            />
-            <IssuedRangeMenu
-              issuedFrom={issuedFrom}
-              issuedTo={issuedTo}
-              currentPreset={currentPreset}
-              onPreset={applyPreset}
-              onFrom={(value) => {
-                setIssuedFrom(value);
-                setPage(1);
-              }}
-              onTo={(value) => {
-                setIssuedTo(value);
-                setPage(1);
-              }}
-            />
-          </div>
-          {hasFilters ? (
-            <button type="button" className="ui-invoice-filters__clear" onClick={clearFilters}>
-              Clear
-            </button>
-          ) : null}
-          <p className="ui-invoice-filters__count">
-            {loading && !data ? (
-              "Loading"
-            ) : (
-              <>
-                <strong>{total}</strong>
-                <span>{total === 1 ? "invoice" : "invoices"}</span>
-              </>
-            )}
-          </p>
-        </div>
-      </div>
+      <ListFilters
+        search={searchDraft}
+        onSearchChange={setSearchDraft}
+        searchPlaceholder="Search invoices"
+        hasFilters={hasFilters}
+        onClear={clearFilters}
+        count={total}
+        countNoun="invoice"
+        loading={loading && !data}
+      >
+        <FilterPopover
+          label="Filter by client"
+          value={filterClientId ? selectedClientName ?? "Client" : "Client"}
+          active={Boolean(filterClientId)}
+          searchPlaceholder="Search clients"
+          onSelect={(id) => {
+            setFilterClientId(id);
+            setPage(1);
+          }}
+          items={[
+            { id: "", label: "All clients", active: !filterClientId },
+            ...(filterClientId && !clients.some((client) => client.id === filterClientId)
+              ? [{ id: filterClientId, label: selectedClientName ?? "Selected client", active: true }]
+              : []),
+            ...clients.map((client) => ({
+              id: client.id,
+              label: clientDisplayName(client),
+              active: filterClientId === client.id,
+            })),
+          ]}
+        />
+        <FilterPopover
+          label="Filter by status"
+          value={status ? statusLabel(status) : "Status"}
+          active={Boolean(status)}
+          searchPlaceholder="Search status"
+          onSelect={(id) => {
+            setStatus(id);
+            setPage(1);
+          }}
+          items={STATUS_CHIPS.map((chip) => ({
+            id: chip.value,
+            label: chip.value ? chip.label : "All statuses",
+            active: status === chip.value,
+          }))}
+        />
+        <IssuedRangeMenu
+          issuedFrom={issuedFrom}
+          issuedTo={issuedTo}
+          currentPreset={currentPreset}
+          onPreset={applyPreset}
+          onFrom={(value) => {
+            setIssuedFrom(value);
+            setPage(1);
+          }}
+          onTo={(value) => {
+            setIssuedTo(value);
+            setPage(1);
+          }}
+        />
+      </ListFilters>
 
       <div className="ui-invoice-results">
         {loading && !data ? <LoadingState>Loading invoices…</LoadingState> : null}

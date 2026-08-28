@@ -29,7 +29,7 @@ DEMO_ALLOW_RESET=1 pnpm demo:reset -- --sample-catalog
 
 1. (reset only) wipe application tables  
 2. seed entitlement catalog, platform settings, global habits  
-3. import food catalog (curated by default) + starter recipes (full mode)  
+3. import food catalog (curated by default) + Lebanon 2021 dishes/sweets + starter recipes (full mode)  
 4. create users, practices, subscriptions, clients, and domain data  
 
 ## Default password

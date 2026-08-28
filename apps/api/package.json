@@ -20,6 +20,7 @@
     "food:import:sr-legacy": "tsx src/foods/import/sr-legacy.cli.ts",
     "food:import:cnf": "tsx src/foods/import/cnf.cli.ts",
     "food:import:cofid": "tsx src/foods/import/cofid.cli.ts",
+    "food:import:lebanon": "tsx src/foods/import/lebanon-fct-2021.cli.ts",
     "recipe:import": "tsx src/recipes/import/cli.ts",
     "demo:reset": "tsx src/demo/cli.ts",
     "demo:seed": "tsx src/demo/cli.ts --seed-only",

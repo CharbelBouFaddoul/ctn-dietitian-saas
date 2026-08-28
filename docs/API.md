@@ -211,7 +211,7 @@ Session + `TenantGuard`. Client-scoped routes also run `ClientAccessGuard` / `Cl
 | DELETE | `/foods/:foodId/override` | OWNER/DIETITIAN | Deactivate override; effective values return to global |
 | GET | `/food-sources` | Member | Active datasets (version, attribution, food count) |
 
-Global catalog foods are never mutated by dietitian `PATCH`. Import via `pnpm food:import` (runs `tsx src/foods/import/cli.ts` — avoids Nest wiping Docker-mounted `dist`) or platform admin `POST /api/v1/admin/food-sources/import` (bundled curated dataset; no remote URL fetch). Prefer host import when `DATABASE_URL` points at Postgres, or `docker compose -f docker-compose.dev.yml exec api pnpm food:import` when using the dev stack.
+Global catalog foods are never mutated by dietitian `PATCH`. Import via `pnpm food:import` (runs `tsx src/foods/import/cli.ts` — avoids Nest wiping Docker-mounted `dist`) or platform admin `POST /api/v1/admin/food-sources/import` (bundled curated dataset; no remote URL fetch). Lebanon 2021 traditional dishes and Arabic sweets: `pnpm food:import:lebanon`. Prefer host import when `DATABASE_URL` points at Postgres, or `docker compose -f docker-compose.dev.yml exec api pnpm food:import` when using the dev stack.
 
 Platform **Starter recipes** (`dietitianAccountId` null) are imported with `pnpm recipe:import` from `apps/api/recipe-data/myplate-kitchen-starter.json` after foods are imported. Practices can list/use Starters in meal plans but cannot edit/archive them. Practice recipes remain practice-owned.
 

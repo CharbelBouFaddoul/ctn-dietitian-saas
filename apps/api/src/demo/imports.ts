@@ -6,6 +6,7 @@ import {
   datasetFromFoundationDump,
   resolveFoundationDumpPath,
 } from "../foods/import/foundation-dataset";
+import { lebanonFct2021Dataset } from "../foods/import/lebanon-fct-2021-dataset";
 import type { FoodDatasetFile } from "../foods/import/dataset.types";
 import { importRecipeDataset } from "../recipes/import/importer";
 import type { RecipeDatasetFile } from "../recipes/import/dataset.types";
@@ -40,7 +41,11 @@ export async function importDemoFoodCatalog(
     dataset = loadSampleCatalog();
   }
   const report = await importFoodDataset(prisma, dataset);
-  return { foods: report.imported + report.updated, sourceKey: dataset.source.key };
+  const lebanon = await importFoodDataset(prisma, lebanonFct2021Dataset());
+  return {
+    foods: report.imported + report.updated + lebanon.imported + lebanon.updated,
+    sourceKey: dataset.source.key,
+  };
 }
 
 export async function importDemoRecipes(prisma: PrismaClient): Promise<{ recipes: number } | null> {

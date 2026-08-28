@@ -374,6 +374,7 @@ V1 import source is **USDA FoodData Central Foundation Foods** (US government wo
 
 - Pipeline sample: `apps/api/food-data/usda-foundation-sample.json` (format-stable; used by import unit tests).
 - Curated catalog (hundreds of common ACTIVE foods): `apps/api/food-data/usda-foundation-curated.json`.
+- Lebanon 2021 traditional dishes and Arabic sweets (composite foods as served, not recipes): `pnpm food:import:lebanon`.
 
 Import (existing importer only):
 
@@ -382,6 +383,9 @@ pnpm food:import
 # Prefer: runs tsx importer (no Nest dist wipe). Host or:
 # docker compose -f docker-compose.dev.yml exec api pnpm food:import
 # Dataset path relative to apps/api: food-data/usda-foundation-curated.json
+
+pnpm food:import:lebanon
+# 30 traditional dishes + 35 Arabic sweets from Lebanese University / WHO EMRO (CC BY 4.0)
 
 pnpm recipe:import
 # After foods: imports platform Starter recipes from recipe-data/myplate-kitchen-starter.json

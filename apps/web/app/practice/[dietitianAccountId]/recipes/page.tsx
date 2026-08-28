@@ -1,21 +1,16 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
   Alert,
-  Badge,
   Button,
   EmptyState,
-  Field,
   PageHeader,
-  Section,
-  Select,
   StatusBadge,
-  Table,
-  Td,
 } from "@nutrition-saas/ui";
+import { FilterPopover, ListFilters, ListPager, LIST_SEARCH_DEBOUNCE_MS } from "../../../../components/list-filters";
 import { api } from "../../../../lib/api";
 import { errorMessage } from "../../../../lib/humanize-error";
 import { statusLabel } from "../../../../lib/practice-labels";
@@ -38,10 +33,17 @@ interface ListResponse {
   items: RecipeRow[];
 }
 
+const RECIPE_STATUS = [
+  { id: "ACTIVE", label: "Active" },
+  { id: "ARCHIVED", label: "Archived" },
+  { id: "", label: "All statuses" },
+] as const;
+
 export default function RecipesPage() {
   const params = useParams<{ dietitianAccountId: string }>();
   const dietitianAccountId = params.dietitianAccountId;
-  const [q, setQ] = useState("");
+  const [searchDraft, setSearchDraft] = useState("");
+  const [search, setSearch] = useState("");
   const [status, setStatus] = useState("ACTIVE");
   const [page, setPage] = useState(1);
   const [data, setData] = useState<ListResponse | null>(null);
@@ -50,12 +52,12 @@ export default function RecipesPage() {
 
   const query = useMemo(() => {
     const p = new URLSearchParams();
-    if (q) p.set("q", q);
+    if (search) p.set("q", search);
     if (status) p.set("status", status);
     p.set("page", String(page));
     p.set("pageSize", "20");
     return p.toString();
-  }, [q, status, page]);
+  }, [search, status, page]);
 
   async function load() {
     setError(null);
@@ -67,14 +69,18 @@ export default function RecipesPage() {
   }
 
   useEffect(() => {
+    const next = searchDraft.trim();
+    if (next === search) return;
+    const timer = window.setTimeout(() => {
+      setSearch(next);
+      setPage(1);
+    }, LIST_SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [search, searchDraft]);
+
+  useEffect(() => {
     void load();
   }, [query, dietitianAccountId]);
-
-  function onSearch(event: FormEvent) {
-    event.preventDefault();
-    setPage(1);
-    void load();
-  }
 
   async function archiveRecipe(id: string, name: string) {
     if (!window.confirm(`Delete “${name}” from the meal library? It will be archived and hidden from active plans.`)) {
@@ -94,9 +100,18 @@ export default function RecipesPage() {
 
   const pageCount = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
   const items = data?.items ?? [];
+  const hasFilters = Boolean(search || status !== "ACTIVE");
+  const statusTrigger = RECIPE_STATUS.find((item) => item.id === status)?.label;
+
+  function clearFilters() {
+    setSearchDraft("");
+    setSearch("");
+    setStatus("ACTIVE");
+    setPage(1);
+  }
 
   return (
-    <section className="ui-stack" style={{ gap: 24 }}>
+    <section className="ui-list-page">
       <PageHeader
         eyebrow="Nutrition"
         title="Meal library"
@@ -110,136 +125,106 @@ export default function RecipesPage() {
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
 
-      <Section title="Find meals" tone="muted">
-        <form onSubmit={onSearch} className="ui-inline-form">
-          <Field label="Search">
-            <input
-              className="ui-input"
-              value={q}
-              onChange={(event) => setQ(event.target.value)}
-              placeholder="Search by name…"
-            />
-          </Field>
-          <Field label="Status">
-            <Select
-              value={status}
-              onChange={(event) => {
-                setStatus(event.target.value);
-                setPage(1);
-              }}
-            >
-              <option value="ACTIVE">Active</option>
-              <option value="ARCHIVED">Archived</option>
-              <option value="">All</option>
-            </Select>
-          </Field>
-          <div className="ui-inline-form__action">
-            <Button type="submit" variant="secondary">
-              Apply
-            </Button>
-          </div>
-        </form>
-      </Section>
-
-      <Section
-        title="Reusable meals"
-        description={data ? `${data.total} meal${data.total === 1 ? "" : "s"}` : undefined}
+      <ListFilters
+        search={searchDraft}
+        onSearchChange={setSearchDraft}
+        searchPlaceholder="Search meals"
+        hasFilters={hasFilters}
+        onClear={clearFilters}
+        count={data?.total ?? 0}
+        countNoun="meal"
+        loading={!data && !error}
       >
+        <FilterPopover
+          label="Filter by status"
+          value={status === "ACTIVE" ? "Status" : statusTrigger ?? "Status"}
+          active={status !== "ACTIVE"}
+          searchPlaceholder="Search status"
+          onSelect={(id) => {
+            setStatus(id);
+            setPage(1);
+          }}
+          items={RECIPE_STATUS.map((item) => ({
+            id: item.id,
+            label: item.label,
+            active: status === item.id,
+          }))}
+        />
+      </ListFilters>
+
+      <div className="ui-list-results">
         {items.length === 0 ? (
           <EmptyState
-            title={q ? "No meals match this search" : "Your meal library is empty"}
+            title={hasFilters ? "No meals match this search" : "Your meal library is empty"}
             action={
-              !q ? (
+              !hasFilters ? (
                 <Link href={`/practice/${dietitianAccountId}/recipes/new`} className="ui-btn ui-btn--primary">
                   Create first meal
                 </Link>
-              ) : undefined
+              ) : (
+                <Button variant="secondary" onClick={clearFilters}>
+                  Clear filters
+                </Button>
+              )
             }
           >
-            {q
+            {hasFilters
               ? "Try a different name or clear filters."
               : "Create a reusable meal once, then add it to breakfasts, lunches, and snacks across plans."}
           </EmptyState>
         ) : (
-          <Table>
-            <thead>
-              <tr>
-                <th>Meal</th>
-                <th>Origin</th>
-                <th>Servings</th>
-                <th>Ingredients</th>
-                <th>Status</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((row) => (
-                <tr key={row.id}>
-                  <Td label="Meal">
-                    <Link href={`/practice/${dietitianAccountId}/recipes/${row.id}`} className="ui-link">
+          <ul className="ui-list-cards">
+            {items.map((row) => {
+              const origin = row.origin === "starter" ? "Starter" : "Clinic";
+              const summary = [
+                origin,
+                `${row.servings} serving${row.servings === 1 ? "" : "s"}`,
+                `${row.ingredientCount} ingredient${row.ingredientCount === 1 ? "" : "s"}`,
+              ].join(" · ");
+              const blurb = row.description
+                ? row.description.length > 80
+                  ? `${row.description.slice(0, 80)}…`
+                  : row.description
+                : null;
+              return (
+                <li key={row.id}>
+                  <article className="ui-list-cards__item">
+                    <Link
+                      href={`/practice/${dietitianAccountId}/recipes/${row.id}`}
+                      className="ui-list-cards__main"
+                      title={row.name}
+                    >
                       <strong>{row.name}</strong>
+                      <p>{blurb ? `${summary} · ${blurb}` : summary}</p>
                     </Link>
-                    {row.description ? (
-                      <div className="ui-muted" style={{ fontSize: 12, marginTop: 2 }}>
-                        {row.description.length > 80 ? `${row.description.slice(0, 80)}…` : row.description}
-                      </div>
-                    ) : null}
-                  </Td>
-                  <Td label="Origin">
-                    <Badge tone={row.origin === "starter" ? "info" : "neutral"}>
-                      {row.origin === "starter" ? "Starter" : "Clinic"}
-                    </Badge>
-                  </Td>
-                  <Td label="Servings">{row.servings}</Td>
-                  <Td label="Ingredients">{row.ingredientCount}</Td>
-                  <Td label="Status">
-                    <StatusBadge status={row.status} label={statusLabel(row.status)} />
-                  </Td>
-                  <Td label="Actions">
-                    <div className="ui-row" style={{ gap: 8, justifyContent: "flex-end" }}>
-                      <Link
-                        href={`/practice/${dietitianAccountId}/recipes/${row.id}`}
-                        className="ui-btn ui-btn--secondary ui-btn--sm"
-                      >
-                        Open
-                      </Link>
+                    <div className="ui-list-cards__aside">
+                      <StatusBadge status={row.status} label={statusLabel(row.status)} />
                       {row.status === "ACTIVE" && !row.readOnly ? (
-                        <Button
-                          variant="danger"
-                          size="sm"
-                          disabled={busyId === row.id}
-                          onClick={() => void archiveRecipe(row.id, row.name)}
-                        >
-                          Delete
-                        </Button>
+                        <div className="ui-list-cards__actions">
+                          <button
+                            type="button"
+                            className="ui-list-cards__action is-danger"
+                            disabled={busyId === row.id}
+                            onClick={() => void archiveRecipe(row.id, row.name)}
+                          >
+                            Delete
+                          </button>
+                        </div>
                       ) : null}
                     </div>
-                  </Td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
+                  </article>
+                </li>
+              );
+            })}
+          </ul>
         )}
-
-        {data && data.total > data.pageSize ? (
-          <p className="ui-row" style={{ marginTop: 16 }}>
-            <span className="ui-muted">
-              Page {data.page} of {pageCount}
-            </span>
-            <Button variant="secondary" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-              Previous
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={page >= pageCount}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              Next
-            </Button>
-          </p>
-        ) : null}
-      </Section>
+        <ListPager
+          page={page}
+          pageCount={pageCount}
+          onPrev={() => setPage((current) => current - 1)}
+          onNext={() => setPage((current) => current + 1)}
+        />
+      </div>
     </section>
   );
 }

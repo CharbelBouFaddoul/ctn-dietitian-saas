@@ -19,6 +19,7 @@
     "food:import:sr-legacy": "pnpm --filter @nutrition-saas/api food:import:sr-legacy",
     "food:import:cnf": "pnpm --filter @nutrition-saas/api food:import:cnf",
     "food:import:cofid": "pnpm --filter @nutrition-saas/api food:import:cofid",
+    "food:import:lebanon": "pnpm --filter @nutrition-saas/api food:import:lebanon",
     "recipe:import": "pnpm --filter @nutrition-saas/api recipe:import",
     "demo:reset": "pnpm --filter @nutrition-saas/api demo:reset",
     "demo:seed": "pnpm --filter @nutrition-saas/api demo:seed",

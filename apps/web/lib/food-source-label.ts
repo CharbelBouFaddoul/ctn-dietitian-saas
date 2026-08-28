@@ -5,6 +5,7 @@ const SHORT_BY_KEY: Record<string, string> = {
   "usda-fdc-sr-legacy": "USDA SR Legacy",
   "cnf-canada": "CNF",
   "cofid-uk": "McCance and Widdowson",
+  "lebanon-fct-2021": "Lebanon 2021",
   "practice-custom": "Custom",
 };
 
