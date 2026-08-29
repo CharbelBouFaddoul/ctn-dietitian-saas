@@ -170,7 +170,7 @@ export function DonutChart({
                 onMouseLeave={() => setActive(null)}
               >
                 <span className="ui-donut__swatch" style={{ background: arc.color }} />
-                <span>
+                <span className="ui-donut__name">
                   {arc.label}
                   {showPct ? ` ${Math.round(arc.pct)}%` : ""}
                 </span>

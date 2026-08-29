@@ -138,6 +138,7 @@ export function MealPlanAnalysisPanel({
   meals,
   macroTargets,
   macroTargetsFromClient,
+  compact = false,
 }: {
   dayLabel: string;
   presented: Nutrition | undefined;
@@ -145,6 +146,7 @@ export function MealPlanAnalysisPanel({
   meals: Meal[];
   macroTargets: DailyMacroTargets;
   macroTargetsFromClient: boolean;
+  compact?: boolean;
 }) {
   const sugar = n(presented?.sugarG);
   const carbs = n(presented?.carbohydrateG);
@@ -158,6 +160,8 @@ export function MealPlanAnalysisPanel({
   const otherFat = Math.max(0, totalFat - accountedFat);
 
   const foodGroups = foodGroupSlices(meals);
+  const chartSize = compact ? 104 : 168;
+  const chartThickness = compact ? 24 : 38;
   const sugarMissing = carbs > 0 && sugar <= 0;
   const carbInfo = sugarMissing
     ? "Some foods on this day have no sugar value in the catalog, so sugars vs other carbs may be incomplete."
@@ -227,9 +231,10 @@ export function MealPlanAnalysisPanel({
       <div className="ui-mp__chart-grid ui-mp__chart-grid--analysis">
         <ChartCard title="Macronutrients distribution">
           <DonutChart
-            size={168}
-            thickness={38}
+            size={chartSize}
+            thickness={chartThickness}
             showPct={false}
+            interactive={!compact}
             valueUnit="kcal"
             slices={[
               { label: "Fat", value: n(presented?.fatG) * 9, color: MACRO_COLORS.fat },
@@ -241,9 +246,10 @@ export function MealPlanAnalysisPanel({
 
         <ChartCard title="Energy distribution">
           <DonutChart
-            size={168}
-            thickness={38}
+            size={chartSize}
+            thickness={chartThickness}
             showPct={false}
+            interactive={!compact}
             valueUnit="kcal"
             slices={meals.map((meal, i) => ({
               label: meal.name,
@@ -255,9 +261,10 @@ export function MealPlanAnalysisPanel({
 
         <ChartCard title="Protein distribution">
           <DonutChart
-            size={168}
-            thickness={38}
+            size={chartSize}
+            thickness={chartThickness}
             showPct={false}
+            interactive={!compact}
             valueUnit="g"
             slices={meals.map((meal, i) => ({
               label: meal.name,
@@ -269,9 +276,10 @@ export function MealPlanAnalysisPanel({
 
         <ChartCard title="Fats distribution">
           <DonutChart
-            size={168}
-            thickness={38}
+            size={chartSize}
+            thickness={chartThickness}
             showPct={false}
+            interactive={!compact}
             valueUnit="g"
             slices={[
               { label: "Trans", value: trans, color: FAT_COLORS.trans },
@@ -283,11 +291,12 @@ export function MealPlanAnalysisPanel({
           />
         </ChartCard>
 
-        <ChartCard title="Carbohydrates distribution" info={carbInfo}>
+        <ChartCard title="Carbohydrates distribution" info={compact ? null : carbInfo}>
           <DonutChart
-            size={168}
-            thickness={38}
+            size={chartSize}
+            thickness={chartThickness}
             showPct={false}
+            interactive={!compact}
             valueUnit="g"
             slices={[
               { label: "Sugars", value: sugar, color: CARB_COLORS.sugars },
@@ -296,11 +305,12 @@ export function MealPlanAnalysisPanel({
           />
         </ChartCard>
 
-        <ChartCard title="Food groups" info={foodGroupInfo}>
+        <ChartCard title="Food groups" info={compact ? null : foodGroupInfo}>
           <DonutChart
-            size={168}
-            thickness={38}
+            size={chartSize}
+            thickness={chartThickness}
             showPct={false}
+            interactive={!compact}
             valueUnit="kcal"
             slices={foodGroups.slices}
           />

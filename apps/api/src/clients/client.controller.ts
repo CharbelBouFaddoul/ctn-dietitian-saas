@@ -6,6 +6,7 @@ import { DietitianGuard } from "../dietitian/guards/dietitian.guard";
 import type { DietitianTenantContext } from "../dietitian/dietitian.types";
 import { ClientService } from "./client.service";
 import { ClientPortfolioService } from "./client-portfolio.service";
+import { ClientPrintService } from "./client-print.service";
 import { ClientActionRequired } from "./decorators/client-action.decorator";
 import { CreateClientDto, ListClientsQueryDto, RestoreClientDto, UpdateClientDto } from "./dto/client.dto";
 import { ClientAccessGuard } from "./guards/client-access.guard";
@@ -18,6 +19,7 @@ export class ClientController {
   constructor(
     private readonly clients: ClientService,
     private readonly portfolio: ClientPortfolioService,
+    private readonly print: ClientPrintService,
   ) {}
 
   @Get()
@@ -40,6 +42,17 @@ export class ClientController {
     @Param("clientId", ParseUUIDPipe) clientId: string,
   ) {
     return this.portfolio.get(tenant, clientId);
+  }
+
+  @Get(":clientId/print")
+  @UseGuards(ClientAccessGuard)
+  @ApiOperation({ summary: "Print payload for a client chart document" })
+  getPrint(
+    @CurrentTenant() tenant: DietitianTenantContext,
+    @Param("clientId", ParseUUIDPipe) clientId: string,
+    @Query("doc") doc?: string,
+  ) {
+    return this.print.get(tenant, clientId, doc);
   }
 
   @Get(":clientId")

@@ -19,6 +19,7 @@ type Props = {
   allowManage: boolean;
   initialPlanId?: string | null;
   initialView?: MealPlanView;
+  hideViewToggle?: boolean;
   onPlanChange?: (planId: string) => void;
   onViewChange?: (view: MealPlanView) => void;
   onError: (message: string) => void;
@@ -31,6 +32,7 @@ export function ClientNutritionPanel({
   allowManage,
   initialPlanId,
   initialView = "plan",
+  hideViewToggle = false,
   onPlanChange,
   onViewChange,
   onError,
@@ -126,6 +128,7 @@ export function ClientNutritionPanel({
           compact
           allowManage={allowManage}
           initialView={initialView}
+          hideViewToggle={hideViewToggle}
           plans={plans}
           allPlansHref={allPlansHref}
           onViewChange={onViewChange}

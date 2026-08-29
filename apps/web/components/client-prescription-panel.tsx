@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Badge, Button, Dialog, DonutChart, Input, Select } from "@nutrition-saas/ui";
 import { api } from "../lib/api";
 import {
@@ -76,10 +76,35 @@ const SKINFOLD_TYPES: Record<string, SkinfoldSite> = {
 const MANUAL_BODY_FAT = "manual";
 
 const MACRO_COLORS = {
-  fat: "#eab308",
-  carbohydrate: "#f97316",
-  protein: "#3b82f6",
+  fat: "#e8a82e",
+  carbohydrate: "#e89a6a",
+  protein: "#4f8fe0",
 } as const;
+
+const FIBER_COLOR = "#1f9a82";
+
+type MacroSplit = { fatPct: number; carbPct: number; proteinPct: number };
+type MacroKey = keyof MacroSplit;
+
+function roundTenth(value: number) {
+  return Math.round(value * 10) / 10;
+}
+
+function rebalanceMacros(current: MacroSplit, key: MacroKey, nextValue: number): MacroSplit {
+  const clamped = roundTenth(Math.min(100, Math.max(0, nextValue)));
+  const others = (["fatPct", "carbPct", "proteinPct"] as const).filter((item) => item !== key);
+  const rest = roundTenth(100 - clamped);
+  const first = current[others[0]!];
+  const second = current[others[1]!];
+  const sum = first + second;
+  const nextFirst = sum <= 0 ? roundTenth(rest / 2) : roundTenth((first / sum) * rest);
+  return {
+    ...current,
+    [key]: clamped,
+    [others[0]!]: nextFirst,
+    [others[1]!]: roundTenth(rest - nextFirst),
+  };
+}
 
 function ageFromDob(value: string | null): number | null {
   if (!value) return null;
@@ -144,7 +169,9 @@ export function ClientPrescriptionPanel({ base, allowManage, client, latestMeasu
   const [clinical, setClinical] = useState<ClinicalData>(() => emptyClinicalData());
   const [loaded, setLoaded] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
+  const [canUndoMacros, setCanUndoMacros] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const macroHistoryRef = useRef<Array<{ macro: MacroSplit; proteinPerKg: number | null }>>([]);
   const readOnly = !allowManage;
   const rx = clinical.prescription;
 
@@ -268,7 +295,7 @@ export function ClientPrescriptionPanel({ base, allowManage, client, latestMeasu
     proteinPct: rx.macro.proteinPct ?? DEFAULT_MACRO_SPLIT.proteinPct,
   };
   const macroGrams = macroGramsFromEnergy(energyGoal, macro);
-  const macroSum = Math.round(macro.fatPct + macro.carbPct + macro.proteinPct);
+  const macroSum = roundTenth(macro.fatPct + macro.carbPct + macro.proteinPct);
   const fiberSource = rx.fiberSource || DEFAULT_FIBER_SOURCE;
   const fiberRef = fiberReferenceG(fiberSource, energyGoal, inputs.sex);
   const fiberGoal = rx.fiberGoalG ?? fiberRef;
@@ -330,23 +357,29 @@ export function ClientPrescriptionPanel({ base, allowManage, client, latestMeasu
     });
   }
 
-  function patchMacro(patch: Partial<PrescriptionData["macro"]>) {
-    // A manual % edit invalidates any g/kg-driven protein prescription.
-    setClinical((prev) => {
-      const next: ClinicalData = {
-        ...prev,
-        prescription: {
-          ...prev.prescription,
-          proteinPerKg: null,
-          macro: { ...prev.prescription.macro, ...patch },
-        },
-      };
-      scheduleSave(next);
-      return next;
-    });
+  function pushMacroHistory() {
+    if (readOnly) return;
+    macroHistoryRef.current = [
+      ...macroHistoryRef.current,
+      { macro: { ...macro }, proteinPerKg: rx.proteinPerKg },
+    ].slice(-25);
+    setCanUndoMacros(true);
+  }
+
+  function undoMacros() {
+    const last = macroHistoryRef.current[macroHistoryRef.current.length - 1];
+    if (!last) return;
+    macroHistoryRef.current = macroHistoryRef.current.slice(0, -1);
+    setCanUndoMacros(macroHistoryRef.current.length > 0);
+    patchRx({ macro: last.macro, proteinPerKg: last.proteinPerKg });
+  }
+
+  function setMacroPct(key: MacroKey, value: number) {
+    patchRx({ macro: rebalanceMacros(macro, key, value), proteinPerKg: null });
   }
 
   function applyMacroPreset(split: { fatPct: number; carbPct: number; proteinPct: number }) {
+    pushMacroHistory();
     patchRx({ macro: { ...split }, proteinPerKg: null });
   }
 
@@ -372,14 +405,11 @@ export function ClientPrescriptionPanel({ base, allowManage, client, latestMeasu
 
   return (
     <div className="ui-prescription">
-      <header className="ui-prescription__head">
-        <h2 className="ui-prescription__title">Prescription</h2>
-        <p className="ui-prescription__subtitle">
-          Current values sync from <strong>Progress &amp; tracking</strong>. The energy and macro targets set here feed{" "}
-          <strong>Nutrition → Analysis</strong> — every field can be overridden.
-        </p>
-        {!loaded ? <span className="ui-prescription__status">Loading…</span> : null}
-      </header>
+      {!loaded ? (
+        <header className="ui-prescription__head">
+          <span className="ui-prescription__status">Loading…</span>
+        </header>
+      ) : null}
 
       {loaded && !hasBasics ? (
         <div className="ui-prescription__notice">
@@ -649,6 +679,16 @@ export function ClientPrescriptionPanel({ base, allowManage, client, latestMeasu
                 );
               })}
             </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="ui-prescription__undo"
+              disabled={!canUndoMacros}
+              onClick={() => undoMacros()}
+            >
+              Undo
+            </Button>
           </div>
         ) : null}
         <div className="ui-prescription__macro-layout">
@@ -668,7 +708,8 @@ export function ClientPrescriptionPanel({ base, allowManage, client, latestMeasu
                 perKg={gramsPerKg(macroGrams.fatG, weightKg)}
                 reference={`${AMDR.fat.min}–${AMDR.fat.max}%`}
                 readOnly={readOnly}
-                onPct={(v) => patchMacro({ fatPct: v })}
+                onBeginEdit={pushMacroHistory}
+                onPct={(v) => setMacroPct("fatPct", v)}
               />
               <MacroRow
                 label="Carbohydrates"
@@ -678,7 +719,8 @@ export function ClientPrescriptionPanel({ base, allowManage, client, latestMeasu
                 perKg={gramsPerKg(macroGrams.carbohydrateG, weightKg)}
                 reference={`${AMDR.carbohydrate.min}–${AMDR.carbohydrate.max}%`}
                 readOnly={readOnly}
-                onPct={(v) => patchMacro({ carbPct: v })}
+                onBeginEdit={pushMacroHistory}
+                onPct={(v) => setMacroPct("carbPct", v)}
               />
               <MacroRow
                 label="Proteins"
@@ -688,13 +730,14 @@ export function ClientPrescriptionPanel({ base, allowManage, client, latestMeasu
                 perKg={gramsPerKg(macroGrams.proteinG, weightKg)}
                 reference={`${AMDR.protein.min}–${AMDR.protein.max}%`}
                 readOnly={readOnly}
-                onPct={(v) => patchMacro({ proteinPct: v })}
+                onBeginEdit={pushMacroHistory}
+                onPct={(v) => setMacroPct("proteinPct", v)}
               />
               {/* Fiber */}
               <div className="ui-prescription__row ui-prescription__row--macro" role="row">
                 <span className="ui-prescription__cell ui-prescription__cell--metric ui-prescription__cell--fiber">
                   <span className="ui-prescription__metric-head">
-                    <span className="ui-prescription__dot" style={{ backgroundColor: "#22c55e" }} aria-hidden="true" />
+                    <span className="ui-prescription__dot" style={{ backgroundColor: FIBER_COLOR }} aria-hidden="true" />
                     <span className="ui-prescription__name">Dietary fiber</span>
                   </span>
                   <MethodSelect
@@ -729,8 +772,15 @@ export function ClientPrescriptionPanel({ base, allowManage, client, latestMeasu
             </div>
             <div className="ui-prescription__macro-foot">
               <label className="ui-prescription__perkg">
-                <span className="ui-prescription__perkg-label">Prescribe protein by body weight</span>
-                <span className="ui-prescription__field">
+                <span className="ui-prescription__perkg-copy">
+                  <span className="ui-prescription__perkg-label">Prescribe protein by body weight</span>
+                  <span className="ui-prescription__perkg-hint">
+                    {rx.proteinPerKg != null && macroGrams.proteinG != null
+                      ? `= ${fmt(macroGrams.proteinG, 0)} g protein/day · sets carbs to balance`
+                      : "Typical: 0.8 sedentary · 1.2–1.6 active · 1.6–2.2 muscle gain"}
+                  </span>
+                </span>
+                <span className="ui-prescription__field ui-prescription__perkg-input">
                   <Input
                     type="number"
                     min={0}
@@ -738,19 +788,15 @@ export function ClientPrescriptionPanel({ base, allowManage, client, latestMeasu
                     inputMode="decimal"
                     disabled={readOnly || weightKg == null || energyGoal == null}
                     value={rx.proteinPerKg ?? ""}
-                    placeholder="e.g. 1.6"
+                    placeholder="1.6"
+                    onFocus={() => pushMacroHistory()}
                     onChange={(event) => applyProteinPerKg(numberOrNull(event.target.value))}
                   />
                   <span className="ui-prescription__unit">g/kg</span>
                 </span>
-                <span className="ui-prescription__perkg-hint">
-                  {rx.proteinPerKg != null && macroGrams.proteinG != null
-                    ? `= ${fmt(macroGrams.proteinG, 0)} g protein/day · sets carbs to balance`
-                    : "Typical: 0.8 sedentary · 1.2–1.6 active · 1.6–2.2 muscle gain"}
-                </span>
               </label>
               <p className={`ui-prescription__macro-sum${macroSum === 100 ? "" : " ui-prescription__macro-sum--warn"}`}>
-                Macros total {macroSum}%{macroSum === 100 ? "" : " — should add up to 100%"}
+                Macros total {fmt(macroSum, 1)}%{macroSum === 100 ? "" : " — should add up to 100%"}
               </p>
             </div>
           </div>
@@ -1383,6 +1429,7 @@ function MacroRow({
   perKg,
   reference,
   readOnly,
+  onBeginEdit,
   onPct,
 }: {
   label: string;
@@ -1392,31 +1439,54 @@ function MacroRow({
   perKg: number | null;
   reference: string;
   readOnly: boolean;
-  onPct: (value: number | null) => void;
+  onBeginEdit: () => void;
+  onPct: (value: number) => void;
 }) {
+  const value = roundTenth(Math.min(100, Math.max(0, pct)));
   return (
     <div className="ui-prescription__row ui-prescription__row--macro" role="row">
       <span className="ui-prescription__cell ui-prescription__cell--metric">
         <span className="ui-prescription__dot" style={{ backgroundColor: color }} aria-hidden="true" />
         <span className="ui-prescription__name">{label}</span>
       </span>
-      <span className="ui-prescription__cell ui-prescription__pct" data-label="% of energy">
-        <Input
-          type="number"
+      <span
+        className="ui-prescription__cell ui-prescription__pct"
+        data-label="% of energy"
+        style={{ "--range-color": color, "--range-pct": `${value}%` } as CSSProperties}
+      >
+        <input
+          type="range"
+          className="ui-prescription__range"
           min={0}
           max={100}
-          step={1}
+          step={0.1}
+          disabled={readOnly}
+          value={value}
+          aria-label={`${label} percent of energy`}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={value}
+          aria-valuetext={`${fmt(value, 1)} percent of energy`}
+          onPointerDown={() => onBeginEdit()}
+          onChange={(event) => onPct(Number(event.target.value))}
+        />
+        <Input
+          type="number"
+          className="ui-prescription__pct-input"
+          min={0}
+          max={100}
+          step={0.1}
           inputMode="decimal"
           disabled={readOnly}
-          value={Number.isFinite(pct) ? pct : ""}
-          onChange={(event) => onPct(numberOrNull(event.target.value))}
+          value={Number.isFinite(value) ? value : ""}
+          aria-label={`${label} percent of energy value`}
+          onFocus={() => onBeginEdit()}
+          onChange={(event) => {
+            const next = numberOrNull(event.target.value);
+            if (next != null) onPct(next);
+          }}
         />
-        <span className="ui-prescription__bar" aria-hidden="true">
-          <span
-            className="ui-prescription__bar-fill"
-            style={{ width: `${Math.min(100, Math.max(0, pct))}%`, backgroundColor: color }}
-          />
-        </span>
+        <span className="ui-prescription__pct-value">%</span>
       </span>
       <span className="ui-prescription__cell" data-label="Amount">
         <span className="ui-prescription__value">{grams != null ? `${fmt(grams, 0)} g` : "—"}</span>

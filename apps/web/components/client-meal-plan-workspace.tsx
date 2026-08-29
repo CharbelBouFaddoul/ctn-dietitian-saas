@@ -495,6 +495,7 @@ type Props = {
   compact?: boolean;
   allowManage?: boolean;
   initialView?: MealPlanView;
+  hideViewToggle?: boolean;
   versionId?: string | null;
   plans?: PlanOption[];
   allPlansHref?: string;
@@ -511,6 +512,7 @@ export function ClientMealPlanWorkspace({
   compact = false,
   allowManage = true,
   initialView = "plan",
+  hideViewToggle = false,
   versionId: versionIdProp,
   plans: planOptions,
   allPlansHref,
@@ -1472,6 +1474,7 @@ export function ClientMealPlanWorkspace({
           >
             <GearIcon />
           </button>
+          {hideViewToggle ? null : (
           <div className="ui-mp__toggle" role="tablist" aria-label="Plan or analysis">
             <button
               type="button"
@@ -1488,6 +1491,7 @@ export function ClientMealPlanWorkspace({
               Analysis
             </button>
           </div>
+          )}
           {showNotify ? (
             <Tooltip label={notifyTip}>
               <Button

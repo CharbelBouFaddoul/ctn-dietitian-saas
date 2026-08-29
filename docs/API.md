@@ -168,6 +168,7 @@ Session + `TenantGuard`. Client-scoped routes also run `ClientAccessGuard` / `Cl
 |---|---|---|---|
 | GET | `/practice/dashboard` | Owner (`DietitianGuard`) | Aggregated practice home: `clientCount`, `clientLimit`, `unreadMessageCount`, appointments (`endAt`/`status`), messages, notifications, needsAttention, recentlyActive |
 | GET | `/clients/:clientId/portfolio` | Client access | Chart overview aggregate: vitals, `previousWeight`, goals, meal plan, appointment, portal `connectionStatus`, timeline |
+| GET | `/clients/:clientId/print?doc=` | Client access | Chart PDF payload (`clinical` \| `assessments` \| `measurement` \| `tracking` \| `prescription` \| `nutrition` \| `nutrition-analysis`). Shared header + tab body. Browser print → Save as PDF |
 | GET/POST | `/clients` | Member; create OWNER/DIETITIAN | List (search/status/tag/assignee/page) / create chart-only Client (no User/ClientAccount). Portal invite is a separate join-code step |
 | GET/PATCH | `/clients/:clientId` | Client access | Read / update identity |
 | POST | `/clients/:clientId/archive` | OWNER/DIETITIAN assigned | Archive; close assignments; deactivate portal; revoke sessions |

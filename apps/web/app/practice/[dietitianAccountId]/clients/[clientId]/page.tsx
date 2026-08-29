@@ -17,6 +17,7 @@ import {
   Tabs,
   humanizeLabel,
 } from "@nutrition-saas/ui";
+import { ChartPrintControl } from "../../../../../components/chart-document/print-button";
 import { JoinCodePanel } from "../../../../../components/join-code-panel";
 import { ClientAppointmentsPanel } from "../../../../../components/client-appointments-panel";
 import { ClientAssessmentsPanel } from "../../../../../components/client-assessments-panel";
@@ -25,7 +26,7 @@ import { ClientEvolutionPanel } from "../../../../../components/client-evolution
 import { ClientTrackingPanel } from "../../../../../components/client-tracking-panel";
 import { ClientNutritionPanel } from "../../../../../components/client-nutrition-panel";
 import { ClientPrescriptionPanel } from "../../../../../components/client-prescription-panel";
-import type { MealPlanView } from "../../../../../components/client-meal-plan-workspace";
+import { chartPrintActions } from "../../../../../components/chart-document/types";
 import { api } from "../../../../../lib/api";
 import { ageInYears, formatDate, formatFullDate } from "../../../../../lib/format";
 import { errorMessage } from "../../../../../lib/humanize-error";
@@ -41,6 +42,7 @@ type Tab =
   | "assessments"
   | "prescription"
   | "meal-plan"
+  | "nutrition-analysis"
   | "tracking"
   | "appointments"
   | "settings";
@@ -147,7 +149,10 @@ const chartSections: ChartSection[] = [
         <path d="M16 3c3.2 1.6 4.2 5.2 4.2 8.5H16" />
       </ChartTabIcon>
     ),
-    tabs: [{ id: "meal-plan", label: "Nutrition" }],
+    tabs: [
+      { id: "meal-plan", label: "Meal plan" },
+      { id: "nutrition-analysis", label: "Analysis" },
+    ],
   },
   {
     id: "care",
@@ -177,7 +182,8 @@ function isTab(value: string | null, sections: ChartSection[]): value is Tab {
   return sections.some((section) => section.tabs.some((item) => item.id === value));
 }
 
-function resolveTab(value: string | null, sections: ChartSection[]): Tab {
+function resolveTab(value: string | null, sections: ChartSection[], view?: string | null): Tab {
+  if ((value === "meal-plan" || value === "meal-plans") && view === "analysis") return "nutrition-analysis";
   const mapped = value && LEGACY_TABS[value] ? LEGACY_TABS[value] : value;
   if (isTab(mapped, sections)) return mapped;
   return "overview";
@@ -333,7 +339,9 @@ function ClientWorkspacePage() {
   const base = `/api/v1/dietitian/${dietitianAccountId}/clients/${clientId}`;
   const orgBase = `/api/v1/dietitian/${dietitianAccountId}`;
   const tabFromQuery = searchParams.get("tab");
-  const [tab, setTab] = useState<Tab>(() => resolveTab(tabFromQuery, chartSections));
+  const [tab, setTab] = useState<Tab>(() =>
+    resolveTab(tabFromQuery, chartSections, searchParams.get("view")),
+  );
 
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -428,7 +436,7 @@ function ClientWorkspacePage() {
   const [confirmRevoke, setConfirmRevoke] = useState(false);
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
 
-  function selectTab(next: string, extras?: { metric?: string; planId?: string; view?: MealPlanView }) {
+  function selectTab(next: string, extras?: { metric?: string; planId?: string }) {
     if (next === "messages") {
       router.push(`/practice/${dietitianAccountId}/messages?clientId=${clientId}`);
       return;
@@ -440,20 +448,18 @@ function ClientWorkspacePage() {
     if (value === "measurement" && extras?.metric) {
       params.set("metric", extras.metric);
     }
-    if (value === "meal-plan") {
+    if (value === "meal-plan" || value === "nutrition-analysis") {
       const planId = extras?.planId ?? searchParams.get("planId");
-      const view = extras?.view ?? searchParams.get("view");
       if (planId) params.set("planId", planId);
-      if (view === "plan" || view === "analysis") params.set("view", view);
     }
     router.replace(`/practice/${dietitianAccountId}/clients/${clientId}?${params.toString()}`, { scroll: false });
   }
 
-  function setMealPlanQuery(next: { planId?: string; view?: MealPlanView }) {
+  function setMealPlanQuery(next: { planId?: string }) {
     const params = new URLSearchParams(searchParams.toString());
-    params.set("tab", "meal-plan");
+    params.set("tab", tab === "nutrition-analysis" ? "nutrition-analysis" : "meal-plan");
     if (next.planId) params.set("planId", next.planId);
-    if (next.view) params.set("view", next.view);
+    params.delete("view");
     router.replace(`/practice/${dietitianAccountId}/clients/${clientId}?${params.toString()}`, { scroll: false });
   }
 
@@ -560,9 +566,16 @@ function ClientWorkspacePage() {
       router.replace(`/practice/${dietitianAccountId}/ai?clientId=${clientId}`);
       return;
     }
+    if ((raw === "meal-plan" || raw === "meal-plans") && searchParams.get("view") === "analysis") {
+      selectTab("nutrition-analysis");
+      return;
+    }
     if (raw && LEGACY_TABS[raw]) {
       selectTab(LEGACY_TABS[raw]!);
+      return;
     }
+    const next = resolveTab(raw, visibleSections, searchParams.get("view"));
+    if (next !== tab) setTab(next);
   }, [searchParams]);
 
   useEffect(() => {
@@ -664,7 +677,18 @@ function ClientWorkspacePage() {
               </span>
             ) : undefined
           }
-          actions={client ? <Avatar name={name} /> : undefined}
+          actions={
+            client ? (
+              <div className="ui-client-chart__header-actions">
+                <ChartPrintControl
+                  dietitianAccountId={dietitianAccountId}
+                  clientId={clientId}
+                  actions={chartPrintActions(tab)}
+                />
+                <Avatar name={name} />
+              </div>
+            ) : undefined
+          }
         />
 
         <div className="ui-client-chart__tabs ui-client-chart__nav">
@@ -1031,16 +1055,16 @@ function ClientWorkspacePage() {
       ) : null}
 
       {/* ── NUTRITION ── */}
-      {tab === "meal-plan" && portfolio ? (
+      {(tab === "meal-plan" || tab === "nutrition-analysis") && portfolio ? (
         <ClientNutritionPanel
           dietitianAccountId={dietitianAccountId}
           clientId={clientId}
           clientName={portfolio.client.displayName ?? `${portfolio.client.firstName} ${portfolio.client.lastName}`}
           allowManage={allowManage}
           initialPlanId={searchParams.get("planId") ?? portfolio.activeMealPlan?.id ?? null}
-          initialView={searchParams.get("view") === "analysis" ? "analysis" : "plan"}
+          initialView={tab === "nutrition-analysis" ? "analysis" : "plan"}
+          hideViewToggle
           onPlanChange={(planId) => setMealPlanQuery({ planId })}
-          onViewChange={(view) => setMealPlanQuery({ view })}
           onError={setError}
         />
       ) : null}
