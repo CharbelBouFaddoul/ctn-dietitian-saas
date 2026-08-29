@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { Button, Dialog, EmptyState, Field, Input, LoadingState } from "@nutrition-saas/ui";
+import { Button, Dialog, EmptyState, Field, Input, LoadingState, Select } from "@nutrition-saas/ui";
 import { api } from "../lib/api";
 import { errorMessage } from "../lib/humanize-error";
 import { ClientMealPlanWorkspace, type MealPlanView } from "./client-meal-plan-workspace";
@@ -11,6 +11,17 @@ type PlanRow = {
   name: string;
   status: string;
 };
+
+type ClientRow = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  displayName?: string | null;
+};
+
+function clientLabel(client: ClientRow): string {
+  return client.displayName ?? `${client.firstName} ${client.lastName}`;
+}
 
 type Props = {
   dietitianAccountId: string;
@@ -45,6 +56,12 @@ export function ClientNutritionPanel({
   const [weekCount, setWeekCount] = useState("1");
   const [daysPerWeek, setDaysPerWeek] = useState("7");
   const [dayLabelMode, setDayLabelMode] = useState<"NUMBERED" | "WEEKDAY">("WEEKDAY");
+  const [startMode, setStartMode] = useState<"blank" | "import">("blank");
+  const [sourceClientId, setSourceClientId] = useState("");
+  const [sourcePlanId, setSourcePlanId] = useState("");
+  const [importClients, setImportClients] = useState<ClientRow[]>([]);
+  const [importPlans, setImportPlans] = useState<PlanRow[]>([]);
+  const [importLoading, setImportLoading] = useState(false);
 
   const orgBase = `/api/v1/dietitian/${dietitianAccountId}`;
   const allPlansHref = `/practice/${dietitianAccountId}/meal-plans?clientId=${encodeURIComponent(clientId)}`;
@@ -79,7 +96,35 @@ export function ClientNutritionPanel({
     setWeekCount("1");
     setDaysPerWeek("7");
     setDayLabelMode("WEEKDAY");
+    setStartMode("blank");
+    setSourceClientId(clientId);
+    setSourcePlanId("");
     setShowCreate(true);
+    void loadImportSources(clientId);
+  }
+
+  async function loadImportSources(forClientId: string) {
+    setImportLoading(true);
+    try {
+      const [clients, listed] = await Promise.all([
+        api<{ items: ClientRow[] }>(`${orgBase}/clients?pageSize=50`),
+        forClientId
+          ? api<{ items: PlanRow[] }>(
+              `${orgBase}/meal-plans?clientId=${encodeURIComponent(forClientId)}&pageSize=50`,
+            )
+          : Promise.resolve({ items: [] as PlanRow[] }),
+      ]);
+      setImportClients(clients.items);
+      const items = listed.items.filter((row) => row.status !== "ARCHIVED");
+      setImportPlans(items);
+      setSourcePlanId((current) => (items.some((row) => row.id === current) ? current : (items[0]?.id ?? "")));
+    } catch {
+      setImportClients([]);
+      setImportPlans([]);
+      setSourcePlanId("");
+    } finally {
+      setImportLoading(false);
+    }
   }
 
   function selectPlan(id: string) {
@@ -99,8 +144,9 @@ export function ClientNutritionPanel({
           clientId,
           name: newName.trim() || `${clientName} meal plan`,
           dayLabelMode,
-          weekCount: weeks,
-          daysPerWeek: days,
+          ...(startMode === "import" && sourcePlanId
+            ? { sourcePlanId }
+            : { weekCount: weeks, daysPerWeek: days }),
         }),
       });
       setShowCreate(false);
@@ -169,6 +215,67 @@ export function ClientNutritionPanel({
             <Input value={newName} onChange={(e) => setNewName(e.target.value)} required autoFocus />
           </Field>
           <div>
+            <p className="ui-mp__settings-label">Start from</p>
+            <div className="ui-mp__choice">
+              <button
+                type="button"
+                className={startMode === "blank" ? "is-active" : undefined}
+                onClick={() => setStartMode("blank")}
+              >
+                <strong>Blank</strong>
+                <span>Empty weeks and meals</span>
+              </button>
+              <button
+                type="button"
+                className={startMode === "import" ? "is-active" : undefined}
+                onClick={() => {
+                  setStartMode("import");
+                  if (!importPlans.length && !importLoading) void loadImportSources(sourceClientId || clientId);
+                }}
+              >
+                <strong>Import plan</strong>
+                <span>Copy every day and week</span>
+              </button>
+            </div>
+          </div>
+          {startMode === "import" ? (
+            <>
+              <Field label="Source client">
+                <Select
+                  value={sourceClientId}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setSourceClientId(next);
+                    setSourcePlanId("");
+                    void loadImportSources(next);
+                  }}
+                >
+                  {importClients.length === 0 ? <option value="">No clients</option> : null}
+                  {importClients.map((row) => (
+                    <option key={row.id} value={row.id}>
+                      {clientLabel(row)}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field
+                label="Meal plan"
+                hint={importLoading ? "Loading…" : "Copies every week, day, meal, and food into a new draft."}
+              >
+                <Select value={sourcePlanId} onChange={(e) => setSourcePlanId(e.target.value)} required>
+                  {importPlans.length === 0 ? (
+                    <option value="">{importLoading ? "Loading plans…" : "No plans for this client"}</option>
+                  ) : null}
+                  {importPlans.map((row) => (
+                    <option key={row.id} value={row.id}>
+                      {row.name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            </>
+          ) : null}
+          <div>
             <p className="ui-mp__settings-label">Day labels</p>
             <div className="ui-mp__choice">
               <button
@@ -189,32 +296,34 @@ export function ClientNutritionPanel({
               </button>
             </div>
           </div>
-          <div className="ui-grid">
-            <Field label="Weeks" hint="1–12">
-              <Input
-                type="number"
-                min={1}
-                max={12}
-                value={weekCount}
-                onChange={(e) => setWeekCount(e.target.value)}
-              />
-            </Field>
-            <Field label="Days per week" hint="1–7">
-              <Input
-                type="number"
-                min={1}
-                max={7}
-                value={daysPerWeek}
-                onChange={(e) => setDaysPerWeek(e.target.value)}
-              />
-            </Field>
-          </div>
+          {startMode === "blank" ? (
+            <div className="ui-grid">
+              <Field label="Weeks" hint="1–12">
+                <Input
+                  type="number"
+                  min={1}
+                  max={12}
+                  value={weekCount}
+                  onChange={(e) => setWeekCount(e.target.value)}
+                />
+              </Field>
+              <Field label="Days per week" hint="1–7">
+                <Input
+                  type="number"
+                  min={1}
+                  max={7}
+                  value={daysPerWeek}
+                  onChange={(e) => setDaysPerWeek(e.target.value)}
+                />
+              </Field>
+            </div>
+          ) : null}
           <div className="ui-row" style={{ justifyContent: "flex-end", gap: 10 }}>
             <Button type="button" variant="secondary" onClick={() => setShowCreate(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={creating}>
-              {creating ? "Creating…" : "Create plan"}
+            <Button type="submit" disabled={creating || (startMode === "import" && !sourcePlanId)}>
+              {creating ? (startMode === "import" ? "Importing…" : "Creating…") : startMode === "import" ? "Import plan" : "Create plan"}
             </Button>
           </div>
         </form>

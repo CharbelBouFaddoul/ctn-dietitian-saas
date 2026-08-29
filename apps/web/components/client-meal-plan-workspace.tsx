@@ -561,11 +561,16 @@ export function ClientMealPlanWorkspace({
   const [dragOverId, setDragOverId] = useState<string | null>(null);
   const [addMealOpen, setAddMealOpen] = useState(false);
   const [mealMenuId, setMealMenuId] = useState<string | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
   const [importTargetMealId, setImportTargetMealId] = useState<string | null>(null);
   const [importClients, setImportClients] = useState<ImportClient[]>([]);
   const [importClientId, setImportClientId] = useState("");
   const [importClientOpen, setImportClientOpen] = useState(false);
   const [importClientSearch, setImportClientSearch] = useState("");
+  const [importPlans, setImportPlans] = useState<PlanOption[]>([]);
+  const [importPlanId, setImportPlanId] = useState("");
+  const [importPlanOpen, setImportPlanOpen] = useState(false);
+  const [importPlanSearch, setImportPlanSearch] = useState("");
   const [importSourceVersion, setImportSourceVersion] = useState<VersionDetail | null>(null);
   const [importSourceDayId, setImportSourceDayId] = useState("");
   const [importDayOpen, setImportDayOpen] = useState(false);
@@ -1109,12 +1114,23 @@ export function ClientMealPlanWorkspace({
     }
   }
 
-  function openImport(mealId: string) {
-    setImportTargetMealId(mealId);
+  function closeImport() {
+    setImportOpen(false);
+    setImportTargetMealId(null);
+    setImportClientOpen(false);
+    setImportPlanOpen(false);
+    setImportDayOpen(false);
+  }
+
+  function openImport(mealId?: string) {
+    setImportOpen(true);
+    setImportTargetMealId(mealId ?? null);
     setImportNotes(true);
     setImportClientOpen(false);
+    setImportPlanOpen(false);
     setImportDayOpen(false);
     setImportClientSearch("");
+    setImportPlanSearch("");
     setImportDaySearch("");
     setMealMenuId(null);
     const sourceClient = trackingClientId ?? plan?.clientId ?? "";
@@ -1128,35 +1144,65 @@ export function ClientMealPlanWorkspace({
       } catch {
         setImportClients([]);
       }
-      await loadImportSource(sourceClient);
+      await loadImportPlans(sourceClient, plan?.id, !mealId);
     })();
   }
 
-  async function loadImportSource(clientId: string) {
+  async function loadImportPlans(clientId: string, preferPlanId?: string, preferOtherDay = false) {
     if (!clientId) {
+      setImportPlans([]);
+      setImportPlanId("");
       setImportSourceVersion(null);
       setImportSourceDayId("");
       return;
     }
     setImportLoading(true);
     try {
-      if (clientId === (trackingClientId ?? plan?.clientId) && version) {
-        setImportSourceVersion(version);
-        setImportSourceDayId(focusedDay?.id ?? version.snapshot.days[0]?.id ?? "");
-        return;
-      }
-      const listed = await api<{ items: Array<{ id: string; status: string }> }>(
-        `/api/v1/dietitian/${dietitianAccountId}/meal-plans?clientId=${encodeURIComponent(clientId)}&pageSize=20`,
+      const listed = await api<{ items: PlanOption[] }>(
+        `/api/v1/dietitian/${dietitianAccountId}/meal-plans?clientId=${encodeURIComponent(clientId)}&pageSize=50`,
       );
+      const items = listed.items.filter((row) => row.status !== "ARCHIVED");
+      setImportPlans(items);
       const chosen =
-        listed.items.find((row) => row.status === "ACTIVE") ?? listed.items[0];
+        (preferPlanId && items.find((row) => row.id === preferPlanId)) ??
+        items.find((row) => row.status === "ACTIVE") ??
+        items[0];
+      setImportPlanId(chosen?.id ?? "");
       if (!chosen) {
         setImportSourceVersion(null);
         setImportSourceDayId("");
         return;
       }
+      await loadImportPlan(chosen.id, preferOtherDay);
+    } catch (err) {
+      setImportPlans([]);
+      setImportPlanId("");
+      setImportSourceVersion(null);
+      setImportSourceDayId("");
+      setError(errorMessage(err, "Could not load meals to import"));
+    } finally {
+      setImportLoading(false);
+    }
+  }
+
+  async function loadImportPlan(planId: string, preferOtherDay = false) {
+    if (!planId) {
+      setImportSourceVersion(null);
+      setImportSourceDayId("");
+      return;
+    }
+    setImportLoading(true);
+    try {
+      if (planId === plan?.id && version) {
+        setImportSourceVersion(version);
+        const otherDay = preferOtherDay
+          ? version.snapshot.days.find((day) => day.id !== focusedDay?.id)
+          : null;
+        setImportSourceDayId(otherDay?.id ?? focusedDay?.id ?? version.snapshot.days[0]?.id ?? "");
+        return;
+      }
       const detail = await api<PlanDetail>(
-        `/api/v1/dietitian/${dietitianAccountId}/meal-plans/${chosen.id}`,
+        `/api/v1/dietitian/${dietitianAccountId}/meal-plans/${planId}`,
       );
       const versionId =
         detail.versions.find((row) => row.status === "PUBLISHED")?.id ??
@@ -1168,7 +1214,7 @@ export function ClientMealPlanWorkspace({
         return;
       }
       const loaded = await api<VersionDetail>(
-        `/api/v1/dietitian/${dietitianAccountId}/meal-plans/${chosen.id}/versions/${versionId}`,
+        `/api/v1/dietitian/${dietitianAccountId}/meal-plans/${planId}/versions/${versionId}`,
       );
       setImportSourceVersion(loaded);
       setImportSourceDayId(loaded.snapshot.days[0]?.id ?? "");
@@ -1182,16 +1228,31 @@ export function ClientMealPlanWorkspace({
   }
 
   async function importChosenMeal(sourceMeal: Meal) {
-    if (!version || !importTargetMealId) return;
+    if (!version || !focusedDay) return;
     if (sourceMeal.items.length === 0 && !(importNotes && sourceMeal.notes)) {
       setError("That meal has no foods to import");
       return;
     }
     setBusy(true);
     try {
+      let targetMealId = importTargetMealId;
+      if (!targetMealId) {
+        await api(`${apiBase}/versions/${version.id}/days/${focusedDay.id}/meals`, {
+          method: "POST",
+          body: JSON.stringify({
+            name: sourceMeal.name,
+            notes: importNotes && sourceMeal.notes ? sourceMeal.notes : undefined,
+          }),
+        });
+        const loaded = await load(version.id);
+        const day = loaded?.snapshot.days.find((row) => row.id === focusedDay.id);
+        const created = [...(day?.meals ?? [])].reverse().find((meal) => meal.name === sourceMeal.name);
+        targetMealId = created?.id ?? null;
+        if (!targetMealId) throw new Error("Imported meal was not created");
+      }
       for (const item of sourceMeal.items) {
         if (item.itemType === "FOOD" && item.food?.id) {
-          await api(`${apiBase}/versions/${version.id}/meals/${importTargetMealId}/items`, {
+          await api(`${apiBase}/versions/${version.id}/meals/${targetMealId}/items`, {
             method: "POST",
             body: JSON.stringify({
               itemType: "FOOD",
@@ -1201,7 +1262,7 @@ export function ClientMealPlanWorkspace({
             }),
           });
         } else if (item.itemType === "RECIPE" && item.recipe?.id) {
-          await api(`${apiBase}/versions/${version.id}/meals/${importTargetMealId}/items`, {
+          await api(`${apiBase}/versions/${version.id}/meals/${targetMealId}/items`, {
             method: "POST",
             body: JSON.stringify({
               itemType: "RECIPE",
@@ -1212,13 +1273,13 @@ export function ClientMealPlanWorkspace({
           });
         }
       }
-      if (importNotes && sourceMeal.notes) {
+      if (importTargetMealId && importNotes && sourceMeal.notes) {
         await api(`${apiBase}/versions/${version.id}/meals/${importTargetMealId}`, {
           method: "PATCH",
           body: JSON.stringify({ notes: sourceMeal.notes }),
         });
       }
-      setImportTargetMealId(null);
+      closeImport();
       await load(version.id);
     } catch (err) {
       setError(errorMessage(err, "Could not import meal"));
@@ -1303,6 +1364,10 @@ export function ClientMealPlanWorkspace({
   const filteredImportClients = importClients.filter((row) =>
     importClientName(row).toLowerCase().includes(importClientSearch.trim().toLowerCase()),
   );
+  const selectedImportPlan = importPlans.find((row) => row.id === importPlanId) ?? null;
+  const filteredImportPlans = importPlans.filter((row) =>
+    row.name.toLowerCase().includes(importPlanSearch.trim().toLowerCase()),
+  );
   const importDays = importSourceVersion?.snapshot.days ?? [];
   const filteredImportDays = importDays.filter((day) => {
     const q = importDaySearch.trim().toLowerCase();
@@ -1310,7 +1375,9 @@ export function ClientMealPlanWorkspace({
     return `${dayTabLabel(day)} ${dayFullLabel(day)}`.toLowerCase().includes(q);
   });
   const importDay = importDays.find((day) => day.id === importSourceDayId) ?? importDays[0] ?? null;
-  const importMeals = (importDay?.meals ?? []).filter((meal) => meal.id !== importTargetMealId);
+  const importMeals = (importDay?.meals ?? []).filter((meal) =>
+    importTargetMealId ? meal.id !== importTargetMealId : true,
+  );
 
   return (
     <>
@@ -1637,9 +1704,14 @@ export function ClientMealPlanWorkspace({
             </div>
 
             {canEdit ? (
-              <Button block variant="secondary" onClick={() => setAddMealOpen(true)}>
-                Add meal
-              </Button>
+              <div className="ui-mp__day-actions">
+                <Button block variant="secondary" onClick={() => setAddMealOpen(true)}>
+                  Add meal
+                </Button>
+                <Button block variant="ghost" onClick={() => openImport()}>
+                  Import meal
+                </Button>
+              </div>
             ) : null}
 
             {focusedDay.meals.length === 0 ? (
@@ -1675,7 +1747,7 @@ export function ClientMealPlanWorkspace({
                         <button
                           type="button"
                           className="ui-mp__item-icon ui-mp__import-btn"
-                          aria-label="Import food from other meal"
+                          aria-label="Import foods into this meal"
                           onClick={() => openImport(meal.id)}
                         >
                           <ImportIcon />
@@ -2249,14 +2321,12 @@ export function ClientMealPlanWorkspace({
       </form>
     </Dialog>
     <Dialog
-      open={importTargetMealId !== null}
-      title="Import meal"
+      open={importOpen}
+      title={importTargetMealId ? "Import foods into meal" : "Import meal"}
       className="ui-mp__import-dialog"
       onClose={() => {
         if (busy) return;
-        setImportTargetMealId(null);
-        setImportClientOpen(false);
-        setImportDayOpen(false);
+        closeImport();
       }}
     >
       <div className="ui-mp__import">
@@ -2264,6 +2334,7 @@ export function ClientMealPlanWorkspace({
           label="Select client"
           open={importClientOpen}
           onOpenChange={(next) => {
+            setImportPlanOpen(false);
             setImportDayOpen(false);
             setImportClientOpen(next);
             if (next) setImportClientSearch("");
@@ -2296,7 +2367,7 @@ export function ClientMealPlanWorkspace({
                   onClick={() => {
                     setImportClientId(row.id);
                     setImportClientOpen(false);
-                    void loadImportSource(row.id);
+                    void loadImportPlans(row.id);
                   }}
                 >
                   <ImportAvatar name={name} />
@@ -2308,19 +2379,62 @@ export function ClientMealPlanWorkspace({
         </SearchableSelect>
 
         <SearchableSelect
-          label="Select version"
+          label="Select meal plan"
+          open={importPlanOpen}
+          onOpenChange={(next) => {
+            setImportClientOpen(false);
+            setImportDayOpen(false);
+            setImportPlanOpen(next);
+            if (next) setImportPlanSearch("");
+          }}
+          value={
+            selectedImportPlan ? (
+              `${selectedImportPlan.name} · ${planStatusCaption(selectedImportPlan.status)}`
+            ) : (
+              <span className="ui-muted">Select a meal plan</span>
+            )
+          }
+          search={importPlanSearch}
+          onSearch={setImportPlanSearch}
+        >
+          {filteredImportPlans.length === 0 ? (
+            <p className="ui-muted ui-mp__ss-empty">No meal plans match.</p>
+          ) : (
+            filteredImportPlans.map((row) => (
+              <button
+                key={row.id}
+                type="button"
+                role="option"
+                className={row.id === importPlanId ? "is-active" : undefined}
+                aria-selected={row.id === importPlanId}
+                onClick={() => {
+                  setImportPlanId(row.id);
+                  setImportPlanOpen(false);
+                  void loadImportPlan(row.id);
+                }}
+              >
+                <span>{row.name}</span>
+                <span className="ui-muted">{planStatusCaption(row.status)}</span>
+              </button>
+            ))
+          )}
+        </SearchableSelect>
+
+        <SearchableSelect
+          label="Select day"
           open={importDayOpen}
           onOpenChange={(next) => {
             setImportClientOpen(false);
+            setImportPlanOpen(false);
             setImportDayOpen(next);
             if (next) setImportDaySearch("");
           }}
-          value={importDay ? dayTabLabel(importDay) : <span className="ui-muted">Select a version</span>}
+          value={importDay ? dayFullLabel(importDay) : <span className="ui-muted">Select a day</span>}
           search={importDaySearch}
           onSearch={setImportDaySearch}
         >
           {filteredImportDays.length === 0 ? (
-            <p className="ui-muted ui-mp__ss-empty">No versions match.</p>
+            <p className="ui-muted ui-mp__ss-empty">No days match.</p>
           ) : (
             filteredImportDays.map((day) => (
               <button
@@ -2334,18 +2448,20 @@ export function ClientMealPlanWorkspace({
                   setImportDayOpen(false);
                 }}
               >
-                {dayTabLabel(day)}
+                {dayFullLabel(day)}
               </button>
             ))
           )}
         </SearchableSelect>
 
         <div className="ui-mp__import-meals">
-          <p className="ui-mp__import-heading">Choose a meal to import</p>
+          <p className="ui-mp__import-heading">
+            {importTargetMealId ? "Choose a meal to copy foods from" : "Choose a meal to add to this day"}
+          </p>
           {importLoading ? (
             <LoadingState>Loading meals…</LoadingState>
           ) : importMeals.length === 0 ? (
-            <p className="ui-muted">No meals to import from this version.</p>
+            <p className="ui-muted">No meals to import from this day.</p>
           ) : (
             <ul>
               {importMeals.map((meal) => (

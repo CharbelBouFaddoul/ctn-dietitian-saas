@@ -209,6 +209,7 @@ export class MealPlanService {
       dayLabelMode?: DayLabelMode;
       weekCount?: number;
       daysPerWeek?: number;
+      sourcePlanId?: string;
     },
   ) {
     await this.access.assertCanAccess(tenant, clientId, "manageRecords");
@@ -216,6 +217,35 @@ export class MealPlanService {
     const weekCount = Math.min(12, Math.max(1, Math.trunc(input.weekCount ?? 1)));
     const daysPerWeek = Math.min(7, Math.max(1, Math.trunc(input.daysPerWeek ?? 1)));
     const totalDays = weekCount * daysPerWeek;
+    const sourceInclude = {
+      days: {
+        include: {
+          meals: {
+            include: { items: { orderBy: { sortOrder: "asc" as const } } },
+            orderBy: { sortOrder: "asc" as const },
+          },
+        },
+        orderBy: { dayNumber: "asc" as const },
+      },
+    };
+    let sourceVersion = null;
+    if (input.sourcePlanId) {
+      const sourcePlan = await this.requirePlan(tenant, input.sourcePlanId, "read");
+      sourceVersion =
+        (await this.prisma.mealPlanVersion.findFirst({
+          where: { mealPlanId: sourcePlan.id, status: "PUBLISHED", ...tenantWhere(tenant.dietitianAccountId) },
+          orderBy: { publishedAt: "desc" },
+          include: sourceInclude,
+        })) ??
+        (await this.prisma.mealPlanVersion.findFirst({
+          where: { mealPlanId: sourcePlan.id, ...tenantWhere(tenant.dietitianAccountId) },
+          orderBy: { versionNumber: "desc" },
+          include: sourceInclude,
+        }));
+    }
+    if (input.sourcePlanId && (!sourceVersion || sourceVersion.days.length === 0)) {
+      throw new BadRequestException("Source meal plan has no days to import");
+    }
     const created = await this.prisma.$transaction(async (tx) => {
       const plan = await tx.mealPlan.create({
         data: {
@@ -235,25 +265,67 @@ export class MealPlanService {
           createdById: tenant.userId,
         },
       });
-      for (let dayNumber = 1; dayNumber <= totalDays; dayNumber += 1) {
-        const labels = dayLabels(dayNumber, dayLabelMode);
-        const day = await tx.mealPlanDay.create({
-          data: {
-            dietitianAccountId: tenant.dietitianAccountId,
-            mealPlanVersionId: version.id,
-            dayNumber,
-            title: labels.title,
-            weekday: labels.weekday,
-          },
-        });
-        await tx.meal.createMany({
-          data: DEFAULT_MEALS.map((name, index) => ({
-            dietitianAccountId: tenant.dietitianAccountId,
-            mealPlanDayId: day.id,
-            name,
-            sortOrder: index,
-          })),
-        });
+      if (sourceVersion) {
+        for (const day of sourceVersion.days) {
+          const labels = dayLabels(day.dayNumber, dayLabelMode);
+          const newDay = await tx.mealPlanDay.create({
+            data: {
+              dietitianAccountId: tenant.dietitianAccountId,
+              mealPlanVersionId: version.id,
+              dayNumber: day.dayNumber,
+              title: labels.title,
+              weekday: labels.weekday,
+              notes: day.notes,
+            },
+          });
+          for (const meal of day.meals) {
+            const newMeal = await tx.meal.create({
+              data: {
+                dietitianAccountId: tenant.dietitianAccountId,
+                mealPlanDayId: newDay.id,
+                name: meal.name,
+                sortOrder: meal.sortOrder,
+                notes: meal.notes,
+              },
+            });
+            if (meal.items.length > 0) {
+              await tx.mealItem.createMany({
+                data: meal.items.map((item) => ({
+                  dietitianAccountId: tenant.dietitianAccountId,
+                  mealId: newMeal.id,
+                  itemType: item.itemType,
+                  foodId: item.foodId,
+                  recipeId: item.recipeId,
+                  quantity: item.quantity,
+                  unit: item.unit,
+                  sortOrder: item.sortOrder,
+                  notes: item.notes,
+                })),
+              });
+            }
+          }
+        }
+      } else {
+        for (let dayNumber = 1; dayNumber <= totalDays; dayNumber += 1) {
+          const labels = dayLabels(dayNumber, dayLabelMode);
+          const day = await tx.mealPlanDay.create({
+            data: {
+              dietitianAccountId: tenant.dietitianAccountId,
+              mealPlanVersionId: version.id,
+              dayNumber,
+              title: labels.title,
+              weekday: labels.weekday,
+            },
+          });
+          await tx.meal.createMany({
+            data: DEFAULT_MEALS.map((name, index) => ({
+              dietitianAccountId: tenant.dietitianAccountId,
+              mealPlanDayId: day.id,
+              name,
+              sortOrder: index,
+            })),
+          });
+        }
       }
       return { plan, version };
     });
@@ -264,7 +336,7 @@ export class MealPlanService {
       dietitianAccountId: tenant.dietitianAccountId,
       targetType: "meal_plan",
       targetId: created.plan.id,
-      metadata: { clientId, dayLabelMode },
+      metadata: { clientId, dayLabelMode, sourcePlanId: input.sourcePlanId ?? null },
     });
     await this.timeline.record({
       dietitianAccountId: tenant.dietitianAccountId,

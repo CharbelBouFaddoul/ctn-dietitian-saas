@@ -500,4 +500,83 @@ describe("Phase 7 recipes and meal plans", () => {
     expect(withNull.body.snapshot.days[0].nutrition.fiberG).toBeNull();
     expect(withNull.body.snapshot.days[0].nutrition.energyKcal).toBeGreaterThan(0);
   });
+
+  it("imports every day, meal, and item when creating from sourcePlanId", async () => {
+    const owner = await registerVerifyLogin();
+    const org = await createOrg(owner.cookie, "Practice");
+    const sourceClient = await createClient(owner.cookie, org.id, { firstName: "Source" });
+    const targetClient = await createClient(owner.cookie, org.id, { firstName: "Target" });
+    const food = await seedFood("Imported oats");
+
+    const source = await request(ctx.app.getHttpServer())
+      .post(`/api/v1/dietitian/${org.id}/meal-plans`)
+      .set("Cookie", owner.cookie)
+      .send({
+        clientId: sourceClient.body.id,
+        name: "4-week cut",
+        dayLabelMode: "NUMBERED",
+        weekCount: 2,
+        daysPerWeek: 3,
+      })
+      .expect(201);
+    const sourceDraftId = source.body.versions[0].id as string;
+    const sourceDraft = await request(ctx.app.getHttpServer())
+      .get(`/api/v1/dietitian/${org.id}/meal-plans/${source.body.id}/versions/${sourceDraftId}`)
+      .set("Cookie", owner.cookie)
+      .expect(200);
+    expect(sourceDraft.body.snapshot.days).toHaveLength(6);
+    const breakfast = breakfastMeal(sourceDraft.body);
+    await request(ctx.app.getHttpServer())
+      .post(
+        `/api/v1/dietitian/${org.id}/meal-plans/${source.body.id}/versions/${sourceDraftId}/meals/${breakfast.id}/items`,
+      )
+      .set("Cookie", owner.cookie)
+      .send({ itemType: "FOOD", foodId: food.id, quantity: 80, unit: "g" })
+      .expect(201);
+    const lastDay = sourceDraft.body.snapshot.days[5];
+    await request(ctx.app.getHttpServer())
+      .post(`/api/v1/dietitian/${org.id}/meal-plans/${source.body.id}/versions/${sourceDraftId}/days/${lastDay.id}/meals`)
+      .set("Cookie", owner.cookie)
+      .send({ name: "Evening snack", notes: "yogurt" })
+      .expect(201);
+
+    const copied = await request(ctx.app.getHttpServer())
+      .post(`/api/v1/dietitian/${org.id}/meal-plans`)
+      .set("Cookie", owner.cookie)
+      .send({
+        clientId: targetClient.body.id,
+        name: "Imported cut",
+        dayLabelMode: "WEEKDAY",
+        weekCount: 1,
+        daysPerWeek: 1,
+        sourcePlanId: source.body.id,
+      })
+      .expect(201);
+    const copiedDraftId = copied.body.versions[0].id as string;
+    const copiedDraft = await request(ctx.app.getHttpServer())
+      .get(`/api/v1/dietitian/${org.id}/meal-plans/${copied.body.id}/versions/${copiedDraftId}`)
+      .set("Cookie", owner.cookie)
+      .expect(200);
+    expect(copiedDraft.body.snapshot.days).toHaveLength(6);
+    expect(copiedDraft.body.snapshot.days[0].title).toBe("Monday");
+    const copiedBreakfast = copiedDraft.body.snapshot.days[0].meals.find(
+      (row: { name: string }) => row.name === "Breakfast",
+    );
+    expect(copiedBreakfast.items).toHaveLength(1);
+    expect(copiedBreakfast.items[0].food.id).toBe(food.id);
+    expect(copiedBreakfast.items[0].quantity).toBe(80);
+    const copiedLastDay = copiedDraft.body.snapshot.days[5];
+    expect(copiedLastDay.meals.map((row: { name: string }) => row.name)).toContain("Evening snack");
+    expect(copiedLastDay.meals.find((row: { name: string }) => row.name === "Evening snack").notes).toBe("yogurt");
+
+    await request(ctx.app.getHttpServer())
+      .post(`/api/v1/dietitian/${org.id}/meal-plans`)
+      .set("Cookie", owner.cookie)
+      .send({
+        clientId: targetClient.body.id,
+        name: "Missing source",
+        sourcePlanId: "00000000-0000-4000-8000-000000000099",
+      })
+      .expect(404);
+  });
 });

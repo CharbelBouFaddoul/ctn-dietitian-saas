@@ -85,6 +85,11 @@ export class CreateMealPlanDto {
   @Min(1)
   @Max(7)
   daysPerWeek?: number;
+
+  @ApiPropertyOptional({ description: "Copy every day, meal, and item from this plan instead of seeding empty weeks." })
+  @IsOptional()
+  @IsUUID()
+  sourcePlanId?: string;
 }
 
 export class UpdateMealPlanDto {

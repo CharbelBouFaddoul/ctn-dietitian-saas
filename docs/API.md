@@ -247,7 +247,7 @@ Every endpoint authenticates, establishes tenant context, and uses `ClientAccess
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | GET | `/meal-plans` | Member + visible clients | List (`clientId`, `status`, pagination) |
-| POST | `/meal-plans` | manageRecords | Create plan + draft version 1 + first day + Breakfast/Lunch/Dinner (`dayLabelMode`: `NUMBERED` \| `WEEKDAY`) |
+| POST | `/meal-plans` | manageRecords | Create plan + draft version 1. Empty seed (`weekCount`, `daysPerWeek`, `dayLabelMode`) or copy every day/meal/item from `sourcePlanId` |
 | GET | `/meal-plans/:planId` | read | Plan metadata + version list (`dayLabelMode`) |
 | PATCH | `/meal-plans/:planId` | manageRecords | Name/description/`dayLabelMode` (relabels draft days) |
 | POST | `/meal-plans/:planId/archive` | manageRecords | Soft-archive plan |

@@ -16829,6 +16829,12 @@ a.ui-list-cards__main {
   font-size: 0.88rem;
 }
 
+.ui-mp__day-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
 .ui-mp__add-meal {
   display: flex;
   flex-wrap: wrap;
