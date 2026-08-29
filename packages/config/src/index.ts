@@ -38,6 +38,7 @@ export const PLAN_SLUGS = ["standard", "pro", "premium"] as const;
 export const FEATURE_KEYS = {
   AI: "AI",
   AI_REQUEST_LIMIT: "AI_REQUEST_LIMIT",
+  AI_TOKEN_LIMIT: "AI_TOKEN_LIMIT",
   CLIENT_LIMIT: "CLIENT_LIMIT",
   AUTOMATION: "AUTOMATION",
   AUTOMATION_RULE_LIMIT: "AUTOMATION_RULE_LIMIT",
@@ -78,6 +79,7 @@ export const PLAN_FEATURE_DISPLAY_ORDER: readonly string[] = [
   FEATURE_KEYS.ANALYTICS,
   FEATURE_KEYS.AI,
   FEATURE_KEYS.AI_REQUEST_LIMIT,
+  FEATURE_KEYS.AI_TOKEN_LIMIT,
   FEATURE_KEYS.AUTOMATION,
   FEATURE_KEYS.AUTOMATION_RULE_LIMIT,
   FEATURE_KEYS.AUTOMATION_EXECUTION_LIMIT,
@@ -115,3 +117,25 @@ export const THROTTLE_NAMES = {
 } as const;
 
 export const DEFAULT_AUTH_TOKEN_SECRET_PLACEHOLDER = "change-me-to-a-long-random-secret-value";
+
+/** USD per 1M tokens. Unknown models use gpt-4o-mini so estimates never go blank. */
+export const AI_MODEL_PRICES_USD_PER_MILLION: Record<string, { input: number; output: number }> = {
+  "gpt-4o-mini": { input: 0.15, output: 0.6 },
+  "gpt-4o": { input: 2.5, output: 10 },
+};
+
+export const AI_DEFAULT_MODEL_PRICE = AI_MODEL_PRICES_USD_PER_MILLION["gpt-4o-mini"]!;
+
+export function estimateAiCostMicros(
+  model: string | null | undefined,
+  inputTokens: number,
+  outputTokens: number,
+): number {
+  const price = (model && AI_MODEL_PRICES_USD_PER_MILLION[model]) || AI_DEFAULT_MODEL_PRICE;
+  const usd = (Math.max(0, inputTokens) / 1_000_000) * price.input + (Math.max(0, outputTokens) / 1_000_000) * price.output;
+  return Math.round(usd * 1_000_000);
+}
+
+export function microsToUsd(micros: number | bigint): number {
+  return Number(micros) / 1_000_000;
+}

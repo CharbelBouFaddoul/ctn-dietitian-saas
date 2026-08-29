@@ -317,12 +317,13 @@ Indexes: `invoices(organization_id, status)`, `tasks(organization_id, assigned_m
 
 ## Phase 11 — AI
 
-Migration: `20260818070000_ai` (11 of 11 through Phase 11).
+Migrations: `20260818070000_ai`, `20260829183000_ai_usage_cost`, `20260829191000_ai_drafts`, `20260829200000_ai_draft_messages`.
 
 | Table | Purpose |
 |---|---|
-| `ai_requests` | Audit/metadata per AI call: org, user, optional client, action, provider, model, status, token counts, latency, error category. No long-term prompt/response storage |
-| `ai_usage` | Monthly org counter (`organization_id` + `period_key` YYYY-MM) for `AI_REQUEST_LIMIT` enforcement |
+| `ai_requests` | Audit/metadata per AI call: dietitian, user, optional client, action, provider, model, status, token counts, `cost_micros`, latency, error category. No long-term prompt/response storage |
+| `ai_usage` | Monthly counters (`dietitian_account_id` + `period_key` YYYY-MM): `request_count`, `token_count`, `cost_micros` for `AI_REQUEST_LIMIT` and `AI_TOKEN_LIMIT` |
+| `ai_drafts` | Last 50 replayable chats per practice: action, latest output JSON, and `messages` turns. No system prompt or chart dump |
 
 Enums: `AiAction` (CLIENT_SUMMARY, MEAL_PLAN_ASSISTANCE, NUTRITION_ASSISTANCE, CONSULTATION_SUMMARY, MESSAGE_DRAFT), `AiRequestStatus` (REJECTED, PENDING, COMPLETED, FAILED).
 
@@ -354,7 +355,7 @@ Execution uses serializable transactions for usage limits. Worker runs BullMQ `a
 **Practice:** `appointments`, `tasks`, `tags`, `client_tags`, `timeline_events`  
 **Communication:** `conversations`, `messages`, `notifications`, `documents`  
 **Business:** `invoices`, `invoice_items`  
-**Platform:** `plans`, `subscriptions`, `features`, `plan_features`, `feature_overrides`, `ai_requests`, `ai_usage`, `automation_rules`, `automation_runs`, `automation_usage`, `audit_logs`  
+**Platform:** `plans`, `subscriptions`, `features`, `plan_features`, `feature_overrides`, `ai_requests`, `ai_drafts`, `ai_usage`, `automation_rules`, `automation_runs`, `automation_usage`, `audit_logs`  
 **Settings:** `organization_settings`  
 **Auth extras:** `sessions`, tokens, `consents`  
 **Assessments:** `assessment_templates`, `assessments`, `client_profiles`, `client_goals`

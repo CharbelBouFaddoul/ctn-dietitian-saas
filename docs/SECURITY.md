@@ -170,9 +170,10 @@ The API sets `trust proxy` so `Secure` cookies and client IPs work behind Coolif
 - Globally inactive `AI` feature denies all orgs regardless of plan.
 - Provider API keys never exposed to browser or API responses.
 - Structured AI output validated with zod; malformed output rejected.
+- AI context is professional clinical data only (personal-data clinical fields + labeled custom evaluation answers; no email, phone, address, ID numbers, or emergency contacts).
 - AI does not mutate clients, meal plans, messages, invoices, tasks, or tracking records.
 - No client portal AI endpoints.
-- Audit: entitlement denial, limit exceeded (via `ai_requests` REJECTED + security logger).
+- Audit: entitlement denial, request or token limit exceeded (via `ai_requests` REJECTED + security logger). Failed provider/validation calls refund the request reservation.
 - Tests: `apps/api/test/ai.e2e.spec.ts`, `ai-output.spec.ts`.
 
 ## Phase 12 — Automation

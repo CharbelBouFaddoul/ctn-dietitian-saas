@@ -13,6 +13,7 @@ import { PublicPlansController } from "./public-plans.controller";
 import { AdminFoodsController } from "./admin-foods.controller";
 import { AdminListsController } from "./admin-lists.controller";
 import { AdminMeController } from "./admin-me.controller";
+import { AdminAiController } from "./admin-ai.controller";
 import { AdminDietitiansManageController } from "./admin-dietitians-manage.controller";
 import { AdminDietitianAccountService } from "./admin-dietitian-account.service";
 import { AdminOverrideService } from "./admin-override.service";
@@ -37,6 +38,7 @@ import { PlatformRolesGuard } from "./guards/platform-roles.guard";
   ],
   controllers: [
     AdminMeController,
+    AdminAiController,
     AdminDietitiansManageController,
     AdminUsersController,
     AdminDietitiansController,

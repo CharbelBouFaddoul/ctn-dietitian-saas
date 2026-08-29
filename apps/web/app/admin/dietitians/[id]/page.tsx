@@ -65,6 +65,46 @@ function formatValue(enabled: boolean | null, limit: number | null): string {
   return limit === null ? flag || "—" : `${flag} · ${limit}`.trim();
 }
 
+function AiUsageCard({ dietitianAccountId }: { dietitianAccountId: string }) {
+  const [usage, setUsage] = useState<{
+    requests?: { used: number; limit: number | null };
+    tokens?: { used: number; limit: number | null };
+    costUsd?: number;
+  } | null>(null);
+
+  useEffect(() => {
+    void api<{
+      requests?: { used: number; limit: number | null };
+      tokens?: { used: number; limit: number | null };
+      costUsd?: number;
+    }>(`/api/v1/admin/dietitians/${dietitianAccountId}/ai/usage`)
+      .then(setUsage)
+      .catch(() => setUsage(null));
+  }, [dietitianAccountId]);
+
+  if (!usage) return null;
+  return (
+    <Section
+      title="AI usage"
+      description="This calendar month."
+      actions={
+        <Link href="/admin/ai" className="ui-link">
+          Platform usage
+        </Link>
+      }
+    >
+      <p className="ui-muted" style={{ margin: 0 }}>
+        {usage.requests?.used ?? 0}
+        {usage.requests?.limit != null ? ` / ${usage.requests.limit}` : ""} requests
+        {" · "}
+        {(usage.tokens?.used ?? 0).toLocaleString()}
+        {usage.tokens?.limit != null ? ` / ${usage.tokens.limit.toLocaleString()}` : ""} tokens
+        {" · "}${(usage.costUsd ?? 0).toFixed(4)}
+      </p>
+    </Section>
+  );
+}
+
 function defaultPeriodEndIso(): string {
   const d = new Date();
   d.setUTCMonth(d.getUTCMonth() + 1);
@@ -146,6 +186,8 @@ export default function AdminDietitianDetailPage() {
         }
       />
       {error ? <Alert tone="danger">{error}</Alert> : null}
+
+      <AiUsageCard dietitianAccountId={dietitianAccountId} />
 
       <Section title="Clinic status" tone="mint">
         <div className="ui-row" style={{ marginBottom: 12 }}>

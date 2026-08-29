@@ -61,8 +61,11 @@ export class AdminDietitiansManageController {
 
   @Get(":dietitianAccountId/ai/usage")
   @ApiOperation({ summary: "Inspect dietitian AI usage and entitlement" })
-  aiUsage(@Param("dietitianAccountId", ParseUUIDPipe) dietitianAccountId: string) {
-    return this.ai.getUsageSummary(dietitianAccountId);
+  aiUsage(
+    @Param("dietitianAccountId", ParseUUIDPipe) dietitianAccountId: string,
+    @Query("period") period?: string,
+  ) {
+    return this.ai.getUsageSummary(dietitianAccountId, period);
   }
 
   @Get(":dietitianAccountId/automation/summary")

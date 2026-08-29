@@ -303,7 +303,7 @@ Resolution order:
 
 Result shape: `{ enabled, limit, source: "override" | "plan" | "default" }`.
 
-AI is a normal catalog feature (`AI` boolean + `AI_REQUEST_LIMIT`). Phase 11 consumes these entitlements via `EntitlementService` — no separate AI subscription.
+AI is a normal catalog feature (`AI` boolean + `AI_REQUEST_LIMIT` + `AI_TOKEN_LIMIT`). Phase 11 consumes these entitlements via `EntitlementService` — no separate AI subscription.
 
 V1 has **no payment processor**. Admins assign plans manually. Subscription rows include unused billing metadata (`billing_cycle`, `provider`, `external_id`, `payment_status`, period dates) so a future processor can attach without redesigning entitlements.
 
@@ -623,13 +623,17 @@ Settings are consumed by invoices, emails, PDFs, appointments, client portal, an
 
 **Module:** `AiModule` (`AiService`, `AiContextService`, `AiUsageService`, `AiProvider`).
 
-**Flow:** Controller → `AiService` → `EntitlementService` → atomic usage reservation → `AiContextService` → prompt builder → `AiProvider` → zod validation → `ai_requests` persistence.
+**Flow:** Controller → `AiService` → `EntitlementService` → atomic request reservation + token-budget check → action-specific `AiContextService` → prompt builder → `AiProvider` → zod validation → `ai_requests` / `ai_usage` persistence, then a replayable `ai_drafts` row (validated output JSON only). Failed calls refund the request reservation. Draft persist failures do not refund a completed generation.
+
+**Budgets:** Monthly request cap and token cap. Estimated USD is derived from a model price table and stored as `cost_micros` on completed requests.
 
 **Providers:** `MockAiProvider` (default, no API key) and `OpenAiProvider` (when `AI_PROVIDER=openai` and `AI_API_KEY` set).
 
-**Privacy:** Context builder sends minimal client data only; no passwords, tokens, or storage keys. Prompts/responses are not stored long-term.
+**Privacy:** Context includes professional clinical chart data (visit, lifestyle, health, eating, nutrition, prescription, measurements, goals, pregnancy/clinical notes) and labeled answers from the latest custom evaluations. It never includes email, phone, address, national/health/VAT numbers, or emergency contacts. Meal-item lines are sent only for meal-plan assistance. Validated draft JSON may be stored on `ai_drafts` for replay (last 50). The system/user prompt and chart dump are not stored.
 
-**Safety:** Structured JSON output validated before return. AI never mutates clients, meal plans, messages, invoices, or tracking data. Client portal has no AI routes.
+**Safety:** Structured JSON output validated before return. AI never mutates clients, meal plans, messages, invoices, or tracking data unless the dietitian explicitly applies a draft (chart note, message composer, or draft-day meal notes). Client portal has no AI routes.
+
+**Practice UI:** `/ai` is a full-page chat workspace (history + composer). Follow-up sends append to the same draft. Usage is a slide-over from the history footer.
 
 ---
 

@@ -161,6 +161,21 @@ export async function seedEntitlementCatalog(prisma: PrismaClient): Promise<void
       status: "INACTIVE",
     },
   });
+  const aiTokenLimit = await prisma.feature.upsert({
+    where: { key: FEATURE_KEYS.AI_TOKEN_LIMIT },
+    update: {
+      name: "AI token limit",
+      description: "Monthly AI token budget for the organization subscription.",
+      status: "INACTIVE",
+    },
+    create: {
+      key: FEATURE_KEYS.AI_TOKEN_LIMIT,
+      name: "AI token limit",
+      description: "Monthly AI token budget for the organization subscription.",
+      valueType: "LIMIT",
+      status: "INACTIVE",
+    },
+  });
   const clientLimit = await prisma.feature.upsert({
     where: { key: FEATURE_KEYS.CLIENT_LIMIT },
     update: {},
@@ -223,18 +238,21 @@ export async function seedEntitlementCatalog(prisma: PrismaClient): Promise<void
   rows.push(
     { planId: standard.id, featureId: ai.id, enabled: false, limitValue: null },
     { planId: standard.id, featureId: aiLimit.id, enabled: false, limitValue: 0 },
+    { planId: standard.id, featureId: aiTokenLimit.id, enabled: false, limitValue: 0 },
     { planId: standard.id, featureId: clientLimit.id, enabled: true, limitValue: 25 },
     { planId: standard.id, featureId: automation.id, enabled: false, limitValue: null },
     { planId: standard.id, featureId: automationRuleLimit.id, enabled: false, limitValue: 0 },
     { planId: standard.id, featureId: automationExecutionLimit.id, enabled: false, limitValue: 0 },
     { planId: pro.id, featureId: ai.id, enabled: true, limitValue: null },
     { planId: pro.id, featureId: aiLimit.id, enabled: true, limitValue: 300 },
+    { planId: pro.id, featureId: aiTokenLimit.id, enabled: true, limitValue: 1_500_000 },
     { planId: pro.id, featureId: clientLimit.id, enabled: true, limitValue: 100 },
     { planId: pro.id, featureId: automation.id, enabled: true, limitValue: null },
     { planId: pro.id, featureId: automationRuleLimit.id, enabled: true, limitValue: 25 },
     { planId: pro.id, featureId: automationExecutionLimit.id, enabled: true, limitValue: 2000 },
     { planId: premium.id, featureId: ai.id, enabled: true, limitValue: null },
     { planId: premium.id, featureId: aiLimit.id, enabled: true, limitValue: 1000 },
+    { planId: premium.id, featureId: aiTokenLimit.id, enabled: true, limitValue: 5_000_000 },
     { planId: premium.id, featureId: clientLimit.id, enabled: true, limitValue: 300 },
     { planId: premium.id, featureId: automation.id, enabled: true, limitValue: null },
     { planId: premium.id, featureId: automationRuleLimit.id, enabled: true, limitValue: 100 },

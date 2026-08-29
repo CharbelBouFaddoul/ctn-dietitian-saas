@@ -5,7 +5,6 @@ import { AuthModule } from "../auth/auth.module";
 import { ClientsModule } from "../clients/clients.module";
 import { EntitlementsModule } from "../entitlements/entitlements.module";
 import { DietitianModule } from "../dietitian/dietitian.module";
-import { TrackingModule } from "../tracking/tracking.module";
 import { AI_PROVIDER } from "./ai.provider";
 import { AiContextService } from "./ai-context.service";
 import { AiUsageService } from "./ai-usage.service";
@@ -15,7 +14,7 @@ import { MockAiProvider } from "./mock-ai.provider";
 import { OpenAiProvider } from "./openai-ai.provider";
 
 @Module({
-  imports: [AuthModule, DietitianModule, ClientsModule, EntitlementsModule, TrackingModule],
+  imports: [AuthModule, DietitianModule, ClientsModule, EntitlementsModule],
   controllers: [OrganizationAiController, ClientAiController],
   providers: [
     MockAiProvider,
@@ -31,6 +30,6 @@ import { OpenAiProvider } from "./openai-ai.provider";
     AiContextService,
     AiService,
   ],
-  exports: [AiService],
+  exports: [AiService, AiContextService],
 })
 export class AiModule {}

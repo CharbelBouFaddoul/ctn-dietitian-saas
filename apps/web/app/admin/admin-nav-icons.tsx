@@ -67,6 +67,12 @@ export const AdminNavIcons = {
       <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
     </Icon>
   ),
+  ai: (
+    <Icon>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4L7 17M17 7l1.4-1.4" />
+    </Icon>
+  ),
   health: (
     <Icon>
       <path d="M22 12h-4l-3 9L9 3l-3 9H2" />

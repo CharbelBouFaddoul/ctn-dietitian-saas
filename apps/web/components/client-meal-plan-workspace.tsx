@@ -503,6 +503,7 @@ type Props = {
   onArchived?: () => void;
   onCreateRequest?: () => void;
   onSelectPlan?: (planId: string) => void;
+  onFocusedDraftChange?: (day: { planId: string; versionId: string; dayId: string } | null) => void;
 };
 
 export function ClientMealPlanWorkspace({
@@ -520,6 +521,7 @@ export function ClientMealPlanWorkspace({
   onArchived,
   onCreateRequest,
   onSelectPlan,
+  onFocusedDraftChange,
 }: Props) {
   const router = useRouter();
   const [view, setView] = useState<MealPlanView>(initialView);
@@ -729,6 +731,15 @@ export function ClientMealPlanWorkspace({
     (weekDays.find((d) => d.id === activeDayId) as PlanDay | undefined) ??
     (weekDays[0] as PlanDay | undefined) ??
     null;
+
+  useEffect(() => {
+    if (!onFocusedDraftChange) return;
+    if (canEdit && version && focusedDay) {
+      onFocusedDraftChange({ planId, versionId: version.id, dayId: focusedDay.id });
+      return;
+    }
+    onFocusedDraftChange(null);
+  }, [canEdit, focusedDay, onFocusedDraftChange, planId, version]);
 
   function selectView(next: MealPlanView) {
     setView(next);

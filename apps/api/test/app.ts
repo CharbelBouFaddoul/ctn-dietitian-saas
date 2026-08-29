@@ -158,7 +158,7 @@ export async function resetAuthDatabase(prisma: PrismaService): Promise<void> {
   await seedPlatformBootstrap(prisma, { registrationEnabled: true });
   // Demo/prod seed keeps AI catalog features inactive; automated tests re-enable them.
   await prisma.feature.updateMany({
-    where: { key: { in: [FEATURE_KEYS.AI, FEATURE_KEYS.AI_REQUEST_LIMIT] } },
+    where: { key: { in: [FEATURE_KEYS.AI, FEATURE_KEYS.AI_REQUEST_LIMIT, FEATURE_KEYS.AI_TOKEN_LIMIT] } },
     data: { status: "ACTIVE" },
   });
 }

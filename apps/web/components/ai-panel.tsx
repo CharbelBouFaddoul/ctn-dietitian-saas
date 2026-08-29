@@ -1,11 +1,17 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
-import { Alert, Badge, Button, Card, Field, Input, Section, Textarea } from "@nutrition-saas/ui";
+import { useEffect, useRef, useState } from "react";
+import { Alert, Badge, Button, Card, Field, Input, Textarea } from "@nutrition-saas/ui";
 import { api } from "../lib/api";
 import { errorMessage } from "../lib/humanize-error";
 import { humanizeLabel } from "@nutrition-saas/ui";
+
+export const AI_MESSAGE_DRAFT_STORAGE_PREFIX = "ai-message-draft:";
+
+export function aiMessageDraftStorageKey(clientId: string): string {
+  return `${AI_MESSAGE_DRAFT_STORAGE_PREFIX}${clientId}`;
+}
 
 interface Usage {
   enabled: boolean;
@@ -13,7 +19,14 @@ interface Usage {
   used: number;
   remaining: number | null;
   periodKey: string;
+  tokens?: { used: number; limit: number | null; remaining: number | null };
 }
+
+export type AiDraftDay = {
+  planId: string;
+  versionId: string;
+  dayId: string;
+};
 
 interface AiPanelProps {
   dietitianAccountId: string;
@@ -28,6 +41,23 @@ interface AiPanelProps {
   description: string;
   promptLabel?: string;
   foodQuery?: boolean;
+  compact?: boolean;
+  apply?: "note" | "message" | "meal";
+  draftDay?: AiDraftDay | null;
+  showUsage?: boolean;
+  showModel?: boolean;
+  chrome?: "card" | "plain";
+  hideHeader?: boolean;
+  hideComposer?: boolean;
+  initialResult?: Record<string, unknown> | null;
+  initialPrompt?: string;
+  initialFood?: string;
+  onUsageChange?: (usage: Usage) => void;
+  onGenerated?: (payload: {
+    draftId?: string;
+    result: Record<string, unknown>;
+    usage: Usage & { tokens?: { used: number; limit: number | null; remaining: number | null } };
+  }) => void;
 }
 
 function asList(value: unknown): string[] {
@@ -213,6 +243,134 @@ function renderResult(result: Record<string, unknown>): ReactNode {
   return sections;
 }
 
+function flattenResult(result: Record<string, unknown>): string {
+  return Object.values(result)
+    .flatMap((value) =>
+      Array.isArray(value)
+        ? value.map((item) =>
+            typeof item === "string"
+              ? item
+              : Object.values(item as Record<string, unknown>)
+                  .filter((v) => typeof v === "string")
+                  .join(" — "),
+          )
+        : typeof value === "string"
+          ? [value]
+          : [],
+    )
+    .join("\n");
+}
+
+function noteBodyFromResult(result: Record<string, unknown>): string {
+  const text = flattenResult(result).trim();
+  if (text.length <= 4000) return text;
+  return `${text.slice(0, 3990).trimEnd()}…`;
+}
+
+export function flattenAiResult(result: Record<string, unknown>): string {
+  return flattenResult(result);
+}
+
+export function AiAnswer({
+  result,
+  apply,
+  dietitianAccountId,
+  clientId,
+  draftDay = null,
+}: {
+  result: Record<string, unknown>;
+  apply?: "note" | "message" | "meal";
+  dietitianAccountId: string;
+  clientId: string;
+  draftDay?: AiDraftDay | null;
+}) {
+  const [applying, setApplying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const copyText = flattenResult(result);
+
+  async function applyDraft() {
+    if (!apply) return;
+    setApplying(true);
+    setError(null);
+    setNotice(null);
+    try {
+      if (apply === "note") {
+        const body = noteBodyFromResult(result);
+        await api(`/api/v1/dietitian/${dietitianAccountId}/clients/${clientId}/chart-notes`, {
+          method: "POST",
+          body: JSON.stringify({ kind: "CLINICAL", body }),
+        });
+        setNotice(body.length >= 4000 ? "Saved to clinical notes (truncated to 4,000 characters)." : "Saved to clinical notes.");
+      } else if (apply === "message") {
+        const subject = typeof result.subject === "string" ? result.subject : "";
+        const body = typeof result.body === "string" ? result.body : flattenResult(result);
+        sessionStorage.setItem(aiMessageDraftStorageKey(clientId), JSON.stringify({ subject, body }));
+        window.location.href = `/practice/${dietitianAccountId}/messages?clientId=${encodeURIComponent(clientId)}`;
+      } else if (apply === "meal") {
+        if (!draftDay) {
+          setError("Open a draft day first");
+          return;
+        }
+        const suggestions = Array.isArray(result.suggestions) ? result.suggestions : [];
+        const first = suggestions[0] && typeof suggestions[0] === "object" ? (suggestions[0] as Record<string, unknown>) : null;
+        const name = typeof first?.title === "string" && first.title.trim() ? first.title.trim() : "AI suggestion";
+        const notes = flattenResult(result);
+        if (!window.confirm(`Add “${name}” as a meal on this draft day? Foods are not created automatically — review the notes.`)) {
+          return;
+        }
+        await api(
+          `/api/v1/dietitian/${dietitianAccountId}/meal-plans/${draftDay.planId}/versions/${draftDay.versionId}/days/${draftDay.dayId}/meals`,
+          { method: "POST", body: JSON.stringify({ name, notes }) },
+        );
+        setNotice("Added as a meal with notes on the draft day.");
+      }
+    } catch (err) {
+      setError(errorMessage(err, "Could not apply this draft"));
+    } finally {
+      setApplying(false);
+    }
+  }
+
+  return (
+    <div className="ui-ai-msg ui-ai-msg--ai">
+      <div className="ui-ai-msg__body">{renderResult(result)}</div>
+      <div className="ui-ai-msg__actions">
+        <button
+          type="button"
+          className="ui-ai-msg__icon"
+          aria-label="Copy"
+          title="Copy"
+          onClick={() => void navigator.clipboard.writeText(copyText)}
+        >
+          <CopyIcon />
+        </button>
+        {apply ? (
+          <button
+            type="button"
+            className="ui-ai-msg__action"
+            disabled={applying || (apply === "meal" && !draftDay)}
+            onClick={() => void applyDraft()}
+          >
+            {applying ? "Applying…" : apply === "message" ? "Use in Messages" : apply === "meal" ? "Add as meal notes" : "Save as note"}
+          </button>
+        ) : null}
+      </div>
+      {error ? <Alert tone="danger">{error}</Alert> : null}
+      {notice ? <Alert tone="success">{notice}</Alert> : null}
+    </div>
+  );
+}
+
+function CopyIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
+      <rect x="9" y="9" width="13" height="13" rx="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+  );
+}
+
 export function AiPanel({
   dietitianAccountId,
   clientId,
@@ -221,20 +379,41 @@ export function AiPanel({
   description,
   promptLabel = "Optional instructions",
   foodQuery = false,
+  compact = false,
+  apply,
+  draftDay = null,
+  showUsage = true,
+  showModel = true,
+  chrome = "card",
+  hideHeader = false,
+  hideComposer = false,
+  initialResult = null,
+  initialPrompt = "",
+  initialFood = "",
+  onUsageChange,
+  onGenerated,
 }: AiPanelProps) {
   const [usage, setUsage] = useState<Usage | null>(null);
-  const [prompt, setPrompt] = useState("");
-  const [food, setFood] = useState("");
+  const [prompt, setPrompt] = useState(initialPrompt);
+  const [food, setFood] = useState(initialFood);
   const [loading, setLoading] = useState(false);
+  const [applying, setApplying] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<Record<string, unknown> | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [result, setResult] = useState<Record<string, unknown> | null>(initialResult);
   const [meta, setMeta] = useState<{ provider?: string; model?: string } | null>(null);
+  const onUsageChangeRef = useRef(onUsageChange);
+  onUsageChangeRef.current = onUsageChange;
 
   useEffect(() => {
+    if (hideComposer && !showUsage) return;
     void api<Usage>(`/api/v1/dietitian/${dietitianAccountId}/ai/usage`)
-      .then(setUsage)
+      .then((data) => {
+        setUsage(data);
+        onUsageChangeRef.current?.(data);
+      })
       .catch(() => setUsage(null));
-  }, [dietitianAccountId]);
+  }, [dietitianAccountId, hideComposer, showUsage]);
 
   async function generate() {
     setLoading(true);
@@ -242,24 +421,29 @@ export function AiPanel({
     setResult(null);
     try {
       const response = await api<{
+        draftId?: string;
         result: Record<string, unknown>;
         provider: string;
         model: string;
         generatedAt: string;
-        usage: Usage;
+        usage: Usage & { tokens?: { used: number; limit: number | null; remaining: number | null } };
       }>(`/api/v1/dietitian/${dietitianAccountId}/clients/${clientId}/ai/${action}`, {
         method: "POST",
         body: JSON.stringify({ prompt, ...(foodQuery ? { foodQuery: food } : {}) }),
       });
       setResult(response.result);
       setMeta({ provider: response.provider, model: response.model });
-      setUsage({
+      const nextUsage = {
         enabled: true,
         limit: response.usage.limit,
         used: response.usage.used,
         remaining: response.usage.remaining,
         periodKey: response.usage.periodKey,
-      });
+        tokens: response.usage.tokens,
+      };
+      setUsage(nextUsage);
+      onUsageChangeRef.current?.(nextUsage);
+      onGenerated?.({ draftId: response.draftId, result: response.result, usage: response.usage });
     } catch (err) {
       setError(errorMessage(err, "Unable to generate a draft"));
     } finally {
@@ -267,94 +451,150 @@ export function AiPanel({
     }
   }
 
-  const copyText = result
-    ? Object.values(result)
-        .flatMap((value) =>
-          Array.isArray(value)
-            ? value.map((item) =>
-                typeof item === "string"
-                  ? item
-                  : Object.values(item as Record<string, unknown>)
-                      .filter((v) => typeof v === "string")
-                      .join(" — "),
-              )
-            : typeof value === "string"
-              ? [value]
-              : [],
-        )
-        .join("\n")
-    : "";
+  async function applyDraft() {
+    if (!result || !apply) return;
+    setApplying(true);
+    setError(null);
+    setNotice(null);
+    try {
+      if (apply === "note") {
+        const body = noteBodyFromResult(result);
+        await api(`/api/v1/dietitian/${dietitianAccountId}/clients/${clientId}/chart-notes`, {
+          method: "POST",
+          body: JSON.stringify({ kind: "CLINICAL", body }),
+        });
+        setNotice(body.length >= 4000 ? "Saved to clinical notes (truncated to 4,000 characters)." : "Saved to clinical notes.");
+      } else if (apply === "message") {
+        const subject = typeof result.subject === "string" ? result.subject : "";
+        const body = typeof result.body === "string" ? result.body : flattenResult(result);
+        sessionStorage.setItem(aiMessageDraftStorageKey(clientId), JSON.stringify({ subject, body }));
+        window.location.href = `/practice/${dietitianAccountId}/messages?clientId=${encodeURIComponent(clientId)}`;
+      } else if (apply === "meal") {
+        if (!draftDay) {
+          setError("Open a draft day first");
+          return;
+        }
+        const suggestions = Array.isArray(result.suggestions) ? result.suggestions : [];
+        const first = suggestions[0] && typeof suggestions[0] === "object" ? (suggestions[0] as Record<string, unknown>) : null;
+        const name = typeof first?.title === "string" && first.title.trim() ? first.title.trim() : "AI suggestion";
+        const notes = flattenResult(result);
+        if (!window.confirm(`Add “${name}” as a meal on this draft day? Foods are not created automatically — review the notes.`)) {
+          return;
+        }
+        await api(
+          `/api/v1/dietitian/${dietitianAccountId}/meal-plans/${draftDay.planId}/versions/${draftDay.versionId}/days/${draftDay.dayId}/meals`,
+          { method: "POST", body: JSON.stringify({ name, notes }) },
+        );
+        setNotice("Added as a meal with notes on the draft day.");
+      }
+    } catch (err) {
+      setError(errorMessage(err, "Could not apply this draft"));
+    } finally {
+      setApplying(false);
+    }
+  }
+
+  const copyText = result ? flattenResult(result) : "";
 
   const aiDisabled = usage?.enabled === false;
+  const budgetGone =
+    (usage?.remaining !== null && usage?.remaining === 0) ||
+    (usage?.tokens?.remaining !== null && usage?.tokens?.remaining === 0);
   const usageLine = usage?.enabled
-    ? `${usage.used}${usage.limit !== null ? ` / ${usage.limit}` : ""} used this ${humanizeLabel(usage.periodKey)}${usage.remaining !== null ? ` · ${usage.remaining} remaining` : ""}`
+    ? `${usage.used}${usage.limit !== null ? ` / ${usage.limit}` : ""} requests${usage.tokens ? ` · ${usage.tokens.used.toLocaleString()}${usage.tokens.limit != null ? ` / ${usage.tokens.limit.toLocaleString()}` : ""} tokens` : ""} this ${humanizeLabel(usage.periodKey)}`
     : null;
 
-  return (
-    <Card title={title}>
+  const mockModel = meta?.provider === "mock" || meta?.model === "mock-model";
+  const header = hideHeader ? null : chrome === "plain" ? (
+    <header className="ui-ai-panel__head">
+      <h2 className="ui-ai-panel__title">{title}</h2>
+      <p className="ui-muted">{description}</p>
+    </header>
+  ) : (
+    <>
+      <h2 className="ui-card__title">{title}</h2>
       <p className="ui-muted" style={{ marginBottom: 10 }}>
         {description}
       </p>
+    </>
+  );
 
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
-        <Badge tone="warning">AI-generated — review before use</Badge>
-        {usage !== null ? (
-          <Badge tone={aiDisabled ? "danger" : "neutral"}>
-            {aiDisabled ? "AI not enabled for this clinic" : usageLine}
-          </Badge>
-        ) : null}
-      </div>
-
-      {foodQuery ? (
-        <Field label="Food search">
-          <Input value={food} onChange={(e) => setFood(e.target.value)} placeholder="e.g. salmon, almonds…" />
-        </Field>
+  const body = (
+    <>
+      {header}
+      {!hideHeader ? (
+        <div className="ui-ai-panel__badges">
+          <Badge tone="warning">Review before use</Badge>
+          {showUsage && usage !== null ? (
+            <Badge tone={aiDisabled ? "danger" : "neutral"}>
+              {aiDisabled ? "AI not enabled for this clinic" : usageLine}
+            </Badge>
+          ) : null}
+        </div>
       ) : null}
 
-      <Field label={promptLabel}>
-        <Textarea
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          placeholder="Leave blank for default behaviour, or add specific instructions…"
-          style={{ minHeight: 80 }}
-        />
-      </Field>
-
-      <div className="ui-row">
-        <Button size="sm" variant="secondary" disabled={loading || aiDisabled} onClick={() => void generate()}>
-          {loading ? "Generating…" : "Generate"}
-        </Button>
-        {result ? (
-          <>
+      {result ? (
+        <div className="ui-ai-bubble">
+          {renderResult(result)}
+          <div className="ui-ai-bubble__actions">
             <Button size="sm" variant="secondary" onClick={() => void navigator.clipboard.writeText(copyText)}>
               Copy all
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => setResult(null)}>
-              Clear
-            </Button>
-          </>
-        ) : null}
-      </div>
+            {apply ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={applying || (apply === "meal" && !draftDay)}
+                title={apply === "meal" && !draftDay ? "Open a draft day first" : undefined}
+                onClick={() => void applyDraft()}
+              >
+                {applying ? "Applying…" : apply === "message" ? "Use in Messages" : apply === "meal" ? "Add as meal notes" : "Save as note"}
+              </Button>
+            ) : null}
+            {showModel && meta?.model && !mockModel ? <span className="ui-hint">{meta.model}</span> : null}
+          </div>
+        </div>
+      ) : null}
 
+      {!hideComposer ? (
+        <div className="ui-ai-panel__composer">
+          {foodQuery ? (
+            <Field label="Food search">
+              <Input value={food} onChange={(e) => setFood(e.target.value)} placeholder="e.g. salmon, almonds…" />
+            </Field>
+          ) : null}
+          <Field label={promptLabel}>
+            <Textarea
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder="Leave blank for default behaviour, or add specific instructions…"
+              style={{ minHeight: compact ? 56 : 72 }}
+            />
+          </Field>
+          <div className="ui-row">
+            <Button disabled={loading || aiDisabled || budgetGone} onClick={() => void generate()}>
+              {loading ? "Generating…" : result ? "Generate again" : "Generate"}
+            </Button>
+          </div>
+          {apply === "meal" && !draftDay ? (
+            <p className="ui-hint" style={{ marginTop: 8, marginBottom: 0 }}>
+              Open a draft day first to apply a meal suggestion.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
       {error ? (
         <div style={{ marginTop: 12 }}>
           <Alert tone="danger">{error}</Alert>
         </div>
       ) : null}
-
-      {result ? (
-        <div style={{ marginTop: 16 }}>
-          <Section tone="muted">
-            {renderResult(result)}
-            {meta?.model ? (
-              <p className="ui-hint" style={{ marginTop: 14, marginBottom: 0 }}>
-                Generated by {meta.model}
-                {meta.provider && meta.provider !== meta.model ? ` (${meta.provider})` : ""}
-              </p>
-            ) : null}
-          </Section>
+      {notice ? (
+        <div style={{ marginTop: 12 }}>
+          <Alert tone="success">{notice}</Alert>
         </div>
       ) : null}
-    </Card>
+    </>
   );
+
+  return chrome === "plain" ? <div className="ui-ai-panel">{body}</div> : <Card>{body}</Card>;
 }

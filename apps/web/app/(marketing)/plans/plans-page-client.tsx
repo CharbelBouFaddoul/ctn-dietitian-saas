@@ -71,14 +71,16 @@ const FEATURE_GROUPS: Array<{
   },
   {
     id: "ai",
-    keys: ["AI", "AI_REQUEST_LIMIT"],
+    keys: ["AI", "AI_REQUEST_LIMIT", "AI_TOKEN_LIMIT"],
     label: (features) => {
       if (!hasAny(features, ["AI"])) return null;
       const limit = features.find((f) => f.key === "AI_REQUEST_LIMIT");
-      if (limit?.limitValue != null) {
-        return `AI assistance (${limit.limitValue.toLocaleString()} requests / period)`;
-      }
-      return "AI assistance";
+      const tokens = features.find((f) => f.key === "AI_TOKEN_LIMIT");
+      const parts = [
+        limit?.limitValue != null ? `${limit.limitValue.toLocaleString()} requests` : null,
+        tokens?.limitValue != null ? `${tokens.limitValue.toLocaleString()} tokens` : null,
+      ].filter(Boolean);
+      return parts.length ? `AI assistance (${parts.join(" / ")} / period)` : "AI assistance";
     },
   },
   {

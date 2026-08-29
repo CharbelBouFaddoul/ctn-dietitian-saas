@@ -160,6 +160,46 @@ function assertQuestionValue(question: AssessmentQuestion, value: unknown): void
  * - complete: all required active questions must be answered
  * Inactive questions are not required; stray answers for unknown/inactive ids are ignored.
  */
+export function labeledAssessmentAnswers(
+  schemaRaw: unknown,
+  responses: unknown,
+): Array<{ question: string; answer: string }> {
+  let schema: AssessmentSchema;
+  try {
+    schema = parseAssessmentSchema(schemaRaw);
+  } catch {
+    return [];
+  }
+  const raw = responses && typeof responses === "object" && !Array.isArray(responses) ? (responses as Record<string, unknown>) : {};
+  const out: Array<{ question: string; answer: string }> = [];
+  for (const section of schema.sections) {
+    for (const question of section.questions) {
+      const answer = formatAssessmentAnswer(question, raw[question.id]);
+      if (answer) out.push({ question: question.label, answer });
+    }
+  }
+  return out;
+}
+
+function formatAssessmentAnswer(question: AssessmentQuestion, value: unknown): string | null {
+  if (!isAnswered(value)) return null;
+  if (question.type === "BOOLEAN") return value === true ? "Yes" : "No";
+  if (question.type === "NUMBER") return String(value);
+  if (question.type === "SINGLE_CHOICE") {
+    const option = question.options?.find((row) => row.id === value);
+    return option?.label ?? String(value);
+  }
+  if (question.type === "MULTI_CHOICE" && Array.isArray(value)) {
+    const labels = value.map((id) => question.options?.find((row) => row.id === id)?.label ?? String(id));
+    return labels.join(", ");
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length > 500 ? `${trimmed.slice(0, 497)}…` : trimmed;
+  }
+  return null;
+}
+
 export function validateAssessmentResponses(
   schema: AssessmentSchema,
   responses: unknown,

@@ -80,6 +80,7 @@ model User {
   tasksCreated            Task[]                   @relation("TaskCreatedBy")
   tasksAssigned           Task[]                   @relation("TaskAssignedUser")
   aiRequests              AiRequest[]
+  aiDrafts                AiDraft[]
   automationRulesCreated  AutomationRule[]         @relation("AutomationRuleCreatedBy")
   automationRulesUpdated  AutomationRule[]         @relation("AutomationRuleUpdatedBy")
 
@@ -263,6 +264,7 @@ model DietitianAccount {
   invoiceSequence        InvoiceSequence?
   tasks                  Task[]
   aiRequests             AiRequest[]
+  aiDrafts               AiDraft[]
   aiUsage                AiUsage[]
   automationRules        AutomationRule[]
   automationRuns         AutomationRun[]
@@ -781,6 +783,7 @@ model Client {
   invoices         Invoice[]
   tasks            Task[]
   aiRequests       AiRequest[]
+  aiDrafts         AiDraft[]
   activeSessions   Session[]
 
   @@unique([dietitianAccountId, code])
@@ -1763,6 +1766,8 @@ model AiUsage {
   dietitianAccountId String   @map("dietitian_account_id") @db.Uuid
   periodKey          String   @map("period_key")
   requestCount       Int      @default(0) @map("request_count")
+  tokenCount         Int      @default(0) @map("token_count")
+  costMicros         BigInt   @default(0) @map("cost_micros")
   updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   dietitianAccount DietitianAccount @relation(fields: [dietitianAccountId], references: [id], onDelete: Cascade)
@@ -1785,6 +1790,7 @@ model AiRequest {
   correlationId      String?         @map("correlation_id")
   inputTokens        Int?            @map("input_tokens")
   outputTokens       Int?            @map("output_tokens")
+  costMicros         BigInt?         @map("cost_micros")
   latencyMs          Int?            @map("latency_ms")
   errorCategory      String?         @map("error_category")
   requestedAt        DateTime        @default(now()) @map("requested_at") @db.Timestamptz
@@ -1799,6 +1805,29 @@ model AiRequest {
   @@index([userId, requestedAt])
   @@index([clientId])
   @@map("ai_requests")
+}
+
+model AiDraft {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  dietitianAccountId String   @map("dietitian_account_id") @db.Uuid
+  userId             String   @map("user_id") @db.Uuid
+  clientId           String   @map("client_id") @db.Uuid
+  action             AiAction
+  userInput          String?  @map("user_input") @db.VarChar(4000)
+  foodQuery          String?  @map("food_query") @db.VarChar(200)
+  output             Json
+  messages           Json?
+  requestId          String?  @map("request_id") @db.Uuid
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  dietitianAccount DietitianAccount @relation(fields: [dietitianAccountId], references: [id], onDelete: Restrict)
+  user             User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  client           Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([dietitianAccountId, createdAt])
+  @@index([dietitianAccountId, clientId, createdAt])
+  @@map("ai_drafts")
 }
 
 model AutomationRule {

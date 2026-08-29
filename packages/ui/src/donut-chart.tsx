@@ -56,6 +56,19 @@ function formatValue(value: number) {
   return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
 }
 
+function contrastingInk(color: string): string {
+  const hex = color.trim();
+  const match = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(hex);
+  if (!match) return "#fff";
+  let raw = match[1]!;
+  if (raw.length === 3) raw = raw.split("").map((ch) => ch + ch).join("");
+  const r = Number.parseInt(raw.slice(0, 2), 16);
+  const g = Number.parseInt(raw.slice(2, 4), 16);
+  const b = Number.parseInt(raw.slice(4, 6), 16);
+  const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return luma > 165 ? "#0f172a" : "#fff";
+}
+
 export function DonutChart({
   slices,
   size = 112,
@@ -143,7 +156,7 @@ export function DonutChart({
         {center && !activeArc ? <div className="ui-donut__center">{center}</div> : null}
         {activeArc ? (
           <div className="ui-donut__tip">
-            <span className="ui-donut__tip-pill" style={{ background: activeArc.color, color: "#1e293b" }}>
+            <span className="ui-donut__tip-pill" style={{ background: activeArc.color, color: contrastingInk(activeArc.color) }}>
               {activeArc.label}
             </span>
             <span className="ui-donut__tip-stats">

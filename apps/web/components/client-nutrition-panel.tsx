@@ -4,7 +4,9 @@ import { FormEvent, useEffect, useState } from "react";
 import { Button, Dialog, EmptyState, Field, Input, LoadingState, Select } from "@nutrition-saas/ui";
 import { api } from "../lib/api";
 import { errorMessage } from "../lib/humanize-error";
+import { AiPanel, type AiDraftDay } from "./ai-panel";
 import { ClientMealPlanWorkspace, type MealPlanView } from "./client-meal-plan-workspace";
+import { usePractice } from "../app/practice/[dietitianAccountId]/practice-shell";
 
 type PlanRow = {
   id: string;
@@ -62,6 +64,8 @@ export function ClientNutritionPanel({
   const [importClients, setImportClients] = useState<ClientRow[]>([]);
   const [importPlans, setImportPlans] = useState<PlanRow[]>([]);
   const [importLoading, setImportLoading] = useState(false);
+  const [draftDay, setDraftDay] = useState<AiDraftDay | null>(null);
+  const { aiAvailable } = usePractice();
 
   const orgBase = `/api/v1/dietitian/${dietitianAccountId}`;
   const allPlansHref = `/practice/${dietitianAccountId}/meal-plans?clientId=${encodeURIComponent(clientId)}`;
@@ -181,6 +185,7 @@ export function ClientNutritionPanel({
           onArchived={() => void loadPlans()}
           onCreateRequest={allowManage ? openCreate : undefined}
           onSelectPlan={selectPlan}
+          onFocusedDraftChange={setDraftDay}
         />
       ) : (
         <div className="ui-mp">
@@ -208,6 +213,33 @@ export function ClientNutritionPanel({
           />
         </div>
       )}
+
+      {aiAvailable ? (
+        <div style={{ marginTop: 20 }}>
+          {initialView === "analysis" ? (
+            <AiPanel
+              compact
+              dietitianAccountId={dietitianAccountId}
+              clientId={clientId}
+              action="nutrition-assistance"
+              title="Nutrition assistance"
+              description="Explain foods using values from your food database."
+              foodQuery
+            />
+          ) : (
+            <AiPanel
+              compact
+              apply="meal"
+              draftDay={draftDay}
+              dietitianAccountId={dietitianAccountId}
+              clientId={clientId}
+              action="meal-plan-assistance"
+              title="Meal plan assistance"
+              description="Suggestions only — apply as meal notes on a draft day, then add foods yourself."
+            />
+          )}
+        </div>
+      ) : null}
 
       <Dialog open={showCreate} title="New meal plan" onClose={() => setShowCreate(false)}>
         <form className="ui-stack" style={{ gap: 14, width: "100%" }} onSubmit={(e) => void createPlan(e)}>

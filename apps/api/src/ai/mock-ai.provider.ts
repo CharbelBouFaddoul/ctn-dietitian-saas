@@ -40,6 +40,18 @@ export class MockAiProvider implements AiProvider {
   readonly name = "mock";
 
   async complete(input: AiCompletionInput): Promise<AiCompletionResult> {
+    if (input.user.includes("__FORCE_AI_FAIL__")) {
+      throw new Error("Forced mock provider failure");
+    }
+    if (input.user.includes("__FORCE_AI_INVALID__")) {
+      return {
+        content: "{not-json",
+        inputTokens: Math.ceil((input.system.length + input.user.length) / 4),
+        outputTokens: 8,
+        model: "mock-model",
+        provider: this.name,
+      };
+    }
     const action = this.detectAction(input.system);
     const payload = action ? MOCK_OUTPUT[action] : { message: "Mock AI response" };
     const content = input.responseFormat === "json" ? JSON.stringify(payload) : String(payload);

@@ -1,14 +1,22 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Post, Query, UseGuards } from "@nestjs/common";
 import { ApiCookieAuth, ApiPropertyOptional, ApiTags } from "@nestjs/swagger";
 import { Throttle, ThrottlerGuard } from "@nestjs/throttler";
 import { THROTTLE_NAMES } from "@nutrition-saas/config";
-import { IsOptional, IsString, MaxLength } from "class-validator";
+import { IsOptional, IsString, IsUUID, Matches, MaxLength } from "class-validator";
 import { SessionGuard } from "../auth/guards/session.guard";
 import { ClientAccessGuard } from "../clients/guards/client-access.guard";
 import { CurrentTenant } from "../dietitian/decorators/current-tenant.decorator";
 import { DietitianGuard } from "../dietitian/guards/dietitian.guard";
 import type { DietitianTenantContext } from "../dietitian/dietitian.types";
 import { AiService } from "./ai.service";
+
+class AiUsageQueryDto {
+  @ApiPropertyOptional({ description: "`current` or YYYY-MM" })
+  @IsOptional()
+  @IsString()
+  @Matches(/^(current|\d{4}-\d{2})$/)
+  period?: string;
+}
 
 class AiPromptDto {
   @ApiPropertyOptional()
@@ -22,6 +30,11 @@ class AiPromptDto {
   @IsString()
   @MaxLength(200)
   foodQuery?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  draftId?: string;
 }
 
 @ApiTags("ai")
@@ -32,8 +45,29 @@ export class OrganizationAiController {
   constructor(private readonly ai: AiService) {}
 
   @Get("ai/usage")
-  usage(@CurrentTenant() tenant: DietitianTenantContext) {
-    return this.ai.getUsageSummary(tenant.dietitianAccountId);
+  usage(@CurrentTenant() tenant: DietitianTenantContext, @Query() query: AiUsageQueryDto) {
+    return this.ai.getUsageSummary(tenant.dietitianAccountId, query.period);
+  }
+
+  @Get("ai/drafts")
+  drafts(@CurrentTenant() tenant: DietitianTenantContext) {
+    return this.ai.listDrafts(tenant.dietitianAccountId);
+  }
+
+  @Get("ai/drafts/:draftId")
+  draft(
+    @CurrentTenant() tenant: DietitianTenantContext,
+    @Param("draftId", ParseUUIDPipe) draftId: string,
+  ) {
+    return this.ai.getDraft(tenant.dietitianAccountId, draftId);
+  }
+
+  @Delete("ai/drafts/:draftId")
+  removeDraft(
+    @CurrentTenant() tenant: DietitianTenantContext,
+    @Param("draftId", ParseUUIDPipe) draftId: string,
+  ) {
+    return this.ai.deleteDraft(tenant.dietitianAccountId, draftId);
   }
 }
 
@@ -51,7 +85,7 @@ export class ClientAiController {
     @Param("clientId", ParseUUIDPipe) clientId: string,
     @Body() body: AiPromptDto,
   ) {
-    return this.ai.generateClientSummary(tenant, clientId, body.prompt);
+    return this.ai.generateClientSummary(tenant, clientId, body.prompt, body.draftId);
   }
 
   @Post("meal-plan-assistance")
@@ -60,7 +94,7 @@ export class ClientAiController {
     @Param("clientId", ParseUUIDPipe) clientId: string,
     @Body() body: AiPromptDto,
   ) {
-    return this.ai.generateMealPlanAssistance(tenant, clientId, body.prompt);
+    return this.ai.generateMealPlanAssistance(tenant, clientId, body.prompt, body.draftId);
   }
 
   @Post("nutrition-assistance")
@@ -69,7 +103,7 @@ export class ClientAiController {
     @Param("clientId", ParseUUIDPipe) clientId: string,
     @Body() body: AiPromptDto,
   ) {
-    return this.ai.generateNutritionAssistance(tenant, clientId, body.foodQuery, body.prompt);
+    return this.ai.generateNutritionAssistance(tenant, clientId, body.foodQuery, body.prompt, body.draftId);
   }
 
   @Post("consultation-summary")
@@ -78,7 +112,7 @@ export class ClientAiController {
     @Param("clientId", ParseUUIDPipe) clientId: string,
     @Body() body: AiPromptDto,
   ) {
-    return this.ai.generateConsultationSummary(tenant, clientId, body.prompt);
+    return this.ai.generateConsultationSummary(tenant, clientId, body.prompt, body.draftId);
   }
 
   @Post("message-draft")
@@ -87,6 +121,6 @@ export class ClientAiController {
     @Param("clientId", ParseUUIDPipe) clientId: string,
     @Body() body: AiPromptDto,
   ) {
-    return this.ai.generateMessageDraft(tenant, clientId, body.prompt);
+    return this.ai.generateMessageDraft(tenant, clientId, body.prompt, body.draftId);
   }
 }

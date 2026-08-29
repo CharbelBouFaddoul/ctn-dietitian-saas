@@ -446,29 +446,38 @@ Create/update draft body may include: `discountType`, `discountValue`, `taxRateP
 
 Periods: `today`, `this_week`, `this_month`, `last_30_days`, `last_90_days`, `custom`.
 
-### AI — organization
+### AI — practice (`GET /api/v1/dietitian/:dietitianAccountId/ai/usage`)
+
+Query: `period=current` (default) or `YYYY-MM`.
+
+Returns request counters (`used` / `limit` / `remaining` and nested `requests`) plus `tokens` (used/limit/remaining/input/output), `costUsd`, `byDay`, `byAction`, and `recent` (last 50 **COMPLETED** calls; no prompt text). Monthly quotas: `AI_REQUEST_LIMIT` and `AI_TOKEN_LIMIT`. Failed generations refund the request reservation and do not add tokens.
+
+Draft sessions store validated output JSON only (action, optional `userInput` / `foodQuery`, last 50 per practice). Follow-up generate calls may send `draftId` to append a turn; `GET` draft returns `messages`. The system prompt and chart dump are not stored. Generate responses include `draftId`.
 
 | Method | Path | Description |
 |---|---|---|
-| GET | `/organizations/:orgId/ai/usage` | Used/limit/remaining for current period |
+| GET | `/dietitian/:dietitianAccountId/ai/drafts` | List this practice’s drafts |
+| GET | `/dietitian/:dietitianAccountId/ai/drafts/:draftId` | Replay one draft (`result` + metadata) |
+| DELETE | `/dietitian/:dietitianAccountId/ai/drafts/:draftId` | Delete one draft |
 
 ### AI — client (dietitian only, `ClientAccessGuard`)
 
 | Method | Path | Description |
 |---|---|---|
-| POST | `/organizations/:orgId/clients/:clientId/ai/client-summary` | AI client overview draft |
+| POST | `/dietitian/:dietitianAccountId/clients/:clientId/ai/client-summary` | AI client overview draft |
 | POST | `.../meal-plan-assistance` | Meal suggestions (no auto-publish) |
 | POST | `.../nutrition-assistance` | Food/nutrition help (`foodQuery` optional) |
 | POST | `.../consultation-summary` | Consultation summary draft |
 | POST | `.../message-draft` | Message draft (no auto-send) |
 
-All AI endpoints return structured JSON with a review disclaimer. No provider API keys in responses.
+All AI endpoints return structured JSON with a review disclaimer. Prompts include professional clinical chart data (personal-data clinical fields, pregnancy notes, latest custom evaluation answers) and never email, phone, address, or ID numbers. Apply-to-chart is a separate explicit write (notes / composer / draft meal notes). No provider API keys in responses.
 
 ### Admin AI
 
 | Method | Path | Description |
 |---|---|---|
-| GET | `/api/v1/admin/organizations/:orgId/ai/usage` | Platform admin inspects org AI usage |
+| GET | `/api/v1/admin/dietitians/:dietitianAccountId/ai/usage` | Same usage payload as the practice endpoint |
+| GET | `/api/v1/admin/ai/usage` | Platform totals, daily series, ranked practices (`period`, `q`, `page`) |
 
 ### Automations — organization (`OWNER` / `DIETITIAN`; `STAFF` denied)
 
