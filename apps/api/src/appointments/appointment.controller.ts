@@ -108,6 +108,22 @@ export class AppointmentController {
     return this.appointments.rejectRescheduleForPractice(tenant, appointmentId);
   }
 
+  @Post("appointments/:appointmentId/accept-request")
+  acceptRequest(
+    @CurrentTenant() tenant: DietitianTenantContext,
+    @Param("appointmentId", ParseUUIDPipe) appointmentId: string,
+  ) {
+    return this.appointments.acceptRequestForPractice(tenant, appointmentId);
+  }
+
+  @Post("appointments/:appointmentId/decline-request")
+  declineRequest(
+    @CurrentTenant() tenant: DietitianTenantContext,
+    @Param("appointmentId", ParseUUIDPipe) appointmentId: string,
+  ) {
+    return this.appointments.declineRequestForPractice(tenant, appointmentId);
+  }
+
   @Get("clients/:clientId/appointments")
   @UseGuards(ClientAccessGuard)
   list(@CurrentTenant() tenant: DietitianTenantContext, @Param("clientId", ParseUUIDPipe) clientId: string) {

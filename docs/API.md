@@ -199,6 +199,8 @@ Session + `TenantGuard`. Client-scoped routes also run `ClientAccessGuard` / `Cl
 | POST | `/appointments/:appointmentId/propose-reschedule` | manageRecords | Body `{ startAt, endAt }` → `RESCHEDULE_PENDING` |
 | POST | `/appointments/:appointmentId/accept-reschedule` | manageRecords | Non-proposer only; applies proposed times → `SCHEDULED` |
 | POST | `/appointments/:appointmentId/reject-reschedule` | manageRecords | Non-proposer only; discards proposal → `SCHEDULED` |
+| POST | `/appointments/:appointmentId/accept-request` | manageRecords | Patient visit request `REQUESTED` → `SCHEDULED` |
+| POST | `/appointments/:appointmentId/decline-request` | manageRecords | Patient visit request `REQUESTED` → `CANCELLED` |
 | GET/POST/PATCH | `/clients/:clientId/appointments` | Read / manageRecords | Per-client list/create; status PATCH (`SCHEDULED`/`COMPLETED`/`CANCELLED`/`NO_SHOW`). Create accepts `category` |
 | GET | `/foods` | Member | Server-side search (`q`, `category`, `sourceId`, `origin=catalog\|custom\|all`, `page`, `pageSize` ≤ 50). Returns catalog + own custom foods. Each item has `origin` and `hasOverride` |
 | GET | `/foods/categories` | Member | Distinct active categories (catalog + own customs) |
@@ -267,7 +269,8 @@ Published versions reject content mutations (`400` “Published versions cannot 
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| GET | `/api/v1/portal/me` | Session + active client account | Portal identity |
+| GET | `/api/v1/portal/me` | Session + active client account | Portal identity for the active connection: name/email/phone/DOB/sex, `profile` (allergies/preferences/lifestyle + emergency contact), read-only `goals`, `energyUnit`, `weightUnit`, `enabledMeasurements`. Clinic-internal `client.status` is omitted |
+| PATCH | `/api/v1/portal/me` | Session + active client account | Update identity (name, email, phone, DOB, sex) and emergency contact only. Allergies, lifestyle, and goals are ignored |
 | POST | `/api/v1/portal/join-code/resolve` | Patient session | Preview practice **or per-client** join code: `{ status: "ok" \| "already_connected", practiceName, dietitianDisplayName, clientId? }`. Invalid/expired/used codes reject like join |
 | POST | `/api/v1/portal/join` | Patient session | Confirm join with the same code. Creates `Client` + `ClientAccount` when new; `{ status: "joined" \| "already_connected", … }`. Does not consume reusable practice invites |
 | GET | `/api/v1/portal/connections` | Patient session | List linked practices / client accounts |
@@ -311,7 +314,7 @@ Authenticated client account only (`Session.activeClientId`). Mutations use `ass
 
 | Method | Path | Description |
 |---|---|---|
-| POST | `/api/v1/portal/measurements` | Create measurement for active client (`type`, `value`, `unit`, optional `measuredAt`). Feeds existing Evolution API |
+| POST | `/api/v1/portal/measurements` | Create measurement for active client (`type`, `value`, `unit`, optional `measuredAt`). Rejects types not in clinic `enabledMeasurements` (`null` = all types allowed). Feeds existing Evolution API |
 
 ### Client tracking — dietitian review (`/api/v1/dietitian/:dietitianAccountId/clients/:clientId/tracking`)
 
@@ -342,13 +345,14 @@ Scoped to `Session.activeClientId` + `ClientAccount` (never trust a browser `cli
 | Method | Path | Description |
 |---|---|---|
 | GET | `/` | List appointments for the active connection |
+| POST | `/` | Request a visit (`REQUESTED`). Body: optional `title`, `category`, `startAt`, optional `endAt` (defaults to clinic `defaultAppointmentMinutes`), optional `notes`. Clinic confirms later |
 | GET | `/:appointmentId` | Detail |
 | POST | `/:appointmentId/cancel` | Patient cancel |
 | POST | `/:appointmentId/propose-reschedule` | Patient proposes `{ startAt, endAt }` |
 | POST | `/:appointmentId/accept-reschedule` | Accept dietitian proposal |
 | POST | `/:appointmentId/reject-reschedule` | Reject dietitian proposal |
 
-Statuses: `SCHEDULED`, `RESCHEDULE_PENDING`, `CANCELLED`, `COMPLETED`, `NO_SHOW`. Categories: `CONSULTATION`, `FOLLOW_UP`, `ASSESSMENT`, `MEAL_PLAN`, `OTHER`. Overlap prevention is per `dietitianAccountId` for `SCHEDULED`/`RESCHEDULE_PENDING`. Appointment changes use REST + `NotificationService` (no Socket.IO appointment events).
+Statuses: `SCHEDULED`, `REQUESTED`, `RESCHEDULE_PENDING`, `CANCELLATION_PENDING`, `CANCELLED`, `COMPLETED`, `NO_SHOW`. Categories: `CONSULTATION`, `FOLLOW_UP`, `ASSESSMENT`, `MEAL_PLAN`, `OTHER`. Overlap prevention is per `dietitianAccountId` for `SCHEDULED`/`RESCHEDULE_PENDING`/`CANCELLATION_PENDING`/`REQUESTED`. Appointment changes use REST + `NotificationService` (no Socket.IO appointment events).
 
 ### Assessments & evolution — portal
 

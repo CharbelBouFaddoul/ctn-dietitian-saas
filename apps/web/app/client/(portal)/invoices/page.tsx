@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Button,
@@ -11,10 +11,20 @@ import {
   StatusBadge,
 } from "@nutrition-saas/ui";
 import { InvoiceDocument } from "../../../../components/invoice-document";
+import { FilterPopover, ListFilters } from "../../../../components/list-filters";
 import { api } from "../../../../lib/api";
 import { formatDateOnly, formatMoney } from "../../../../lib/format";
 import { errorMessage } from "../../../../lib/humanize-error";
 import { statusLabel } from "../../../../lib/practice-labels";
+
+const STATUS_CHIPS = [
+  { value: "", label: "All statuses" },
+  { value: "ISSUED", label: "Issued" },
+  { value: "SENT", label: "Sent" },
+  { value: "PAID", label: "Paid" },
+  { value: "OVERDUE", label: "Overdue" },
+  { value: "CANCELLED", label: "Cancelled" },
+] as const;
 
 interface InvoiceRow {
   id: string;
@@ -58,6 +68,20 @@ export default function ClientInvoicesPage() {
   const [selected, setSelected] = useState<InvoicePayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("");
+
+  const query = search.trim().toLowerCase();
+  const filtered = useMemo(() => {
+    if (!invoices) return null;
+    return invoices.filter((invoice) => {
+      const number = (invoice.invoiceNumber ?? "invoice").toLowerCase();
+      const matchesSearch = !query || number.includes(query);
+      const matchesStatus = !status || invoice.status === status;
+      return matchesSearch && matchesStatus;
+    });
+  }, [invoices, query, status]);
+  const hasFilters = Boolean(query || status);
 
   useEffect(() => {
     void api<InvoiceRow[]>("/api/v1/portal/invoices")
@@ -87,19 +111,48 @@ export default function ClientInvoicesPage() {
         />
         {error ? <Alert tone="danger">{error}</Alert> : null}
 
+        <ListFilters
+          search={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Search invoice number"
+          hasFilters={hasFilters}
+          onClear={() => {
+            setSearch("");
+            setStatus("");
+          }}
+          count={filtered?.length}
+          countNoun="invoice"
+          loading={invoices === null}
+        >
+          <FilterPopover
+            label="Filter by status"
+            value={status ? statusLabel(status) : "Status"}
+            active={Boolean(status)}
+            searchPlaceholder="Search status"
+            onSelect={setStatus}
+            items={STATUS_CHIPS.map((chip) => ({
+              id: chip.value,
+              label: chip.label,
+              active: status === chip.value,
+            }))}
+          />
+        </ListFilters>
+
         {invoices === null ? <LoadingState>Loading invoices…</LoadingState> : null}
-        {invoices && invoices.length === 0 ? (
+        {filtered && filtered.length === 0 ? (
           <Section title="All invoices" tone="muted">
-            <EmptyState title="No invoices yet">
-              When your dietitian shares an invoice, you’ll see it here.
+            <EmptyState title={hasFilters ? "No invoices match" : "No invoices yet"}>
+              {hasFilters
+                ? "Try a different search or status, or clear filters."
+                : "When your dietitian shares an invoice, you’ll see it here."}
             </EmptyState>
           </Section>
         ) : null}
 
-        {invoices && invoices.length > 0 ? (
+        {filtered && filtered.length > 0 ? (
           <Section title="All invoices">
             <ul className="ui-client-invoice-list">
-              {invoices.map((invoice) => (
+              {filtered.map((invoice) => (
                 <li key={invoice.id}>
                   <div>
                     <button

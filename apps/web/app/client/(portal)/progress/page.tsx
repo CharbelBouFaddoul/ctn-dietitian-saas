@@ -6,7 +6,7 @@ import { Alert, EmptyState, PageHeader, Section, Skeleton } from "@nutrition-saa
 import { ClientEvolutionPanel } from "../../../../components/client-evolution-panel";
 import { api } from "../../../../lib/api";
 import { errorMessage } from "../../../../lib/humanize-error";
-import { nutritionLabel } from "../../../../lib/format";
+import { formatEnergyKcal, nutritionLabel } from "../../../../lib/format";
 import { PatientAccents } from "../patient-accents";
 
 interface Summary {
@@ -21,12 +21,20 @@ interface Summary {
 
 export default function ClientProgressPage() {
   const [summary, setSummary] = useState<Summary | null>(null);
+  const [enabledMeasurements, setEnabledMeasurements] = useState<string[] | null>(null);
+  const [energyUnit, setEnergyUnit] = useState("kcal");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [connectionKey, setConnectionKey] = useState(0);
 
   async function loadSummary() {
-    setSummary(await api<Summary>("/api/v1/portal/tracking/summary"));
+    const [next, me] = await Promise.all([
+      api<Summary>("/api/v1/portal/tracking/summary"),
+      api<{ enabledMeasurements: string[] | null; energyUnit?: string }>("/api/v1/portal/me"),
+    ]);
+    setSummary(next);
+    setEnabledMeasurements(me.enabledMeasurements);
+    setEnergyUnit(me.energyUnit ?? "kcal");
   }
 
   useEffect(() => {
@@ -58,8 +66,8 @@ export default function ClientProgressPage() {
     {
       tone: "food" as const,
       label: "Nutrition",
-      value: `${nutritionLabel(summary?.food.presented.energyKcal, "kcal")}${
-        summary?.food.presented.proteinG != null ? ` · ${summary.food.presented.proteinG} g protein` : ""
+      value: `${formatEnergyKcal(summary?.food.presented.energyKcal, energyUnit)}${
+        summary?.food.presented.proteinG != null ? ` · ${nutritionLabel(summary.food.presented.proteinG, "g protein")}` : ""
       }`,
       icon: PatientAccents.food,
     },
@@ -153,6 +161,8 @@ export default function ClientProgressPage() {
           key={connectionKey}
           base="/api/v1/portal"
           allowManage={false}
+          allowLog
+          enabledMeasurements={enabledMeasurements}
           onError={(message) => setError(message)}
         />
       </Section>

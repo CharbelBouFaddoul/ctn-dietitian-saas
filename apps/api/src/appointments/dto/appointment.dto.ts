@@ -23,6 +23,8 @@ export const APPOINTMENT_STATUSES = [
   "CANCELLED",
   "NO_SHOW",
   "RESCHEDULE_PENDING",
+  "CANCELLATION_PENDING",
+  "REQUESTED",
 ] as const;
 
 export type AppointmentCategoryValue = (typeof APPOINTMENT_CATEGORIES)[number];
@@ -104,6 +106,34 @@ export class UpdateAppointmentStatusDto {
   @ApiProperty({ enum: ["SCHEDULED", "COMPLETED", "CANCELLED", "NO_SHOW"] })
   @IsEnum(["SCHEDULED", "COMPLETED", "CANCELLED", "NO_SHOW"])
   status!: "SCHEDULED" | "COMPLETED" | "CANCELLED" | "NO_SHOW";
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  notes?: string;
+}
+
+export class CreatePortalAppointmentDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  title?: string;
+
+  @ApiProperty({ enum: APPOINTMENT_CATEGORIES, required: false })
+  @IsOptional()
+  @IsEnum(APPOINTMENT_CATEGORIES)
+  category?: AppointmentCategoryValue;
+
+  @ApiProperty()
+  @IsDateString()
+  startAt!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsDateString()
+  endAt?: string;
 
   @ApiPropertyOptional()
   @IsOptional()

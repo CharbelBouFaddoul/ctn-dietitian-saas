@@ -333,7 +333,7 @@ export class ClientAccountService {
       requireSelection: false,
     });
     const accountId = requireDietitianAccountId(client);
-    const [account, profile, portalAccount] = await Promise.all([
+    const [account, profile, portalAccount, goals] = await Promise.all([
       this.prisma.dietitianAccount.findUnique({
         where: { id: accountId },
         include: { settings: true, user: true },
@@ -341,6 +341,10 @@ export class ClientAccountService {
       this.prisma.clientProfile.findUnique({ where: { clientId: client.id } }),
       this.prisma.clientAccount.findFirst({
         where: { userId, clientId: client.id, status: "ACTIVE" },
+      }),
+      this.prisma.clientGoal.findMany({
+        where: { clientId: client.id, dietitianAccountId: accountId, status: "ACTIVE" },
+        orderBy: { createdAt: "desc" },
       }),
     ]);
     const dietitian = account ? this.portalDietitian(account) : { name: null, title: null, specialization: null };
@@ -354,21 +358,32 @@ export class ClientAccountService {
         phone: client.phone,
         dateOfBirth: client.dateOfBirth?.toISOString().slice(0, 10) ?? null,
         sex: client.sex,
-        status: client.status,
       },
-      profile: profile
-        ? {
-            allergies: profile.allergies,
-            intolerances: profile.intolerances,
-            dietaryPreferences: profile.dietaryPreferences,
-            lifestyle: profile.lifestyle,
-          }
-        : null,
+      profile: {
+        allergies: profile?.allergies ?? null,
+        intolerances: profile?.intolerances ?? null,
+        dietaryPreferences: profile?.dietaryPreferences ?? null,
+        lifestyle: profile?.lifestyle ?? null,
+        emergencyContactName: profile?.emergencyContactName ?? null,
+        emergencyContactPhone: profile?.emergencyContactPhone ?? null,
+      },
+      goals: goals.map((goal) => ({
+        id: goal.id,
+        title: goal.title,
+        description: goal.description,
+        status: goal.status,
+        targetValue: goal.targetValue === null ? null : Number(goal.targetValue),
+        targetUnit: goal.targetUnit,
+        startDate: goal.startDate?.toISOString().slice(0, 10) ?? null,
+        targetDate: goal.targetDate?.toISOString().slice(0, 10) ?? null,
+      })),
       practiceName: await this.practiceNameForAccount(accountId, account),
       dietitianDisplayName: dietitian.name,
       dietitian,
       portalPresets: normalizePortalPresets(account?.settings?.portalPresets),
       enabledMeasurements: normalizeEnabledMeasurements(account?.settings?.enabledMeasurements),
+      energyUnit: account?.settings?.energyUnit ?? "kcal",
+      weightUnit: account?.settings?.weightUnit ?? "kg",
       activeClientId: client.id,
       disconnectRequestedAt: portalAccount?.disconnectRequestedAt?.toISOString() ?? null,
       disconnectRequestNote: portalAccount?.disconnectRequestNote ?? null,
@@ -522,6 +537,19 @@ export class ClientAccountService {
           ? new Date(input.dateOfBirth)
           : null;
 
+    const emergencyContactName =
+      input.emergencyContactName === undefined
+        ? undefined
+        : input.emergencyContactName?.trim()
+          ? input.emergencyContactName.trim()
+          : null;
+    const emergencyContactPhone =
+      input.emergencyContactPhone === undefined
+        ? undefined
+        : input.emergencyContactPhone?.trim()
+          ? input.emergencyContactPhone.trim()
+          : null;
+
     await this.prisma.$transaction(async (tx) => {
       await tx.client.update({
         where: { id: client.id },
@@ -539,6 +567,21 @@ export class ClientAccountService {
         where: { id: userId },
         data: { firstName, lastName },
       });
+      if (emergencyContactName !== undefined || emergencyContactPhone !== undefined) {
+        await tx.clientProfile.upsert({
+          where: { clientId: client.id },
+          create: {
+            clientId: client.id,
+            dietitianAccountId: accountId,
+            emergencyContactName: emergencyContactName ?? null,
+            emergencyContactPhone: emergencyContactPhone ?? null,
+          },
+          update: {
+            ...(emergencyContactName !== undefined ? { emergencyContactName } : {}),
+            ...(emergencyContactPhone !== undefined ? { emergencyContactPhone } : {}),
+          },
+        });
+      }
     });
 
     await this.timeline.record({

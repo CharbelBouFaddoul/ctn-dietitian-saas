@@ -74,4 +74,11 @@ export const PatientNavIcons = {
       <path d="M9 12h6M9 16h4" />
     </Icon>
   ),
+  join: (
+    <Icon>
+      <circle cx="9" cy="8" r="3.25" />
+      <path d="M3.5 20c.9-3.2 3.2-4.8 5.5-4.8 1.1 0 2.1.4 3 .9" />
+      <path d="M16 8h6M19 5v6" />
+    </Icon>
+  ),
 } as const;

@@ -11,7 +11,9 @@ import {
   Input,
   LoadingState,
   PageHeader,
+  Select,
   StatusBadge,
+  Textarea,
 } from "@nutrition-saas/ui";
 import { api } from "../../../../lib/api";
 import { CATEGORY_LABELS, combineLocalDateTime, toDateInputValue, toTimeInputValue } from "../../../../lib/calendar-range";
@@ -48,6 +50,12 @@ export default function PortalAppointmentsPage() {
   const [proposeDate, setProposeDate] = useState(toDateInputValue(new Date()));
   const [proposeStart, setProposeStart] = useState("10:00");
   const [proposeEnd, setProposeEnd] = useState("11:00");
+  const [requestOpen, setRequestOpen] = useState(false);
+  const [requestDate, setRequestDate] = useState(toDateInputValue(new Date()));
+  const [requestStart, setRequestStart] = useState("10:00");
+  const [requestEnd, setRequestEnd] = useState("11:00");
+  const [requestCategory, setRequestCategory] = useState("CONSULTATION");
+  const [requestNote, setRequestNote] = useState("");
 
   const load = useCallback(async () => {
     const [authMe, list] = await Promise.all([
@@ -87,7 +95,8 @@ export default function PortalAppointmentsPage() {
     (r) =>
       (r.status === "SCHEDULED" ||
         r.status === "RESCHEDULE_PENDING" ||
-        r.status === "CANCELLATION_PENDING") &&
+        r.status === "CANCELLATION_PENDING" ||
+        r.status === "REQUESTED") &&
       new Date(r.endAt) >= new Date(),
   );
   const past = (rows ?? []).filter((r) => !upcoming.includes(r));
@@ -151,6 +160,30 @@ export default function PortalAppointmentsPage() {
     }
   }
 
+  async function requestVisit(event: FormEvent) {
+    event.preventDefault();
+    setPending(true);
+    setActionError(null);
+    try {
+      await api("/api/v1/portal/appointments", {
+        method: "POST",
+        body: JSON.stringify({
+          category: requestCategory,
+          startAt: combineLocalDateTime(requestDate, requestStart),
+          endAt: combineLocalDateTime(requestDate, requestEnd),
+          notes: requestNote.trim() || undefined,
+        }),
+      });
+      setRequestOpen(false);
+      setRequestNote("");
+      await load();
+    } catch (err) {
+      setActionError(errorMessage(err, "Unable to request a visit"));
+    } finally {
+      setPending(false);
+    }
+  }
+
   async function reject() {
     if (!selected) return;
     setPending(true);
@@ -176,6 +209,7 @@ export default function PortalAppointmentsPage() {
     selected.proposedByUserId !== me.user.id;
 
   function appointmentStatusLabel(row: AppointmentRow): string {
+    if (row.status === "REQUESTED") return "Waiting for clinic";
     if (row.status === "CANCELLATION_PENDING") return "Cancellation requested";
     if (row.status === "RESCHEDULE_PENDING") {
       const fromDietitian =
@@ -215,7 +249,31 @@ export default function PortalAppointmentsPage() {
 
   return (
     <section>
-      <PageHeader title="Appointments" description="Upcoming visits with your dietitian." />
+      <PageHeader
+        title="Appointments"
+        description="Upcoming visits with your dietitian."
+        actions={
+          <Button
+            type="button"
+            onClick={() => {
+              const start = new Date();
+              start.setMinutes(0, 0, 0);
+              start.setHours(start.getHours() + 1);
+              const end = new Date(start);
+              end.setHours(end.getHours() + 1);
+              setRequestDate(toDateInputValue(start));
+              setRequestStart(toTimeInputValue(start));
+              setRequestEnd(toTimeInputValue(end));
+              setRequestCategory("CONSULTATION");
+              setRequestNote("");
+              setActionError(null);
+              setRequestOpen(true);
+            }}
+          >
+            Request a visit
+          </Button>
+        }
+      />
       {error ? <Alert tone="danger">{error}</Alert> : null}
       {rows === null && !error ? <LoadingState>Loading appointments…</LoadingState> : null}
 
@@ -278,6 +336,12 @@ export default function PortalAppointmentsPage() {
             </div>
 
             {selected.notes ? <p className="ui-muted ui-portal-appt-detail__notes">{selected.notes}</p> : null}
+
+            {selected.status === "REQUESTED" ? (
+              <p className="ui-portal-appt-detail__request">
+                Waiting for the clinic to confirm this visit.
+              </p>
+            ) : null}
 
             {selected.status === "CANCELLATION_PENDING" ? (
               <p className="ui-portal-appt-detail__request">
@@ -387,6 +451,52 @@ export default function PortalAppointmentsPage() {
           <div className="ui-row" style={{ justifyContent: "flex-end", gap: 8 }}>
             <Button type="button" variant="secondary" onClick={() => setProposeOpen(false)}>
               Back
+            </Button>
+            <Button type="submit" disabled={pending}>
+              {pending ? "Sending…" : "Send request"}
+            </Button>
+          </div>
+        </form>
+      </Dialog>
+
+      <Dialog open={requestOpen} title="Request a visit" onClose={() => setRequestOpen(false)}>
+        {actionError ? <Alert tone="danger">{actionError}</Alert> : null}
+        <form className="ui-stack" onSubmit={(e) => void requestVisit(e)}>
+          <p className="ui-muted" style={{ margin: 0 }}>
+            Pick a date and time. Your clinic will confirm or decline the request.
+          </p>
+          <Field label="Visit type">
+            <Select
+              value={requestCategory}
+              onChange={(e) => setRequestCategory(e.target.value)}
+            >
+              {Object.entries(CATEGORY_LABELS).map(([id, label]) => (
+                <option key={id} value={id}>
+                  {label}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Date">
+            <Input type="date" value={requestDate} onChange={(e) => setRequestDate(e.target.value)} required />
+          </Field>
+          <Field label="Start">
+            <Input type="time" value={requestStart} onChange={(e) => setRequestStart(e.target.value)} required />
+          </Field>
+          <Field label="End">
+            <Input type="time" value={requestEnd} onChange={(e) => setRequestEnd(e.target.value)} required />
+          </Field>
+          <Field label="Note (optional)">
+            <Textarea
+              value={requestNote}
+              onChange={(e) => setRequestNote(e.target.value)}
+              rows={3}
+              placeholder="Anything the clinic should know"
+            />
+          </Field>
+          <div className="ui-row" style={{ justifyContent: "flex-end", gap: 8 }}>
+            <Button type="button" variant="secondary" onClick={() => setRequestOpen(false)}>
+              Cancel
             </Button>
             <Button type="submit" disabled={pending}>
               {pending ? "Sending…" : "Send request"}

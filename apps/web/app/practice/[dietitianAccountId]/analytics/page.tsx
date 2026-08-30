@@ -42,6 +42,7 @@ const APPOINTMENT_COLORS: Record<string, string> = {
   NO_SHOW: "#dc2626",
   RESCHEDULE_PENDING: "#f59e0b",
   CANCELLATION_PENDING: "#f59e0b",
+  REQUESTED: "#f59e0b",
 };
 
 const APPOINTMENT_LABELS: Record<string, string> = {
@@ -51,6 +52,7 @@ const APPOINTMENT_LABELS: Record<string, string> = {
   NO_SHOW: "No-show",
   RESCHEDULE_PENDING: "Reschedule pending",
   CANCELLATION_PENDING: "Cancellation pending",
+  REQUESTED: "Visit requested",
 };
 
 const TRACKING_META: Record<

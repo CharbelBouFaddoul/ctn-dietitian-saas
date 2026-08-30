@@ -25,6 +25,7 @@ export default function ClientPortalLayout({ children }: { children: ReactNode }
   const [state, setState] = useState<"loading" | "ok">("loading");
   const [me, setMe] = useState<PortalMe | null>(null);
   const [unreadMessages, setUnreadMessages] = useState(0);
+  const [pendingForms, setPendingForms] = useState(0);
 
   const refreshUnreadMessages = useCallback(async () => {
     const conversation = await api<{ unreadCount: number }>("/api/v1/portal/conversation");
@@ -74,8 +75,12 @@ export default function ClientPortalLayout({ children }: { children: ReactNode }
   }, [refreshUnreadMessages]);
 
   const load = useCallback(async () => {
-    const profile = await api<PortalMe>("/api/v1/portal/me");
+    const [profile, dashboard] = await Promise.all([
+      api<PortalMe>("/api/v1/portal/me"),
+      api<{ pendingAssessmentsCount?: number }>("/api/v1/portal/dashboard").catch(() => null),
+    ]);
     setMe(profile);
+    setPendingForms(dashboard?.pendingAssessmentsCount ?? 0);
     setState("ok");
   }, []);
 
@@ -160,7 +165,12 @@ export default function ClientPortalLayout({ children }: { children: ReactNode }
               { href: "/client/progress", label: "Progress", icon: PatientNavIcons.progress },
             ]
           : []),
-        { href: "/client/assessments", label: "Forms", icon: PatientNavIcons.assessments },
+        {
+          href: "/client/assessments",
+          label: "Forms",
+          icon: PatientNavIcons.assessments,
+          badge: pendingForms,
+        },
       ],
     },
     {
@@ -183,7 +193,8 @@ export default function ClientPortalLayout({ children }: { children: ReactNode }
       label: "Account",
       items: [
         { href: "/client/profile", label: "Profile", icon: PatientNavIcons.profile },
-        { href: "/client/join", label: "Join another clinic", icon: PatientNavIcons.profile },
+        { href: "/client/notifications", label: "Notifications", icon: PatientNavIcons.notifications },
+        { href: "/client/join", label: "Join another clinic", icon: PatientNavIcons.join },
       ],
     },
   ];

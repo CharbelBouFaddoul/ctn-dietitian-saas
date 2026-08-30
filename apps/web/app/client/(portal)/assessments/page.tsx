@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Alert, EmptyState, PageHeader, Skeleton, StatusBadge } from "@nutrition-saas/ui";
+import { ListFilters } from "../../../../components/list-filters";
 import { api } from "../../../../lib/api";
 import {
   evaluationStatusLabel,
@@ -15,6 +16,7 @@ export default function PortalAssessmentsPage() {
   const [rows, setRows] = useState<EvaluationAssessment[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -38,8 +40,17 @@ export default function PortalAssessmentsPage() {
     return () => window.removeEventListener("portal-connection-changed", onSwitch);
   }, [load]);
 
-  const openRows = rows.filter((r) => r.status === "IN_PROGRESS" || r.status === "DRAFT");
-  const doneRows = rows.filter((r) => r.status === "COMPLETED");
+  const query = search.trim().toLowerCase();
+  const filtered = useMemo(
+    () =>
+      query
+        ? rows.filter((row) => (row.templateName ?? "").toLowerCase().includes(query))
+        : rows,
+    [rows, query],
+  );
+  const openRows = filtered.filter((r) => r.status === "IN_PROGRESS" || r.status === "DRAFT");
+  const doneRows = filtered.filter((r) => r.status === "COMPLETED");
+  const hasSearch = Boolean(query);
 
   return (
     <section className="ui-eval ui-eval--portal">
@@ -49,11 +60,23 @@ export default function PortalAssessmentsPage() {
         description="Complete questionnaires from your dietitian. These are separate from the clinic’s standard chart notes."
       />
       {error ? <Alert tone="danger">{error}</Alert> : null}
+      <ListFilters
+        search={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search form name"
+        hasFilters={hasSearch}
+        onClear={() => setSearch("")}
+        count={filtered.length}
+        countNoun="form"
+        loading={loading}
+      />
       {loading ? <Skeleton style={{ height: 140, borderRadius: 14 }} /> : null}
 
       {!loading && openRows.length === 0 && doneRows.length === 0 ? (
-        <EmptyState title="No evaluations yet">
-          When your dietitian starts a patient evaluation for you, it will appear here.
+        <EmptyState title={hasSearch ? "No forms match" : "No evaluations yet"}>
+          {hasSearch
+            ? "Try a different search, or clear the filter."
+            : "When your dietitian starts a patient evaluation for you, it will appear here."}
         </EmptyState>
       ) : null}
 

@@ -72,7 +72,7 @@ function belongsToClient<T extends { clientId?: string | null }>(row: T, clientI
 }
 
 function appointmentLocked(status: string) {
-  return status === "RESCHEDULE_PENDING" || status === "CANCELLATION_PENDING";
+  return status === "RESCHEDULE_PENDING" || status === "CANCELLATION_PENDING" || status === "REQUESTED";
 }
 
 function taskClosed(status: string) {
@@ -221,7 +221,10 @@ export function ClientAppointmentsPanel({
   const pending = useMemo(
     () =>
       appointments.filter(
-        (row) => row.status === "RESCHEDULE_PENDING" || row.status === "CANCELLATION_PENDING",
+        (row) =>
+          row.status === "RESCHEDULE_PENDING" ||
+          row.status === "CANCELLATION_PENDING" ||
+          row.status === "REQUESTED",
       ),
     [appointments],
   );
@@ -464,8 +467,10 @@ export function ClientAppointmentsPanel({
         body: JSON.stringify({}),
       });
       await refresh();
+      return true;
     } catch (err) {
       setLocalError(errorMessage(err, fail));
+      return false;
     } finally {
       setBusyId(null);
     }
@@ -517,7 +522,9 @@ export function ClientAppointmentsPanel({
               <span>
                 {row.status === "CANCELLATION_PENDING"
                   ? "Cancellation requested"
-                  : "Reschedule requested"}
+                  : row.status === "REQUESTED"
+                    ? "Visit requested"
+                    : "Reschedule requested"}
               </span>
             </button>
           ))}
@@ -600,6 +607,7 @@ export function ClientAppointmentsPanel({
                     const pendingReschedule =
                       row.status === "RESCHEDULE_PENDING" && row.proposedStartAt && row.proposedEndAt;
                     const pendingCancel = row.status === "CANCELLATION_PENDING";
+                    const requested = row.status === "REQUESTED";
                     const cancelled = row.status === "CANCELLED";
                     return (
                       <article
@@ -637,6 +645,9 @@ export function ClientAppointmentsPanel({
                         ) : null}
                         {pendingCancel ? (
                           <p className="ui-client-cal__flag">Patient requested cancellation</p>
+                        ) : null}
+                        {requested ? (
+                          <p className="ui-client-cal__flag">Patient requested this visit</p>
                         ) : null}
                         {pendingReschedule ? (
                           <div className="ui-client-cal__actions" onClick={(event) => event.stopPropagation()}>
@@ -701,6 +712,27 @@ export function ClientAppointmentsPanel({
                             </Button>
                           </div>
                         ) : null}
+                        {requested ? (
+                          <div className="ui-client-cal__actions" onClick={(event) => event.stopPropagation()}>
+                            <Button
+                              type="button"
+                              size="sm"
+                              disabled={busy}
+                              onClick={() => void runAction(row.id, "accept-request", "Unable to accept visit request")}
+                            >
+                              Accept
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="secondary"
+                              disabled={busy}
+                              onClick={() => void runAction(row.id, "decline-request", "Unable to decline visit request")}
+                            >
+                              Decline
+                            </Button>
+                          </div>
+                        ) : null}
                       </article>
                     );
                   })}
@@ -756,6 +788,40 @@ export function ClientAppointmentsPanel({
           <p className="ui-muted" style={{ margin: "0 0 0.75rem" }}>
             Resolve the cancellation request before changing this visit.
           </p>
+        ) : null}
+        {selected?.status === "REQUESTED" ? (
+          <div style={{ margin: "0 0 0.75rem" }}>
+            <p className="ui-muted" style={{ margin: "0 0 0.5rem" }}>
+              The patient requested this visit. Accept to schedule it, or decline.
+            </p>
+            <div className="ui-row" style={{ gap: 8 }}>
+              <Button
+                type="button"
+                disabled={saving}
+                onClick={() => {
+                  void (async () => {
+                    const ok = await runAction(selected.id, "accept-request", "Unable to accept visit request");
+                    if (ok) closeAppt();
+                  })();
+                }}
+              >
+                Accept
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={saving}
+                onClick={() => {
+                  void (async () => {
+                    const ok = await runAction(selected.id, "decline-request", "Unable to decline visit request");
+                    if (ok) closeAppt();
+                  })();
+                }}
+              >
+                Decline
+              </Button>
+            </div>
+          </div>
         ) : null}
         <form className="ui-stack" onSubmit={(event) => void onSaveAppointment(event)}>
           <Field label="Title">
@@ -1063,7 +1129,7 @@ function MonthGrid({
                 {dayItems.slice(0, 5).map((row) => (
                   <span
                     key={row.id}
-                    className={`ui-client-cal__pill${row.kind === "task" ? " is-task" : ""}${row.status === "RESCHEDULE_PENDING" || row.status === "CANCELLATION_PENDING" ? " is-pending" : ""}${row.status === "CANCELLED" || row.status === "COMPLETED" ? " is-done" : ""}`}
+                    className={`ui-client-cal__pill${row.kind === "task" ? " is-task" : ""}${row.status === "RESCHEDULE_PENDING" || row.status === "CANCELLATION_PENDING" || row.status === "REQUESTED" ? " is-pending" : ""}${row.status === "CANCELLED" || row.status === "COMPLETED" ? " is-done" : ""}`}
                     title={`${formatMessageTime(row.startAt)} ${row.title}`}
                   >
                     {row.kind === "task"

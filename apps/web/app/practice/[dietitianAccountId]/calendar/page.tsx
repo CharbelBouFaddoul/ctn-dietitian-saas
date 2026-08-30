@@ -197,6 +197,7 @@ function roundToHour(d: Date): Date {
 }
 
 function appointmentStatusLabel(status: string): string {
+  if (status === "REQUESTED") return "Visit requested";
   if (status === "RESCHEDULE_PENDING") return "Reschedule pending";
   if (status === "CANCELLATION_PENDING") return "Cancellation pending";
   if (status === "NO_SHOW") return "No-show";
@@ -574,6 +575,42 @@ export default function CalendarPage() {
     }
   }
 
+  async function onAcceptRequest() {
+    if (!selected) return;
+    setSaving(true);
+    setFormError(null);
+    try {
+      await api(
+        `/api/v1/dietitian/${dietitianAccountId}/appointments/${selected.id}/accept-request`,
+        { method: "POST", body: JSON.stringify({}) },
+      );
+      closeDialog();
+      await load();
+    } catch (err) {
+      setFormError(errorMessage(err, "Unable to accept visit request"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function onDeclineRequest() {
+    if (!selected) return;
+    setSaving(true);
+    setFormError(null);
+    try {
+      await api(
+        `/api/v1/dietitian/${dietitianAccountId}/appointments/${selected.id}/decline-request`,
+        { method: "POST", body: JSON.stringify({}) },
+      );
+      closeDialog();
+      await load();
+    } catch (err) {
+      setFormError(errorMessage(err, "Unable to decline visit request"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   const titleLabel = useMemo(() => {
     if (view === "day") {
       return anchor.toLocaleDateString(undefined, {
@@ -763,6 +800,20 @@ export default function CalendarPage() {
             </div>
           </div>
         ) : null}
+        {selected?.status === "REQUESTED" ? (
+          <div className="ui-cal-proposal">
+            <strong>Visit requested</strong>
+            <p className="ui-muted">The patient asked to book this time. Confirm or decline.</p>
+            <div className="ui-cal-dialog__actions">
+              <Button type="button" disabled={saving} onClick={() => void onAcceptRequest()}>
+                Accept
+              </Button>
+              <Button type="button" variant="secondary" disabled={saving} onClick={() => void onDeclineRequest()}>
+                Decline
+              </Button>
+            </div>
+          </div>
+        ) : null}
         <form className="ui-cal-form" onSubmit={(e) => void onSave(e)}>
           {selected ? (
             <div className="ui-cal-form__meta">
@@ -789,7 +840,8 @@ export default function CalendarPage() {
                   clients.length === 0 ||
                   (mode === "edit" &&
                     (selected?.status === "RESCHEDULE_PENDING" ||
-                      selected?.status === "CANCELLATION_PENDING"))
+                      selected?.status === "CANCELLATION_PENDING" ||
+                      selected?.status === "REQUESTED"))
                 }
               >
                 <option value="" disabled>
@@ -901,7 +953,8 @@ export default function CalendarPage() {
                 Close
               </Button>
               {selected?.status !== "RESCHEDULE_PENDING" &&
-              selected?.status !== "CANCELLATION_PENDING" ? (
+              selected?.status !== "CANCELLATION_PENDING" &&
+              selected?.status !== "REQUESTED" ? (
                 <Button type="submit" disabled={saving || !form.clientId}>
                   {saving ? "Saving…" : mode === "create" ? "Create appointment" : "Save changes"}
                 </Button>
@@ -1087,7 +1140,7 @@ function TimeGrid({
                     <button
                       key={item.id}
                       type="button"
-                      className={`ui-cal-block cat-${item.category}${item.status === "RESCHEDULE_PENDING" ? " is-pending" : ""}${compact ? " is-compact" : ""}`}
+                      className={`ui-cal-block cat-${item.category}${item.status === "RESCHEDULE_PENDING" || item.status === "REQUESTED" ? " is-pending" : ""}${compact ? " is-compact" : ""}`}
                       style={{ top: `${item.top}rem`, height: `${item.height}rem`, left, width }}
                       onClick={() => item.appointment && onSelectAppointment(item.appointment)}
                       title={`${item.title} · ${clientLabel(item.client, item.clientId ?? undefined)} · ${formatMessageTime(item.startAt)}–${formatMessageTime(item.endAt)}`}

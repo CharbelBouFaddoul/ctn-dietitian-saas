@@ -1000,6 +1000,48 @@
   transform: none;
 }
 
+[data-theme="client"] .ui-profile-hub:not(.is-editing) .ui-input,
+[data-theme="client"] .ui-profile-hub:not(.is-editing) .ui-textarea,
+[data-theme="client"] .ui-profile-hub:not(.is-editing) .ui-select {
+  background: #f4faf8;
+}
+
+[data-theme="client"] .ui-profile-hub:not(.is-editing) .ui-section:hover {
+  transform: none;
+}
+
+.ui-portal-identity {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.ui-portal-identity .ui-avatar {
+  width: 3rem;
+  height: 3rem;
+  font-size: 0.95rem;
+}
+
+.ui-portal-identity strong {
+  display: block;
+  font-size: 1.05rem;
+}
+
+.ui-portal-identity p {
+  margin: 0.15rem 0 0;
+}
+
+.ui-portal-goal-list {
+  margin: 0;
+  padding-left: 1.15rem;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.ui-portal-goal-list p {
+  margin: 0.2rem 0 0;
+}
+
 .ui-profile-hub.is-editing .ui-profile-readonly,
 .ui-profile-hub.is-editing .ui-input[readonly] {
   border-color: transparent;
@@ -3832,6 +3874,20 @@
     height: 100%;
     margin-bottom: 0;
   }
+}
+
+.ui-client-welcome__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+}
+
+.ui-client-metric__hint {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.75rem;
+  color: var(--color-muted);
 }
 
 .ui-client-metrics {

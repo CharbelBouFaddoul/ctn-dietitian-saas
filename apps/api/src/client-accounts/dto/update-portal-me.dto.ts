@@ -51,4 +51,16 @@ export class UpdatePortalMeDto {
   @IsOptional()
   @IsEnum(["FEMALE", "MALE", "OTHER", "UNSPECIFIED"])
   sex?: "FEMALE" | "MALE" | "OTHER" | "UNSPECIFIED";
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  emergencyContactName?: string | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  emergencyContactPhone?: string | null;
 }

@@ -41,6 +41,8 @@ type Comparison = {
 type Props = {
   base: string;
   allowManage: boolean;
+  allowLog?: boolean;
+  enabledMeasurements?: string[] | null;
   onError: (message: string) => void;
   initialMetric?: string | null;
   onMetricChange?: (metric: string) => void;
@@ -61,10 +63,13 @@ function unitLabel(unit: string) {
 export function ClientEvolutionPanel({
   base,
   allowManage,
+  allowLog = false,
+  enabledMeasurements,
   onError,
   initialMetric,
   onMetricChange,
 }: Props) {
+  const canLog = allowManage || allowLog;
   const [data, setData] = useState<EvolutionResponse | null>(null);
   const [metric, setMetric] = useState<MeasurementMetricId>(() =>
     isMeasurementMetricId(initialMetric) ? initialMetric : "WEIGHT",
@@ -105,12 +110,16 @@ export function ClientEvolutionPanel({
   }, [base]);
 
   useEffect(() => {
+    if (enabledMeasurements !== undefined) {
+      setEnabledMetricIds(enabledMeasurements);
+      return;
+    }
     const dietitianId = /\/dietitian\/([^/]+)\//.exec(base)?.[1];
     if (!dietitianId) return;
     void api<{ enabledMeasurements: string[] | null }>(`/api/v1/dietitian/${dietitianId}/settings`)
       .then((row) => setEnabledMetricIds(row.enabledMeasurements))
       .catch(() => undefined);
-  }, [base]);
+  }, [base, enabledMeasurements]);
 
   useEffect(() => {
     if (isMeasurementMetricId(initialMetric) && initialMetric !== metric) {
@@ -315,7 +324,7 @@ export function ClientEvolutionPanel({
             ) : null}
           </header>
 
-          {allowManage && selected.stored ? (
+          {canLog && selected.stored ? (
             <form
               className="ui-evo__register"
               onSubmit={(event) => {

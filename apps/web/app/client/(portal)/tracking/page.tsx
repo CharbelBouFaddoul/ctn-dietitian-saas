@@ -16,6 +16,7 @@ import {
 } from "@nutrition-saas/ui";
 import { api } from "../../../../lib/api";
 import { errorMessage } from "../../../../lib/humanize-error";
+import { formatEnergyKcal } from "../../../../lib/format";
 import { unitLabel } from "../../../../lib/practice-labels";
 
 interface Nutrition {
@@ -96,8 +97,8 @@ const MEAL_LABELS: Record<MealCategory, string> = {
   UNCATEGORIZED: "Uncategorized",
 };
 
-function formatKcal(value: number | null): string {
-  return value === null ? "—" : `${value} kcal`;
+function formatKcal(value: number | null, unit = "kcal"): string {
+  return value === null ? "—" : formatEnergyKcal(value, unit);
 }
 
 function formatDuration(minutes: number | null | undefined): string {
@@ -138,6 +139,11 @@ function ClientTrackingPageInner() {
   const [wakeTime, setWakeTime] = useState("");
   const [weight, setWeight] = useState("");
   const [habits, setHabits] = useState<PortalHabit[]>([]);
+  const [energyUnit, setEnergyUnit] = useState("kcal");
+  const [weightUnit, setWeightUnit] = useState("kg");
+  const [editFood, setEditFood] = useState<{ id: string; quantity: string } | null>(null);
+  const [editWater, setEditWater] = useState<{ id: string; amount: string } | null>(null);
+  const [editExercise, setEditExercise] = useState<{ id: string; duration: string } | null>(null);
 
   async function loadHabits(selectedDate?: string) {
     const row = await api<{ habits: PortalHabit[] }>(
@@ -158,7 +164,13 @@ function ClientTrackingPageInner() {
   useEffect(() => {
     const seed =
       initialDate && /^\d{4}-\d{2}-\d{2}$/.test(initialDate) ? initialDate : undefined;
-    void load(seed).catch((err) => setError(errorMessage(err, "Unable to load tracking")));
+    void Promise.all([
+      load(seed),
+      api<{ energyUnit?: string; weightUnit?: string }>("/api/v1/portal/me").then((me) => {
+        setEnergyUnit(me.energyUnit ?? "kcal");
+        setWeightUnit(me.weightUnit ?? "kg");
+      }),
+    ]).catch((err) => setError(errorMessage(err, "Unable to load tracking")));
   }, [initialDate]);
 
   async function run(action: () => Promise<void>, fallback: string) {
@@ -172,6 +184,39 @@ function ClientTrackingPageInner() {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function saveFood(logId: string, quantity: number) {
+    await run(async () => {
+      await api(`/api/v1/portal/tracking/food-logs/${logId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ quantity }),
+      });
+      setEditFood(null);
+      await load(date);
+    }, "Unable to update food");
+  }
+
+  async function saveWater(logId: string, amountMl: number) {
+    await run(async () => {
+      await api(`/api/v1/portal/tracking/water-logs/${logId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ amount: amountMl, unit: "ml" }),
+      });
+      setEditWater(null);
+      await load(date);
+    }, "Unable to update water");
+  }
+
+  async function saveExercise(logId: string, durationMinutes: number) {
+    await run(async () => {
+      await api(`/api/v1/portal/tracking/exercise-logs/${logId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ durationMinutes }),
+      });
+      setEditExercise(null);
+      await load(date);
+    }, "Unable to update exercise");
   }
 
   async function removeFood(logId: string) {
@@ -258,7 +303,7 @@ function ClientTrackingPageInner() {
         body: JSON.stringify({
           type: "WEIGHT",
           value: Number(weight),
-          unit: "kg",
+          unit: weightUnit,
         }),
       });
       setWeight("");
@@ -324,7 +369,7 @@ function ClientTrackingPageInner() {
           <Section
             className="ui-client-panel ui-client-panel--food"
             title="Food logged"
-            description={`${formatKcal(summary.food.presented.energyKcal)} · P ${summary.food.presented.proteinG ?? "—"}g · C ${summary.food.presented.carbohydrateG ?? "—"}g · F ${summary.food.presented.fatG ?? "—"}g · Fiber ${summary.food.presented.fiberG ?? "—"}g`}
+            description={`${formatKcal(summary.food.presented.energyKcal, energyUnit)} · P ${summary.food.presented.proteinG ?? "—"}g · C ${summary.food.presented.carbohydrateG ?? "—"}g · F ${summary.food.presented.fatG ?? "—"}g · Fiber ${summary.food.presented.fiberG ?? "—"}g`}
             actions={
               <Link
                 href={`/client/tracking/add-food${date ? `?date=${encodeURIComponent(date)}` : ""}`}
@@ -348,7 +393,7 @@ function ClientTrackingPageInner() {
                   <div key={meal.category} className="ui-client-food-group">
                     <div className="ui-client-food-group__head">
                       <strong>{MEAL_LABELS[meal.category] ?? meal.category}</strong>
-                      <span className="ui-client-kcal">{formatKcal(meal.presented?.energyKcal ?? null)}</span>
+                      <span className="ui-client-kcal">{formatKcal(meal.presented?.energyKcal ?? null, energyUnit)}</span>
                     </div>
                     <ul className="ui-client-food-list">
                       {meal.items.map((row) => (
@@ -363,20 +408,55 @@ function ClientTrackingPageInner() {
                             <span className="ui-client-food-list__meta">
                               {row.quantity} {unitLabel(row.unit)}
                               {row.presented?.energyKcal != null
-                                ? ` · ${formatKcal(row.presented.energyKcal)}`
+                                ? ` · ${formatKcal(row.presented.energyKcal, energyUnit)}`
                                 : ""}
                             </span>
                           </div>
                           <div className="ui-client-food-list__actions">
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="ghost"
-                              disabled={busy}
-                              onClick={() => void removeFood(row.id)}
-                            >
-                              Remove
-                            </Button>
+                            {editFood?.id === row.id ? (
+                              <>
+                                <Input
+                                  type="number"
+                                  step="any"
+                                  value={editFood.quantity}
+                                  onChange={(event) => setEditFood({ id: row.id, quantity: event.target.value })}
+                                  aria-label="Quantity"
+                                  style={{ width: "5.5rem" }}
+                                />
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  disabled={busy}
+                                  onClick={() => void saveFood(row.id, Number(editFood.quantity))}
+                                >
+                                  Save
+                                </Button>
+                                <Button type="button" size="sm" variant="ghost" onClick={() => setEditFood(null)}>
+                                  Cancel
+                                </Button>
+                              </>
+                            ) : (
+                              <>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  disabled={busy}
+                                  onClick={() => setEditFood({ id: row.id, quantity: String(row.quantity) })}
+                                >
+                                  Edit
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  disabled={busy}
+                                  onClick={() => void removeFood(row.id)}
+                                >
+                                  Remove
+                                </Button>
+                              </>
+                            )}
                           </div>
                         </li>
                       ))}
@@ -384,7 +464,7 @@ function ClientTrackingPageInner() {
                   </div>
                 ))}
                 <p className="ui-client-food-total">
-                  Total <span className="ui-client-kcal">{formatKcal(summary.food.presented.energyKcal)}</span>
+                  Total <span className="ui-client-kcal">{formatKcal(summary.food.presented.energyKcal, energyUnit)}</span>
                 </p>
               </div>
             )}
@@ -419,7 +499,35 @@ function ClientTrackingPageInner() {
               <ul className="ui-client-meal-items" style={{ marginTop: 12 }}>
                 {summary.water.entries.map((row) => (
                   <li key={row.id}>
-                    <span>{row.amountMl} ml</span>
+                    {editWater?.id === row.id ? (
+                      <>
+                        <Input
+                          type="number"
+                          value={editWater.amount}
+                          onChange={(event) => setEditWater({ id: row.id, amount: event.target.value })}
+                          aria-label="Water amount"
+                          style={{ width: "5.5rem" }}
+                        />
+                        <Button type="button" size="sm" disabled={busy} onClick={() => void saveWater(row.id, Number(editWater.amount))}>
+                          Save
+                        </Button>
+                      </>
+                    ) : (
+                      <span>{row.amountMl} ml</span>
+                    )}
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      disabled={busy}
+                      onClick={() =>
+                        editWater?.id === row.id
+                          ? setEditWater(null)
+                          : setEditWater({ id: row.id, amount: String(row.amountMl) })
+                      }
+                    >
+                      {editWater?.id === row.id ? "Cancel" : "Edit"}
+                    </Button>
                     <Button
                       type="button"
                       size="sm"
@@ -444,10 +552,43 @@ function ClientTrackingPageInner() {
               <ul className="ui-client-meal-items" style={{ marginBottom: 12 }}>
                 {summary.exercise.entries.map((row) => (
                   <li key={row.id}>
-                    <span>
-                      {row.activityType} · {row.durationMinutes} min
-                      {row.intensity ? ` · ${row.intensity.toLowerCase()}` : ""}
-                    </span>
+                    {editExercise?.id === row.id ? (
+                      <>
+                        <Input
+                          type="number"
+                          value={editExercise.duration}
+                          onChange={(event) => setEditExercise({ id: row.id, duration: event.target.value })}
+                          aria-label="Duration"
+                          style={{ width: "5.5rem" }}
+                        />
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={busy}
+                          onClick={() => void saveExercise(row.id, Number(editExercise.duration))}
+                        >
+                          Save
+                        </Button>
+                      </>
+                    ) : (
+                      <span>
+                        {row.activityType} · {row.durationMinutes} min
+                        {row.intensity ? ` · ${row.intensity.toLowerCase()}` : ""}
+                      </span>
+                    )}
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      disabled={busy}
+                      onClick={() =>
+                        editExercise?.id === row.id
+                          ? setEditExercise(null)
+                          : setEditExercise({ id: row.id, duration: String(row.durationMinutes) })
+                      }
+                    >
+                      {editExercise?.id === row.id ? "Cancel" : "Edit"}
+                    </Button>
                     <Button
                       type="button"
                       size="sm"
@@ -491,7 +632,9 @@ function ClientTrackingPageInner() {
           <Section
             className="ui-client-panel ui-client-panel--sleep"
             title="Sleep"
-            description={`Last night ${formatDuration(summary.sleep?.durationMinutes)} · Week avg ${formatDuration(summary.sleepWeek.averageDurationMinutes)}`}
+            description={`Last night ${formatDuration(summary.sleep?.durationMinutes)}${
+              summary.sleep?.quality != null ? ` · quality ${summary.sleep.quality}/5` : ""
+            } · Week avg ${formatDuration(summary.sleepWeek.averageDurationMinutes)}`}
           >
             <form onSubmit={(event) => void saveSleep(event)} className="ui-inline-form">
               <Field label="Bedtime">
@@ -555,7 +698,7 @@ function ClientTrackingPageInner() {
 
           <Section title="Weight" description="Saved to your measurement history for this clinic.">
             <form onSubmit={(event) => void logWeight(event)} className="ui-inline-form">
-              <Field label="Weight (kg)">
+              <Field label={`Weight (${weightUnit})`}>
                 <Input
                   value={weight}
                   type="number"

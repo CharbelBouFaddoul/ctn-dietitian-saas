@@ -4,7 +4,7 @@ import { CurrentSession, CurrentUser } from "../auth/decorators/current-user.dec
 import { SessionGuard } from "../auth/guards/session.guard";
 import type { AuthenticatedRequestUser, AuthenticatedSession } from "../auth/auth.types";
 import { AppointmentService } from "./appointment.service";
-import { ProposeRescheduleDto } from "./dto/appointment.dto";
+import { CreatePortalAppointmentDto, ProposeRescheduleDto } from "./dto/appointment.dto";
 
 @ApiTags("portal")
 @ApiCookieAuth()
@@ -17,6 +17,16 @@ export class PortalAppointmentsController {
   @ApiOperation({ summary: "List appointments for the active portal connection" })
   list(@CurrentUser() user: AuthenticatedRequestUser, @CurrentSession() session: AuthenticatedSession) {
     return this.appointments.listForPortal(user.id, session.activeClientId);
+  }
+
+  @Post()
+  @ApiOperation({ summary: "Request a visit; the clinic confirms or declines" })
+  create(
+    @CurrentUser() user: AuthenticatedRequestUser,
+    @CurrentSession() session: AuthenticatedSession,
+    @Body() body: CreatePortalAppointmentDto,
+  ) {
+    return this.appointments.createForPortal(user.id, body, session.activeClientId);
   }
 
   @Get(":appointmentId")

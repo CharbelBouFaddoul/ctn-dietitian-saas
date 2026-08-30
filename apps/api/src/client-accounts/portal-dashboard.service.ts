@@ -26,7 +26,7 @@ export class PortalDashboardService {
     const me = await this.accounts.portalMe(userId, client.id);
 
     const conversation = await this.conversations.getOrCreate(client);
-    const [messages, unreadMessages, upcoming, recentNotifications, unreadNotificationCount, tracking, mealPlan] =
+    const [messages, unreadMessages, upcoming, recentNotifications, unreadNotificationCount, tracking, mealPlan, pendingAssessmentsCount] =
       await Promise.all([
         this.conversations.listMessages(conversation.id, dietitianAccountId, userId, undefined, 5),
         this.conversations.unreadCount(conversation.id, userId),
@@ -34,7 +34,7 @@ export class PortalDashboardService {
           where: {
             clientId: client.id,
             ...tenantWhere(dietitianAccountId),
-            status: { in: ["SCHEDULED", "RESCHEDULE_PENDING", "CANCELLATION_PENDING"] },
+            status: { in: ["SCHEDULED", "RESCHEDULE_PENDING", "CANCELLATION_PENDING", "REQUESTED"] },
             startAt: { gte: new Date() },
           },
           orderBy: { startAt: "asc" },
@@ -43,6 +43,13 @@ export class PortalDashboardService {
         this.notifications.unreadCount(userId, dietitianAccountId),
         this.tracking.dailySummary(client),
         this.mealPlans.portalCurrent(userId, client.id),
+        this.prisma.assessment.count({
+          where: {
+            clientId: client.id,
+            ...tenantWhere(dietitianAccountId),
+            status: { in: ["DRAFT", "IN_PROGRESS"] },
+          },
+        }),
       ]);
 
     const presets = me.portalPresets ?? { messaging: true, tracking: true, mealPlans: true };
@@ -72,6 +79,7 @@ export class PortalDashboardService {
         unreadCount: unreadNotificationCount,
       },
       tracking,
+      pendingAssessmentsCount,
       mealPlan: mealPlan.plan
         ? {
             name: mealPlan.plan.name,
@@ -83,6 +91,7 @@ export class PortalDashboardService {
         ...(presets.tracking ? [{ href: "/client/tracking", label: "Tracking" }] : []),
         ...(presets.messaging ? [{ href: "/client/messages", label: "Messages" }] : []),
         { href: "/client/documents", label: "Documents" },
+        { href: "/client/assessments", label: pendingAssessmentsCount ? `Forms · ${pendingAssessmentsCount}` : "Forms" },
       ],
     };
   }

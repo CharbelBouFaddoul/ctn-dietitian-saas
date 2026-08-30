@@ -10,7 +10,7 @@ import {
 } from "@nutrition-saas/ui";
 import { api } from "../../../lib/api";
 import { errorMessage } from "../../../lib/humanize-error";
-import { formatDate } from "../../../lib/format";
+import { formatDate, formatEnergyKcal } from "../../../lib/format";
 import { useMessagingRealtime } from "../../../lib/realtime";
 import { PatientAccents } from "./patient-accents";
 
@@ -21,6 +21,8 @@ interface PortalDashboard {
     dietitian?: { name: string | null; title: string | null; specialization: string | null };
     dietitianDisplayName?: string | null;
     portalPresets?: { messaging: boolean; tracking: boolean; mealPlans: boolean };
+    energyUnit?: "kcal" | "kj" | string;
+    goals?: Array<{ id: string; title: string; targetValue: number | null; targetUnit: string | null }>;
   };
   upcomingAppointment: {
     id: string;
@@ -43,8 +45,10 @@ interface PortalDashboard {
     exercise: { totalDurationMinutes: number };
     sleep: { durationMinutes: number | null } | null;
     habits: { completed: number; total: number };
+    goals?: Array<{ title: string; targetValue: number | null; targetUnit: string | null }>;
   };
   mealPlan: { name: string; description: string | null } | null;
+  pendingAssessmentsCount?: number;
   quickLinks: Array<{ href: string; label: string }>;
 }
 
@@ -137,14 +141,15 @@ export default function ClientHomePage() {
   const dietitianName = dietitian?.name?.trim() || me?.dietitianDisplayName?.trim() || "";
   const dietitianMeta = [dietitian?.title, dietitian?.specialization].filter(Boolean).join(" · ");
 
+  const energyUnit = me?.energyUnit ?? "kcal";
+  const pendingForms = data?.pendingAssessmentsCount ?? 0;
+  const goals = (me?.goals ?? tracking?.goals ?? []).slice(0, 2);
   const metrics = [
     {
       tone: "food" as const,
       label: "Food",
-      value:
-        tracking?.food.presented.energyKcal != null
-          ? `${tracking.food.presented.energyKcal} kcal`
-          : "Not logged",
+      value: formatEnergyKcal(tracking?.food.presented.energyKcal, energyUnit),
+      hint: tracking?.food.presented.proteinG != null ? `${tracking.food.presented.proteinG} g protein` : undefined,
       icon: PatientAccents.food,
     },
     {
@@ -171,6 +176,7 @@ export default function ClientHomePage() {
       value: tracking
         ? `${tracking.habits.completed} of ${tracking.habits.total || tracking.habits.completed} done`
         : "—",
+      hint: tracking?.habits.total ? `${tracking.habits.completed}/${tracking.habits.total}` : undefined,
       icon: PatientAccents.habits,
     },
   ];
@@ -190,11 +196,42 @@ export default function ClientHomePage() {
                 ? `Your nutrition day with ${me.practiceName}.`
                 : "Your nutrition day — plan, tracking, and messages in one place."}
           </p>
+          <div className="ui-client-welcome__actions">
+            {presets.tracking ? (
+              <Link href="/client/tracking" className="ui-btn ui-btn--primary ui-btn--sm">
+                Log today
+              </Link>
+            ) : null}
+            {presets.mealPlans ? (
+              <Link href="/client/plan" className="ui-btn ui-btn--secondary ui-btn--sm">
+                Open plan
+              </Link>
+            ) : null}
+          </div>
         </div>
         <div className="ui-client-welcome__orb" aria-hidden="true" />
       </header>
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
+
+      {goals.length ? (
+        <Section title="What we’re working on" tone="mint">
+          <ul className="ui-portal-goal-list">
+            {goals.map((goal, index) => (
+              <li key={"id" in goal && goal.id ? goal.id : `${goal.title}-${index}`}>
+                <strong>{goal.title}</strong>
+                {goal.targetValue != null ? (
+                  <span className="ui-muted">
+                    {" "}
+                    · {goal.targetValue}
+                    {goal.targetUnit ? ` ${goal.targetUnit}` : ""}
+                  </span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </Section>
+      ) : null}
 
       {dietitianName ? (
         <Section title="Your dietitian">
@@ -218,7 +255,9 @@ export default function ClientHomePage() {
           <Skeleton style={{ height: 40, width: "70%" }} />
         ) : data?.upcomingAppointment ? (
           <div className="ui-client-spotlight">
-            <span className="ui-client-spotlight__badge">Scheduled</span>
+            <span className="ui-client-spotlight__badge">
+              {data.upcomingAppointment.status === "REQUESTED" ? "Waiting for clinic" : "Scheduled"}
+            </span>
             <h3>{data.upcomingAppointment.title}</h3>
             <p className="ui-muted">{formatDate(data.upcomingAppointment.startAt)}</p>
           </div>
@@ -243,6 +282,7 @@ export default function ClientHomePage() {
                   <span className="ui-client-metric__icon">{metric.icon}</span>
                   <span className="ui-client-metric__label">{metric.label}</span>
                   <strong className="ui-client-metric__value">{metric.value}</strong>
+                  {metric.hint ? <span className="ui-client-metric__hint">{metric.hint}</span> : null}
                 </div>
               ))}
             </div>
@@ -265,6 +305,7 @@ export default function ClientHomePage() {
           ...(presets.tracking ? [{ href: "/client/tracking", label: "Daily log" }] : []),
           ...(presets.messaging ? [{ href: "/client/messages", label: "Messages" }] : []),
           { href: "/client/documents", label: "Documents" },
+          { href: "/client/assessments", label: pendingForms ? `Forms · ${pendingForms}` : "Forms" },
         ]).map((link) => (
           <Link
             key={link.href}

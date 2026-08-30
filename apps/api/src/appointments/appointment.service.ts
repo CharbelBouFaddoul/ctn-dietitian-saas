@@ -25,7 +25,16 @@ const BLOCKING_STATUSES: AppointmentStatus[] = [
   "SCHEDULED",
   "RESCHEDULE_PENDING",
   "CANCELLATION_PENDING",
+  "REQUESTED",
 ];
+
+const CATEGORY_TITLES: Record<string, string> = {
+  CONSULTATION: "Consultation",
+  FOLLOW_UP: "Follow-up",
+  ASSESSMENT: "Assessment",
+  MEAL_PLAN: "Meal plan",
+  OTHER: "Visit",
+};
 
 type AppointmentRow = Appointment & {
   client?: {
@@ -186,6 +195,9 @@ export class AppointmentService {
     if (existing.status === "CANCELLATION_PENDING") {
       throw new BadRequestException("Resolve the pending cancellation request before editing");
     }
+    if (existing.status === "REQUESTED") {
+      throw new BadRequestException("Accept or decline the visit request before editing");
+    }
     if (existing.status === "CANCELLED") {
       throw new BadRequestException("Cancelled appointments cannot be edited");
     }
@@ -278,7 +290,8 @@ export class AppointmentService {
     if (
       existing.status !== "SCHEDULED" &&
       existing.status !== "RESCHEDULE_PENDING" &&
-      existing.status !== "CANCELLATION_PENDING"
+      existing.status !== "CANCELLATION_PENDING" &&
+      existing.status !== "REQUESTED"
     ) {
       throw new BadRequestException("Only upcoming appointments can be cancelled");
     }
@@ -415,7 +428,145 @@ export class AppointmentService {
     });
   }
 
+  async acceptRequestForPractice(tenant: DietitianTenantContext, appointmentId: string) {
+    const existing = await this.requirePracticeAppointment(tenant, appointmentId, "manageRecords");
+    if (existing.status !== "REQUESTED") {
+      throw new BadRequestException("No pending visit request");
+    }
+    await this.assertNoOverlap(
+      tenant.dietitianAccountId,
+      existing.startAt,
+      existing.endAt,
+      existing.id,
+    );
+    const appointment = await this.prisma.appointment.update({
+      where: { id: appointmentId },
+      data: { status: "SCHEDULED" },
+    });
+    await this.timeline.record({
+      dietitianAccountId: tenant.dietitianAccountId,
+      clientId: appointment.clientId,
+      type: "APPOINTMENT_UPDATED",
+      actorUserId: tenant.userId,
+      targetType: "appointment",
+      targetId: appointment.id,
+      metadata: { action: "accept_request" },
+    });
+    await this.notifyAppointmentParties({
+      dietitianAccountId: tenant.dietitianAccountId,
+      clientId: appointment.clientId,
+      appointmentId: appointment.id,
+      title: appointment.title,
+      type: "APPOINTMENT_UPDATED",
+      body: `Visit confirmed: ${appointment.title}`,
+      excludeUserId: tenant.userId,
+    });
+    return this.toResponse(appointment);
+  }
+
+  async declineRequestForPractice(tenant: DietitianTenantContext, appointmentId: string) {
+    const existing = await this.requirePracticeAppointment(tenant, appointmentId, "manageRecords");
+    if (existing.status !== "REQUESTED") {
+      throw new BadRequestException("No pending visit request");
+    }
+    const appointment = await this.prisma.appointment.update({
+      where: { id: appointmentId },
+      data: { status: "CANCELLED" },
+    });
+    await this.timeline.record({
+      dietitianAccountId: tenant.dietitianAccountId,
+      clientId: appointment.clientId,
+      type: "APPOINTMENT_CANCELLED",
+      actorUserId: tenant.userId,
+      targetType: "appointment",
+      targetId: appointment.id,
+      metadata: { action: "decline_request" },
+    });
+    await this.notifyAppointmentParties({
+      dietitianAccountId: tenant.dietitianAccountId,
+      clientId: appointment.clientId,
+      appointmentId: appointment.id,
+      title: appointment.title,
+      type: "APPOINTMENT_CANCELLED",
+      body: `Visit request declined: ${appointment.title}`,
+      excludeUserId: tenant.userId,
+    });
+    return this.toResponse(appointment);
+  }
+
   // --- Portal ---
+
+  async createForPortal(
+    userId: string,
+    input: {
+      title?: string;
+      category?: AppointmentCategoryValue;
+      startAt: string;
+      endAt?: string;
+      notes?: string;
+    },
+    activeClientId?: string | null,
+  ) {
+    const client = await this.access.assertPortalAccess(userId, { activeClientId });
+    const dietitianAccountId = requireDietitianAccountId(client);
+    const settings = await this.prisma.dietitianSettings.findUnique({
+      where: { dietitianAccountId },
+      select: { defaultAppointmentMinutes: true },
+    });
+    const startAt = this.parseDate(input.startAt, "startAt");
+    if (startAt.getTime() <= Date.now()) {
+      throw new BadRequestException("Choose a future date and time");
+    }
+    let endAt: Date;
+    if (input.endAt) {
+      endAt = this.parseDate(input.endAt, "endAt");
+    } else {
+      const minutes = settings?.defaultAppointmentMinutes && settings.defaultAppointmentMinutes > 0
+        ? settings.defaultAppointmentMinutes
+        : 60;
+      endAt = new Date(startAt.getTime() + minutes * 60_000);
+    }
+    this.assertValidRange(startAt, endAt);
+    await this.assertNoOverlap(dietitianAccountId, startAt, endAt);
+
+    const category = (input.category ?? "CONSULTATION") as AppointmentCategory;
+    const fallbackTitle = `${CATEGORY_TITLES[category] ?? "Visit"} request`;
+    const title = input.title?.trim() || fallbackTitle;
+
+    const appointment = await this.prisma.appointment.create({
+      data: {
+        dietitianAccountId,
+        clientId: client.id,
+        title,
+        category,
+        startAt,
+        endAt,
+        status: "REQUESTED",
+        assignedUserId: null,
+        notes: input.notes?.trim() || null,
+        createdById: userId,
+      },
+    });
+    await this.timeline.record({
+      dietitianAccountId,
+      clientId: client.id,
+      type: "APPOINTMENT_CREATED",
+      actorUserId: userId,
+      targetType: "appointment",
+      targetId: appointment.id,
+      metadata: { title: appointment.title, category: appointment.category, status: "REQUESTED" },
+    });
+    await this.notifyAppointmentParties({
+      dietitianAccountId,
+      clientId: client.id,
+      appointmentId: appointment.id,
+      title: appointment.title,
+      type: "APPOINTMENT_CREATED",
+      body: `Visit requested: ${appointment.title}`,
+      excludeUserId: userId,
+    });
+    return this.toResponse(appointment);
+  }
 
   async listForPortal(userId: string, activeClientId?: string | null) {
     const client = await this.access.assertPortalAccess(userId, { activeClientId });

@@ -128,6 +128,12 @@ export function nutritionLabel(value: number | null | undefined, suffix: string)
   return `${value} ${suffix}`;
 }
 
+export function formatEnergyKcal(value: number | null | undefined, unit: "kcal" | "kj" | string = "kcal"): string {
+  if (value == null || Number.isNaN(value)) return "Not logged";
+  if (unit === "kj") return `${Math.round(value * 4.184)} kJ`;
+  return `${Math.round(value)} kcal`;
+}
+
 export function statusTone(status: string | null | undefined): "accent" | "neutral" | "danger" | "success" | "warning" {
   const value = (status ?? "").toUpperCase();
   if (["ACTIVE", "PAID", "CONNECTED", "COMPLETED", "PUBLISHED", "OK"].includes(value)) return "success";

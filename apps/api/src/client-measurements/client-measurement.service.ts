@@ -8,6 +8,7 @@ import { tenantWhere } from "../dietitian/tenant-scope";
 import { TimelineService } from "../timeline/timeline.service";
 import { ClientAccessService } from "../clients/client-access.service";
 import { deduceBodyComposition } from "./body-composition";
+import { normalizeEnabledMeasurements } from "../dietitian/profile-settings";
 
 const LENGTH_TYPES = new Set<MeasurementType>([
   "HEIGHT",
@@ -204,6 +205,14 @@ export class ClientMeasurementService {
     actorUserId: string,
     input: { type: MeasurementType; value: number; unit: string; measuredAt?: string; notes?: string },
   ) {
+    const settings = await this.prisma.dietitianSettings.findUnique({
+      where: { dietitianAccountId: client.dietitianAccountId },
+      select: { enabledMeasurements: true },
+    });
+    const enabled = normalizeEnabledMeasurements(settings?.enabledMeasurements);
+    if (enabled && !enabled.includes(input.type)) {
+      throw new BadRequestException("This measurement is not enabled for your clinic");
+    }
     return this.createScoped(client.dietitianAccountId, client.id, actorUserId, {
       type: input.type,
       value: input.value,

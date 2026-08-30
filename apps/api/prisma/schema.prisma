@@ -555,6 +555,7 @@ enum AppointmentStatus {
   NO_SHOW
   RESCHEDULE_PENDING
   CANCELLATION_PENDING
+  REQUESTED
 }
 
 enum AppointmentCategory {

@@ -77,6 +77,30 @@ Automated coverage: `test/v1-acceptance/isolation.e2e.spec.ts`, `multi-dietitian
 5. Historical data (meal plans, messages, documents, appointments, assessments, tracking, profile) remains under that connection’s authorization  
 6. Already ACTIVE for a practice → resolve/join returns `already_connected` (no duplicate `ClientAccount`)  
 
+### Patient portal profile hub
+
+1. Login as Emma (`patient.emma@demo.local`) → `/client/profile`
+2. Page title stays **Profile** across **About you**, **Care notes**, and **Clinic and security**
+3. About you: edit emergency contact and save; email hint says it is used for this clinic connection
+4. Care notes: allergies / preferences / lifestyle / goals are visible and not editable
+5. Clinic and security: change password with current + new; then sign in again with the new password (or use forgot-password as fallback)
+
+### Patient home, progress, daily log
+
+1. Home shows 1–2 clinic goals when present, energy in the clinic unit, and a Forms hint when a questionnaire is open
+2. Progress lists only clinic-enabled measurements; log one non-weight metric if the clinic enabled it
+3. Daily log: edit a food quantity (or water/exercise) with Save — no delete/re-add
+4. Forms / Documents / Invoices: search (and invoice status filter) narrows the list client-side
+
+### Request a visit
+
+1. Portal **Appointments → Request a visit** — pick date/time/category, send
+2. Row shows **Waiting for clinic** (`REQUESTED`) under Upcoming
+3. Clinic calendar (Charlie or Alice) shows the requested visit — Accept → portal status becomes Scheduled; Decline → Cancelled
+4. Other clinic cannot see the request
+
+Automated coverage: `apps/api/test/portal-upgrade.e2e.spec.ts`.
+
 ### Patient leave request
 
 1. Portal **Profile → Account → Request to leave** (optional note)  

@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Alert } from "@nutrition-saas/ui";
 import { DocumentsLibrary, type DocumentsLibraryItem } from "../../../../components/documents-library";
+import { ListFilters } from "../../../../components/list-filters";
 import { api, apiUrl } from "../../../../lib/api";
 import { downloadAuthenticatedFile } from "../../../../lib/documents";
 import { errorMessage } from "../../../../lib/humanize-error";
@@ -13,6 +14,14 @@ export default function ClientDocumentsPage() {
   const [uploading, setUploading] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+
+  const query = search.trim().toLowerCase();
+  const filtered = useMemo(() => {
+    if (!documents) return null;
+    if (!query) return documents;
+    return documents.filter((doc) => doc.filename.toLowerCase().includes(query));
+  }, [documents, query]);
 
   async function load() {
     setDocuments(await api<DocumentsLibraryItem[]>("/api/v1/portal/documents"));
@@ -25,10 +34,20 @@ export default function ClientDocumentsPage() {
   return (
     <section className="ui-client-stack">
       {error ? <Alert tone="danger">{error}</Alert> : null}
+      <ListFilters
+        search={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search filename"
+        hasFilters={Boolean(query)}
+        onClear={() => setSearch("")}
+        count={filtered?.length}
+        countNoun="document"
+        loading={documents === null}
+      />
       <DocumentsLibrary
         variant="portal"
         pageHeader
-        documents={documents}
+        documents={filtered}
         uploading={uploading}
         downloadingId={downloadingId}
         deletingId={deletingId}
