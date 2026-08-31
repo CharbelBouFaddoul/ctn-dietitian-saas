@@ -204,7 +204,10 @@ function itemGramsLabel(item: MealItem): string | null {
 }
 
 function itemLine(item: MealItem): string {
-  const name = item.food?.servingDescription?.trim() || itemName(item);
+  const serving = item.food?.servingDescription?.trim() ?? "";
+  const genericServing = /^(\d+(\.\d+)?\s*)?(g|ml|100 g|100 ml)$/i.test(serving);
+  const name =
+    item.unit === "serving" && serving && !genericServing ? serving : itemName(item);
   const amount = `${trimQty(item.quantity)} ${unitLabel(item.unit)}`;
   const grams = itemGramsLabel(item);
   if (grams && item.unit !== "g" && item.unit !== "ml") return `${amount} ${name} (${grams})`;

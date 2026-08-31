@@ -162,6 +162,7 @@ export function MealPlanAnalysisPanel({
   const foodGroups = foodGroupSlices(meals);
   const chartSize = compact ? 104 : 168;
   const chartThickness = compact ? 24 : 38;
+  const showLegendNumbers = compact;
   const sugarMissing = carbs > 0 && sugar <= 0;
   const carbInfo = sugarMissing
     ? "Some foods on this day have no sugar value in the catalog, so sugars vs other carbs may be incomplete."
@@ -233,7 +234,8 @@ export function MealPlanAnalysisPanel({
           <DonutChart
             size={chartSize}
             thickness={chartThickness}
-            showPct={false}
+            showPct={showLegendNumbers}
+            showValue={showLegendNumbers}
             interactive={!compact}
             valueUnit="kcal"
             slices={[
@@ -248,7 +250,8 @@ export function MealPlanAnalysisPanel({
           <DonutChart
             size={chartSize}
             thickness={chartThickness}
-            showPct={false}
+            showPct={showLegendNumbers}
+            showValue={showLegendNumbers}
             interactive={!compact}
             valueUnit="kcal"
             slices={meals.map((meal, i) => ({
@@ -263,7 +266,8 @@ export function MealPlanAnalysisPanel({
           <DonutChart
             size={chartSize}
             thickness={chartThickness}
-            showPct={false}
+            showPct={showLegendNumbers}
+            showValue={showLegendNumbers}
             interactive={!compact}
             valueUnit="g"
             slices={meals.map((meal, i) => ({
@@ -278,7 +282,8 @@ export function MealPlanAnalysisPanel({
           <DonutChart
             size={chartSize}
             thickness={chartThickness}
-            showPct={false}
+            showPct={showLegendNumbers}
+            showValue={showLegendNumbers}
             interactive={!compact}
             valueUnit="g"
             slices={[
@@ -295,7 +300,8 @@ export function MealPlanAnalysisPanel({
           <DonutChart
             size={chartSize}
             thickness={chartThickness}
-            showPct={false}
+            showPct={showLegendNumbers}
+            showValue={showLegendNumbers}
             interactive={!compact}
             valueUnit="g"
             slices={[
@@ -309,7 +315,8 @@ export function MealPlanAnalysisPanel({
           <DonutChart
             size={chartSize}
             thickness={chartThickness}
-            showPct={false}
+            showPct={showLegendNumbers}
+            showValue={showLegendNumbers}
             interactive={!compact}
             valueUnit="kcal"
             slices={foodGroups.slices}

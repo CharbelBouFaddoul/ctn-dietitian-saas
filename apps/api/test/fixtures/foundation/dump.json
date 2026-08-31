@@ -30,6 +30,18 @@
         { "amount": 33, "nutrient": { "number": "307" } },
         { "amount": 89.2, "nutrient": { "number": "401" } }
       ]
+    },
+    {
+      "fdcId": 2346396,
+      "description": "Oats, whole grain, rolled, old fashioned",
+      "foodCategory": { "description": "Cereal Grains and Pasta" },
+      "foodNutrients": [
+        { "amount": 382, "nutrient": { "number": "957", "id": 2047, "name": "Energy (Atwater General Factors)", "unitName": "kcal" } },
+        { "amount": 379, "nutrient": { "number": "958", "id": 2048, "name": "Energy (Atwater Specific Factors)", "unitName": "kcal" } },
+        { "amount": 13.5, "nutrient": { "number": "203" } },
+        { "amount": 5.89, "nutrient": { "number": "204" } },
+        { "amount": 68.7, "nutrient": { "number": "205" } }
+      ]
     }
   ]
 }

@@ -75,10 +75,16 @@ function amountsByNumber(foodNutrients: FdcNutrient[] | undefined): Map<number, 
   const map = new Map<number, number>();
   if (!Array.isArray(foodNutrients)) return map;
   for (const entry of foodNutrients) {
-    const nbr = nutrientNumber(entry);
     const amount = nutrientAmount(entry);
-    if (nbr == null || amount == null || map.has(nbr)) continue;
-    map.set(nbr, amount);
+    if (amount == null) continue;
+    const nbr = nutrientNumber(entry);
+    if (nbr != null && !map.has(nbr)) map.set(nbr, amount);
+    // Foundation dumps sometimes omit nutrient.number; id still identifies Energy (1008/2047/2048).
+    const idRaw = entry.nutrient && "id" in entry.nutrient ? (entry.nutrient as { id?: number }).id : undefined;
+    if (idRaw != null && Number.isFinite(Number(idRaw))) {
+      const id = Math.trunc(Number(idRaw));
+      if (!map.has(id)) map.set(id, amount);
+    }
   }
   return map;
 }
@@ -93,10 +99,28 @@ function categoryOf(food: FdcFood): string | null {
   return desc || null;
 }
 
+/**
+ * USDA Energy fields differ by dataset:
+ * - SR Legacy / older Foundation: nutrient number 208 (kcal), sometimes 268 (kJ)
+ * - Newer Foundation Foods: 957 Atwater General / 958 Atwater Specific (kcal)
+ * Nutrient ids 1008 / 2047 / 2048 are kept as fallbacks when number is missing.
+ */
+function energyKcalFromNutrients(byNumber: Map<number, number>): number | null {
+  return (
+    byNumber.get(208) ??
+    byNumber.get(957) ??
+    byNumber.get(958) ??
+    byNumber.get(1008) ??
+    byNumber.get(2047) ??
+    byNumber.get(2048) ??
+    (byNumber.has(268) ? byNumber.get(268)! / 4.184 : null)
+  );
+}
+
 export function convertFdcFood(food: FdcFood): FoodDatasetRecord | null {
   if (food.fdcId == null || !food.description?.trim()) return null;
   const byNumber = amountsByNumber(food.foodNutrients);
-  const energyKcal = byNumber.get(208) ?? (byNumber.has(268) ? byNumber.get(268)! / 4.184 : null);
+  const energyKcal = energyKcalFromNutrients(byNumber);
   const vitaminD = byNumber.get(328) ?? (byNumber.has(324) ? byNumber.get(324)! / 40 : null);
   const extraNutrients: Record<string, number | null> = {};
   for (const [nbr, key] of Object.entries(EXTRA_BY_NUMBER)) {

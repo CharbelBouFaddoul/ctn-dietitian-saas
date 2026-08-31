@@ -23,7 +23,9 @@ export class ClientPortfolioService {
 
     const [
       goals,
-      measurements,
+      latestPerType,
+      weightSeries,
+      heightSeries,
       assessments,
       upcomingAppointment,
       mealPlan,
@@ -35,10 +37,22 @@ export class ClientPortfolioService {
         orderBy: { createdAt: "desc" },
         take: 20,
       }),
+      // Latest row per type. Prisma applies distinct in memory after orderBy, so
+      // measuredAt desc is required — a global take:40 used to drop older HEIGHT.
       this.prisma.clientMeasurement.findMany({
         where: { clientId, ...tenantWhere(orgId) },
         orderBy: { measuredAt: "desc" },
-        take: 40,
+        distinct: ["type"],
+      }),
+      this.prisma.clientMeasurement.findMany({
+        where: { clientId, ...tenantWhere(orgId), type: "WEIGHT" },
+        orderBy: { measuredAt: "asc" },
+        take: 100,
+      }),
+      this.prisma.clientMeasurement.findMany({
+        where: { clientId, ...tenantWhere(orgId), type: "HEIGHT" },
+        orderBy: { measuredAt: "asc" },
+        take: 100,
       }),
       this.prisma.assessment.findMany({
         where: { clientId, ...tenantWhere(orgId), status: { not: "ARCHIVED" } },
@@ -82,11 +96,8 @@ export class ClientPortfolioService {
     const activeGoals = goals.filter((g) => g.status === "ACTIVE");
     const primaryGoal = activeGoals[0] ?? null;
 
-    const latestByType = new Map<string, (typeof measurements)[number]>();
-    for (const row of measurements) {
-      if (!latestByType.has(row.type)) latestByType.set(row.type, row);
-    }
-    const latestMeasurements = [...latestByType.values()].map((row) => ({
+    const latestByType = new Map(latestPerType.map((row) => [row.type, row] as const));
+    const latestMeasurements = latestPerType.map((row) => ({
       id: row.id,
       type: row.type,
       value: Number(row.value),
@@ -106,15 +117,6 @@ export class ClientPortfolioService {
     const latestAssessment = (completed ?? assessments[0])
       ? mapAssessment(completed ?? assessments[0]!)
       : null;
-
-    const weightSeries = measurements
-      .filter((m) => m.type === "WEIGHT")
-      .slice()
-      .sort((a, b) => a.measuredAt.getTime() - b.measuredAt.getTime());
-    const heightSeries = measurements
-      .filter((m) => m.type === "HEIGHT")
-      .slice()
-      .sort((a, b) => a.measuredAt.getTime() - b.measuredAt.getTime());
     const latestWeight = weightSeries.length > 0 ? weightSeries[weightSeries.length - 1]! : null;
     const previousWeightRow =
       weightSeries.length >= 2 ? weightSeries[weightSeries.length - 2]! : null;

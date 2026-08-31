@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useRef, useState, type ReactNode } from "react";
+import { FormEvent, useEffect, useState, type ReactNode } from "react";
 import {
   Badge,
   Button,
@@ -45,6 +45,7 @@ import {
 } from "../lib/documents";
 import { formatDate, formatDateOnly, localDateInputFromInstant, localTimeInputValue, toLocalDateTimeIso } from "../lib/format";
 import { errorMessage } from "../lib/humanize-error";
+import { useOverflowHint } from "../lib/use-overflow-hint";
 
 type ChartNote = ChartNoteRow & {
   kind: "CLINICAL" | "MEAL" | "EATING_HABIT" | "PREGNANCY";
@@ -124,44 +125,6 @@ function patientIdLabel(id: string): string {
 }
 
 const IDENTITY_PLACEHOLDER = "Write here...";
-
-function useOverflowHint() {
-  const ref = useRef<HTMLDivElement>(null);
-  const [above, setAbove] = useState(false);
-  const [below, setBelow] = useState(false);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-
-    const update = () => {
-      const max = el.scrollHeight - el.clientHeight;
-      setAbove(el.scrollTop > 8);
-      setBelow(max - el.scrollTop > 8);
-    };
-
-    update();
-    el.addEventListener("scroll", update, { passive: true });
-    const resize = new ResizeObserver(update);
-    resize.observe(el);
-    const watchChildren = () => {
-      for (const child of el.children) resize.observe(child);
-    };
-    watchChildren();
-    const mutate = new MutationObserver(() => {
-      watchChildren();
-      update();
-    });
-    mutate.observe(el, { childList: true, subtree: true });
-    return () => {
-      el.removeEventListener("scroll", update);
-      resize.disconnect();
-      mutate.disconnect();
-    };
-  }, []);
-
-  return { ref, above, below };
-}
 
 function SelectNotes({
   selectLabel,

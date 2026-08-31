@@ -4,6 +4,7 @@ import {
   type NutrientKey,
   type ExtraNutrients,
   NUTRIENT_KEYS,
+  atwaterEnergyKcal,
   sanitizeExtraNutrients,
   roundExtraNutrients,
 } from "@nutrition-saas/nutrition";
@@ -24,11 +25,14 @@ export function nutritionFromRow(row: {
   sugarG: unknown;
   sodiumMg: unknown;
 }): NutritionValues {
+  const proteinG = decimalToNumber(row.proteinG);
+  const carbohydrateG = decimalToNumber(row.carbohydrateG);
+  const fatG = decimalToNumber(row.fatG);
   return {
-    energyKcal: decimalToNumber(row.energyKcal),
-    proteinG: decimalToNumber(row.proteinG),
-    carbohydrateG: decimalToNumber(row.carbohydrateG),
-    fatG: decimalToNumber(row.fatG),
+    energyKcal: decimalToNumber(row.energyKcal) ?? atwaterEnergyKcal({ proteinG, carbohydrateG, fatG }),
+    proteinG,
+    carbohydrateG,
+    fatG,
     fiberG: decimalToNumber(row.fiberG),
     sugarG: decimalToNumber(row.sugarG),
     sodiumMg: decimalToNumber(row.sodiumMg),

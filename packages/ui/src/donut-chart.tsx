@@ -19,7 +19,9 @@ export type DonutChartProps = {
   legend?: boolean;
   /** Show percent next to legend labels. Default true. */
   showPct?: boolean;
-  /** Unit shown in the hover tip, e.g. "kcal" or "g". */
+  /** Show absolute value (+ unit) next to legend labels. Default false. */
+  showValue?: boolean;
+  /** Unit shown in the hover tip / legend value, e.g. "kcal" or "g". */
   valueUnit?: string;
   /** Content rendered in the middle of the ring; hidden while a slice is hovered. */
   center?: ReactNode;
@@ -77,6 +79,7 @@ export function DonutChart({
   caption,
   legend = true,
   showPct = true,
+  showValue = false,
   valueUnit,
   center,
   interactive = true,
@@ -185,7 +188,14 @@ export function DonutChart({
                 <span className="ui-donut__swatch" style={{ background: arc.color }} />
                 <span className="ui-donut__name">
                   {arc.label}
-                  {showPct ? ` ${Math.round(arc.pct)}%` : ""}
+                  {showPct || showValue ? (
+                    <span className="ui-donut__meta">
+                      {showPct ? ` ${Math.round(arc.pct)}%` : ""}
+                      {showValue
+                        ? `${showPct ? " · " : " "}${formatValue(arc.value)}${valueUnit ? ` ${valueUnit}` : ""}`
+                        : ""}
+                    </span>
+                  ) : null}
                 </span>
               </li>
             ))

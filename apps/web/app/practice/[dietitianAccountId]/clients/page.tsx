@@ -8,6 +8,7 @@ import {
   Badge,
   Button,
   ConfirmDialog,
+  Dialog,
   EmptyState,
   PageHeader,
   SearchInput,
@@ -265,10 +266,10 @@ export default function ClientsPage() {
                 type="button"
                 variant="secondary"
                 size="sm"
-                aria-expanded={tagsOpen}
+                aria-haspopup="dialog"
                 onClick={() => {
                   setJoinOpen(false);
-                  setTagsOpen((open) => !open);
+                  setTagsOpen(true);
                 }}
               >
                 Manage tags
@@ -284,39 +285,6 @@ export default function ClientsPage() {
       />
 
       {error ? <Alert tone="danger">{error}</Alert> : null}
-
-      {tagsOpen && allowCreate ? (
-        <div className="ui-clients__tags-panel">
-          <div className="ui-clients__tags-panel-head">
-            <div>
-              <h2 className="ui-clients__tags-panel-title">Clinic tags</h2>
-              <p className="ui-muted" style={{ margin: 0, fontSize: "0.85rem" }}>
-                Create labels you can assign to clients. Edit or remove anytime.
-              </p>
-            </div>
-            <button
-              type="button"
-              className="ui-clients__join-close"
-              aria-label="Close"
-              onClick={() => setTagsOpen(false)}
-            >
-              ×
-            </button>
-          </div>
-          <ClinicTagsManager
-            dietitianAccountId={dietitianAccountId}
-            tags={tags}
-            onChange={(next) => {
-              setTags(next);
-              if (tagId && !next.some((tag) => tag.id === tagId)) {
-                setTagId("");
-                setPage(1);
-              }
-              void load();
-            }}
-          />
-        </div>
-      ) : null}
 
       <div className="ui-clients__toolbar">
         <div className="ui-clients__search">
@@ -476,6 +444,25 @@ export default function ClientsPage() {
           </div>
         </div>
       ) : null}
+
+      <Dialog open={tagsOpen && allowCreate} title="Clinic tags" onClose={() => setTagsOpen(false)}>
+        <p className="ui-muted" style={{ margin: "0 0 0.85rem", fontSize: "0.85rem" }}>
+          Create labels you can assign to clients. Edit or remove anytime.
+        </p>
+        <ClinicTagsManager
+          dietitianAccountId={dietitianAccountId}
+          tags={tags}
+          compact
+          onChange={(next) => {
+            setTags(next);
+            if (tagId && !next.some((tag) => tag.id === tagId)) {
+              setTagId("");
+              setPage(1);
+            }
+            void load();
+          }}
+        />
+      </Dialog>
 
       <ConfirmDialog
         open={confirmRevoke}

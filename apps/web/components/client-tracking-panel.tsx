@@ -21,6 +21,7 @@ import {
   typesForTimelineCategory,
   type TimelineCategoryId,
 } from "../lib/timeline-care";
+import { useOverflowHint } from "../lib/use-overflow-hint";
 
 export type TrackingSummaryView = {
   date: string;
@@ -207,6 +208,8 @@ export function ClientTrackingPanel({
   const [activityFilter, setActivityFilter] = useState<TimelineCategoryId>("all");
   const [habitsOpen, setHabitsOpen] = useState(false);
   const [infoFoodId, setInfoFoodId] = useState<string | null>(null);
+  const mainHint = useOverflowHint();
+  const railHint = useOverflowHint();
 
   const habitsDone = summary?.habits.completed ?? 0;
   const habitsTotal = summary?.habits.total ?? summary?.habits.items.length ?? 0;
@@ -246,344 +249,347 @@ export function ClientTrackingPanel({
   }
 
   return (
-    <div className="ui-track">
-      <div className="ui-track__layout">
-        <div className="ui-track__main">
-          <header className="ui-track__daybar">
-            <div>
-              <p className="ui-track__eyebrow">Daily tracking</p>
-              <h2 className="ui-track__title">{formatDayLabel(trackingDate || summary?.date || "")}</h2>
-            </div>
-            <div className="ui-track__day-controls">
-              <Button
-                type="button"
-                size="sm"
-                variant="secondary"
-                onClick={() => onShiftDate(-1)}
-                disabled={!trackingDate}
-              >
-                Previous
-              </Button>
-              <Field label="Date">
-                <Input
-                  type="date"
-                  value={trackingDate}
-                  onChange={(event) => onDateChange(event.target.value)}
-                />
-              </Field>
-              <Button
-                type="button"
-                size="sm"
-                variant="secondary"
-                onClick={() => onShiftDate(1)}
-                disabled={!trackingDate}
-              >
-                Next
-              </Button>
-            </div>
-          </header>
+    <div className="ui-clinical">
+      <div
+        className={`ui-clinical__pane${mainHint.above ? " is-more-above" : ""}${mainHint.below ? " is-more-below" : ""}`}
+      >
+        <div className="ui-clinical__main" ref={mainHint.ref}>
+          <div className="ui-track">
+            <header className="ui-track__daybar">
+              <div>
+                <p className="ui-track__eyebrow">Daily tracking</p>
+                <h2 className="ui-track__title">{formatDayLabel(trackingDate || summary?.date || "")}</h2>
+              </div>
+              <div className="ui-track__day-controls">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => onShiftDate(-1)}
+                  disabled={!trackingDate}
+                >
+                  Previous
+                </Button>
+                <Field label="Date">
+                  <Input
+                    type="date"
+                    value={trackingDate}
+                    onChange={(event) => onDateChange(event.target.value)}
+                  />
+                </Field>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => onShiftDate(1)}
+                  disabled={!trackingDate}
+                >
+                  Next
+                </Button>
+              </div>
+            </header>
 
-          {!summary ? (
-            <div className="ui-track__stack">
-              <Skeleton style={{ height: 140, borderRadius: 14 }} />
-              <Skeleton style={{ height: 180, borderRadius: 14 }} />
-            </div>
-          ) : (
-            <div className="ui-track__stack">
-              <section className="ui-track__card">
-                <header className="ui-track__card-head">
-                  <h3>Daily analysis</h3>
-                  <span className="ui-muted">
-                    {nutritionLabel(summary.food.presented.energyKcal, "kcal")} total
-                  </span>
-                </header>
-                <div className="ui-track__macros">
-                  {macros.map((m) => (
-                    <MacroRow
-                      key={m.tone}
-                      label={m.label}
-                      value={m.value}
-                      unit={m.unit}
-                      tone={m.tone}
-                      share={m.weight / macroMax}
-                    />
-                  ))}
-                </div>
-                <div className="ui-track__water">
-                  <div className="ui-track__water-meta">
-                    <span>Water</span>
-                    <strong>
-                      {summary.water.targetMl != null
-                        ? `${summary.water.totalLiters.toFixed(2)} / ${(summary.water.targetMl / 1000).toFixed(1)} L`
-                        : `${summary.water.totalLiters.toFixed(2)} L`}
-                    </strong>
+            {!summary ? (
+              <div className="ui-track__stack">
+                <Skeleton style={{ height: 140, borderRadius: 14 }} />
+                <Skeleton style={{ height: 180, borderRadius: 14 }} />
+              </div>
+            ) : (
+              <div className="ui-track__stack">
+                <section className="ui-track__card">
+                  <header className="ui-track__card-head">
+                    <h3>Daily analysis</h3>
+                    <span className="ui-muted">
+                      {nutritionLabel(summary.food.presented.energyKcal, "kcal")} total
+                    </span>
+                  </header>
+                  <div className="ui-track__macros">
+                    {macros.map((m) => (
+                      <MacroRow
+                        key={m.tone}
+                        label={m.label}
+                        value={m.value}
+                        unit={m.unit}
+                        tone={m.tone}
+                        share={m.weight / macroMax}
+                      />
+                    ))}
                   </div>
-                  <div className="ui-track__water-track" aria-hidden="true">
-                    <span className="ui-track__water-fill" style={{ width: `${waterPct}%` }} />
+                  <div className="ui-track__water">
+                    <div className="ui-track__water-meta">
+                      <span>Water</span>
+                      <strong>
+                        {summary.water.targetMl != null
+                          ? `${summary.water.totalLiters.toFixed(2)} / ${(summary.water.targetMl / 1000).toFixed(1)} L`
+                          : `${summary.water.totalLiters.toFixed(2)} L`}
+                      </strong>
+                    </div>
+                    <div className="ui-track__water-track" aria-hidden="true">
+                      <span className="ui-track__water-fill" style={{ width: `${waterPct}%` }} />
+                    </div>
                   </div>
-                </div>
-              </section>
+                </section>
 
-              <section className="ui-track__card">
-                <header className="ui-track__card-head">
-                  <h3>Food diary</h3>
-                  <span className="ui-muted">
-                    {summary.food.byMeal.length} meal
-                    {summary.food.byMeal.length === 1 ? "" : "s"}
-                  </span>
-                </header>
-                {summary.food.byMeal.length === 0 ? (
-                  <EmptyState title="No food logged">Nothing recorded for this day yet.</EmptyState>
-                ) : (
-                  <div className="ui-track__meals">
-                    {summary.food.byMeal.map((meal) => {
-                      const open = mealOpen(meal.category);
-                      return (
-                        <article key={meal.category} className={`ui-track__meal${open ? " is-open" : ""}`}>
-                          <button
-                            type="button"
-                            className="ui-track__meal-toggle"
-                            aria-expanded={open}
-                            onClick={() =>
-                              setOpenMeals((prev) => ({
-                                ...prev,
-                                [meal.category]: !open,
-                              }))
-                            }
-                          >
-                            <span className="ui-track__meal-check" aria-hidden="true">
-                              ✓
-                            </span>
-                            <span className="ui-track__meal-title">{humanizeLabel(meal.category)}</span>
-                            <span className="ui-log-stat">
-                              <span className="ui-log-stat__label">Energy</span>
-                              <span className="ui-log-stat__value">
+                <section className="ui-track__card">
+                  <header className="ui-track__card-head">
+                    <h3>Food diary</h3>
+                    <span className="ui-muted">
+                      {summary.food.byMeal.length} meal
+                      {summary.food.byMeal.length === 1 ? "" : "s"}
+                    </span>
+                  </header>
+                  {summary.food.byMeal.length === 0 ? (
+                    <EmptyState title="No food logged">Nothing recorded for this day yet.</EmptyState>
+                  ) : (
+                    <div className="ui-track__meals">
+                      {summary.food.byMeal.map((meal) => {
+                        const open = mealOpen(meal.category);
+                        return (
+                          <article key={meal.category} className={`ui-track__meal${open ? " is-open" : ""}`}>
+                            <button
+                              type="button"
+                              className="ui-track__meal-toggle"
+                              aria-expanded={open}
+                              onClick={() =>
+                                setOpenMeals((prev) => ({
+                                  ...prev,
+                                  [meal.category]: !open,
+                                }))
+                              }
+                            >
+                              <span className="ui-track__meal-check" aria-hidden="true">
+                                ✓
+                              </span>
+                              <span className="ui-track__meal-title">{humanizeLabel(meal.category)}</span>
+                              <span className="ui-track__meal-kcal">
                                 {meal.presented?.energyKcal != null
                                   ? `${meal.presented.energyKcal} kcal`
                                   : "—"}
                               </span>
-                            </span>
-                            <span className="ui-track__meal-chevron" aria-hidden="true">
-                              {open ? "▾" : "▸"}
-                            </span>
-                          </button>
-                          {open ? (
-                            <ul className="ui-track__meal-items">
-                              {meal.items.map((row) => (
-                                <li key={row.id}>
-                                  <span className="ui-track__meal-food">{row.foodName}</span>
-                                  <span className="ui-log-stat">
-                                    <span className="ui-log-stat__label">Amount</span>
-                                    <span className="ui-log-stat__value">
-                                      {row.quantity} {humanizeLabel(row.unit)}
+                              <span className="ui-track__meal-chevron" aria-hidden="true">
+                                {open ? "▾" : "▸"}
+                              </span>
+                            </button>
+                            {open ? (
+                              <ul className="ui-track__meal-items">
+                                {meal.items.map((row) => (
+                                  <li key={row.id}>
+                                    <span className="ui-track__meal-food">{row.foodName}</span>
+                                    <span className="ui-track__meal-meta">
+                                      <span>
+                                        {row.quantity} {humanizeLabel(row.unit)}
+                                      </span>
+                                      <span>
+                                        {row.presented?.energyKcal != null
+                                          ? `${row.presented.energyKcal} kcal`
+                                          : "—"}
+                                      </span>
                                     </span>
+                                    {row.foodId ? (
+                                      <button
+                                        type="button"
+                                        className="ui-food-info-btn"
+                                        aria-label={`Nutrition facts for ${row.foodName}`}
+                                        onClick={() => setInfoFoodId(row.foodId!)}
+                                      >
+                                        <FoodInfoIcon />
+                                      </button>
+                                    ) : null}
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : null}
+                          </article>
+                        );
+                      })}
+                    </div>
+                  )}
+                </section>
+
+                <div className="ui-track__glance">
+                  <section className="ui-track__card ui-track__card--compact">
+                    <h3>Exercise</h3>
+                    {summary.exercise.entries.length === 0 ? (
+                      <p className="ui-muted ui-track__empty-line">No exercise logged</p>
+                    ) : (
+                      <ul className="ui-track__glance-list">
+                        {summary.exercise.entries.map((row) => (
+                          <li key={row.id}>
+                            <strong>{row.activityType}</strong>
+                            <span className="ui-muted">
+                              {row.durationMinutes} min
+                              {row.intensity ? ` · ${humanizeLabel(row.intensity)}` : ""}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </section>
+
+                  <section className="ui-track__card ui-track__card--compact">
+                    <h3>Sleep</h3>
+                    {summary.sleep?.durationMinutes != null ? (
+                      <div className="ui-track__sleep">
+                        <p className="ui-track__sleep-value">{formatSleep(summary.sleep.durationMinutes)}</p>
+                        <p className="ui-muted" style={{ margin: 0 }}>
+                          {summary.sleep.quality != null
+                            ? `Quality ${summary.sleep.quality}/5`
+                            : "Quality not rated"}
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="ui-muted ui-track__empty-line">No sleep logged</p>
+                    )}
+                  </section>
+
+                  <section className="ui-track__card ui-track__card--compact">
+                    <h3>Habits</h3>
+                    <p className="ui-track__habit-summary">
+                      {habitsTotal > 0
+                        ? `${habitsDone} of ${habitsTotal} completed`
+                        : "No habits assigned"}
+                    </p>
+                    {summary.habits.items.length > 0 ? (
+                      <ul className="ui-track__habits">
+                        {summary.habits.items.map((item) => (
+                          <li key={item.habitKey} className={item.completed ? "is-done" : undefined}>
+                            <span className="ui-track__habit-mark" aria-hidden="true">
+                              {item.completed ? "✓" : ""}
+                            </span>
+                            <span>{item.habitLabel}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </section>
+                </div>
+
+                <section className="ui-track__card">
+                  <button
+                    type="button"
+                    className="ui-track__assign-toggle"
+                    aria-expanded={habitsOpen}
+                    onClick={() => setHabitsOpen((v) => !v)}
+                  >
+                    <span>
+                      <strong>Assign habits</strong>
+                      <span className="ui-muted">
+                        {clientHabits.length} assigned · patient completes in portal
+                      </span>
+                    </span>
+                    <span aria-hidden="true">{habitsOpen ? "▾" : "▸"}</span>
+                  </button>
+                  {habitsOpen ? (
+                    <div className="ui-track__assign-body">
+                      <div className="ui-track__assign-actions">
+                        <Link href={libraryHref} className="ui-btn ui-btn--secondary ui-btn--sm">
+                          Habit library
+                        </Link>
+                      </div>
+                      {habitCatalog.length === 0 ? (
+                        <EmptyState
+                          title="Habit library is empty"
+                          action={
+                            <Link href={libraryHref} className="ui-btn ui-btn--primary ui-btn--sm">
+                              Create habits
+                            </Link>
+                          }
+                        >
+                          Create habits in the library first, then assign them here.
+                        </EmptyState>
+                      ) : (
+                        <>
+                          <div className="ui-track__assign">
+                            <Field label="Assign from library">
+                              <Select
+                                value={assignHabitId}
+                                onChange={(e) => onAssignHabitIdChange(e.target.value)}
+                                disabled={!allowManage || availableToAssign.length === 0}
+                              >
+                                <option value="">
+                                  {availableToAssign.length === 0
+                                    ? "All library habits assigned"
+                                    : "Select a habit…"}
+                                </option>
+                                {availableToAssign.map((habit) => (
+                                  <option key={habit.id} value={habit.id}>
+                                    {habit.name}
+                                    {habit.scope === "global" ? " (global)" : ""}
+                                  </option>
+                                ))}
+                              </Select>
+                            </Field>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="secondary"
+                              disabled={!assignHabitId || !allowManage}
+                              onClick={onAssignHabit}
+                            >
+                              Assign to client
+                            </Button>
+                          </div>
+                          {clientHabits.length === 0 ? (
+                            <p className="ui-muted" style={{ margin: "0.75rem 0 0" }}>
+                              No habits assigned to this client yet.
+                            </p>
+                          ) : (
+                            <ul className="ui-track__assigned">
+                              {clientHabits.map((habit) => (
+                                <li key={habit.habitDefinitionId}>
+                                  <span>
+                                    {habit.name}
+                                    {habit.targetValue != null
+                                      ? ` · ${habit.targetValue}${habit.targetUnit ? ` ${habit.targetUnit}` : ""}`
+                                      : ""}
                                   </span>
-                                  <span className="ui-log-stat">
-                                    <span className="ui-log-stat__label">Energy</span>
-                                    <span className="ui-log-stat__value">
-                                      {row.presented?.energyKcal != null
-                                        ? `${row.presented.energyKcal} kcal`
-                                        : "—"}
-                                    </span>
-                                  </span>
-                                  {row.foodId ? (
-                                    <button
+                                  {allowManage ? (
+                                    <Button
                                       type="button"
-                                      className="ui-food-info-btn"
-                                      aria-label={`Nutrition facts for ${row.foodName}`}
-                                      onClick={() => setInfoFoodId(row.foodId!)}
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => onRemoveHabit(habit.habitDefinitionId)}
                                     >
-                                      <FoodInfoIcon />
-                                    </button>
+                                      Remove
+                                    </Button>
                                   ) : null}
                                 </li>
                               ))}
                             </ul>
-                          ) : null}
-                        </article>
-                      );
-                    })}
-                  </div>
-                )}
-              </section>
-
-              <div className="ui-track__glance">
-                <section className="ui-track__card ui-track__card--compact">
-                  <h3>Exercise</h3>
-                  {summary.exercise.entries.length === 0 ? (
-                    <p className="ui-muted ui-track__empty-line">No exercise logged</p>
-                  ) : (
-                    <ul className="ui-track__glance-list">
-                      {summary.exercise.entries.map((row) => (
-                        <li key={row.id}>
-                          <strong>{row.activityType}</strong>
-                          <span className="ui-muted">
-                            {row.durationMinutes} min
-                            {row.intensity ? ` · ${humanizeLabel(row.intensity)}` : ""}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </section>
-
-                <section className="ui-track__card ui-track__card--compact">
-                  <h3>Sleep</h3>
-                  {summary.sleep?.durationMinutes != null ? (
-                    <div className="ui-track__sleep">
-                      <p className="ui-track__sleep-value">{formatSleep(summary.sleep.durationMinutes)}</p>
-                      <p className="ui-muted" style={{ margin: 0 }}>
-                        {summary.sleep.quality != null
-                          ? `Quality ${summary.sleep.quality}/5`
-                          : "Quality not rated"}
-                      </p>
+                          )}
+                        </>
+                      )}
                     </div>
-                  ) : (
-                    <p className="ui-muted ui-track__empty-line">No sleep logged</p>
-                  )}
-                </section>
-
-                <section className="ui-track__card ui-track__card--compact">
-                  <h3>Habits</h3>
-                  <p className="ui-track__habit-summary">
-                    {habitsTotal > 0
-                      ? `${habitsDone} of ${habitsTotal} completed`
-                      : "No habits assigned"}
-                  </p>
-                  {summary.habits.items.length > 0 ? (
-                    <ul className="ui-track__habits">
-                      {summary.habits.items.map((item) => (
-                        <li key={item.habitKey} className={item.completed ? "is-done" : undefined}>
-                          <span className="ui-track__habit-mark" aria-hidden="true">
-                            {item.completed ? "✓" : ""}
-                          </span>
-                          <span>{item.habitLabel}</span>
-                        </li>
-                      ))}
-                    </ul>
                   ) : null}
                 </section>
               </div>
-
-              <section className="ui-track__card">
-                <button
-                  type="button"
-                  className="ui-track__assign-toggle"
-                  aria-expanded={habitsOpen}
-                  onClick={() => setHabitsOpen((v) => !v)}
-                >
-                  <span>
-                    <strong>Assign habits</strong>
-                    <span className="ui-muted">
-                      {clientHabits.length} assigned · patient completes in portal
-                    </span>
-                  </span>
-                  <span aria-hidden="true">{habitsOpen ? "▾" : "▸"}</span>
-                </button>
-                {habitsOpen ? (
-                  <div className="ui-track__assign-body">
-                    <div className="ui-track__assign-actions">
-                      <Link href={libraryHref} className="ui-btn ui-btn--secondary ui-btn--sm">
-                        Habit library
-                      </Link>
-                    </div>
-                    {habitCatalog.length === 0 ? (
-                      <EmptyState
-                        title="Habit library is empty"
-                        action={
-                          <Link href={libraryHref} className="ui-btn ui-btn--primary ui-btn--sm">
-                            Create habits
-                          </Link>
-                        }
-                      >
-                        Create habits in the library first, then assign them here.
-                      </EmptyState>
-                    ) : (
-                      <>
-                        <div className="ui-track__assign">
-                          <Field label="Assign from library">
-                            <Select
-                              value={assignHabitId}
-                              onChange={(e) => onAssignHabitIdChange(e.target.value)}
-                              disabled={!allowManage || availableToAssign.length === 0}
-                            >
-                              <option value="">
-                                {availableToAssign.length === 0
-                                  ? "All library habits assigned"
-                                  : "Select a habit…"}
-                              </option>
-                              {availableToAssign.map((habit) => (
-                                <option key={habit.id} value={habit.id}>
-                                  {habit.name}
-                                  {habit.scope === "global" ? " (global)" : ""}
-                                </option>
-                              ))}
-                            </Select>
-                          </Field>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="secondary"
-                            disabled={!assignHabitId || !allowManage}
-                            onClick={onAssignHabit}
-                          >
-                            Assign to client
-                          </Button>
-                        </div>
-                        {clientHabits.length === 0 ? (
-                          <p className="ui-muted" style={{ margin: "0.75rem 0 0" }}>
-                            No habits assigned to this client yet.
-                          </p>
-                        ) : (
-                          <ul className="ui-track__assigned">
-                            {clientHabits.map((habit) => (
-                              <li key={habit.habitDefinitionId}>
-                                <span>
-                                  {habit.name}
-                                  {habit.targetValue != null
-                                    ? ` · ${habit.targetValue}${habit.targetUnit ? ` ${habit.targetUnit}` : ""}`
-                                    : ""}
-                                </span>
-                                {allowManage ? (
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => onRemoveHabit(habit.habitDefinitionId)}
-                                  >
-                                    Remove
-                                  </Button>
-                                ) : null}
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </>
-                    )}
-                  </div>
-                ) : null}
-              </section>
-            </div>
-          )}
+            )}
+          </div>
         </div>
+      </div>
 
-        <aside className="ui-track__activities" aria-label="Timeline">
-          <header className="ui-track__activities-head">
-            <h3>Timeline</h3>
-            <Select
-              value={activityFilter}
-              onChange={(e) => setActivityFilter(e.target.value as TimelineCategoryId)}
-              aria-label="Filter timeline"
-            >
-              {TIMELINE_CATEGORIES.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.label}
-                </option>
-              ))}
-            </Select>
-          </header>
+      <aside
+        className={`ui-clinical__rail${railHint.above ? " is-more-above" : ""}${railHint.below ? " is-more-below" : ""}`}
+        aria-label="Timeline and notes"
+      >
+        <div className="ui-clinical__rail-scroll" ref={railHint.ref}>
+          <section className="ui-clinical-rail">
+            <header className="ui-clinical-rail__head">
+              <h3>Timeline</h3>
+              <Select
+                value={activityFilter}
+                onChange={(e) => setActivityFilter(e.target.value as TimelineCategoryId)}
+                aria-label="Filter timeline"
+                className="ui-track__timeline-filter"
+              >
+                {TIMELINE_CATEGORIES.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.label}
+                  </option>
+                ))}
+              </Select>
+            </header>
 
-          <div className="ui-track__activities-scroll">
             {filteredActivities.length === 0 && !activitiesLoading ? (
               <EmptyState title="No events for this day">
                 Timeline updates for the selected date will appear here.
@@ -610,32 +616,31 @@ export function ClientTrackingPanel({
                 Loading timeline…
               </p>
             ) : null}
-          </div>
 
-          {activitiesHasNewer || activitiesHasOlder || activitiesPage > 1 ? (
-            <div className="ui-track__activities-pager">
-              <span className="ui-muted">Page {activitiesPage}</span>
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={activitiesLoading || !activitiesHasNewer}
-                onClick={onActivitiesNewer}
-              >
-                Newer
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={activitiesLoading || !activitiesHasOlder}
-                onClick={onActivitiesOlder}
-              >
-                {activitiesLoading ? "Loading…" : "Older"}
-              </Button>
-            </div>
-          ) : null}
+            {activitiesHasNewer || activitiesHasOlder || activitiesPage > 1 ? (
+              <div className="ui-track__activities-pager">
+                <span className="ui-muted">Page {activitiesPage}</span>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={activitiesLoading || !activitiesHasNewer}
+                  onClick={onActivitiesNewer}
+                >
+                  Newer
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={activitiesLoading || !activitiesHasOlder}
+                  onClick={onActivitiesOlder}
+                >
+                  {activitiesLoading ? "Loading…" : "Older"}
+                </Button>
+              </div>
+            ) : null}
+          </section>
 
           <ChartNotesSection
-            className="ui-clinical-rail ui-track__notes"
             dietitianAccountId={dietitianAccountId}
             clientId={clientId}
             kind="CLINICAL"
@@ -644,8 +649,9 @@ export function ClientTrackingPanel({
             allowManage={allowManage}
             onError={onError}
           />
-        </aside>
-      </div>
+        </div>
+      </aside>
+
       {infoFoodId ? (
         <FoodInformationDialog
           foodId={infoFoodId}

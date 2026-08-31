@@ -28,7 +28,7 @@ export class PortalDashboardService {
     const conversation = await this.conversations.getOrCreate(client);
     const [messages, unreadMessages, upcoming, recentNotifications, unreadNotificationCount, tracking, mealPlan, pendingAssessmentsCount] =
       await Promise.all([
-        this.conversations.listMessages(conversation.id, dietitianAccountId, userId, undefined, 5),
+        this.conversations.listMessages(conversation.id, dietitianAccountId, userId, undefined, 20),
         this.conversations.unreadCount(conversation.id, userId),
         this.prisma.appointment.findFirst({
           where: {
@@ -66,12 +66,16 @@ export class PortalDashboardService {
           }
         : null,
       messages: {
-        preview: messages.map((row) => ({
-          id: row.id,
-          body: row.body,
-          createdAt: row.createdAt,
-          senderUserId: row.senderUserId,
-        })),
+        // Soft-deleted messages keep an empty body for thread tombstones — don't surface those on home.
+        preview: messages
+          .filter((row) => !row.deleted && row.body.trim().length > 0)
+          .slice(-5)
+          .map((row) => ({
+            id: row.id,
+            body: row.body,
+            createdAt: row.createdAt,
+            senderUserId: row.senderUserId,
+          })),
         unreadCount: unreadMessages,
       },
       notifications: {

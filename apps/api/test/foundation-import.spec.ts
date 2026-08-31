@@ -9,7 +9,7 @@ describe("Foundation dataset conversion", () => {
     const dataset = datasetFromFoundationDump(fixturePath);
     expect(dataset.source.key).toBe("usda-fdc-foundation-curated");
     expect(dataset.source.datasetVersion).toBe("2026-04");
-    expect(dataset.foods).toHaveLength(2);
+    expect(dataset.foods).toHaveLength(3);
 
     const yogurt = dataset.foods.find((row) => row.sourceFoodId === "330137");
     expect(yogurt).toMatchObject({
@@ -28,5 +28,10 @@ describe("Foundation dataset conversion", () => {
     expect(broccoli?.name).toBe("Broccoli, raw");
     expect(broccoli?.fiberG).toBe(2.6);
     expect(broccoli?.extraNutrients?.vitaminCMg).toBe(89.2);
+
+    // Newer Foundation Foods publish kcal as nutrient 957/958 (not classic 208).
+    const oats = dataset.foods.find((row) => row.sourceFoodId === "2346396");
+    expect(oats?.energyKcal).toBe(382);
+    expect(oats?.proteinG).toBe(13.5);
   });
 });

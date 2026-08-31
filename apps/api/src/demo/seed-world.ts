@@ -12,6 +12,21 @@ import {
 } from "./constants";
 import { importDemoFoodCatalog, importDemoRecipes, type CatalogImportMode } from "./imports";
 import { seedPlatformBootstrap } from "./wipe";
+import {
+  applyAliceHarborSettings,
+  createEmmaRacePrepPlan,
+  emmaClinicalData,
+  emmaDateOfBirth,
+  EMMA_CHART_NOTES,
+  HARBOR_DOCUMENT_BODY,
+  HARBOR_INTAKE_RESPONSES,
+  HARBOR_INTAKE_SCHEMA,
+  pickHarborPantry,
+  completeHarborPantryNutrition,
+  seedEmmaAppointments,
+  seedEmmaMessages,
+  seedEmmaTracking,
+} from "./seed-harbor-demo";
 
 export type SeedDemoOptions = {
   /** full = curated foods + starter recipes; sample = small food set; none = hand foods only */
@@ -279,6 +294,8 @@ async function createClientWithPortal(
     email: string;
     passwordHash: string;
     sex?: "FEMALE" | "MALE" | "OTHER" | "UNSPECIFIED";
+    dateOfBirth?: Date;
+    phone?: string;
     notes?: string;
     allergies?: string;
     intolerances?: string;
@@ -287,6 +304,9 @@ async function createClientWithPortal(
     emergencyContactName?: string;
     emergencyContactPhone?: string;
     goalTitle?: string;
+    goalDescription?: string;
+    goalTargetValue?: number;
+    goalTargetUnit?: string;
     tags?: string[];
     chartNotes?: Array<{
       kind: "CLINICAL" | "MEAL" | "EATING_HABIT" | "PREGNANCY";
@@ -314,6 +334,8 @@ async function createClientWithPortal(
       lastName: input.lastName,
       displayName: `${input.firstName} ${input.lastName}`,
       email: input.email,
+      phone: input.phone ?? null,
+      dateOfBirth: input.dateOfBirth ?? null,
       sex: input.sex ?? "UNSPECIFIED",
       status: "ACTIVE",
       createdById: input.createdById,
@@ -348,6 +370,9 @@ async function createClientWithPortal(
         dietitianAccountId: input.dietitianAccountId,
         clientId: client.id,
         title: input.goalTitle,
+        description: input.goalDescription ?? null,
+        targetValue: input.goalTargetValue ?? null,
+        targetUnit: input.goalTargetUnit ?? null,
         status: "ACTIVE",
         targetDate: daysFromNow(90),
         createdById: input.createdById,
@@ -552,6 +577,7 @@ export async function seedDemoWorld(
   const aliceId = await ensurePractice(prisma, aliceUser.id, DEMO_PRACTICES.alice);
   const bobId = await ensurePractice(prisma, bobUser.id, DEMO_PRACTICES.bob);
   const charlieId = await ensurePractice(prisma, charlieUser.id, DEMO_PRACTICES.charlie);
+  await applyAliceHarborSettings(prisma, aliceId);
 
   await ensureSubscription(prisma, aliceId, DEMO_PRACTICES.alice.planSlug);
   await ensureSubscription(prisma, bobId, DEMO_PRACTICES.bob.planSlug);
@@ -648,6 +674,47 @@ export async function seedDemoWorld(
       importedAt: new Date(),
     },
   });
+  const aliceElectrolyte = await prisma.food.create({
+    data: {
+      foodSourceId: customSource.id,
+      sourceFoodId: randomUUID(),
+      dietitianAccountId: aliceId,
+      name: "Harbor Electrolyte Mix",
+      nameNormalized: "harbor electrolyte mix",
+      status: "ACTIVE",
+      referenceQuantity: 100,
+      referenceUnit: "ml",
+      energyKcal: 12,
+      proteinG: 0,
+      carbohydrateG: 3,
+      fatG: 0,
+      fiberG: 0,
+      sugarG: 2.5,
+      sodiumMg: 220,
+      servingDescription: "100 ml prepared",
+      importedAt: new Date(),
+    },
+  });
+  const aliceOil = await prisma.food.create({
+    data: {
+      foodSourceId: customSource.id,
+      sourceFoodId: randomUUID(),
+      dietitianAccountId: aliceId,
+      name: "Harbor Extra Virgin Olive Oil",
+      nameNormalized: "harbor extra virgin olive oil",
+      status: "ACTIVE",
+      referenceQuantity: 100,
+      referenceUnit: "g",
+      energyKcal: 884,
+      proteinG: 0,
+      carbohydrateG: 0,
+      fatG: 100,
+      fiberG: 0,
+      servingDescription: "1 tsp ≈ 5 g",
+      importedAt: new Date(),
+    },
+  });
+  const harborPantry = await pickHarborPantry(prisma, catalogFood, aliceCustom, aliceElectrolyte, aliceOil);
   const bobCustom = await prisma.food.create({
     data: {
       foodSourceId: customSource.id,
@@ -668,15 +735,7 @@ export async function seedDemoWorld(
     },
   });
 
-  await prisma.foodOverride.create({
-    data: {
-      dietitianAccountId: aliceId,
-      foodId: catalogFood.id,
-      status: "ACTIVE",
-      energyKcal: Number(catalogFood.energyKcal ?? 100) + 5,
-      createdById: aliceUser.id,
-    },
-  });
+  await completeHarborPantryNutrition(prisma, aliceId, aliceUser.id, harborPantry);
 
   const aliceRecipe = await prisma.recipe.create({
     data: {
@@ -684,23 +743,42 @@ export async function seedDemoWorld(
       name: "Harbor Power Bowl",
       status: "ACTIVE",
       servings: 2,
-      description: "Alice practice recipe — should never appear in Bob’s library",
+      description:
+        "Alice’s go-to training bowl for Emma: rice, roasted chicken, broccoli, olive oil. Double batch for lunch leftovers.",
+      instructions:
+        "Cook rice. Sear chicken. Steam broccoli. Toss with olive oil and a pinch of salt. Pack half for lunch, half for dinner on strength days.",
       createdById: aliceUser.id,
       ingredients: {
         create: [
           {
             dietitianAccountId: aliceId,
-            foodId: catalogFood.id,
-            quantity: 150,
+            foodId: harborPantry.rice.id,
+            quantity: 70,
             unit: "g",
             sortOrder: 0,
+            displayNote: "Cooked rice",
           },
           {
             dietitianAccountId: aliceId,
-            foodId: aliceCustom.id,
-            quantity: 40,
+            foodId: harborPantry.chicken.id,
+            quantity: 120,
             unit: "g",
             sortOrder: 1,
+            displayNote: "Roasted breast",
+          },
+          {
+            dietitianAccountId: aliceId,
+            foodId: harborPantry.broccoli.id,
+            quantity: 100,
+            unit: "g",
+            sortOrder: 2,
+          },
+          {
+            dietitianAccountId: aliceId,
+            foodId: harborPantry.oil.id,
+            quantity: 8,
+            unit: "g",
+            sortOrder: 3,
           },
         ],
       },
@@ -743,83 +821,27 @@ export async function seedDemoWorld(
     email: DEMO_EMAILS.patients.emma,
     passwordHash,
     sex: "FEMALE",
-    notes: "Marathon training — Harbor Nutrition only",
-    allergies: "Seasonal pollen (mild)",
+    dateOfBirth: emmaDateOfBirth(),
+    phone: "+1 415 555 0188",
+    notes:
+      "Marathon training — Harbor Nutrition only. Product designer at Northbeam. Partner Sam shares dinners. Peak block into taper.",
+    allergies: "Seasonal pollen (mild) — not food",
     intolerances: "None known",
-    lifestyle: "Runs 5–6 days/week; early wake for long runs",
+    lifestyle: "Runs 5–6 days/week; 5:15 wake on long-run Sundays; hybrid desk job Tue–Thu",
     emergencyContactName: "Sam Parent",
     emergencyContactPhone: "+1 415 555 0142",
-    clinicalData: {
-      visit: {
-        reason: "Race fueling and recovery for spring marathon",
-        expectations: "Stable energy on long runs; avoid GI issues",
-        clinicalAims: "sports",
-        clinicalAimsNotes: "Race weight and carb timing",
-        other: "Prefers evening check-ins after training",
-      },
-      lifestyle: {
-        bowelHabits: "regular",
-        bowelHabitsNotes: "Usually morning; stress before races can disrupt",
-        sleepQuality: "fair",
-        sleepQualityNotes: "6.5–7h; wakes early on long-run days",
-        smoking: "never",
-        smokingNotes: "",
-        alcohol: "occasional",
-        alcoholNotes: "Rare social drinks only",
-        maritalStatus: "partnered",
-        maritalStatusNotes: "",
-        physicalActivity: "vigorous",
-        physicalActivityNotes: "Marathon block: long run + tempo + strength 2x",
-        background: "",
-        other: "Works hybrid office; desk most afternoons",
-      },
-      health: {
-        conditions: "",
-        conditionsNotes: "No chronic diagnoses",
-        medication: "None",
-        personalHistory: "Prior shin splints resolved",
-        familyHistory: "Maternal type 2 diabetes",
-        other: "",
-      },
-      eating: {
-        usualWakeTime: "05:30",
-        usualBedTime: "22:00",
-        dietTypes: "",
-        dietTypesNotes: "High carb around long runs",
-        preferredFoods: "Oats, banana, rice, yogurt, chicken",
-        dislikedFoods: "Heavy cream sauces before runs",
-        allergies: "",
-        allergiesNotes: "Seasonal pollen only",
-        intolerances: "",
-        intolerancesNotes: "",
-      },
-      nutrition: {
-        deficiencies: "",
-        deficienciesNotes: "Ferritin monitored annually",
-        waterIntake: "about_2_3l",
-        other: "Electrolytes on runs over 90 minutes",
-      },
-    },
+    clinicalData: emmaClinicalData(),
     goalTitle: "Race weight 58 kg",
+    goalDescription: "Arrive at the marathon start at 58 kg without losing hill power. Sub-3:30 Boston attempt.",
+    goalTargetValue: 58,
+    goalTargetUnit: "kg",
     tags: ["athlete", "harbor-priority"],
-    chartNotes: [
-      {
-        kind: "CLINICAL",
-        body: "Discussed carb loading plan for race weekend; keep fiber moderate day before.",
-        notedAt: daysAgo(5),
-      },
-      {
-        kind: "MEAL",
-        body: "Oats + banana + honey; tolerated well on long-run morning.",
-        mealSlot: "BREAKFAST",
-        notedAt: daysAgo(3),
-      },
-      {
-        kind: "EATING_HABIT",
-        body: "Tends to under-fuel mid-afternoon on desk days — add snack before evening session.",
-        notedAt: daysAgo(2),
-      },
-    ],
+    chartNotes: EMMA_CHART_NOTES.map((note) => ({
+      kind: note.kind,
+      body: note.body,
+      mealSlot: note.mealSlot,
+      notedAt: daysAgo(note.daysAgo),
+    })),
   });
   const james = await createClientWithPortal(prisma, {
     dietitianAccountId: aliceId,
@@ -1288,6 +1310,121 @@ export async function seedDemoWorld(
       recordedById: aliceUser.id,
     },
   });
+  for (const [days, waist, hips, fat] of [
+    [28, 74.2, 99.4, 29.6],
+    [21, 73.4, 99.0, 29.1],
+    [14, 72.8, 98.4, 28.8],
+    [0, 71.6, 97.6, 27.9],
+  ] as const) {
+    await prisma.clientMeasurement.createMany({
+      data: [
+        {
+          dietitianAccountId: aliceId,
+          clientId: emma.client.id,
+          type: "WAIST",
+          value: waist,
+          unit: "cm",
+          measuredAt: daysAgo(days),
+          recordedById: aliceUser.id,
+        },
+        {
+          dietitianAccountId: aliceId,
+          clientId: emma.client.id,
+          type: "HIPS",
+          value: hips,
+          unit: "cm",
+          measuredAt: daysAgo(days),
+          recordedById: aliceUser.id,
+        },
+        {
+          dietitianAccountId: aliceId,
+          clientId: emma.client.id,
+          type: "BODY_FAT",
+          value: fat,
+          unit: "%",
+          measuredAt: daysAgo(days),
+          recordedById: aliceUser.id,
+        },
+      ],
+    });
+  }
+  for (const [days, arm, thigh, chest] of [
+    [40, 26.2, 54.8, 86.4],
+    [7, 26.0, 54.1, 85.8],
+  ] as const) {
+    await prisma.clientMeasurement.createMany({
+      data: [
+        {
+          dietitianAccountId: aliceId,
+          clientId: emma.client.id,
+          type: "ARM",
+          value: arm,
+          unit: "cm",
+          measuredAt: daysAgo(days),
+          recordedById: aliceUser.id,
+        },
+        {
+          dietitianAccountId: aliceId,
+          clientId: emma.client.id,
+          type: "THIGH",
+          value: thigh,
+          unit: "cm",
+          measuredAt: daysAgo(days),
+          recordedById: aliceUser.id,
+        },
+        {
+          dietitianAccountId: aliceId,
+          clientId: emma.client.id,
+          type: "CHEST",
+          value: chest,
+          unit: "cm",
+          measuredAt: daysAgo(days),
+          recordedById: aliceUser.id,
+        },
+      ],
+    });
+  }
+  await prisma.clientMeasurement.createMany({
+    data: [
+      {
+        dietitianAccountId: aliceId,
+        clientId: emma.client.id,
+        type: "CHOLESTEROL_TOTAL",
+        value: 178,
+        unit: "mg/dL",
+        measuredAt: daysAgo(40),
+        recordedById: aliceUser.id,
+        notes: "Intake labs",
+      },
+      {
+        dietitianAccountId: aliceId,
+        clientId: emma.client.id,
+        type: "CHOLESTEROL_HDL",
+        value: 62,
+        unit: "mg/dL",
+        measuredAt: daysAgo(40),
+        recordedById: aliceUser.id,
+      },
+      {
+        dietitianAccountId: aliceId,
+        clientId: emma.client.id,
+        type: "CHOLESTEROL_LDL",
+        value: 98,
+        unit: "mg/dL",
+        measuredAt: daysAgo(40),
+        recordedById: aliceUser.id,
+      },
+      {
+        dietitianAccountId: aliceId,
+        clientId: emma.client.id,
+        type: "TRIGLYCERIDES",
+        value: 85,
+        unit: "mg/dL",
+        measuredAt: daysAgo(40),
+        recordedById: aliceUser.id,
+      },
+    ],
+  });
   for (const [week, weight] of [
     [28, 98.2],
     [21, 96.5],
@@ -1313,22 +1450,11 @@ export async function seedDemoWorld(
     data: {
       dietitianAccountId: aliceId,
       name: "Harbor Intake",
-      description: "Initial lifestyle & training assessment",
+      description: "Initial lifestyle, training load, and race-fueling assessment",
       status: "ACTIVE",
       version: 1,
       createdById: aliceUser.id,
-      schema: {
-        sections: [
-          {
-            id: "main",
-            title: "Lifestyle",
-            questions: [
-              { id: "goal", type: "TEXT", label: "Primary nutrition goal", required: true, active: true },
-              { id: "energy", type: "NUMBER", label: "Energy 1–10", required: false, active: true },
-            ],
-          },
-        ],
-      },
+      schema: HARBOR_INTAKE_SCHEMA as Prisma.InputJsonValue,
     },
   });
   const schemaSnapshot = aliceTemplate.schema;
@@ -1340,7 +1466,7 @@ export async function seedDemoWorld(
       templateVersion: 1,
       status: "COMPLETED",
       schemaSnapshot: schemaSnapshot as Prisma.InputJsonValue,
-      responses: { goal: "Run Boston marathon strong", energy: 8 } as Prisma.InputJsonValue,
+      responses: HARBOR_INTAKE_RESPONSES as Prisma.InputJsonValue,
       startedAt: daysAgo(30),
       completedAt: daysAgo(29),
       createdById: aliceUser.id,
@@ -1354,21 +1480,23 @@ export async function seedDemoWorld(
       templateVersion: 1,
       status: "IN_PROGRESS",
       schemaSnapshot: schemaSnapshot as Prisma.InputJsonValue,
-      responses: { goal: "Hold race weight through taper" } as Prisma.InputJsonValue,
+      responses: {
+        goal: "Hold race weight through taper",
+        energy: 7,
+        long_run: "28 km yesterday",
+        sleep: 7,
+      } as Prisma.InputJsonValue,
       startedAt: daysAgo(1),
       createdById: aliceUser.id,
     },
   });
 
   // Meal plans: Emma 14-day published + draft; Noah 7-day; Ava 21-day draft; shared Alice/Bob different plans
-  const emmaPlan = await createPublishedPlan(prisma, {
+  const emmaPlan = await createEmmaRacePrepPlan(prisma, {
     dietitianAccountId: aliceId,
     clientId: emma.client.id,
     createdById: aliceUser.id,
-    name: "Emma Race Prep — 14 days",
-    dayCount: 14,
-    foodId: catalogFood.id,
-    foodName: catalogFood.name,
+    pantry: harborPantry,
     recipeId: aliceRecipe.id,
     recipeName: aliceRecipe.name,
   });
@@ -1431,184 +1559,20 @@ export async function seedDemoWorld(
     foodName: catalogFood.name,
   });
 
-  // Tracking for Emma
-  const habits = await prisma.habitDefinition.findMany({
-    where: { dietitianAccountId: null, active: true },
-    take: 3,
-  });
-  for (const habit of habits) {
-    await prisma.clientHabitAssignment.create({
-      data: {
-        dietitianAccountId: aliceId,
-        clientId: emma.client.id,
-        habitDefinitionId: habit.id,
-        active: true,
-      },
-    });
-    for (let i = 0; i < 14; i++) {
-      if (i % 3 === 0) continue;
-      await prisma.habitLog.create({
-        data: {
-          dietitianAccountId: aliceId,
-          clientId: emma.client.id,
-          habitDefinitionId: habit.id,
-          habitKey: habit.name.toLowerCase().replace(/\s+/g, "_"),
-          habitLabel: habit.name,
-          logDate: dateOnly(daysAgo(i)),
-          completed: true,
-        },
-      });
-    }
-  }
-
-  for (let i = 0; i < 14; i++) {
-    const day = daysAgo(i);
-    await prisma.foodLog.create({
-      data: {
-        dietitianAccountId: aliceId,
-        clientId: emma.client.id,
-        foodId: catalogFood.id,
-        displayName: catalogFood.name,
-        quantity: 120,
-        unit: "g",
-        consumedAt: day,
-        trackingDate: dateOnly(day),
-        mealCategory: i % 2 === 0 ? "BREAKFAST" : "LUNCH",
-        nutritionSnapshot: foodLogNutritionSnapshotV1({
-          foodId: catalogFood.id,
-          foodName: catalogFood.name,
-          quantity: 120,
-          unit: "g",
-          nutrition: {
-            energyKcal: 198,
-            proteinG: 37,
-            carbohydrateG: 0,
-            fatG: 4,
-          },
-        }) as unknown as Prisma.InputJsonValue,
-      },
-    });
-    await prisma.waterLog.create({
-      data: {
-        dietitianAccountId: aliceId,
-        clientId: emma.client.id,
-        amountMl: 1800 + i * 50,
-        loggedAt: day,
-        trackingDate: dateOnly(day),
-      },
-    });
-    await prisma.exerciseLog.create({
-      data: {
-        dietitianAccountId: aliceId,
-        clientId: emma.client.id,
-        activityType: i % 2 === 0 ? "Easy run" : "Strength circuit",
-        durationMinutes: 35 + i,
-        intensity: i % 2 === 0 ? "MODERATE" : "HIGH",
-        performedAt: day,
-        trackingDate: dateOnly(day),
-      },
-    });
-    await prisma.sleepLog.create({
-      data: {
-        dietitianAccountId: aliceId,
-        clientId: emma.client.id,
-        date: dateOnly(day),
-        durationMinutes: Math.round((6.5 + (i % 4) * 0.25) * 60),
-        quality: 3 + (i % 3),
-      },
-    });
-  }
-
-  // Planned meal log snapshot (immutable history)
-  await prisma.foodLog.create({
-    data: {
-      dietitianAccountId: aliceId,
-      clientId: emma.client.id,
-      displayName: "Planned breakfast from race prep",
-      sourceType: "PLANNED_MEAL",
-      sourceMealPlanVersionId: emmaPlan.versionId,
-      servingsLogged: 1,
-      quantity: 1,
-      unit: "serving",
-      consumedAt: daysAgo(1),
-      trackingDate: dateOnly(daysAgo(1)),
-      mealCategory: "BREAKFAST",
-      nutritionSnapshot: foodLogNutritionSnapshotV2({
-        mealId: "demo-planned-breakfast",
-        mealName: "Planned breakfast from race prep",
-        mealPlanVersionId: emmaPlan.versionId,
-        nutrition: {
-          energyKcal: 420,
-          proteinG: 32,
-          carbohydrateG: 40,
-          fatG: 12,
-          fiberG: 6,
-        },
-      }) as unknown as Prisma.InputJsonValue,
-    },
+  await seedEmmaTracking(prisma, {
+    dietitianAccountId: aliceId,
+    clientId: emma.client.id,
+    pantry: harborPantry,
+    planVersionId: emmaPlan.versionId,
+    breakfastMealId: emmaPlan.breakfastMealId ?? undefined,
   });
 
   // Appointments
-  await prisma.appointment.create({
-    data: {
-      dietitianAccountId: aliceId,
-      clientId: emma.client.id,
-      assignedUserId: aliceUser.id,
-      title: "Race prep check-in",
-      category: "FOLLOW_UP",
-      startAt: daysAgo(3),
-      endAt: new Date(daysAgo(3).getTime() + 45 * 60_000),
-      status: "COMPLETED",
-      createdById: aliceUser.id,
-    },
-  });
-  await prisma.appointment.create({
-    data: {
-      dietitianAccountId: aliceId,
-      clientId: emma.client.id,
-      assignedUserId: aliceUser.id,
-      title: "Today — fueling review",
-      category: "CONSULTATION",
-      startAt: (() => {
-        const d = new Date();
-        d.setUTCHours(15, 0, 0, 0);
-        return d;
-      })(),
-      endAt: (() => {
-        const d = new Date();
-        d.setUTCHours(16, 0, 0, 0);
-        return d;
-      })(),
-      status: "SCHEDULED",
-      createdById: aliceUser.id,
-    },
-  });
-  await prisma.appointment.create({
-    data: {
-      dietitianAccountId: aliceId,
-      clientId: emma.client.id,
-      assignedUserId: aliceUser.id,
-      title: "Taper week planning",
-      category: "MEAL_PLAN",
-      startAt: daysFromNow(5),
-      endAt: new Date(daysFromNow(5).getTime() + 60 * 60_000),
-      status: "SCHEDULED",
-      createdById: aliceUser.id,
-    },
-  });
-  await prisma.appointment.create({
-    data: {
-      dietitianAccountId: aliceId,
-      clientId: emma.client.id,
-      assignedUserId: aliceUser.id,
-      title: "Consultation request",
-      category: "CONSULTATION",
-      startAt: daysFromNow(8),
-      endAt: new Date(daysFromNow(8).getTime() + 45 * 60_000),
-      status: "REQUESTED",
-      notes: "Patient requested a visit from the portal.",
-      createdById: emma.user.id,
-    },
+  await seedEmmaAppointments(prisma, {
+    dietitianAccountId: aliceId,
+    aliceUserId: aliceUser.id,
+    emmaClientId: emma.client.id,
+    emmaUserId: emma.user.id,
   });
   await prisma.appointment.create({
     data: {
@@ -1642,60 +1606,11 @@ export async function seedDemoWorld(
   });
 
   // Messaging
-  const emmaConvo = await prisma.conversation.create({
-    data: {
-      dietitianAccountId: aliceId,
-      clientId: emma.client.id,
-      status: "ACTIVE",
-    },
-  });
-  await prisma.message.createMany({
-    data: [
-      {
-        conversationId: emmaConvo.id,
-        dietitianAccountId: aliceId,
-        clientId: emma.client.id,
-        senderUserId: aliceUser.id,
-        body: "Emma — great splits this week. Keep carbs high on long-run days.",
-        createdAt: hoursAgo(50),
-      },
-      {
-        conversationId: emmaConvo.id,
-        dietitianAccountId: aliceId,
-        clientId: emma.client.id,
-        senderUserId: emma.user.id,
-        body: "Thanks! Should I bump the evening snack before Saturday’s 28k?",
-        createdAt: hoursAgo(26),
-      },
-      {
-        conversationId: emmaConvo.id,
-        dietitianAccountId: aliceId,
-        clientId: emma.client.id,
-        senderUserId: aliceUser.id,
-        body: "Yes — add 30–40g carbs. I’ll tweak the plan tonight.",
-        createdAt: hoursAgo(4),
-      },
-    ],
-  });
-  const emmaLast = await prisma.message.findFirstOrThrow({
-    where: { conversationId: emmaConvo.id },
-    orderBy: { createdAt: "desc" },
-  });
-  await prisma.conversation.update({
-    where: { id: emmaConvo.id },
-    data: {
-      lastMessageId: emmaLast.id,
-      lastMessageAt: emmaLast.createdAt,
-      lastMessagePreview: emmaLast.body.slice(0, 120),
-    },
-  });
-  await prisma.conversationReadState.create({
-    data: {
-      conversationId: emmaConvo.id,
-      readerUserId: aliceUser.id,
-      dietitianAccountId: aliceId,
-      lastReadAt: hoursAgo(48),
-    },
+  const { conversationId: emmaConvoId } = await seedEmmaMessages(prisma, {
+    dietitianAccountId: aliceId,
+    clientId: emma.client.id,
+    aliceUserId: aliceUser.id,
+    emmaUserId: emma.user.id,
   });
 
   const noahConvo = await prisma.conversation.create({
@@ -1739,9 +1654,9 @@ export async function seedDemoWorld(
         clientId: emma.client.id,
         type: "NEW_MESSAGE",
         title: "New message from Emma",
-        body: "Thanks! Should I bump the evening snack…",
+        body: "Perfect. Sleep was 7h last night. Weight this morning 59.9…",
         targetType: "conversation",
-        targetId: emmaConvo.id,
+        targetId: emmaConvoId,
       },
       {
         dietitianAccountId: bobId,
@@ -1770,7 +1685,9 @@ export async function seedDemoWorld(
     dietitianAccountId: aliceId,
     clientId: emma.client.id,
     uploadedByUserId: aliceUser.id,
-    label: "harbor",
+    label: "harbor-race-prep",
+    filename: "Emma-Rodriguez-race-prep-notes.txt",
+    body: HARBOR_DOCUMENT_BODY,
   });
   await seedDocuments(prisma, {
     dietitianAccountId: bobId,
@@ -1799,10 +1716,19 @@ export async function seedDemoWorld(
       {
         dietitianAccountId: aliceId,
         clientId: emma.client.id,
-        title: "Review Emma long-run fueling",
+        title: "Pack Emma race-vest grocery list",
         status: "TODO",
         priority: "HIGH",
         dueAt: daysFromNow(1),
+        createdById: aliceUser.id,
+      },
+      {
+        dietitianAccountId: aliceId,
+        clientId: emma.client.id,
+        title: "Review Sunday 32k fueling log",
+        status: "COMPLETED",
+        priority: "NORMAL",
+        completedAt: daysAgo(2),
         createdById: aliceUser.id,
       },
       {
@@ -2271,6 +2197,8 @@ async function seedDocuments(
     clientId: string;
     uploadedByUserId: string;
     label: string;
+    filename?: string;
+    body?: string;
   },
 ) {
   const storageRoot = process.env.FILE_STORAGE_PATH
@@ -2286,7 +2214,8 @@ async function seedDocuments(
   );
   const absolute = path.join(storageRoot, storageKey);
   await mkdir(path.dirname(absolute), { recursive: true });
-  const body = `Demo ${input.label} nutrition notes for client ${input.clientId}\n`;
+  const body = input.body ?? `Demo ${input.label} nutrition notes for client ${input.clientId}\n`;
+  const filename = input.filename ?? `${input.label}-notes.txt`;
   await writeFile(absolute, body, "utf8");
   await prisma.document.create({
     data: {
@@ -2294,8 +2223,8 @@ async function seedDocuments(
       dietitianAccountId: input.dietitianAccountId,
       clientId: input.clientId,
       uploadedByUserId: input.uploadedByUserId,
-      filename: `${input.label}-notes.txt`,
-      originalFilename: `${input.label}-notes.txt`,
+      filename,
+      originalFilename: filename,
       storageKey,
       mimeType: "text/plain",
       sizeBytes: BigInt(Buffer.byteLength(body)),
@@ -2359,7 +2288,10 @@ async function seedInvoices(
       data: {
         invoiceId: invoice.id,
         dietitianAccountId: input.dietitianAccountId,
-        description: "Nutrition consultation (60 min)",
+        description:
+          input.prefix === "HN"
+            ? "Race-prep follow-up (45 min)"
+            : "Nutrition consultation (60 min)",
         quantity: 1,
         unitPrice: 150,
         lineTotal: 150,

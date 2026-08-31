@@ -150,7 +150,9 @@ export default function ClientHomePage() {
     `${me?.client.firstName ?? ""} ${me?.client.lastName ?? ""}`.trim() ||
     "there";
   const firstName = name.split(" ")[0] ?? name;
-  const latestMessage = data?.messages.preview[data.messages.preview.length - 1];
+  const latestMessage = [...(data?.messages.preview ?? [])]
+    .reverse()
+    .find((row) => row.body.trim().length > 0);
   const dietitian = me?.dietitian ?? null;
   const dietitianName = dietitian?.name?.trim() || me?.dietitianDisplayName?.trim() || "";
   const dietitianMeta = [dietitian?.title, dietitian?.specialization].filter(Boolean).join(" · ");
