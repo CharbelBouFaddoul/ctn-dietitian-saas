@@ -58,7 +58,7 @@ const FEATURE_GROUPS: Array<{
     keys: ["MESSAGING", "APPOINTMENTS", "DOCUMENTS", "ASSESSMENTS", "TRACKING"],
     label: (features) =>
       hasAny(features, ["MESSAGING", "APPOINTMENTS", "DOCUMENTS", "ASSESSMENTS", "TRACKING"])
-        ? "Messaging, appointments, tracking & documents"
+        ? "Messaging, appointments, custom forms, tracking & documents"
         : null,
   },
   {

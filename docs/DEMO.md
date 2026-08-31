@@ -54,8 +54,9 @@ DEMO_ALLOW_RESET=1 pnpm demo:reset -- --sample-catalog
 
 - Emma Rodriguez, James Chen, Olivia Park, Daniel Kim  
 - Maya Thompson (shared)  
+- Emma: emergency contact, a **requested** consultation, completed + in-progress Harbor Intake forms  
 - Client limit **override = 6** (near-limit demo)  
-- AI / automation **off** (Standard)
+- AI / automation **off** on the Standard plan (AI catalog feature is active for Pro/Premium)
 
 **Cedar Wellness (Bob / Pro)**
 
@@ -90,3 +91,20 @@ Demo seed creates AI usage rows only when `AI_ENABLED=true`. UI AI requires env 
 ## Credentials policy
 
 These accounts are **development-only**. Never use them in production. Never commit real secrets.
+
+## Copy this database to another environment
+
+`demo:reset` is refused when `NODE_ENV=production`. To copy the **local** world (users, clinics, food catalog, logs, admin plans) onto a deploy:
+
+```bash
+./scripts/export-local-db.sh
+# produces backups/local-db-<timestamp>.sql
+```
+
+On the target Postgres (after the API has applied migrations):
+
+```bash
+psql "$DATABASE_URL" < backups/local-db-<timestamp>.sql
+```
+
+That SQL includes the admin catalog (plans and features) as they exist locally. Uploaded files are not in the SQL dump — use `scripts/backup.sh` if you also need `FILE_STORAGE_PATH`.

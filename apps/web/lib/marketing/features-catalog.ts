@@ -137,7 +137,8 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     audience: "dietitian",
     category: "Nutrition libraries",
     title: "Food catalog & custom foods",
-    summary: "Search the food catalog and add custom foods for your practice.",
+    summary:
+      "Search multi-source catalog foods and add practice custom foods. Open full nutrition facts (macros and micros) from search or a logged item.",
   },
   {
     id: "d-habits",
@@ -153,7 +154,8 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     audience: "dietitian",
     category: "Tracking",
     title: "Review client tracking",
-    summary: "See food, water, exercise, sleep, and habit logs your clients record in the portal.",
+    summary:
+      "See labeled food, water, exercise, sleep, and habit logs. Open nutrition facts for any catalog or custom food in the diary.",
     highlight: true,
   },
 
@@ -163,7 +165,8 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     audience: "dietitian",
     category: "Appointments",
     title: "Schedule & reschedule",
-    summary: "Schedule, cancel, and reschedule appointments, including patient portal requests.",
+    summary:
+      "Schedule, cancel, and reschedule appointments, including patient visit requests and reschedule or cancellation requests from the portal.",
   },
   {
     id: "d-calendar",
@@ -195,8 +198,9 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     id: "d-invoices",
     audience: "dietitian",
     category: "Invoices",
-    title: "Invoices & printable PDF",
-    summary: "Draft, issue, send, mark paid, overdue, or cancel — plus printable invoice PDFs. No built-in payment gateway.",
+    title: "Invoices, quotations & printable PDF",
+    summary:
+      "Draft quotations, issue invoices, send, mark paid, overdue, or cancel. Preview the paper document and print or save as PDF. No built-in payment gateway.",
   },
 
   // Tasks
@@ -217,7 +221,6 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     summary: "Track period rates, revenue trends, invoice mix, and client tracking activity with vs-prior-period deltas.",
   },
 
-  // AI — catalog feature is seeded INACTIVE (hidden on /features until re-enabled).
   {
     id: "d-ai",
     audience: "dietitian",
@@ -226,7 +229,7 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     summary:
       "Optional plan capability for client summaries, meal-plan help, nutrition assistance, consultation notes, and message drafts.",
     entitlementKey: "AI",
-    highlight: false,
+    highlight: true,
   },
 
   // Automations
@@ -255,7 +258,8 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     audience: "patient",
     category: "Home",
     title: "Personal dashboard",
-    summary: "Next appointment, today’s tracking, meal plan snapshot, messages, and notifications.",
+    summary:
+      "Next appointment, today’s tracking, meal plan snapshot, messages, a live pending-forms count, and notifications from the bell.",
     highlight: true,
   },
 
@@ -275,7 +279,8 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     audience: "patient",
     category: "Tracking",
     title: "Daily food log",
-    summary: "Log food from the catalog and clinic foods with portions and meals; browse any past date.",
+    summary:
+      "Search and add food on the same page (quantity, unit, filters, and nutrition columns), open full nutrition facts, and browse any past date.",
     highlight: true,
   },
   {
@@ -329,7 +334,8 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     audience: "patient",
     category: "Assessments",
     title: "Complete & submit forms",
-    summary: "Complete custom forms assigned by your dietitian; save progress and submit when ready — separate from clinic chart notes.",
+    summary:
+      "Complete custom forms assigned by your dietitian; save progress and submit when ready. The Forms badge updates live as forms are assigned or submitted.",
   },
 
   // Messages
@@ -348,7 +354,7 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     audience: "patient",
     category: "Appointments",
     title: "Appointments & requests",
-    summary: "View upcoming and past appointments; request reschedule or cancellation.",
+    summary: "View upcoming and past appointments; request a new visit, or ask to reschedule or cancel.",
   },
 
   // Documents
@@ -366,7 +372,8 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     audience: "patient",
     category: "Billing",
     title: "Invoices & printable PDF",
-    summary: "View invoices issued by your clinic and open printable PDFs. Online payment is not built in.",
+    summary:
+      "View invoices and quotations from your clinic in a document preview, then print or save as PDF. Online payment is not built in.",
   },
 
   // Profile
@@ -376,7 +383,7 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     category: "Profile",
     title: "Profile, notes & multi-clinic",
     summary:
-      "Edit personal details, view clinic notes for allergies and lifestyle context, connect to multiple clinics, switch between them, or leave a clinic.",
+      "Edit personal details and emergency contact, set energy and weight units, view clinic notes for allergies and lifestyle context, connect to multiple clinics, switch between them, or leave a clinic.",
   },
 
   // Join-code onboarding

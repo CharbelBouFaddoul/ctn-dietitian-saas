@@ -2,30 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { LoadingState } from "@nutrition-saas/ui";
 import { API_URL } from "../../../lib/api";
 import { MARKETING_FEATURES } from "../../../lib/marketing/features-catalog";
-
-/** Maps marketing feature ids to admin catalog keys (when applicable). */
-const CATALOG_KEY_BY_FEATURE_ID: Record<string, string> = {
-  "d-dashboard": "DASHBOARD",
-  "d-clients": "CLIENTS",
-  "d-assessments": "ASSESSMENTS",
-  "d-documents": "DOCUMENTS",
-  "d-meal-plans": "MEAL_PLANS",
-  "d-recipes": "MEAL_LIBRARY",
-  "d-foods": "FOODS",
-  "d-habits": "HABITS",
-  "d-tracking": "TRACKING",
-  "d-appointments": "APPOINTMENTS",
-  "d-calendar": "APPOINTMENTS",
-  "d-messaging": "MESSAGING",
-  "d-invoices": "INVOICES",
-  "d-tasks": "TASKS",
-  "d-analytics": "ANALYTICS",
-  "d-ai": "AI",
-  "d-automations": "AUTOMATION",
-};
 
 type FeatureGroup = {
   id: string;
@@ -77,10 +55,10 @@ const DIETITIAN_GROUPS: FeatureGroup[] = [
       "d-settings",
     ],
   },
-  {
+    {
     id: "advanced",
-    title: "Automations",
-    featureIds: ["d-automations"],
+    title: "AI & automations",
+    featureIds: ["d-ai", "d-automations"],
   },
 ];
 
@@ -112,19 +90,10 @@ const PATIENT_GROUPS: FeatureGroup[] = [
   },
 ];
 
-function isFeatureVisible(featureId: string, activeKeys: Set<string> | null) {
-  const catalogKey = CATALOG_KEY_BY_FEATURE_ID[featureId];
-  if (!catalogKey) return true;
-  // Until catalog loads, keep items visible to avoid layout flash hiding everything.
-  if (!activeKeys) return true;
-  return activeKeys.has(catalogKey);
-}
-
-function resolveGroupItems(group: FeatureGroup, activeKeys: Set<string> | null) {
+function resolveGroupItems(group: FeatureGroup) {
   const byId = new Map(MARKETING_FEATURES.map((f) => [f.id, f]));
   const items: string[] = [];
   for (const id of group.featureIds) {
-    if (!isFeatureVisible(id, activeKeys)) continue;
     const feature = byId.get(id);
     if (!feature) continue;
     items.push(feature.entitlementKey ? `${feature.title} (plan add-on)` : feature.title);
@@ -138,21 +107,19 @@ function FeatureGroupGrid({
   title,
   description,
   groups,
-  activeKeys,
 }: {
   anchor: string;
   eyebrow: string;
   title: string;
   description: string;
   groups: FeatureGroup[];
-  activeKeys: Set<string> | null;
 }) {
   const visibleGroups = useMemo(
     () =>
       groups
-        .map((group) => ({ ...group, items: resolveGroupItems(group, activeKeys) }))
+        .map((group) => ({ ...group, items: resolveGroupItems(group) }))
         .filter((group) => group.items.length > 0),
-    [groups, activeKeys],
+    [groups],
   );
 
   if (visibleGroups.length === 0) {
@@ -192,22 +159,7 @@ function FeatureGroupGrid({
 }
 
 export default function FeaturesPage() {
-  const [activeKeys, setActiveKeys] = useState<Set<string> | null>(null);
-  const [loading, setLoading] = useState(true);
   const [plansHref, setPlansHref] = useState("/contact");
-
-  useEffect(() => {
-    void fetch(`${API_URL}/api/v1/public/features`)
-      .then(async (res) => {
-        if (!res.ok) throw new Error("Unable to load features");
-        const keys = (await res.json()) as string[];
-        setActiveKeys(new Set(keys));
-      })
-      .catch(() => {
-        setActiveKeys(null);
-      })
-      .finally(() => setLoading(false));
-  }, []);
 
   useEffect(() => {
     void fetch(`${API_URL}/api/v1/public/site-settings`)
@@ -240,33 +192,21 @@ export default function FeaturesPage() {
         </div>
       </section>
 
-      {loading ? (
-        <section className="ui-mkt__band ui-mkt__band--plans">
-          <div className="ui-mkt__section">
-            <LoadingState>Loading features…</LoadingState>
-          </div>
-        </section>
-      ) : (
-        <>
-          <FeatureGroupGrid
-            anchor="dietitian"
-            eyebrow="Dietitian"
-            title="Clinic workspace"
-            description="Everything you use to run care and clinic operations."
-            groups={DIETITIAN_GROUPS}
-            activeKeys={activeKeys}
-          />
+      <FeatureGroupGrid
+        anchor="dietitian"
+        eyebrow="Dietitian"
+        title="Clinic workspace"
+        description="Everything you use to run care and clinic operations."
+        groups={DIETITIAN_GROUPS}
+      />
 
-          <FeatureGroupGrid
-            anchor="patient"
-            eyebrow="Patient"
-            title="Client portal"
-            description="What patients see after they join with your clinic code."
-            groups={PATIENT_GROUPS}
-            activeKeys={activeKeys}
-          />
-        </>
-      )}
+      <FeatureGroupGrid
+        anchor="patient"
+        eyebrow="Patient"
+        title="Client portal"
+        description="What patients see after they join with your clinic code."
+        groups={PATIENT_GROUPS}
+      />
 
       <section className="ui-mkt__band ui-mkt__band--cta">
         <div className="ui-mkt__cta-band">

@@ -110,9 +110,10 @@ export default function HowItWorksPage() {
                 <li>Create a personal account</li>
                 <li>Enter the clinic join code</li>
                 <li>View the published meal plan</li>
-                <li>Log food, water, exercise, sleep, and habits</li>
-                <li>Complete assessments and message your dietitian</li>
-                <li>View appointments, documents, and invoices</li>
+                <li>Log food on the daily log (search, portions, nutrition facts)</li>
+                <li>Track water, exercise, sleep, and habits</li>
+                <li>Complete custom forms and message your dietitian</li>
+                <li>Request visits, and view documents and invoices</li>
               </ul>
               <Link href="/auth/client/login" className="ui-link">
                 Patient sign in →

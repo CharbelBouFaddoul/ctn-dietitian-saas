@@ -150,6 +150,16 @@ pnpm test
 
 Treat backup artifacts as sensitive (full tenant data).
 
+To seed a **new** deploy from the local development database (demo accounts, catalog foods, admin plans):
+
+```bash
+./scripts/export-local-db.sh
+# Copy backups/local-db-*.sql onto the server, then:
+psql "$DATABASE_URL" < backups/local-db-<timestamp>.sql
+```
+
+Do not run `pnpm demo:reset` in production (`NODE_ENV=production` is refused). Prefer this dump/restore for a one-time copy of the local world.
+
 ## Monitoring
 
 Monitor via Coolify/VPS:

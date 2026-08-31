@@ -284,6 +284,8 @@ async function createClientWithPortal(
     intolerances?: string;
     lifestyle?: string;
     clinicalData?: Prisma.InputJsonValue;
+    emergencyContactName?: string;
+    emergencyContactPhone?: string;
     goalTitle?: string;
     tags?: string[];
     chartNotes?: Array<{
@@ -322,6 +324,8 @@ async function createClientWithPortal(
           allergies: input.allergies ?? null,
           intolerances: input.intolerances ?? null,
           lifestyle: input.lifestyle ?? null,
+          emergencyContactName: input.emergencyContactName ?? null,
+          emergencyContactPhone: input.emergencyContactPhone ?? null,
           clinicalData: input.clinicalData ?? undefined,
         },
       },
@@ -743,6 +747,8 @@ export async function seedDemoWorld(
     allergies: "Seasonal pollen (mild)",
     intolerances: "None known",
     lifestyle: "Runs 5–6 days/week; early wake for long runs",
+    emergencyContactName: "Sam Parent",
+    emergencyContactPhone: "+1 415 555 0142",
     clinicalData: {
       visit: {
         reason: "Race fueling and recovery for spring marathon",
@@ -1340,6 +1346,19 @@ export async function seedDemoWorld(
       createdById: aliceUser.id,
     },
   });
+  await prisma.assessment.create({
+    data: {
+      dietitianAccountId: aliceId,
+      clientId: emma.client.id,
+      templateId: aliceTemplate.id,
+      templateVersion: 1,
+      status: "IN_PROGRESS",
+      schemaSnapshot: schemaSnapshot as Prisma.InputJsonValue,
+      responses: { goal: "Hold race weight through taper" } as Prisma.InputJsonValue,
+      startedAt: daysAgo(1),
+      createdById: aliceUser.id,
+    },
+  });
 
   // Meal plans: Emma 14-day published + draft; Noah 7-day; Ava 21-day draft; shared Alice/Bob different plans
   const emmaPlan = await createPublishedPlan(prisma, {
@@ -1575,6 +1594,20 @@ export async function seedDemoWorld(
       endAt: new Date(daysFromNow(5).getTime() + 60 * 60_000),
       status: "SCHEDULED",
       createdById: aliceUser.id,
+    },
+  });
+  await prisma.appointment.create({
+    data: {
+      dietitianAccountId: aliceId,
+      clientId: emma.client.id,
+      assignedUserId: aliceUser.id,
+      title: "Consultation request",
+      category: "CONSULTATION",
+      startAt: daysFromNow(8),
+      endAt: new Date(daysFromNow(8).getTime() + 45 * 60_000),
+      status: "REQUESTED",
+      notes: "Patient requested a visit from the portal.",
+      createdById: emma.user.id,
     },
   });
   await prisma.appointment.create({

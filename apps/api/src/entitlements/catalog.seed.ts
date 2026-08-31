@@ -12,7 +12,8 @@ const CORE_CAPABILITIES: Array<{ key: string; name: string; description: string 
   {
     key: FEATURE_KEYS.CLIENTS,
     name: "Client roster & charts",
-    description: "Search, filter, and manage full client charts.",
+    description:
+      "Search, filter, and manage full client charts including clinical profile, notes, measurements, and portal connection.",
   },
   {
     key: FEATURE_KEYS.MESSAGING,
@@ -32,7 +33,7 @@ const CORE_CAPABILITIES: Array<{ key: string; name: string; description: string 
   {
     key: FEATURE_KEYS.FOODS,
     name: "Foods",
-    description: "Food catalog and custom foods for your practice.",
+    description: "Multi-source food catalog, practice custom foods, and full nutrition facts.",
   },
   {
     key: FEATURE_KEYS.HABITS,
@@ -42,17 +43,17 @@ const CORE_CAPABILITIES: Array<{ key: string; name: string; description: string 
   {
     key: FEATURE_KEYS.TRACKING,
     name: "Tracking review",
-    description: "Review food, water, exercise, sleep, and habit logs.",
+    description: "Review labeled food, water, exercise, sleep, and habit logs with nutrition facts.",
   },
   {
     key: FEATURE_KEYS.APPOINTMENTS,
     name: "Appointments & calendar",
-    description: "Schedule appointments and view the clinic calendar.",
+    description: "Schedule visits, handle patient visit requests, and view the clinic calendar.",
   },
   {
     key: FEATURE_KEYS.ASSESSMENTS,
-    name: "Assessments",
-    description: "Run nutrition assessments from templates on each chart.",
+    name: "Custom forms",
+    description: "Build questionnaires, assign them to patients, and review submitted answers.",
   },
   {
     key: FEATURE_KEYS.DOCUMENTS,
@@ -61,8 +62,8 @@ const CORE_CAPABILITIES: Array<{ key: string; name: string; description: string 
   },
   {
     key: FEATURE_KEYS.INVOICES,
-    name: "Invoices",
-    description: "Create, issue, and mark invoices paid.",
+    name: "Invoices & quotations",
+    description: "Draft quotations, issue invoices, preview the document, and print or save as PDF.",
   },
   {
     key: FEATURE_KEYS.TASKS,
@@ -134,16 +135,16 @@ export async function seedEntitlementCatalog(prisma: PrismaClient): Promise<void
   const ai = await prisma.feature.upsert({
     where: { key: FEATURE_KEYS.AI },
     update: {
-      name: "AI",
-      description: "Unified AI capability. Not a separate subscription.",
-      status: "INACTIVE",
+      name: "AI assistance",
+      description: "Optional plan capability for summaries, meal-plan help, notes, and message drafts.",
+      status: "ACTIVE",
     },
     create: {
       key: FEATURE_KEYS.AI,
-      name: "AI",
-      description: "Unified AI capability. Not a separate subscription.",
+      name: "AI assistance",
+      description: "Optional plan capability for summaries, meal-plan help, notes, and message drafts.",
       valueType: "BOOLEAN",
-      status: "INACTIVE",
+      status: "ACTIVE",
     },
   });
   const aiLimit = await prisma.feature.upsert({
@@ -151,14 +152,14 @@ export async function seedEntitlementCatalog(prisma: PrismaClient): Promise<void
     update: {
       name: "AI request limit",
       description: "Monthly AI request quota for the organization subscription.",
-      status: "INACTIVE",
+      status: "ACTIVE",
     },
     create: {
       key: FEATURE_KEYS.AI_REQUEST_LIMIT,
       name: "AI request limit",
       description: "Monthly AI request quota for the organization subscription.",
       valueType: "LIMIT",
-      status: "INACTIVE",
+      status: "ACTIVE",
     },
   });
   const aiTokenLimit = await prisma.feature.upsert({
@@ -166,14 +167,14 @@ export async function seedEntitlementCatalog(prisma: PrismaClient): Promise<void
     update: {
       name: "AI token limit",
       description: "Monthly AI token budget for the organization subscription.",
-      status: "INACTIVE",
+      status: "ACTIVE",
     },
     create: {
       key: FEATURE_KEYS.AI_TOKEN_LIMIT,
       name: "AI token limit",
       description: "Monthly AI token budget for the organization subscription.",
       valueType: "LIMIT",
-      status: "INACTIVE",
+      status: "ACTIVE",
     },
   });
   const clientLimit = await prisma.feature.upsert({
