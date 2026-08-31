@@ -11,6 +11,7 @@ import {
 import { api } from "../../../lib/api";
 import { errorMessage } from "../../../lib/humanize-error";
 import { formatDate, formatEnergyKcal } from "../../../lib/format";
+import { PORTAL_FORMS_CHANGED } from "../../../lib/portal-forms";
 import { useMessagingRealtime } from "../../../lib/realtime";
 import { PatientAccents } from "./patient-accents";
 
@@ -104,6 +105,19 @@ export default function ClientHomePage() {
     }
     window.addEventListener("portal-messages-read", onMessagesRead);
     return () => window.removeEventListener("portal-messages-read", onMessagesRead);
+  }, [loadDashboard]);
+
+  useEffect(() => {
+    function onFormsChanged(event: Event) {
+      const count = (event as CustomEvent<{ count?: number }>).detail?.count;
+      if (typeof count === "number") {
+        setData((prev) => (prev ? { ...prev, pendingAssessmentsCount: count } : prev));
+        return;
+      }
+      void loadDashboard().catch(() => undefined);
+    }
+    window.addEventListener(PORTAL_FORMS_CHANGED, onFormsChanged);
+    return () => window.removeEventListener(PORTAL_FORMS_CHANGED, onFormsChanged);
   }, [loadDashboard]);
 
   useMessagingRealtime(true, {
@@ -305,8 +319,14 @@ export default function ClientHomePage() {
           ...(presets.tracking ? [{ href: "/client/tracking", label: "Daily log" }] : []),
           ...(presets.messaging ? [{ href: "/client/messages", label: "Messages" }] : []),
           { href: "/client/documents", label: "Documents" },
-          { href: "/client/assessments", label: pendingForms ? `Forms · ${pendingForms}` : "Forms" },
-        ]).map((link) => (
+          { href: "/client/assessments", label: "Forms" },
+        ])
+          .map((link) =>
+            link.href === "/client/assessments"
+              ? { ...link, label: pendingForms ? `Forms · ${pendingForms}` : "Forms" }
+              : link,
+          )
+          .map((link) => (
           <Link
             key={link.href}
             href={link.href}

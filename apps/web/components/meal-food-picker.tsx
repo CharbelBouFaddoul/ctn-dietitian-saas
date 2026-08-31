@@ -5,6 +5,7 @@ import { api } from "../lib/api";
 import { foodSourceCaption, foodSourceShortLabel } from "../lib/food-source-label";
 import { errorMessage } from "../lib/humanize-error";
 import { unitLabel } from "../lib/practice-labels";
+import { FoodInfoIcon } from "./food-info-icon";
 
 type Nutrition = {
   energyKcal: number | null;
@@ -50,12 +51,30 @@ const VOLUME_UNITS = ["ml", "l", "fl_oz"] as const;
 const MASS_TO_G: Record<string, number> = { g: 1, kg: 1000, oz: 28.349523125, lb: 453.59237 };
 const VOL_TO_ML: Record<string, number> = { ml: 1, l: 1000, fl_oz: 29.5735295625 };
 
+type MealCategory = "BREAKFAST" | "LUNCH" | "DINNER" | "SNACK" | "OTHER";
+
+const MEAL_LABELS: Record<MealCategory, string> = {
+  BREAKFAST: "Breakfast",
+  LUNCH: "Lunch",
+  DINNER: "Dinner",
+  SNACK: "Snack",
+  OTHER: "Other",
+};
+
 type Props = {
-  dietitianAccountId: string;
+  dietitianAccountId?: string;
+  foodsUrl?: string;
+  sourcesUrl?: string;
+  recipesUrl?: string;
+  showRecipes?: boolean;
+  showMealCategory?: boolean;
+  mealCategory?: MealCategory;
+  onMealCategoryChange?: (value: MealCategory) => void;
   onAddFood: (input: { foodId: string; quantity: number; unit: string }) => Promise<void>;
-  onAddRecipe: (input: { recipeId: string; servings: number }) => Promise<void>;
-  onClose: () => void;
+  onAddRecipe?: (input: { recipeId: string; servings: number }) => Promise<void>;
+  onClose?: () => void;
   onError: (message: string) => void;
+  onInfo?: (foodId: string) => void;
 };
 
 function trimAmount(value: number) {
@@ -115,7 +134,25 @@ function pagerWindow(page: number, totalPages: number): Array<number | "ellipsis
   return [1, "ellipsis", page - 1, page, page + 1, "ellipsis", totalPages];
 }
 
-export function MealFoodPicker({ dietitianAccountId, onAddFood, onAddRecipe, onClose, onError }: Props) {
+export function MealFoodPicker({
+  dietitianAccountId,
+  foodsUrl,
+  sourcesUrl,
+  recipesUrl,
+  showRecipes,
+  showMealCategory = false,
+  mealCategory = "LUNCH",
+  onMealCategoryChange,
+  onAddFood,
+  onAddRecipe,
+  onClose,
+  onError,
+  onInfo,
+}: Props) {
+  const resolvedFoodsUrl = foodsUrl ?? `/api/v1/dietitian/${dietitianAccountId}/foods`;
+  const resolvedSourcesUrl = sourcesUrl ?? `/api/v1/dietitian/${dietitianAccountId}/food-sources`;
+  const resolvedRecipesUrl = recipesUrl ?? `/api/v1/dietitian/${dietitianAccountId}/recipes`;
+  const recipesEnabled = Boolean(showRecipes ?? (dietitianAccountId && onAddRecipe));
   const [tab, setTab] = useState<Tab>("food");
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
@@ -147,10 +184,10 @@ export function MealFoodPicker({ dietitianAccountId, onAddFood, onAddRecipe, onC
   }, [debounced, sourceKey, sort, sortDir, tab]);
 
   useEffect(() => {
-    void api<FoodSource[]>(`/api/v1/dietitian/${dietitianAccountId}/food-sources`)
+    void api<FoodSource[]>(resolvedSourcesUrl)
       .then(setSources)
       .catch(() => setSources([]));
-  }, [dietitianAccountId]);
+  }, [resolvedSourcesUrl]);
 
   useEffect(() => {
     searchRef.current?.focus();
@@ -184,7 +221,7 @@ export function MealFoodPicker({ dietitianAccountId, onAddFood, onAddRecipe, onC
     if (tab !== "food") return;
     const id = ++requestId.current;
     setLoading(true);
-    void api<{ items: FoodHit[]; total: number }>(`/api/v1/dietitian/${dietitianAccountId}/foods?${foodParams}`)
+    void api<{ items: FoodHit[]; total: number }>(`${resolvedFoodsUrl}?${foodParams}`)
       .then((result) => {
         if (id !== requestId.current) return;
         setFoods(result.items);
@@ -199,15 +236,13 @@ export function MealFoodPicker({ dietitianAccountId, onAddFood, onAddRecipe, onC
       .finally(() => {
         if (id === requestId.current) setLoading(false);
       });
-  }, [dietitianAccountId, foodParams, tab]);
+  }, [resolvedFoodsUrl, foodParams, tab]);
 
   useEffect(() => {
-    if (tab !== "recipe") return;
+    if (tab !== "recipe" || !recipesEnabled) return;
     const id = ++requestId.current;
     setLoading(true);
-    void api<{ items: RecipeHit[]; total: number }>(
-      `/api/v1/dietitian/${dietitianAccountId}/recipes?${recipeParams}`,
-    )
+    void api<{ items: RecipeHit[]; total: number }>(`${resolvedRecipesUrl}?${recipeParams}`)
       .then((result) => {
         if (id !== requestId.current) return;
         setRecipes(result.items);
@@ -222,7 +257,7 @@ export function MealFoodPicker({ dietitianAccountId, onAddFood, onAddRecipe, onC
       .finally(() => {
         if (id === requestId.current) setLoading(false);
       });
-  }, [dietitianAccountId, recipeParams, tab]);
+  }, [resolvedRecipesUrl, recipeParams, tab, recipesEnabled]);
 
   function amountFor(food: FoodHit): Amount {
     return amounts[food.id] ?? { qty: "1", unit: "serving" };
@@ -252,6 +287,7 @@ export function MealFoodPicker({ dietitianAccountId, onAddFood, onAddRecipe, onC
   async function addRecipe(recipe: RecipeHit) {
     const servings = Number(recipeServings[recipe.id] ?? "1");
     if (!(servings > 0)) return;
+    if (!onAddRecipe) return;
     setAddingId(recipe.id);
     try {
       await onAddRecipe({ recipeId: recipe.id, servings });
@@ -268,19 +304,39 @@ export function MealFoodPicker({ dietitianAccountId, onAddFood, onAddRecipe, onC
     <section className="ui-food-pick" aria-label={tab === "food" ? "Add new food" : "Add recipe"}>
       <header className="ui-food-pick__top">
         <div className="ui-food-pick__title-row">
-          <h5>{tab === "food" ? "Add new food" : "Add recipe"}</h5>
-          <div className="ui-food-pick__tabs" role="tablist" aria-label="Food or recipe">
-            <button type="button" role="tab" aria-selected={tab === "food"} className={tab === "food" ? "is-active" : undefined} onClick={() => setTab("food")}>
-              Food
-            </button>
-            <button type="button" role="tab" aria-selected={tab === "recipe"} className={tab === "recipe" ? "is-active" : undefined} onClick={() => setTab("recipe")}>
-              Recipe
-            </button>
-          </div>
+          <h5>{tab === "food" ? "Add food" : "Add recipe"}</h5>
+          {recipesEnabled ? (
+            <div className="ui-food-pick__tabs" role="tablist" aria-label="Food or recipe">
+              <button type="button" role="tab" aria-selected={tab === "food"} className={tab === "food" ? "is-active" : undefined} onClick={() => setTab("food")}>
+                Food
+              </button>
+              <button type="button" role="tab" aria-selected={tab === "recipe"} className={tab === "recipe" ? "is-active" : undefined} onClick={() => setTab("recipe")}>
+                Recipe
+              </button>
+            </div>
+          ) : null}
+          {showMealCategory ? (
+            <label className="ui-food-pick__meal">
+              <span>Meal</span>
+              <select
+                value={mealCategory}
+                aria-label="Meal"
+                onChange={(event) => onMealCategoryChange?.(event.target.value as MealCategory)}
+              >
+                {(Object.keys(MEAL_LABELS) as MealCategory[]).map((item) => (
+                  <option key={item} value={item}>
+                    {MEAL_LABELS[item]}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
         </div>
-        <button type="button" className="ui-food-pick__close" aria-label="Close" onClick={onClose}>
-          ×
-        </button>
+        {onClose ? (
+          <button type="button" className="ui-food-pick__close" aria-label="Close" onClick={onClose}>
+            ×
+          </button>
+        ) : null}
       </header>
 
       <div className="ui-food-pick__toolbar">
@@ -401,26 +457,42 @@ export function MealFoodPicker({ dietitianAccountId, onAddFood, onAddRecipe, onC
                       </small>
                     </span>
                     <span className="ui-food-pick__n" title={energy}>
+                      <em>Energy</em>
                       {energy}
                     </span>
                     <span className="ui-food-pick__n" title={fat}>
+                      <em>Fat</em>
                       {fat}
                     </span>
                     <span className="ui-food-pick__n" title={carb}>
+                      <em>Carbs</em>
                       {carb}
                     </span>
                     <span className="ui-food-pick__n" title={protein}>
+                      <em>Protein</em>
                       {protein}
                     </span>
-                    <button
-                      type="button"
-                      className="ui-food-pick__add"
-                      aria-label={`Add ${food.name}`}
-                      disabled={addingId === food.id || !(qty > 0)}
-                      onClick={() => void addFood(food)}
-                    >
-                      +
-                    </button>
+                    <div className="ui-food-pick__row-actions">
+                      {onInfo ? (
+                        <button
+                          type="button"
+                          className="ui-food-pick__info"
+                          aria-label={`Nutrition facts for ${food.name}`}
+                          onClick={() => onInfo(food.id)}
+                        >
+                          <FoodInfoIcon />
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        className="ui-food-pick__add"
+                        aria-label={`Add ${food.name}`}
+                        disabled={addingId === food.id || !(qty > 0)}
+                        onClick={() => void addFood(food)}
+                      >
+                        +
+                      </button>
+                    </div>
                   </div>
                 );
               })

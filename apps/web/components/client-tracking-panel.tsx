@@ -11,6 +11,8 @@ import {
   Skeleton,
   humanizeLabel,
 } from "@nutrition-saas/ui";
+import { FoodInformationDialog } from "./food-information-dialog";
+import { FoodInfoIcon } from "./food-info-icon";
 import { formatDate, nutritionLabel } from "../lib/format";
 import { ChartNotesSection } from "./chart-notes-list";
 import {
@@ -34,6 +36,7 @@ export type TrackingSummaryView = {
       category: string;
       items: Array<{
         id: string;
+        foodId?: string | null;
         foodName: string;
         quantity: number;
         unit: string;
@@ -203,6 +206,7 @@ export function ClientTrackingPanel({
   const [openMeals, setOpenMeals] = useState<Record<string, boolean>>({});
   const [activityFilter, setActivityFilter] = useState<TimelineCategoryId>("all");
   const [habitsOpen, setHabitsOpen] = useState(false);
+  const [infoFoodId, setInfoFoodId] = useState<string | null>(null);
 
   const habitsDone = summary?.habits.completed ?? 0;
   const habitsTotal = summary?.habits.total ?? summary?.habits.items.length ?? 0;
@@ -351,10 +355,13 @@ export function ClientTrackingPanel({
                               ✓
                             </span>
                             <span className="ui-track__meal-title">{humanizeLabel(meal.category)}</span>
-                            <span className="ui-muted">
-                              {meal.presented?.energyKcal != null
-                                ? `${meal.presented.energyKcal} kcal`
-                                : "—"}
+                            <span className="ui-log-stat">
+                              <span className="ui-log-stat__label">Energy</span>
+                              <span className="ui-log-stat__value">
+                                {meal.presented?.energyKcal != null
+                                  ? `${meal.presented.energyKcal} kcal`
+                                  : "—"}
+                              </span>
                             </span>
                             <span className="ui-track__meal-chevron" aria-hidden="true">
                               {open ? "▾" : "▸"}
@@ -365,14 +372,30 @@ export function ClientTrackingPanel({
                               {meal.items.map((row) => (
                                 <li key={row.id}>
                                   <span className="ui-track__meal-food">{row.foodName}</span>
-                                  <span className="ui-muted">
-                                    {row.quantity} {humanizeLabel(row.unit)}
+                                  <span className="ui-log-stat">
+                                    <span className="ui-log-stat__label">Amount</span>
+                                    <span className="ui-log-stat__value">
+                                      {row.quantity} {humanizeLabel(row.unit)}
+                                    </span>
                                   </span>
-                                  <strong>
-                                    {row.presented?.energyKcal != null
-                                      ? `${row.presented.energyKcal} kcal`
-                                      : "—"}
-                                  </strong>
+                                  <span className="ui-log-stat">
+                                    <span className="ui-log-stat__label">Energy</span>
+                                    <span className="ui-log-stat__value">
+                                      {row.presented?.energyKcal != null
+                                        ? `${row.presented.energyKcal} kcal`
+                                        : "—"}
+                                    </span>
+                                  </span>
+                                  {row.foodId ? (
+                                    <button
+                                      type="button"
+                                      className="ui-food-info-btn"
+                                      aria-label={`Nutrition facts for ${row.foodName}`}
+                                      onClick={() => setInfoFoodId(row.foodId!)}
+                                    >
+                                      <FoodInfoIcon />
+                                    </button>
+                                  ) : null}
                                 </li>
                               ))}
                             </ul>
@@ -623,6 +646,14 @@ export function ClientTrackingPanel({
           />
         </aside>
       </div>
+      {infoFoodId ? (
+        <FoodInformationDialog
+          foodId={infoFoodId}
+          dietitianAccountId={dietitianAccountId}
+          canMutate={false}
+          onClose={() => setInfoFoodId(null)}
+        />
+      ) : null}
     </div>
   );
 }

@@ -165,18 +165,22 @@ function formFromFood(food: EffectiveFood): EditForm {
 export function FoodInformationDialog({
   foodId,
   dietitianAccountId,
-  canMutate,
+  canMutate = false,
   onClose,
   onChanged,
   onFoodIdChange,
 }: {
   foodId: string;
-  dietitianAccountId: string;
-  canMutate: boolean;
+  dietitianAccountId?: string;
+  canMutate?: boolean;
   onClose: () => void;
   onChanged?: () => void;
   onFoodIdChange?: (foodId: string) => void;
 }) {
+  const foodsBase = dietitianAccountId
+    ? `/api/v1/dietitian/${dietitianAccountId}/foods`
+    : "/api/v1/portal/foods";
+  const allowMutate = Boolean(dietitianAccountId && canMutate);
   const [food, setFood] = useState<EffectiveFood | null>(null);
   const [form, setForm] = useState<EditForm | null>(null);
   const [quantity, setQuantity] = useState("100");
@@ -196,7 +200,7 @@ export function FoodInformationDialog({
 
   async function load(id = foodId) {
     setError(null);
-    const detail = await api<EffectiveFood>(`/api/v1/dietitian/${dietitianAccountId}/foods/${id}`);
+    const detail = await api<EffectiveFood>(`${foodsBase}/${id}`);
     setFood(detail);
     setForm(formFromFood(detail));
     setQuantity(String(detail.referenceQuantity));
@@ -218,10 +222,10 @@ export function FoodInformationDialog({
     if (keepNoticeRef.current !== foodId) setNotice(null);
     void load(foodId).catch((err) => setError(errorMessage(err, "Unable to load food")));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dietitianAccountId, foodId]);
+  }, [foodsBase, foodId]);
 
   const isCustom = food?.origin === "custom";
-  const canEdit = Boolean(isCustom && canMutate);
+  const canEdit = Boolean(isCustom && allowMutate);
   const unitOptions = food?.referenceUnit === "g" ? ["g", "kg", "oz", "lb"] : ["ml", "l", "fl_oz"];
   const sourceLabel = food
     ? food.origin === "custom"
@@ -250,7 +254,7 @@ export function FoodInformationDialog({
     setError(null);
     try {
       const result = await api<CalculateResult>(
-        `/api/v1/dietitian/${dietitianAccountId}/foods/${food.id}/calculate`,
+        `${foodsBase}/${food.id}/calculate`,
         { method: "POST", body: JSON.stringify({ quantity: qty, unit: nextUnit }) },
       );
       setCalculated(result);
@@ -313,7 +317,7 @@ export function FoodInformationDialog({
     setError(null);
     setNotice(null);
     try {
-      const copy = await api<{ id: string }>(`/api/v1/dietitian/${dietitianAccountId}/foods/${food.id}/duplicate`, {
+      const copy = await api<{ id: string }>(`${foodsBase}/${food.id}/duplicate`, {
         method: "POST",
       });
       keepNoticeRef.current = copy.id;
@@ -348,7 +352,7 @@ export function FoodInformationDialog({
     setSaveBusy(true);
     setError(null);
     try {
-      const updated = await api<EffectiveFood>(`/api/v1/dietitian/${dietitianAccountId}/foods/${food.id}`, {
+      const updated = await api<EffectiveFood>(`${foodsBase}/${food.id}`, {
         method: "PATCH",
         body: JSON.stringify(payload),
       });
@@ -373,7 +377,7 @@ export function FoodInformationDialog({
     setDeleteBusy(true);
     setError(null);
     try {
-      await api(`/api/v1/dietitian/${dietitianAccountId}/foods/${food.id}/archive`, { method: "POST" });
+      await api(`${foodsBase}/${food.id}/archive`, { method: "POST" });
       onChanged?.();
       onClose();
     } catch (err) {
@@ -619,7 +623,7 @@ export function FoodInformationDialog({
                     Save
                   </Button>
                 ) : null}
-                {!isCustom && canMutate ? (
+                {!isCustom && allowMutate ? (
                   <Button type="button" disabled={duplicateBusy} onClick={() => void duplicateFood()}>
                     {duplicateBusy ? "Duplicating…" : "Duplicate to edit"}
                   </Button>

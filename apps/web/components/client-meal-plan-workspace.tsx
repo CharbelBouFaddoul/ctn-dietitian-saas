@@ -34,6 +34,7 @@ import {
 } from "../lib/nutrition-targets";
 import { statusLabel, unitLabel } from "../lib/practice-labels";
 import { ClientMealNotesRail } from "./client-meal-notes-rail";
+import { FoodInformationDialog } from "./food-information-dialog";
 import { MealFoodPicker } from "./meal-food-picker";
 import { MealItemNutritionDialog } from "./meal-item-nutrition-dialog";
 import { MealMacroDonuts } from "./meal-macro-donuts";
@@ -558,6 +559,7 @@ export function ClientMealPlanWorkspace({
     status: string;
   } | null>(null);
   const [inspectingItem, setInspectingItem] = useState<MealItem | null>(null);
+  const [inspectingFoodId, setInspectingFoodId] = useState<string | null>(null);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [dragItem, setDragItem] = useState<{ mealId: string; itemId: string } | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
@@ -1978,6 +1980,7 @@ export function ClientMealPlanWorkspace({
                       onAddRecipe={(input) => addRecipe(meal.id, input.recipeId, input.servings)}
                       onClose={() => setEditingMealId(null)}
                       onError={setError}
+                      onInfo={setInspectingFoodId}
                     />
                   ) : null}
 
@@ -2244,6 +2247,14 @@ export function ClientMealPlanWorkspace({
       }
       onClose={() => setInspectingItem(null)}
     />
+    {inspectingFoodId ? (
+      <FoodInformationDialog
+        dietitianAccountId={dietitianAccountId}
+        foodId={inspectingFoodId}
+        canMutate={false}
+        onClose={() => setInspectingFoodId(null)}
+      />
+    ) : null}
     <ConfirmDialog
       open={pendingDeleteVersion !== null}
       title={

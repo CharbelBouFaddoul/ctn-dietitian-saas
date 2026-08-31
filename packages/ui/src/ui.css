@@ -4371,9 +4371,71 @@
 }
 
 .ui-client-food-list__name {
-  font-weight: 650;
-  font-size: 0.9375rem;
+  font-weight: 700;
+  font-size: 0.95rem;
   color: var(--color-text);
+}
+
+.ui-client-food-list__facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.85rem;
+  margin-top: 0.3rem;
+}
+
+.ui-log-stat {
+  display: grid;
+  gap: 0.05rem;
+  min-width: 3.25rem;
+}
+
+.ui-log-stat__label {
+  font-size: 0.64rem;
+  font-weight: 650;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.ui-log-stat__value {
+  font-size: 0.875rem;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+}
+
+.ui-log-macros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.ui-log-macros .ui-log-stat {
+  padding: 0.35rem 0.55rem;
+  border-radius: 10px;
+  background: rgb(15 23 42 / 3.5%);
+}
+
+.ui-food-info-btn {
+  appearance: none;
+  width: 1.7rem;
+  height: 1.7rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgb(15 23 42 / 14%);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--color-muted);
+  padding: 0;
+  line-height: 0;
+  cursor: pointer;
+}
+
+.ui-food-info-btn:hover {
+  color: var(--practice-deep-teal, #0f766e);
+  border-color: rgb(13 148 136 / 40%);
+  background: rgb(240 253 250);
 }
 
 .ui-client-food-list__meta {
@@ -4981,9 +5043,9 @@
 
 .ui-client-meal-items li {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.5rem 1rem;
-  align-items: baseline;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 0.5rem 0.65rem;
+  align-items: center;
   padding: 0.7rem 0.85rem;
   border-radius: 12px;
   background: linear-gradient(180deg, #f8faf9, #f3f7f5);
@@ -5609,6 +5671,11 @@
   font-size: var(--text-sm);
   line-height: 1.5;
   max-width: 40rem;
+}
+
+.ui-section__desc:has(.ui-log-macros) {
+  max-width: none;
+  color: inherit;
 }
 
 .ui-section--muted,
@@ -11113,9 +11180,9 @@ button.ui-clinical-rail__note:hover {
 
 .ui-track__meal-items li {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
   gap: 0.45rem;
-  align-items: baseline;
+  align-items: center;
   padding-top: 0.45rem;
   font-size: 0.78rem;
 }
@@ -14927,6 +14994,12 @@ a.ui-cal-block.cat-TASK {
   color: #64748b;
 }
 
+.ui-invoice-list > .ui-list-filters,
+.ui-invoice-page > .ui-invoice-page__controls > .ui-list-filters,
+.ui-invoice-page > .ui-list-filters {
+  margin-bottom: 1.15rem;
+}
+
 .ui-invoice-results {
   display: grid;
   gap: 0.75rem;
@@ -15692,8 +15765,8 @@ a.ui-list-cards__main {
 
 .ui-dialog.ui-invoice-preview-dialog {
   width: min(54rem, calc(100vw - 1.5rem));
-  height: auto;
-  max-height: none;
+  height: min(92vh, 64rem);
+  max-height: min(92vh, 64rem);
 }
 
 .ui-invoice-preview-dialog .ui-dialog__head {
@@ -15702,10 +15775,21 @@ a.ui-list-cards__main {
 
 .ui-invoice-preview-dialog .ui-dialog__body {
   padding: 0;
-  overflow: visible;
+  overflow: auto;
   background:
     radial-gradient(circle at top, rgba(15, 23, 42, 0.04), transparent 55%),
     #e8edf3;
+}
+
+.ui-invoice-preview-dialog__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.55rem;
+  padding: 0.7rem 1rem;
+  background: #fff;
+  border-bottom: 1px solid rgb(15 23 42 / 8%);
 }
 
 .ui-invoice-preview-dialog .ui-facture-stage {
@@ -18782,7 +18866,7 @@ a.ui-list-cards__main {
     minmax(3.2rem, 0.75fr)
     minmax(4.6rem, 1fr)
     minmax(3.4rem, 0.8fr)
-    1.7rem;
+    3.6rem;
   align-items: center;
   column-gap: 0.55rem;
   min-height: 2.25rem;
@@ -18905,14 +18989,81 @@ a.ui-list-cards__main {
 
 .ui-food-pick__n {
   min-width: 0;
+  display: grid;
+  justify-items: end;
+  gap: 0.02rem;
   overflow: hidden;
-  text-overflow: ellipsis;
   text-align: right;
   font-size: 0.72rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   color: var(--color-text);
+}
+
+.ui-food-pick__n em {
+  font-style: normal;
+  font-size: 0.58rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+@media (min-width: 860px) {
+  .ui-food-pick__n em {
+    display: none;
+  }
+}
+
+.ui-food-pick__row-actions {
+  display: inline-flex;
+  justify-self: end;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.ui-food-pick__info {
+  appearance: none;
+  width: 1.55rem;
+  height: 1.55rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgb(15 23 42 / 14%);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--color-muted);
+  padding: 0;
+  line-height: 0;
+  cursor: pointer;
+}
+
+.ui-food-pick__info:hover {
+  color: var(--practice-deep-teal, #0f766e);
+  border-color: rgb(13 148 136 / 40%);
+  background: rgb(240 253 250);
+}
+
+.ui-food-pick__meal {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--color-muted);
+  font-size: 0.7rem;
+  font-weight: 650;
+}
+
+.ui-food-pick__meal select {
+  appearance: none;
+  border: 1px solid rgb(15 23 42 / 12%);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 650;
+  padding: 0.28rem 0.55rem;
 }
 
 .ui-food-pick__empty {

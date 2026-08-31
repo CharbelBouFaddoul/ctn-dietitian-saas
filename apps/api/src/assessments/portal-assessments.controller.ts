@@ -43,6 +43,19 @@ export class PortalAssessmentsController {
     return this.assessments.listForClient(client.dietitianAccountId, client.id);
   }
 
+  @Get("pending-count")
+  @ApiOperation({ summary: "Count incomplete portal forms for the nav badge" })
+  async pendingCount(
+    @CurrentUser() user: AuthenticatedRequestUser,
+    @CurrentSession() session: AuthenticatedSession,
+  ) {
+    const client = await this.access.assertPortalAccess(user.id, {
+      activeClientId: session.activeClientId,
+    });
+    const count = await this.assessments.countPendingForClient(client.dietitianAccountId, client.id);
+    return { count };
+  }
+
   @Get(":assessmentId")
   async getOne(
     @CurrentUser() user: AuthenticatedRequestUser,

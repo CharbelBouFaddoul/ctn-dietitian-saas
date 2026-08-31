@@ -14,6 +14,9 @@ import {
   Section,
   Select,
 } from "@nutrition-saas/ui";
+import { FoodInformationDialog } from "../../../../components/food-information-dialog";
+import { FoodInfoIcon } from "../../../../components/food-info-icon";
+import { MealFoodPicker } from "../../../../components/meal-food-picker";
 import { api } from "../../../../lib/api";
 import { errorMessage } from "../../../../lib/humanize-error";
 import { formatEnergyKcal } from "../../../../lib/format";
@@ -38,6 +41,7 @@ interface Summary {
       category: MealCategory;
       items: Array<{
         id: string;
+        foodId?: string | null;
         foodName: string;
         quantity: number;
         unit: string;
@@ -106,6 +110,20 @@ function formatDuration(minutes: number | null | undefined): string {
   return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
 }
 
+function todayLocal(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+
+function LogStat({ label, value }: { label: string; value: string }) {
+  return (
+    <span className="ui-log-stat">
+      <span className="ui-log-stat__label">{label}</span>
+      <span className="ui-log-stat__value">{value}</span>
+    </span>
+  );
+}
+
 function shiftDate(date: string, days: number): string {
   const parts = date.split("-").map(Number);
   const y = parts[0] ?? 0;
@@ -144,6 +162,9 @@ function ClientTrackingPageInner() {
   const [editFood, setEditFood] = useState<{ id: string; quantity: string } | null>(null);
   const [editWater, setEditWater] = useState<{ id: string; amount: string } | null>(null);
   const [editExercise, setEditExercise] = useState<{ id: string; duration: string } | null>(null);
+  const [addingFood, setAddingFood] = useState(() => searchParams.get("add") === "1");
+  const [mealCategory, setMealCategory] = useState<"BREAKFAST" | "LUNCH" | "DINNER" | "SNACK" | "OTHER">("LUNCH");
+  const [infoFoodId, setInfoFoodId] = useState<string | null>(null);
 
   async function loadHabits(selectedDate?: string) {
     const row = await api<{ habits: PortalHabit[] }>(
@@ -195,6 +216,26 @@ function ClientTrackingPageInner() {
       setEditFood(null);
       await load(date);
     }, "Unable to update food");
+  }
+
+  async function addLoggedFood(input: { foodId: string; quantity: number; unit: string }) {
+    await run(async () => {
+      const body: Record<string, unknown> = {
+        foodId: input.foodId,
+        quantity: input.quantity,
+        unit: input.unit,
+        mealCategory,
+      };
+      if (date && date !== todayLocal()) {
+        body.consumedAt = new Date(`${date}T12:00:00`).toISOString();
+      }
+      await api("/api/v1/portal/tracking/food-logs", {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
+      setNotice("Food added to your log.");
+      await load(date);
+    }, "Unable to add food");
   }
 
   async function saveWater(logId: string, amountMl: number) {
@@ -313,11 +354,14 @@ function ClientTrackingPageInner() {
 
   const waterTarget = summary?.water.targetMl;
   const waterDesc =
-    summary == null
-      ? undefined
-      : waterTarget != null
-        ? `${(summary.water.totalMl / 1000).toFixed(2)} L / ${(waterTarget / 1000).toFixed(1)} L`
-        : `${summary.water.totalLiters.toFixed(2)} L today`;
+    summary == null ? undefined : (
+      <span className="ui-log-macros">
+        <LogStat label="Today" value={`${summary.water.totalLiters.toFixed(2)} L`} />
+        {waterTarget != null ? (
+          <LogStat label="Target" value={`${(waterTarget / 1000).toFixed(1)} L`} />
+        ) : null}
+      </span>
+    );
 
   return (
     <section>
@@ -369,16 +413,37 @@ function ClientTrackingPageInner() {
           <Section
             className="ui-client-panel ui-client-panel--food"
             title="Food logged"
-            description={`${formatKcal(summary.food.presented.energyKcal, energyUnit)} · P ${summary.food.presented.proteinG ?? "—"}g · C ${summary.food.presented.carbohydrateG ?? "—"}g · F ${summary.food.presented.fatG ?? "—"}g · Fiber ${summary.food.presented.fiberG ?? "—"}g`}
+            description={
+              <span className="ui-log-macros">
+                <LogStat label="Energy" value={formatKcal(summary.food.presented.energyKcal, energyUnit)} />
+                <LogStat label="Protein" value={summary.food.presented.proteinG != null ? `${summary.food.presented.proteinG} g` : "—"} />
+                <LogStat label="Carbs" value={summary.food.presented.carbohydrateG != null ? `${summary.food.presented.carbohydrateG} g` : "—"} />
+                <LogStat label="Fat" value={summary.food.presented.fatG != null ? `${summary.food.presented.fatG} g` : "—"} />
+                <LogStat label="Fiber" value={summary.food.presented.fiberG != null ? `${summary.food.presented.fiberG} g` : "—"} />
+              </span>
+            }
             actions={
-              <Link
-                href={`/client/tracking/add-food${date ? `?date=${encodeURIComponent(date)}` : ""}`}
-                className="ui-btn ui-btn--primary ui-btn--sm"
-              >
-                + Add food
-              </Link>
+              <Button type="button" size="sm" onClick={() => setAddingFood((open) => !open)}>
+                {addingFood ? "Done" : "+ Add food"}
+              </Button>
             }
           >
+            {addingFood ? (
+              <div style={{ marginBottom: 14 }}>
+                <MealFoodPicker
+                  foodsUrl="/api/v1/portal/foods"
+                  sourcesUrl="/api/v1/portal/foods/sources"
+                  showRecipes={false}
+                  showMealCategory
+                  mealCategory={mealCategory}
+                  onMealCategoryChange={setMealCategory}
+                  onAddFood={addLoggedFood}
+                  onClose={() => setAddingFood(false)}
+                  onError={(message) => setError(message)}
+                  onInfo={setInfoFoodId}
+                />
+              </div>
+            ) : null}
             {summary.food.byMeal.length === 0 ? (
               <EmptyState title="Nothing logged yet">
                 Tap <strong>+ Add food</strong> to search and log, or log a meal from{" "}
@@ -393,7 +458,7 @@ function ClientTrackingPageInner() {
                   <div key={meal.category} className="ui-client-food-group">
                     <div className="ui-client-food-group__head">
                       <strong>{MEAL_LABELS[meal.category] ?? meal.category}</strong>
-                      <span className="ui-client-kcal">{formatKcal(meal.presented?.energyKcal ?? null, energyUnit)}</span>
+                      <LogStat label="Energy" value={formatKcal(meal.presented?.energyKcal ?? null, energyUnit)} />
                     </div>
                     <ul className="ui-client-food-list">
                       {meal.items.map((row) => (
@@ -405,12 +470,26 @@ function ClientTrackingPageInner() {
                                 <span className="ui-client-log-from-plan"> from plan</span>
                               ) : null}
                             </span>
-                            <span className="ui-client-food-list__meta">
-                              {row.quantity} {unitLabel(row.unit)}
-                              {row.presented?.energyKcal != null
-                                ? ` · ${formatKcal(row.presented.energyKcal, energyUnit)}`
-                                : ""}
-                            </span>
+                            <div className="ui-client-food-list__facts">
+                              <LogStat label="Amount" value={`${row.quantity} ${unitLabel(row.unit)}`} />
+                              <LogStat
+                                label="Energy"
+                                value={
+                                  row.presented?.energyKcal != null
+                                    ? formatKcal(row.presented.energyKcal, energyUnit)
+                                    : "—"
+                                }
+                              />
+                              {row.presented?.proteinG != null ? (
+                                <LogStat label="Protein" value={`${row.presented.proteinG} g`} />
+                              ) : null}
+                              {row.presented?.carbohydrateG != null ? (
+                                <LogStat label="Carbs" value={`${row.presented.carbohydrateG} g`} />
+                              ) : null}
+                              {row.presented?.fatG != null ? (
+                                <LogStat label="Fat" value={`${row.presented.fatG} g`} />
+                              ) : null}
+                            </div>
                           </div>
                           <div className="ui-client-food-list__actions">
                             {editFood?.id === row.id ? (
@@ -437,6 +516,16 @@ function ClientTrackingPageInner() {
                               </>
                             ) : (
                               <>
+                                {row.foodId ? (
+                                  <button
+                                    type="button"
+                                    className="ui-food-info-btn"
+                                    aria-label={`Nutrition facts for ${row.foodName}`}
+                                    onClick={() => setInfoFoodId(row.foodId!)}
+                                  >
+                                    <FoodInfoIcon />
+                                  </button>
+                                ) : null}
                                 <Button
                                   type="button"
                                   size="sm"
@@ -513,7 +602,7 @@ function ClientTrackingPageInner() {
                         </Button>
                       </>
                     ) : (
-                      <span>{row.amountMl} ml</span>
+                      <LogStat label="Amount" value={`${row.amountMl} ml`} />
                     )}
                     <Button
                       type="button"
@@ -546,7 +635,11 @@ function ClientTrackingPageInner() {
           <Section
             className="ui-client-panel ui-client-panel--exercise"
             title="Exercise"
-            description={`${summary.exercise.totalDurationMinutes} min today`}
+            description={
+              <span className="ui-log-macros">
+                <LogStat label="Today" value={`${summary.exercise.totalDurationMinutes} min`} />
+              </span>
+            }
           >
             {summary.exercise.entries.length > 0 ? (
               <ul className="ui-client-meal-items" style={{ marginBottom: 12 }}>
@@ -571,10 +664,13 @@ function ClientTrackingPageInner() {
                         </Button>
                       </>
                     ) : (
-                      <span>
-                        {row.activityType} · {row.durationMinutes} min
-                        {row.intensity ? ` · ${row.intensity.toLowerCase()}` : ""}
-                      </span>
+                      <div className="ui-client-food-list__facts">
+                        <LogStat label="Activity" value={row.activityType} />
+                        <LogStat label="Duration" value={`${row.durationMinutes} min`} />
+                        {row.intensity ? (
+                          <LogStat label="Intensity" value={row.intensity.toLowerCase()} />
+                        ) : null}
+                      </div>
                     )}
                     <Button
                       type="button"
@@ -632,9 +728,15 @@ function ClientTrackingPageInner() {
           <Section
             className="ui-client-panel ui-client-panel--sleep"
             title="Sleep"
-            description={`Last night ${formatDuration(summary.sleep?.durationMinutes)}${
-              summary.sleep?.quality != null ? ` · quality ${summary.sleep.quality}/5` : ""
-            } · Week avg ${formatDuration(summary.sleepWeek.averageDurationMinutes)}`}
+            description={
+              <span className="ui-log-macros">
+                <LogStat label="Last night" value={formatDuration(summary.sleep?.durationMinutes)} />
+                {summary.sleep?.quality != null ? (
+                  <LogStat label="Quality" value={`${summary.sleep.quality}/5`} />
+                ) : null}
+                <LogStat label="Week avg" value={formatDuration(summary.sleepWeek.averageDurationMinutes)} />
+              </span>
+            }
           >
             <form onSubmit={(event) => void saveSleep(event)} className="ui-inline-form">
               <Field label="Bedtime">
@@ -663,9 +765,16 @@ function ClientTrackingPageInner() {
             className="ui-client-panel ui-client-panel--habits"
             title="Today's habits"
             description={
-              habits.length > 0
-                ? `${habits.filter((h) => h.completed).length} of ${habits.length} complete`
-                : "No habits assigned yet"
+              habits.length > 0 ? (
+                <span className="ui-log-macros">
+                  <LogStat
+                    label="Complete"
+                    value={`${habits.filter((h) => h.completed).length} of ${habits.length}`}
+                  />
+                </span>
+              ) : (
+                "No habits assigned yet"
+              )
             }
           >
             {habits.length === 0 ? (
@@ -716,6 +825,10 @@ function ClientTrackingPageInner() {
             </form>
           </Section>
         </div>
+      ) : null}
+
+      {infoFoodId ? (
+        <FoodInformationDialog foodId={infoFoodId} onClose={() => setInfoFoodId(null)} />
       ) : null}
     </section>
   );

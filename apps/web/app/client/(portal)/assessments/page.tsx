@@ -11,6 +11,7 @@ import {
 } from "../../../../lib/evaluation";
 import { errorMessage } from "../../../../lib/humanize-error";
 import { formatDate } from "../../../../lib/format";
+import { announcePortalFormsChanged, pendingFormsFromAssessments } from "../../../../lib/portal-forms";
 
 export default function PortalAssessmentsPage() {
   const [rows, setRows] = useState<EvaluationAssessment[]>([]);
@@ -23,6 +24,7 @@ export default function PortalAssessmentsPage() {
     try {
       const list = await api<EvaluationAssessment[]>("/api/v1/portal/assessments");
       setRows(list);
+      announcePortalFormsChanged(pendingFormsFromAssessments(list));
       setError(null);
     } catch (err) {
       setError(errorMessage(err, "Unable to load assessments"));

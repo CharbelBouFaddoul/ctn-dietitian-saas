@@ -144,6 +144,7 @@ export class TrackingSummaryService {
       const snapshot = parseFoodLogNutritionSnapshot(row.nutritionSnapshot);
       return {
         id: row.id,
+        foodId: row.foodId,
         foodName: foodLogDisplayName(snapshot, row.displayName),
         displayName: row.displayName ?? foodLogDisplayName(snapshot),
         sourceType: row.sourceType,
@@ -168,8 +169,9 @@ export class TrackingSummaryService {
       const mealTotals = sumNutrition(items.map((row) => row.nutrition));
       return {
         category,
-        items: items.map(({ id, foodName, displayName, sourceType, sourceMealId, quantity, unit, presented }) => ({
+        items: items.map(({ id, foodId, foodName, displayName, sourceType, sourceMealId, quantity, unit, presented }) => ({
           id,
+          foodId,
           foodName,
           displayName,
           sourceType,

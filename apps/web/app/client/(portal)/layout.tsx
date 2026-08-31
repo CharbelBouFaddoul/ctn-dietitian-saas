@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { AppShell, Button, LoadingState, type NavSection } from "@nutrition-saas/ui";
 import { ApiError, api, logout } from "../../../lib/api";
+import { announcePortalFormsChanged, PORTAL_FORMS_CHANGED } from "../../../lib/portal-forms";
 import { useMessagingRealtime } from "../../../lib/realtime";
 import { loginPathFor, resolveSessionHome } from "../../../lib/session-home";
 import { NotificationBell } from "../../../lib/use-notifications";
@@ -30,6 +31,13 @@ export default function ClientPortalLayout({ children }: { children: ReactNode }
   const refreshUnreadMessages = useCallback(async () => {
     const conversation = await api<{ unreadCount: number }>("/api/v1/portal/conversation");
     setUnreadMessages(conversation.unreadCount || 0);
+  }, []);
+
+  const refreshPendingForms = useCallback(async () => {
+    const row = await api<{ count: number }>("/api/v1/portal/assessments/pending-count");
+    const count = row.count || 0;
+    setPendingForms(count);
+    announcePortalFormsChanged(count);
   }, []);
 
   useMessagingRealtime(state === "ok", {
@@ -73,6 +81,36 @@ export default function ClientPortalLayout({ children }: { children: ReactNode }
     window.addEventListener("portal-messages-read", onMessagesRead);
     return () => window.removeEventListener("portal-messages-read", onMessagesRead);
   }, [refreshUnreadMessages]);
+
+  useEffect(() => {
+    if (state !== "ok") return;
+    void refreshPendingForms().catch(() => undefined);
+    const poll = window.setInterval(() => {
+      void refreshPendingForms().catch(() => undefined);
+    }, 12_000);
+    function onVisibility() {
+      if (document.visibilityState === "visible") {
+        void refreshPendingForms().catch(() => undefined);
+      }
+    }
+    function onFormsChanged(event: Event) {
+      const count = (event as CustomEvent<{ count?: number }>).detail?.count;
+      if (typeof count === "number") {
+        setPendingForms(count);
+        return;
+      }
+      void refreshPendingForms().catch(() => undefined);
+    }
+    window.addEventListener("focus", onVisibility);
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener(PORTAL_FORMS_CHANGED, onFormsChanged);
+    return () => {
+      window.clearInterval(poll);
+      window.removeEventListener("focus", onVisibility);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener(PORTAL_FORMS_CHANGED, onFormsChanged);
+    };
+  }, [state, refreshPendingForms, me?.client.id]);
 
   const load = useCallback(async () => {
     const [profile, dashboard] = await Promise.all([
@@ -193,7 +231,6 @@ export default function ClientPortalLayout({ children }: { children: ReactNode }
       label: "Account",
       items: [
         { href: "/client/profile", label: "Profile", icon: PatientNavIcons.profile },
-        { href: "/client/notifications", label: "Notifications", icon: PatientNavIcons.notifications },
         { href: "/client/join", label: "Join another clinic", icon: PatientNavIcons.join },
       ],
     },

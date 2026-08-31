@@ -207,6 +207,16 @@ export class AssessmentService {
   }
 
   /** Portal / scoped helpers (ownership already asserted). */
+  async countPendingForClient(dietitianAccountId: string, clientId: string) {
+    return this.prisma.assessment.count({
+      where: {
+        clientId,
+        ...tenantWhere(dietitianAccountId),
+        status: { in: ["DRAFT", "IN_PROGRESS"] },
+      },
+    });
+  }
+
   async listForClient(dietitianAccountId: string, clientId: string) {
     const rows = await this.prisma.assessment.findMany({
       where: {

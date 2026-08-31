@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Button,
+  Dialog,
   EmptyState,
   LoadingState,
   PageHeader,
@@ -180,43 +181,45 @@ export default function ClientInvoicesPage() {
         ) : null}
 
         {loadingDetail ? <LoadingState>Opening invoice…</LoadingState> : null}
-
-        {selected ? (
-          <div className="ui-row" style={{ marginBottom: 12 }}>
-            <Button variant="secondary" onClick={() => window.print()}>
-              Print / Download PDF
-            </Button>
-            <Button variant="ghost" onClick={() => setSelected(null)}>
-              Close
-            </Button>
-          </div>
-        ) : null}
       </div>
 
       {selected ? (
-        <div className="ui-facture-stage">
-          <InvoiceDocument
-            practice={selected.practice}
-            invoice={{
-              documentLabel: "Invoice / Facture",
-              documentNumber: selected.invoice.invoiceNumber ?? "Invoice",
-              statusLabel: statusLabel(selected.invoice.status),
-              clientName: "You",
-              issueDate: selected.invoice.issueDate,
-              dueDate: selected.invoice.dueDate,
-              currency: selected.invoice.currency,
-              subtotal: selected.invoice.subtotal,
-              discountType: selected.invoice.discountType,
-              discountValue: selected.invoice.discountValue,
-              discountAmount: selected.invoice.discountAmount,
-              taxRatePercent: selected.invoice.taxRatePercent,
-              taxAmount: selected.invoice.taxAmount,
-              total: selected.invoice.total,
-              notes: selected.invoice.notes,
-              items: selected.invoice.items,
-            }}
-          />
-        </div>
+        <Dialog
+          open
+          title={selected.invoice.invoiceNumber ?? "Invoice"}
+          onClose={() => setSelected(null)}
+          className="ui-invoice-preview-dialog"
+        >
+          <div className="ui-invoice-preview-dialog__toolbar no-print">
+            <StatusBadge status={selected.invoice.status} label={statusLabel(selected.invoice.status)} />
+            <Button size="sm" variant="secondary" onClick={() => window.print()}>
+              Print / Save PDF
+            </Button>
+          </div>
+          <div className="ui-facture-stage">
+            <InvoiceDocument
+              practice={selected.practice}
+              invoice={{
+                documentLabel: "Invoice / Facture",
+                documentNumber: selected.invoice.invoiceNumber ?? "Invoice",
+                statusLabel: statusLabel(selected.invoice.status),
+                clientName: "You",
+                issueDate: selected.invoice.issueDate,
+                dueDate: selected.invoice.dueDate,
+                currency: selected.invoice.currency,
+                subtotal: selected.invoice.subtotal,
+                discountType: selected.invoice.discountType,
+                discountValue: selected.invoice.discountValue,
+                discountAmount: selected.invoice.discountAmount,
+                taxRatePercent: selected.invoice.taxRatePercent,
+                taxAmount: selected.invoice.taxAmount,
+                total: selected.invoice.total,
+                notes: selected.invoice.notes,
+                items: selected.invoice.items,
+              }}
+            />
+          </div>
+        </Dialog>
       ) : null}
     </section>
   );

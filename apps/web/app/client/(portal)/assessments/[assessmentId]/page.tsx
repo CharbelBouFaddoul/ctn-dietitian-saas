@@ -12,6 +12,7 @@ import {
 } from "../../../../../lib/evaluation";
 import { formatDate } from "../../../../../lib/format";
 import { errorMessage } from "../../../../../lib/humanize-error";
+import { announcePortalFormsChanged } from "../../../../../lib/portal-forms";
 
 export default function PortalAssessmentDetailPage() {
   const params = useParams<{ assessmentId: string }>();
@@ -105,6 +106,7 @@ export default function PortalAssessmentDetailPage() {
                     );
                     setSelected(row);
                     setResponses((row.responses as Record<string, unknown>) ?? {});
+                    announcePortalFormsChanged();
                   } catch (err) {
                     setError(errorMessage(err, "Unable to submit"));
                   } finally {
