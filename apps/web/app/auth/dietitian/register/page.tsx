@@ -8,12 +8,15 @@ import { API_URL, api } from "../../../../lib/api";
 import { errorMessage } from "../../../../lib/humanize-error";
 import { resolveSessionHome } from "../../../../lib/session-home";
 import { AuthShell } from "../../auth-shell";
+import { LegalConsentCheckbox } from "../../../../components/legal-consent-checkbox";
+import { LEGAL_POLICY_VERSION } from "../../../../lib/marketing/legal";
 
 export default function DietitianRegisterPage() {
   const router = useRouter();
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [agreed, setAgreed] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,6 +50,10 @@ export default function DietitianRegisterPage() {
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     setError(null);
+    if (!agreed) {
+      setError("Please agree to the Terms of use and Privacy policy.");
+      return;
+    }
     try {
       const result = await api<{ message: string }>("/api/v1/auth/register", {
         method: "POST",
@@ -55,8 +62,8 @@ export default function DietitianRegisterPage() {
           password,
           audience: "dietitian",
           consents: [
-            { type: "TERMS_OF_SERVICE", policyVersion: "1.0" },
-            { type: "PRIVACY_POLICY", policyVersion: "1.0" },
+            { type: "TERMS_OF_SERVICE", policyVersion: LEGAL_POLICY_VERSION },
+            { type: "PRIVACY_POLICY", policyVersion: LEGAL_POLICY_VERSION },
           ],
         }),
       });
@@ -118,6 +125,7 @@ export default function DietitianRegisterPage() {
             required
           />
         </Field>
+        <LegalConsentCheckbox checked={agreed} onChange={setAgreed} />
         <Button type="submit" block>
           Create clinic account
         </Button>

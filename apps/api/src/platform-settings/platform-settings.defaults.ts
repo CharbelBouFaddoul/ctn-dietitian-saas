@@ -104,6 +104,13 @@ export const DEFAULT_PLATFORM_SETTINGS: PlatformSettingsPayload = {
         { href: "/how-it-works", label: "Join your dietitian" },
       ],
     },
+    {
+      title: "Legal",
+      links: [
+        { href: "/privacy", label: "Privacy policy" },
+        { href: "/terms", label: "Terms of use" },
+      ],
+    },
   ],
   copyrightText: "© Nutrition. All rights reserved.",
   socialLinks: [],

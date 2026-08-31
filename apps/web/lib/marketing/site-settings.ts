@@ -1,3 +1,5 @@
+import { LEGAL_FOOTER_GROUP } from "./legal";
+
 export type BrandDisplayMode = "LOGO" | "TEXT" | "LOGO_AND_TEXT";
 
 export interface SiteNavItem {
@@ -94,6 +96,10 @@ export const FALLBACK_SITE_SETTINGS: SiteSettings = {
         { href: "/auth/client/login", label: "Patient sign in" },
         { href: "/how-it-works", label: "Join your dietitian" },
       ],
+    },
+    {
+      title: LEGAL_FOOTER_GROUP.title,
+      links: [...LEGAL_FOOTER_GROUP.links],
     },
   ],
   copyrightText: "© Nutrition. All rights reserved.",

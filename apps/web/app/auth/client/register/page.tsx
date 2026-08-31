@@ -8,6 +8,8 @@ import { API_URL, api } from "../../../../lib/api";
 import { errorMessage } from "../../../../lib/humanize-error";
 import { resolveSessionHome } from "../../../../lib/session-home";
 import { AuthShell } from "../../auth-shell";
+import { LegalConsentCheckbox } from "../../../../components/legal-consent-checkbox";
+import { LEGAL_POLICY_VERSION } from "../../../../lib/marketing/legal";
 
 export default function ClientRegisterPage() {
   const router = useRouter();
@@ -17,6 +19,7 @@ export default function ClientRegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [agreed, setAgreed] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -54,6 +57,10 @@ export default function ClientRegisterPage() {
       setError("Passwords do not match.");
       return;
     }
+    if (!agreed) {
+      setError("Please agree to the Terms of use and Privacy policy.");
+      return;
+    }
     try {
       const result = await api<{ message: string }>("/api/v1/auth/register", {
         method: "POST",
@@ -64,8 +71,8 @@ export default function ClientRegisterPage() {
           lastName,
           audience: "patient",
           consents: [
-            { type: "TERMS_OF_SERVICE", policyVersion: "1.0" },
-            { type: "PRIVACY_POLICY", policyVersion: "1.0" },
+            { type: "TERMS_OF_SERVICE", policyVersion: LEGAL_POLICY_VERSION },
+            { type: "PRIVACY_POLICY", policyVersion: LEGAL_POLICY_VERSION },
           ],
         }),
       });
@@ -137,6 +144,7 @@ export default function ClientRegisterPage() {
             required
           />
         </Field>
+        <LegalConsentCheckbox checked={agreed} onChange={setAgreed} />
         <Button type="submit" block>
           Create account
         </Button>

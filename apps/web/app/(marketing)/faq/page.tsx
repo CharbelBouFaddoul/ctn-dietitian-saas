@@ -17,6 +17,14 @@ const FAQ_CATEGORIES = [
         a: "No. The public website is for dietitians and patients only. Platform administration is not offered as a public sign-in option.",
       },
       {
+        q: "Is this medical advice?",
+        a: "No. The platform is clinic software. Care, meal plans, and advice come from the dietitian — not from CTN Solution. Do not use it for emergencies; call local emergency services.",
+      },
+      {
+        q: "Where are the privacy policy and terms?",
+        a: "See Privacy policy and Terms of use in the website footer. Signup requires that you agree to both.",
+      },
+      {
         q: "Where can I see pricing?",
         a: "Contact us for current plans and included features. Online checkout is not built in yet — we will help you get set up.",
       },

@@ -117,6 +117,13 @@ const DEFAULT_SETTINGS: MarketingSiteSettings = {
         { href: "/how-it-works", label: "Join your dietitian" },
       ],
     },
+    {
+      title: "Legal",
+      links: [
+        { href: "/privacy", label: "Privacy policy" },
+        { href: "/terms", label: "Terms of use" },
+      ],
+    },
   ],
   copyrightText: "© Nutrition. All rights reserved.",
   socialLinks: [],
@@ -320,6 +327,14 @@ export function MarketingShell({
         </div>
         <div className="ui-mkt__footer-bottom">
           <span>{settings.copyrightText}</span>
+          <span className="ui-mkt__footer-legal">
+            <Link href="/privacy" className="ui-mkt__footer-link">
+              Privacy
+            </Link>
+            <Link href="/terms" className="ui-mkt__footer-link">
+              Terms
+            </Link>
+          </span>
         </div>
       </footer>
     </div>

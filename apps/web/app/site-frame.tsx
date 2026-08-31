@@ -23,7 +23,7 @@ function withMarketingDefaults(settings: SiteSettings): SiteSettings {
     navItems = navItems.filter((item) => item.href !== "/plans" && item.href !== "/pricing");
   }
 
-  const footerGroups = settings.footerGroups.map((group) => {
+  let footerGroups = settings.footerGroups.map((group) => {
     let links = group.links;
     if (!plansPageEnabled) {
       links = links.filter((link) => link.href !== "/plans" && link.href !== "/pricing");
@@ -32,6 +32,22 @@ function withMarketingDefaults(settings: SiteSettings): SiteSettings {
     }
     return { ...group, links };
   });
+  const hasPrivacy = footerGroups.some((group) => group.links.some((link) => link.href === "/privacy"));
+  const hasTerms = footerGroups.some((group) => group.links.some((link) => link.href === "/terms"));
+  if (!hasPrivacy || !hasTerms) {
+    const extra = [
+      ...(!hasPrivacy ? [{ href: "/privacy", label: "Privacy policy" }] : []),
+      ...(!hasTerms ? [{ href: "/terms", label: "Terms of use" }] : []),
+    ];
+    const legalIndex = footerGroups.findIndex((group) => group.title === "Legal");
+    if (legalIndex >= 0) {
+      footerGroups = footerGroups.map((group, index) =>
+        index === legalIndex ? { ...group, links: [...group.links, ...extra] } : group,
+      );
+    } else {
+      footerGroups = [...footerGroups, { title: "Legal", links: extra }];
+    }
+  }
 
   let ctaHref = settings.ctaHref || (plansPageEnabled ? "/plans" : "/contact");
   const dietitianRegistrationEnabled =

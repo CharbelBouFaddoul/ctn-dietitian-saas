@@ -12917,6 +12917,72 @@ html:has(.ui-mkt) {
   padding: 1.1rem 1.5rem 1.75rem;
   border-top: 1px solid rgb(255 255 255 / 10%);
   color: rgb(148 163 184);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ui-mkt__footer-legal {
+  display: flex;
+  gap: 1rem;
+}
+
+.ui-mkt__legal {
+  max-width: 42rem;
+}
+
+.ui-mkt__legal h2 {
+  margin: 2rem 0 0.7rem;
+  font-size: 1.15rem;
+  letter-spacing: -0.02em;
+  color: var(--mkt-navy);
+}
+
+.ui-mkt__legal h2:first-child {
+  margin-top: 0;
+}
+
+.ui-mkt__legal p,
+.ui-mkt__legal li {
+  color: var(--mkt-muted);
+  font-size: 1.02rem;
+  line-height: 1.65;
+}
+
+.ui-mkt__legal p {
+  margin: 0 0 0.9rem;
+}
+
+.ui-mkt__legal ul {
+  margin: 0 0 1rem;
+  padding-left: 1.2rem;
+}
+
+.ui-mkt__legal li + li {
+  margin-top: 0.35rem;
+}
+
+.ui-mkt__legal a {
+  color: var(--mkt-deep-teal, #0f766e);
+}
+
+.ui-mkt__legal-nav {
+  max-width: 42rem;
+  margin: 0.5rem 0 0;
+  color: var(--mkt-muted);
+}
+
+.ui-auth__legal-check {
+  align-items: flex-start;
+  margin: 4px 0 16px;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.ui-auth__legal-check input {
+  margin-top: 3px;
 }
 
 .ui-mkt__feature-block {
