@@ -71,11 +71,6 @@ export default function PrivacyPage() {
         <li>To let a clinic and its connected patients use the workspace and portal as designed.</li>
         <li>To operate subscriptions, invoices inside the product, and platform administration.</li>
         <li>To keep the service running (backups, security, fixing bugs, preventing abuse).</li>
-        <li>
-          Optional <strong>AI features</strong>, only when a clinic’s plan includes them and they are turned on: the
-          text or context needed for that feature may be sent to our AI provider to generate a response. Do not put
-          information into AI tools that you are not allowed to share.
-        </li>
       </ul>
       <p>We do not sell personal data. We do not use patient charts for advertising.</p>
 
@@ -94,7 +89,7 @@ export default function PrivacyPage() {
           (accounts, plans, catalog, system health). They are not a substitute for the clinic’s own records policy.
         </li>
         <li>
-          <strong>Processors we use</strong> to host the app, database, email, file storage, and (if enabled) AI. They
+          <strong>Processors we use</strong> to host the app, database, email, and file storage. They
           only get what is needed to provide that function.
         </li>
       </ul>

@@ -4,9 +4,8 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "re
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { Alert, Avatar, EmptyState, LoadingState, SearchInput } from "@nutrition-saas/ui";
-import { AiPanel, aiMessageDraftStorageKey } from "../../../../components/ai-panel";
+import { aiMessageDraftStorageKey } from "../../../../components/ai-panel";
 import { api } from "../../../../lib/api";
-import { usePractice } from "../practice-shell";
 import { dayKey, formatChatDayLabel, formatMessageTime } from "../../../../lib/chat-format";
 import { errorMessage } from "../../../../lib/humanize-error";
 import {
@@ -91,7 +90,6 @@ export default function PracticeMessagesPage() {
   const params = useParams<{ dietitianAccountId: string }>();
   const searchParams = useSearchParams();
   const dietitianAccountId = params.dietitianAccountId;
-  const { aiAvailable } = usePractice();
   const preferredClientId = searchParams.get("clientId");
   const [me, setMe] = useState<Me | null>(null);
   const [rows, setRows] = useState<InboxRow[] | null>(null);
@@ -522,19 +520,6 @@ export default function PracticeMessagesPage() {
                     )}
                   </div>
                 )}
-                {aiAvailable && selectedClientId ? (
-                  <div style={{ padding: "12px 16px 0" }}>
-                    <AiPanel
-                      compact
-                      apply="message"
-                      dietitianAccountId={dietitianAccountId}
-                      clientId={selectedClientId}
-                      action="message-draft"
-                      title="Message draft"
-                      description="Draft only — review in the composer, then send."
-                    />
-                  </div>
-                ) : null}
                 <form className="ui-wa-composer" onSubmit={(event) => void onSend(event)}>
                   <textarea
                     className="ui-wa-composer__input"

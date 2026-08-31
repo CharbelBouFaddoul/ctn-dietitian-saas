@@ -120,7 +120,7 @@ export default function HomePage() {
                 {dietitianHighlights.map((feature) => (
                   <li key={feature.id}>{feature.title}</li>
                 ))}
-                <li>Invoices, tasks, analytics, and optional AI &amp; automations</li>
+                <li>Invoices, tasks, analytics, and automations</li>
               </ul>
               <div className="ui-mkt__experience-cta">
                 <Link href="/features#dietitian" className="ui-link">

@@ -57,8 +57,8 @@ const DIETITIAN_GROUPS: FeatureGroup[] = [
   },
     {
     id: "advanced",
-    title: "AI & automations",
-    featureIds: ["d-ai", "d-automations"],
+    title: "Automations",
+    featureIds: ["d-automations"],
   },
 ];
 

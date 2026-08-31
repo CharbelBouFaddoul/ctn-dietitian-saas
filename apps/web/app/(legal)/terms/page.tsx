@@ -17,7 +17,7 @@ export default function TermsPage() {
       <h2>1. The service</h2>
       <p>
         {LEGAL_PRODUCT} is clinic software: dietitians get a workspace; patients get a portal after they register and
-        join a clinic with a join code. Features depend on the clinic’s plan (for example AI or automations may be
+        join a clinic with a join code. Features depend on the clinic’s plan (for example automations may be
         add-ons). Online card checkout is not built in; plans and billing are arranged with us.
       </p>
       <p>
@@ -55,7 +55,6 @@ export default function TermsPage() {
         <li>obtain any consent your profession and local law require before storing a patient’s information;</li>
         <li>use join codes and the roster only for people you are actually caring for or onboarding;</li>
         <li>not upload files or notes you have no right to store;</li>
-        <li>not rely on optional AI output as a clinical decision — review it yourself;</li>
         <li>keep your own professional insurance, licences, and records as required outside this software.</li>
       </ul>
       <p>
@@ -108,11 +107,10 @@ export default function TermsPage() {
         as a competing dataset.
       </p>
 
-      <h2>9. Availability and AI</h2>
+      <h2>9. Availability</h2>
       <p>
-        We aim for a reliable service but do not guarantee uninterrupted uptime, error-free software, or that AI
-        suggestions are accurate. Scheduled maintenance and faults will happen. Keep copies of anything you cannot
-        afford to lose.
+        We aim for a reliable service but do not guarantee uninterrupted uptime or error-free software. Scheduled
+        maintenance and faults will happen. Keep copies of anything you cannot afford to lose.
       </p>
 
       <h2>10. Liability</h2>

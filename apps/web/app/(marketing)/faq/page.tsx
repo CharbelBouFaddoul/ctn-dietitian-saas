@@ -43,7 +43,7 @@ const FAQ_CATEGORIES = [
       },
       {
         q: "What clinic operations are included?",
-        a: "A practice dashboard, appointments and calendar, messaging, chart-scoped documents and assessments, invoices, tasks, analytics, and clinic settings. AI assistance and automations are available on plans that include those capabilities.",
+        a: "A practice dashboard, appointments and calendar, messaging, chart-scoped documents and assessments, invoices, tasks, analytics, and clinic settings. Automations are available on plans that include them.",
       },
     ],
   },
@@ -95,12 +95,8 @@ const FAQ_CATEGORIES = [
     ],
   },
   {
-    name: "AI & Automation",
+    name: "Automation",
     items: [
-      {
-        q: "Does the platform support AI?",
-        a: "Yes, as an optional plan capability. Clinic users can use AI assistance for things like client summaries, meal-plan help, nutrition assistance, consultation notes, and message drafts when the organization plan includes AI.",
-      },
       {
         q: "What do automations do?",
         a: "On plans that include automations, practices can create rules for events such as upcoming appointments, client inactivity, overdue invoices, due tasks, meal-plan endings, and check-ins — with actions like notifications, email, tasks, or portal notices.",

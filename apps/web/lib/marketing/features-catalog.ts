@@ -1,6 +1,6 @@
 export type MarketingAudience = "dietitian" | "patient";
 
-export type MarketingEntitlementKey = "AI" | "AUTOMATION";
+export type MarketingEntitlementKey = "AUTOMATION";
 
 export interface MarketingFeature {
   id: string;
@@ -221,17 +221,6 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     summary: "Track period rates, revenue trends, invoice mix, and client tracking activity with vs-prior-period deltas.",
   },
 
-  {
-    id: "d-ai",
-    audience: "dietitian",
-    category: "AI",
-    title: "AI assistance",
-    summary:
-      "Optional plan capability for client summaries, meal-plan help, nutrition assistance, consultation notes, and message drafts.",
-    entitlementKey: "AI",
-    highlight: true,
-  },
-
   // Automations
   {
     id: "d-automations",
@@ -413,7 +402,6 @@ const DIETITIAN_CATEGORY_ORDER = [
   "Invoices",
   "Tasks",
   "Analytics",
-  "AI",
   "Automations",
   "Settings",
 ] as const;

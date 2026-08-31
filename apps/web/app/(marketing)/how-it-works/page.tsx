@@ -33,7 +33,7 @@ const STEPS = [
   },
   {
     title: "Manage the nutrition journey together",
-    body: "Publish meal plans, review tracking, schedule appointments, message, invoice, and keep care organized — with optional AI and automations on eligible plans.",
+    body: "Publish meal plans, review tracking, schedule appointments, message, invoice, and keep care organized — with automations on eligible plans.",
     visual: { title: "Shared care", detail: "Plan · track · message" },
   },
 ] as const;
@@ -98,7 +98,7 @@ export default function HowItWorksPage() {
                 <li>Publish plans and review portal tracking</li>
                 <li>Run assessments and share documents on each chart</li>
                 <li>Message, schedule appointments, and manage invoices</li>
-                <li>Use analytics — plus AI and automations when your plan includes them</li>
+                <li>Use analytics — plus automations when your plan includes them</li>
               </ul>
               <Link href="/contact" className="ui-link">
                 Contact us →

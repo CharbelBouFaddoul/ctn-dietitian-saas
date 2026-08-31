@@ -24,7 +24,6 @@ import { ClientAssessmentsPanel } from "../../../../../components/client-assessm
 import { ClientClinicalProfilePanel } from "../../../../../components/client-clinical-profile-panel";
 import { ClientEvolutionPanel } from "../../../../../components/client-evolution-panel";
 import { ClientTrackingPanel } from "../../../../../components/client-tracking-panel";
-import { AiPanel } from "../../../../../components/ai-panel";
 import { ClientNutritionPanel } from "../../../../../components/client-nutrition-panel";
 import { ClientPrescriptionPanel } from "../../../../../components/client-prescription-panel";
 import { chartPrintActions } from "../../../../../components/chart-document/types";
@@ -956,31 +955,6 @@ function ClientWorkspacePage() {
               )}
             </Section>
           )}
-
-          {practice.aiAvailable ? (
-            <Section title="AI assist" description="Drafts for review — nothing is sent or published automatically.">
-              <div className="ui-stack" style={{ gap: 16 }}>
-                <AiPanel
-                  compact
-                  apply="note"
-                  dietitianAccountId={dietitianAccountId}
-                  clientId={clientId}
-                  action="client-summary"
-                  title="Client summary"
-                  description="Overview from profile, goals, and the published meal plan."
-                />
-                <AiPanel
-                  compact
-                  apply="note"
-                  dietitianAccountId={dietitianAccountId}
-                  clientId={clientId}
-                  action="consultation-summary"
-                  title="Consultation summary"
-                  description="Visit notes and follow-ups. Save as a clinical note when ready."
-                />
-              </div>
-            </Section>
-          ) : null}
 
           <Section
             title="Recent activity"

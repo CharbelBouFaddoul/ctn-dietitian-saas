@@ -70,20 +70,6 @@ const FEATURE_GROUPS: Array<{
         : null,
   },
   {
-    id: "ai",
-    keys: ["AI", "AI_REQUEST_LIMIT", "AI_TOKEN_LIMIT"],
-    label: (features) => {
-      if (!hasAny(features, ["AI"])) return null;
-      const limit = features.find((f) => f.key === "AI_REQUEST_LIMIT");
-      const tokens = features.find((f) => f.key === "AI_TOKEN_LIMIT");
-      const parts = [
-        limit?.limitValue != null ? `${limit.limitValue.toLocaleString()} requests` : null,
-        tokens?.limitValue != null ? `${tokens.limitValue.toLocaleString()} tokens` : null,
-      ].filter(Boolean);
-      return parts.length ? `AI assistance (${parts.join(" / ")} / period)` : "AI assistance";
-    },
-  },
-  {
     id: "automation",
     keys: ["AUTOMATION", "AUTOMATION_RULE_LIMIT", "AUTOMATION_EXECUTION_LIMIT"],
     label: (features) => {
