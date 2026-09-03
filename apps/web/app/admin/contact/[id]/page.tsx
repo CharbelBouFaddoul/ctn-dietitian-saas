@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { Alert, Button, LoadingState, PageHeader, Section, StatusBadge } from "@nutrition-saas/ui";
+import { Button, ConfirmDialog, LoadingState, Section, StatusBadge } from "@nutrition-saas/ui";
+import { AdminPage } from "../../_components/admin-page";
 import { statusLabel } from "../../../../lib/admin-labels";
 import { api } from "../../../../lib/api";
 import { formatDate } from "../../../../lib/format";
@@ -41,6 +42,7 @@ export default function AdminContactDetailPage() {
   const [item, setItem] = useState<ContactDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   async function load() {
     try {
@@ -81,7 +83,6 @@ export default function AdminContactDetailPage() {
   }
 
   async function onDelete() {
-    if (!window.confirm("Delete this message? This cannot be undone.")) return;
     setBusy(true);
     setError(null);
     try {
@@ -90,6 +91,7 @@ export default function AdminContactDetailPage() {
     } catch (err) {
       setError(errorMessage(err, "Unable to delete message"));
       setBusy(false);
+      setConfirmDelete(false);
     }
   }
 
@@ -103,18 +105,21 @@ export default function AdminContactDetailPage() {
     : "#";
 
   return (
-    <section>
-      <PageHeader
-        eyebrow="Operations"
-        title={item?.subject || "Message"}
-        description={item ? `From ${item.name}` : undefined}
-        actions={
-          <Link href="/admin/contact" className="ui-btn ui-btn--secondary ui-btn--sm">
-            Back to inbox
-          </Link>
-        }
-      />
-      {error ? <Alert tone="danger">{error}</Alert> : null}
+    <AdminPage
+      eyebrow="Website"
+      title={item?.subject || "Message"}
+      description={item ? `From ${item.name}` : undefined}
+      error={error}
+      crumbs={[
+        { href: "/admin/contact", label: "Inbox" },
+        { label: item?.subject || "Message" },
+      ]}
+      actions={
+        <Link href="/admin/contact" className="ui-btn ui-btn--secondary ui-btn--sm">
+          Back to inbox
+        </Link>
+      }
+    >
 
       {item ? (
         <>
@@ -138,7 +143,7 @@ export default function AdminContactDetailPage() {
                   Move to inbox
                 </Button>
               )}
-              <Button variant="danger" size="sm" disabled={busy} onClick={() => void onDelete()}>
+              <Button variant="danger" size="sm" disabled={busy} onClick={() => setConfirmDelete(true)}>
                 Delete
               </Button>
             </div>
@@ -173,6 +178,16 @@ export default function AdminContactDetailPage() {
           </Section>
         </>
       ) : null}
-    </section>
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Delete this message?"
+        description="This cannot be undone."
+        confirmLabel="Delete message"
+        danger
+        pending={busy}
+        onCancel={() => setConfirmDelete(false)}
+        onConfirm={() => void onDelete()}
+      />
+    </AdminPage>
   );
 }

@@ -10,11 +10,11 @@ import {
   Field,
   Input,
   LoadingState,
-  PageHeader,
   Section,
   StatusBadge,
 } from "@nutrition-saas/ui";
-import { roleLabel, statusLabel } from "../../../../../lib/admin-labels";
+import { AdminPage } from "../../../_components/admin-page";
+import { roleLabel, scopedStatusLabel } from "../../../../../lib/admin-labels";
 import { api } from "../../../../../lib/api";
 import { errorMessage } from "../../../../../lib/humanize-error";
 
@@ -121,7 +121,7 @@ export default function SiteAdminDetailPage() {
         body: JSON.stringify({ platformRole: null }),
       });
       setConfirmDelete(false);
-      router.push("/admin/site-settings?tab=admins");
+      router.push("/admin/admins");
     } catch (err) {
       setError(errorMessage(err, "Unable to remove admin access"));
       setBusy(false);
@@ -135,31 +135,41 @@ export default function SiteAdminDetailPage() {
 
   if (!user) {
     return (
-      <section>
-        <PageHeader eyebrow="Configuration" title="Admin" description="Unable to load this admin." />
-        {error ? <Alert tone="danger">{error}</Alert> : null}
-        <Link href="/admin/site-settings?tab=admins" className="ui-link">
+      <AdminPage
+        eyebrow="People"
+        title="Admin"
+        description="Unable to load this admin."
+        error={error}
+        crumbs={[
+          { href: "/admin/admins", label: "Admins" },
+          { label: "Admin" },
+        ]}
+      >
+        <Link href="/admin/admins" className="ui-link">
           Back to admins
         </Link>
-      </section>
+      </AdminPage>
     );
   }
 
   const displayName = [user.firstName, user.lastName].filter(Boolean).join(" ");
 
   return (
-    <section>
-      <PageHeader
-        eyebrow="Configuration"
-        title={displayName || user.email}
-        description={`${user.email} · ${statusLabel(user.status)} · ${roleLabel(user.platformRole)}`}
-        actions={
-          <Link href="/admin/site-settings?tab=admins" className="ui-btn ui-btn--secondary ui-btn--sm">
-            Back to admins
-          </Link>
-        }
-      />
-      {error ? <Alert tone="danger">{error}</Alert> : null}
+    <AdminPage
+      eyebrow="People"
+      title={displayName || user.email}
+      description={`${user.email} · ${roleLabel(user.platformRole)}`}
+      error={error}
+      crumbs={[
+        { href: "/admin/admins", label: "Admins" },
+        { label: displayName || user.email },
+      ]}
+      actions={
+        <Link href="/admin/admins" className="ui-btn ui-btn--secondary ui-btn--sm">
+          Back to admins
+        </Link>
+      }
+    >
       {message ? <Alert tone="success">{message}</Alert> : null}
 
       <Section
@@ -180,7 +190,7 @@ export default function SiteAdminDetailPage() {
         }
       >
         <div className="ui-row" style={{ marginBottom: 12 }}>
-          <StatusBadge status={user.status} label={statusLabel(user.status)} />
+          <StatusBadge status={user.status} label={scopedStatusLabel("login", user.status)} />
           <StatusBadge status="ACTIVE" label={roleLabel(user.platformRole)} />
         </div>
 
@@ -265,6 +275,6 @@ export default function SiteAdminDetailPage() {
         onCancel={() => setConfirmDelete(false)}
         onConfirm={() => void removeAdminAccess()}
       />
-    </section>
+    </AdminPage>
   );
 }

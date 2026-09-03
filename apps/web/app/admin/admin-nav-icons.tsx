@@ -84,4 +84,10 @@ export const AdminNavIcons = {
       <path d="M3 7l9 6 9-6" />
     </Icon>
   ),
+  admins: (
+    <Icon>
+      <path d="M12 3l8 4v5c0 5-3.4 8.4-8 9.5C7.4 20.4 4 17 4 12V7l8-4z" />
+      <path d="M9.5 12.2l1.7 1.7 3.5-3.6" />
+    </Icon>
+  ),
 } as const;

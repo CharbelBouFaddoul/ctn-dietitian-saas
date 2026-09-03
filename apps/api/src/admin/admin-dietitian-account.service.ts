@@ -34,6 +34,9 @@ export class AdminDietitianAccountService {
       include: {
         subscription: { include: { plan: true } },
         user: { select: { email: true } },
+        _count: {
+          select: { clients: { where: { status: { in: ["PENDING", "ACTIVE"] } } } },
+        },
       },
       orderBy: { createdAt: "desc" },
       take: 100,
@@ -43,8 +46,21 @@ export class AdminDietitianAccountService {
   }
 
   async get(dietitianAccountId: string) {
-    const account = await this.requireAccount(dietitianAccountId);
+    const account = await this.prisma.dietitianAccount.findUnique({
+      where: { id: dietitianAccountId },
+      include: {
+        settings: true,
+        subscription: { include: { plan: true } },
+        user: { select: { id: true, email: true, status: true, firstName: true, lastName: true } },
+      },
+    });
+    if (!account) {
+      throw new NotFoundException(ADMIN_MESSAGES.dietitianAccountNotFound);
+    }
     const entitlements = await this.entitlements.listEffective(dietitianAccountId);
+    const patientCount = await this.prisma.client.count({
+      where: { dietitianAccountId, status: { in: ["PENDING", "ACTIVE"] } },
+    });
     return {
       id: account.id,
       name: account.displayName,
@@ -53,6 +69,16 @@ export class AdminDietitianAccountService {
       createdAt: account.createdAt.toISOString(),
       archivedAt: account.archivedAt?.toISOString() ?? null,
       suspendedAt: account.suspendedAt?.toISOString() ?? null,
+      patientCount,
+      owner: account.user
+        ? {
+            id: account.user.id,
+            email: account.user.email,
+            status: account.user.status,
+            firstName: account.user.firstName,
+            lastName: account.user.lastName,
+          }
+        : null,
       settings: account.settings
         ? {
             timezone: account.settings.timezone,
@@ -96,6 +122,51 @@ export class AdminDietitianAccountService {
     return this.entitlements.listEffective(dietitianAccountId);
   }
 
+  async listClients(dietitianAccountId: string) {
+    await this.requireAccount(dietitianAccountId);
+    const where = { dietitianAccountId };
+    const [total, clients] = await Promise.all([
+      this.prisma.client.count({ where }),
+      this.prisma.client.findMany({
+        where,
+        include: {
+          account: {
+            select: {
+              id: true,
+              status: true,
+              user: { select: { id: true, email: true, status: true } },
+            },
+          },
+        },
+        orderBy: [{ status: "asc" }, { lastName: "asc" }, { firstName: "asc" }],
+        take: 200,
+      }),
+    ]);
+
+    return {
+      total,
+      items: clients.map((client) => ({
+        id: client.id,
+        firstName: client.firstName,
+        lastName: client.lastName,
+        displayName: client.displayName,
+        email: client.email,
+        phone: client.phone,
+        status: client.status,
+        isTrialSeed: client.isTrialSeed,
+        createdAt: client.createdAt.toISOString(),
+        portalUser: client.account?.user
+          ? {
+              id: client.account.user.id,
+              email: client.account.user.email,
+              status: client.account.user.status,
+              accountStatus: client.account.status,
+            }
+          : null,
+      })),
+    };
+  }
+
   private async requireAccount(dietitianAccountId: string) {
     const account = await this.prisma.dietitianAccount.findUnique({
       where: { id: dietitianAccountId },
@@ -117,6 +188,7 @@ export class AdminDietitianAccountService {
     status: string;
     createdAt: Date;
     user?: { email: string } | null;
+    _count?: { clients: number };
     subscription: {
       status: string;
       plan: { id: string; name: string; slug: string };
@@ -129,6 +201,7 @@ export class AdminDietitianAccountService {
       status: account.status,
       ownerEmail: account.user?.email ?? null,
       createdAt: account.createdAt.toISOString(),
+      patientCount: account._count?.clients ?? 0,
       subscription: account.subscription
         ? {
             status: account.subscription.status,

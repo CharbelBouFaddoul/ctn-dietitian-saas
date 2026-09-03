@@ -2,23 +2,17 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import {
-  Alert,
-  EmptyState,
-  LoadingState,
-  PageHeader,
-  Section,
-  StatusBadge,
-  Table,
-  Td,
-} from "@nutrition-saas/ui";
-import { statusLabel } from "../../../lib/admin-labels";
+import { EmptyState, LoadingState, Section, StatusBadge, Table, Td } from "@nutrition-saas/ui";
+import { AdminPage } from "../_components/admin-page";
+import { scopedStatusLabel } from "../../../lib/admin-labels";
 import { api } from "../../../lib/api";
+import { formatDate } from "../../../lib/format";
 import { errorMessage } from "../../../lib/humanize-error";
 
 interface SubscriptionRow {
   id: string;
   status: string;
+  currentPeriodEnd: string | null;
   dietitianAccount: { id: string; name: string };
   plan: { name: string; slug: string };
 }
@@ -34,18 +28,16 @@ export default function AdminSubscriptionsPage() {
   }, []);
 
   return (
-    <section>
-      <PageHeader
-        eyebrow="Commerce"
-        title="Subscriptions"
-        description="One subscription per clinic. Payment UI is out of scope for V1."
-      />
-      {error ? <Alert tone="danger">{error}</Alert> : null}
-
+    <AdminPage
+      eyebrow="Product"
+      title="Subscriptions"
+      description="Roster of clinic subscriptions. Open a clinic to assign, renew, or change access."
+      error={error}
+    >
       <Section title="All subscriptions">
         {rows === null ? <LoadingState>Loading subscriptions…</LoadingState> : null}
         {rows && rows.length === 0 ? (
-          <EmptyState title="No subscriptions yet">Subscriptions appear when practices are assigned a plan.</EmptyState>
+          <EmptyState title="No subscriptions yet">Subscriptions appear when a clinic is assigned a plan.</EmptyState>
         ) : null}
         {rows && rows.length > 0 ? (
           <Table>
@@ -53,20 +45,22 @@ export default function AdminSubscriptionsPage() {
               <tr>
                 <th>Clinic</th>
                 <th>Plan</th>
-                <th>Status</th>
+                <th>Period end</th>
+                <th>Subscription</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row) => (
                 <tr key={row.id}>
                   <Td label="Clinic">
-                    <Link href={`/admin/dietitians/${row.dietitianAccount.id}`} className="ui-link">
+                    <Link href={`/admin/dietitians/${row.dietitianAccount.id}?tab=subscription`} className="ui-link">
                       {row.dietitianAccount.name}
                     </Link>
                   </Td>
                   <Td label="Plan">{row.plan.name}</Td>
-                  <Td label="Status">
-                    <StatusBadge status={row.status} label={statusLabel(row.status)} />
+                  <Td label="Period end">{row.currentPeriodEnd ? formatDate(row.currentPeriodEnd) : "Open-ended"}</Td>
+                  <Td label="Subscription">
+                    <StatusBadge status={row.status} label={scopedStatusLabel("subscription", row.status)} />
                   </Td>
                 </tr>
               ))}
@@ -74,6 +68,6 @@ export default function AdminSubscriptionsPage() {
           </Table>
         ) : null}
       </Section>
-    </section>
+    </AdminPage>
   );
 }

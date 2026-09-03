@@ -3,15 +3,8 @@
 import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  Alert,
-  Button,
-  Field,
-  Input,
-  PageHeader,
-  Section,
-  Select,
-} from "@nutrition-saas/ui";
+import { Button, Field, Input, Section, Select } from "@nutrition-saas/ui";
+import { AdminPage } from "../../_components/admin-page";
 import { api } from "../../../../lib/api";
 import { errorMessage } from "../../../../lib/humanize-error";
 
@@ -34,26 +27,28 @@ export default function AdminCreateFeaturePage() {
       });
       router.push("/admin/features");
     } catch (err) {
-      setError(errorMessage(err, "Unable to create feature"));
+      setError(errorMessage(err, "Unable to create entitlement"));
       setBusy(false);
     }
   }
 
   return (
-    <section>
-      <PageHeader
-        eyebrow="Catalog"
-        title="Add feature"
-        description="Define a new global catalog feature used by subscription plans."
-        actions={
-          <Link href="/admin/features" className="ui-btn ui-btn--secondary ui-btn--sm">
-            Back to features
-          </Link>
-        }
-      />
-      {error ? <Alert tone="danger">{error}</Alert> : null}
-
-      <Section title="Feature details">
+    <AdminPage
+      eyebrow="Product"
+      title="Add entitlement"
+      description="Define a global catalog key used by subscription plans."
+      error={error}
+      crumbs={[
+        { href: "/admin/features", label: "Entitlements" },
+        { label: "Add entitlement" },
+      ]}
+      actions={
+        <Link href="/admin/features" className="ui-btn ui-btn--secondary ui-btn--sm">
+          Back to entitlements
+        </Link>
+      }
+    >
+      <Section title="Entitlement details">
         <form onSubmit={(event) => void onCreate(event)} className="ui-stack" style={{ maxWidth: 480 }}>
           <Field label="Key">
             <Input value={key} onChange={(event) => setKey(event.target.value)} placeholder="FEATURE_KEY" required />
@@ -68,10 +63,10 @@ export default function AdminCreateFeaturePage() {
             </Select>
           </Field>
           <Button type="submit" disabled={busy}>
-            {busy ? "Creating…" : "Create feature"}
+            {busy ? "Creating…" : "Create entitlement"}
           </Button>
         </form>
       </Section>
-    </section>
+    </AdminPage>
   );
 }

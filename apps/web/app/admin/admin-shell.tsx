@@ -85,38 +85,44 @@ export function AdminShell({ children }: { children: ReactNode }) {
       items: [{ href: "/admin", label: "Dashboard", icon: AdminNavIcons.dashboard, exact: true }],
     },
     {
-      label: "Platform",
+      label: "People",
       items: [
-        { href: "/admin/dietitians", label: "Dietitians", icon: AdminNavIcons.dietitians },
-        { href: "/admin/users", label: "Users", icon: AdminNavIcons.users },
+        { href: "/admin/dietitians", label: "Clinics", icon: AdminNavIcons.dietitians },
+        { href: "/admin/users", label: "Accounts", icon: AdminNavIcons.users },
+        {
+          href: "/admin/admins",
+          label: "Admins",
+          icon: AdminNavIcons.admins,
+          matchPrefixes: ["/admin/site-settings/admins"],
+        },
       ],
     },
     {
-      label: "Commerce",
+      label: "Product",
       items: [
-        { href: "/admin/subscriptions", label: "Subscriptions", icon: AdminNavIcons.subscriptions },
         { href: "/admin/plans", label: "Plans", icon: AdminNavIcons.plans },
+        { href: "/admin/features", label: "Entitlements", icon: AdminNavIcons.features },
+        { href: "/admin/subscriptions", label: "Subscriptions", icon: AdminNavIcons.subscriptions },
       ],
     },
     {
-      label: "Catalog",
+      label: "Website",
       items: [
-        { href: "/admin/food-sources", label: "Food database", icon: AdminNavIcons.foods },
-        { href: "/admin/features", label: "Features", icon: AdminNavIcons.features },
+        { href: "/admin/site-settings", label: "Site", icon: AdminNavIcons.site, exact: true },
+        { href: "/admin/contact", label: "Inbox", icon: AdminNavIcons.contact },
       ],
     },
     {
-      label: "Operations",
+      label: "Data",
+      items: [{ href: "/admin/food-sources", label: "Food database", icon: AdminNavIcons.foods }],
+    },
+    {
+      label: "System",
       items: [
-        { href: "/admin/contact", label: "Contact", icon: AdminNavIcons.contact },
         { href: "/admin/audit", label: "Audit", icon: AdminNavIcons.audit },
         { href: "/admin/ai", label: "AI usage", icon: AdminNavIcons.ai },
-        { href: "/admin/health", label: "System health", icon: AdminNavIcons.health },
+        { href: "/admin/health", label: "Health", icon: AdminNavIcons.health },
       ],
-    },
-    {
-      label: "Configuration",
-      items: [{ href: "/admin/site-settings", label: "Site", icon: AdminNavIcons.site }],
     },
   ];
 

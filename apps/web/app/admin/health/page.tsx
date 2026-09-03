@@ -5,13 +5,13 @@ import {
   Alert,
   EmptyState,
   LoadingState,
-  PageHeader,
   Section,
   StatusBadge,
   Table,
   Td,
 } from "@nutrition-saas/ui";
-import { healthStatusLabel } from "../../../lib/admin-labels";
+import { healthBadgeTone, healthStatusLabel } from "../../../lib/admin-labels";
+import { AdminPage } from "../_components/admin-page";
 import { API_URL } from "../../../lib/api";
 import { humanizeLabel } from "@nutrition-saas/ui";
 
@@ -46,12 +46,11 @@ export default function AdminHealthPage() {
     : [];
 
   return (
-    <section>
-      <PageHeader
-        eyebrow="Operations"
-        title="System health"
-        description="Live checks for API, database, and related services."
-      />
+    <AdminPage
+      eyebrow="System"
+      title="Health"
+      description="Live checks for API, database, and related services."
+    >
       {error ? <Alert tone="warning">{error}</Alert> : null}
 
       <Section title="Overall status" tone="mint">
@@ -65,7 +64,7 @@ export default function AdminHealthPage() {
                 Platform status from the health endpoint.
               </p>
             </div>
-            <StatusBadge status={overall === "Operational" ? "ACTIVE" : "SUSPENDED"} label={overall} />
+            <StatusBadge status={overall === "Operational" ? "ACTIVE" : overall} label={overall} tone={healthBadgeTone(overall)} />
           </div>
         )}
       </Section>
@@ -91,7 +90,7 @@ export default function AdminHealthPage() {
                   <tr key={row.name}>
                     <Td label="Service">{humanizeLabel(row.name)}</Td>
                     <Td label="Status">
-                      <StatusBadge status={label === "Operational" ? "ACTIVE" : "SUSPENDED"} label={label} />
+                      <StatusBadge status={label === "Operational" ? "ACTIVE" : label} label={label} tone={healthBadgeTone(label)} />
                     </Td>
                     <Td label="Detail">{row.message || "—"}</Td>
                   </tr>
@@ -101,6 +100,6 @@ export default function AdminHealthPage() {
           </Table>
         ) : null}
       </Section>
-    </section>
+    </AdminPage>
   );
 }

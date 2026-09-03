@@ -3,19 +3,20 @@
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import {
-  Alert,
   Button,
   EmptyState,
   Field,
   Input,
   LoadingState,
-  PageHeader,
   Section,
+  Select,
   StatusBadge,
   Table,
   Td,
 } from "@nutrition-saas/ui";
-import { statusLabel } from "../../../lib/admin-labels";
+import { AdminListToolbar } from "../_components/admin-list-toolbar";
+import { AdminPage } from "../_components/admin-page";
+import { scopedStatusLabel } from "../../../lib/admin-labels";
 import { api } from "../../../lib/api";
 import { errorMessage } from "../../../lib/humanize-error";
 
@@ -24,12 +25,15 @@ interface DietitianRow {
   name: string;
   slug: string;
   status: string;
+  ownerEmail: string | null;
+  patientCount?: number;
   subscription: { status: string; plan: { name: string; slug: string } } | null;
 }
 
 export default function AdminDietitiansPage() {
   const [rows, setRows] = useState<DietitianRow[] | null>(null);
   const [q, setQ] = useState("");
+  const [status, setStatus] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   async function load(search = q) {
@@ -38,7 +42,7 @@ export default function AdminDietitiansPage() {
       setRows(await api<DietitianRow[]>(path));
       setError(null);
     } catch (err) {
-      setError(errorMessage(err, "Unable to load dietitians"));
+      setError(errorMessage(err, "Unable to load clinics"));
     }
   }
 
@@ -46,44 +50,59 @@ export default function AdminDietitiansPage() {
     void load("");
   }, []);
 
+  const visible = rows?.filter((row) => !status || row.status === status) ?? null;
+
   function onSearch(event: FormEvent) {
     event.preventDefault();
     void load(q);
   }
 
   return (
-    <section>
-      <PageHeader
-        eyebrow="Platform"
-        title="Dietitians"
-        description="Practices on the platform — status, plan, and subscription."
-      />
-      {error ? <Alert tone="danger">{error}</Alert> : null}
-
-      <Section title="All dietitians">
-        <form onSubmit={onSearch} className="ui-admin-toolbar">
+    <AdminPage
+      eyebrow="People"
+      title="Clinics"
+      description="Each clinic is a practice: owner login, subscription, and entitlements live here."
+      error={error}
+      actions={
+        <Link href="/admin/dietitians/new" className="ui-btn ui-btn--primary ui-btn--sm">
+          Add clinic
+        </Link>
+      }
+    >
+      <Section title="All clinics">
+        <AdminListToolbar onSubmit={onSearch}>
           <Field label="Search">
-            <Input value={q} onChange={(event) => setQ(event.target.value)} placeholder="Name or slug" />
+            <Input value={q} onChange={(event) => setQ(event.target.value)} placeholder="Name, slug, or owner email" />
+          </Field>
+          <Field label="Clinic status">
+            <Select value={status} onChange={(event) => setStatus(event.target.value)}>
+              <option value="">All statuses</option>
+              <option value="ACTIVE">Active</option>
+              <option value="SUSPENDED">Suspended</option>
+              <option value="ARCHIVED">Archived</option>
+            </Select>
           </Field>
           <Button type="submit">Search</Button>
-        </form>
+        </AdminListToolbar>
 
-        {rows === null ? <LoadingState>Loading dietitians…</LoadingState> : null}
-        {rows && rows.length === 0 ? (
-          <EmptyState title="No dietitians found">Try a different search, or wait for practices to join.</EmptyState>
+        {rows === null ? <LoadingState>Loading clinics…</LoadingState> : null}
+        {visible && visible.length === 0 ? (
+          <EmptyState title="No clinics found">Try a different search or status.</EmptyState>
         ) : null}
-        {rows && rows.length > 0 ? (
+        {visible && visible.length > 0 ? (
           <Table>
             <thead>
               <tr>
                 <th>Clinic</th>
-                <th>Status</th>
+                <th>Owner</th>
+                <th>Patients</th>
+                <th>Clinic status</th>
                 <th>Plan</th>
                 <th>Subscription</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
+              {visible.map((row) => (
                 <tr key={row.id}>
                   <Td label="Clinic">
                     <Link href={`/admin/dietitians/${row.id}`} className="ui-link">
@@ -93,13 +112,22 @@ export default function AdminDietitiansPage() {
                       {row.slug}
                     </div>
                   </Td>
-                  <Td label="Status">
-                    <StatusBadge status={row.status} label={statusLabel(row.status)} />
+                  <Td label="Owner">{row.ownerEmail || "—"}</Td>
+                  <Td label="Patients">
+                    <Link href={`/admin/dietitians/${row.id}?tab=patients`} className="ui-link">
+                      {row.patientCount ?? 0}
+                    </Link>
+                  </Td>
+                  <Td label="Clinic status">
+                    <StatusBadge status={row.status} label={scopedStatusLabel("clinic", row.status)} />
                   </Td>
                   <Td label="Plan">{row.subscription?.plan.name ?? "None"}</Td>
                   <Td label="Subscription">
                     {row.subscription ? (
-                      <StatusBadge status={row.subscription.status} label={statusLabel(row.subscription.status)} />
+                      <StatusBadge
+                        status={row.subscription.status}
+                        label={scopedStatusLabel("subscription", row.subscription.status)}
+                      />
                     ) : (
                       "—"
                     )}
@@ -110,6 +138,6 @@ export default function AdminDietitiansPage() {
           </Table>
         ) : null}
       </Section>
-    </section>
+    </AdminPage>
   );
 }

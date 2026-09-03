@@ -4,17 +4,16 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
-  Alert,
   Button,
   EmptyState,
   LoadingState,
-  PageHeader,
   Section,
   StatusBadge,
   Table,
   Td,
 } from "@nutrition-saas/ui";
-import { roleLabel, statusLabel } from "../../../../lib/admin-labels";
+import { AdminPage } from "../../_components/admin-page";
+import { roleLabel, scopedStatusLabel } from "../../../../lib/admin-labels";
 import { api } from "../../../../lib/api";
 import { errorMessage } from "../../../../lib/humanize-error";
 
@@ -58,7 +57,7 @@ export default function AdminUserDetailPage() {
       setUser(data);
       setError(null);
     } catch (err) {
-      setError(errorMessage(err, "Unable to load user"));
+      setError(errorMessage(err, "Unable to load account"));
     }
   }
 
@@ -76,47 +75,49 @@ export default function AdminUserDetailPage() {
       });
       await load();
     } catch (err) {
-      setError(errorMessage(err, "Unable to update user"));
+      setError(errorMessage(err, "Unable to update account"));
     } finally {
       setBusy(false);
     }
   }
 
   if (!user && !error) {
-    return <LoadingState>Loading user…</LoadingState>;
+    return <LoadingState>Loading account…</LoadingState>;
   }
 
   if (!user) {
     return (
-      <section>
-        <PageHeader title="User" description="Unable to load this user." />
-        {error ? <Alert tone="danger">{error}</Alert> : null}
+      <AdminPage title="Account" description="Unable to load this account." error={error}>
         <Link href="/admin/users" className="ui-link">
-          Back to users
+          Back to accounts
         </Link>
-      </section>
+      </AdminPage>
     );
   }
 
   const displayName = [user.firstName, user.lastName].filter(Boolean).join(" ");
+  const typeLabel =
+    user.accountType === "patient" ? "Patient" : user.accountType === "both" ? "Dietitian & patient" : "Dietitian";
 
   return (
-    <section>
-      <PageHeader
-        eyebrow="Platform"
-        title={displayName || user.email}
-        description={`${user.email} · ${statusLabel(user.status)} · ${user.accountType === "patient" ? "Patient" : user.accountType === "both" ? "Dietitian & patient" : "Dietitian"}`}
-        actions={
-          <Link href="/admin/users" className="ui-btn ui-btn--secondary ui-btn--sm">
-            Back to users
-          </Link>
-        }
-      />
-      {error ? <Alert tone="danger">{error}</Alert> : null}
-
-      <Section title="Account status" tone="mint" description="Activate, suspend, or archive this dietitian or patient login.">
+    <AdminPage
+      eyebrow="People"
+      title={displayName || user.email}
+      description={`${user.email} · ${typeLabel}`}
+      error={error}
+      crumbs={[
+        { href: "/admin/users", label: "Accounts" },
+        { label: displayName || user.email },
+      ]}
+      actions={
+        <Link href="/admin/users" className="ui-btn ui-btn--secondary ui-btn--sm">
+          Back to accounts
+        </Link>
+      }
+    >
+      <Section title="Login status" tone="mint" description="Activate, suspend, or archive this dietitian or patient login.">
         <div className="ui-row" style={{ marginBottom: 12 }}>
-          <StatusBadge status={user.status} label={statusLabel(user.status)} />
+          <StatusBadge status={user.status} label={scopedStatusLabel("login", user.status)} />
         </div>
         <div className="ui-admin-actions">
           <Button disabled={busy} onClick={() => void setStatus("ACTIVE")}>
@@ -132,27 +133,27 @@ export default function AdminUserDetailPage() {
       </Section>
 
       {user.dietitianAccount ? (
-        <Section title="Dietitian clinic">
+        <Section title="Clinic">
           <Table>
             <thead>
               <tr>
                 <th>Clinic</th>
                 <th>Role</th>
-                <th>Status</th>
+                <th>Clinic status</th>
               </tr>
             </thead>
             <tbody>
               <tr>
                 <Td label="Clinic">
-                  <Link href={`/admin/dietitians/${user.dietitianAccount.id}`} className="ui-link">
+                  <Link href={`/admin/dietitians/${user.dietitianAccount.id}?tab=access`} className="ui-link">
                     {user.dietitianAccount.displayName}
                   </Link>
                 </Td>
                 <Td label="Role">{roleLabel("OWNER")}</Td>
-                <Td label="Status">
+                <Td label="Clinic status">
                   <StatusBadge
                     status={user.dietitianAccount.status}
-                    label={statusLabel(user.dietitianAccount.status)}
+                    label={scopedStatusLabel("clinic", user.dietitianAccount.status)}
                   />
                 </Td>
               </tr>
@@ -181,7 +182,7 @@ export default function AdminUserDetailPage() {
                     </Link>
                   </Td>
                   <Td label="Status">
-                    <StatusBadge status={account.status} label={statusLabel(account.status)} />
+                    <StatusBadge status={account.status} label={scopedStatusLabel("clinic", account.status)} />
                   </Td>
                 </tr>
               ))}
@@ -191,12 +192,12 @@ export default function AdminUserDetailPage() {
       ) : null}
 
       {!user.dietitianAccount && (!user.clientAccounts || user.clientAccounts.length === 0) ? (
-        <Section title="Linked accounts">
+        <Section title="Linked records">
           <EmptyState title="No clinic or patient link">
             This login is not connected to a dietitian clinic or patient chart.
           </EmptyState>
         </Section>
       ) : null}
-    </section>
+    </AdminPage>
   );
 }

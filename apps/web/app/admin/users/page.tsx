@@ -3,21 +3,21 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  Alert,
   Button,
   EmptyState,
   Field,
   Input,
   LoadingState,
-  PageHeader,
   Section,
   Select,
   StatusBadge,
   Table,
   Td,
 } from "@nutrition-saas/ui";
+import { AdminListToolbar } from "../_components/admin-list-toolbar";
+import { AdminPage } from "../_components/admin-page";
 import { AdminPagination } from "../_components/admin-pagination";
-import { statusLabel } from "../../../lib/admin-labels";
+import { scopedStatusLabel } from "../../../lib/admin-labels";
 import { api } from "../../../lib/api";
 import { errorMessage } from "../../../lib/humanize-error";
 
@@ -71,7 +71,7 @@ export default function AdminUsersPage() {
         setData(await api<UsersListResponse>(`/api/v1/admin/users?${listQuery}`));
         setError(null);
       } catch (err) {
-        setError(errorMessage(err, "Unable to load users"));
+        setError(errorMessage(err, "Unable to load accounts"));
       }
     })();
   }, [listQuery]);
@@ -85,21 +85,19 @@ export default function AdminUsersPage() {
   const rows = data?.items ?? null;
 
   return (
-    <section>
-      <PageHeader
-        eyebrow="Platform"
-        title="Users"
-        description="Dietitian and patient accounts. Platform admins are managed under Site → Admins."
-        actions={
-          <Link href="/admin/users/new" className="ui-btn ui-btn--primary ui-btn--sm">
-            Add user
-          </Link>
-        }
-      />
-      {error ? <Alert tone="danger">{error}</Alert> : null}
-
-      <Section title="All users">
-        <form onSubmit={onSearch} className="ui-admin-toolbar">
+    <AdminPage
+      eyebrow="People"
+      title="Accounts"
+      description="Dietitian and patient logins. Platform operators are under Admins."
+      error={error}
+      actions={
+        <Link href="/admin/users/new" className="ui-btn ui-btn--primary ui-btn--sm">
+          Add patient
+        </Link>
+      }
+    >
+      <Section title="All accounts">
+        <AdminListToolbar onSubmit={onSearch}>
           <Field label="Search">
             <Input value={q} onChange={(event) => setQ(event.target.value)} placeholder="Email" />
           </Field>
@@ -116,7 +114,7 @@ export default function AdminUsersPage() {
               <option value="patient">Patient</option>
             </Select>
           </Field>
-          <Field label="Status">
+          <Field label="Login status">
             <Select
               value={status}
               onChange={(event) => {
@@ -132,11 +130,11 @@ export default function AdminUsersPage() {
             </Select>
           </Field>
           <Button type="submit">Search</Button>
-        </form>
+        </AdminListToolbar>
 
-        {rows === null && !error ? <LoadingState>Loading users…</LoadingState> : null}
+        {rows === null && !error ? <LoadingState>Loading accounts…</LoadingState> : null}
         {rows && rows.length === 0 ? (
-          <EmptyState title="No users found">Try another search or filter.</EmptyState>
+          <EmptyState title="No accounts found">Try another search or filter.</EmptyState>
         ) : null}
         {rows && rows.length > 0 ? (
           <Table>
@@ -145,7 +143,7 @@ export default function AdminUsersPage() {
                 <th>Email</th>
                 <th>Name</th>
                 <th>Type</th>
-                <th>Status</th>
+                <th>Login status</th>
               </tr>
             </thead>
             <tbody>
@@ -159,7 +157,7 @@ export default function AdminUsersPage() {
                   <Td>{row.displayName || "—"}</Td>
                   <Td>{accountTypeLabel(row.accountType)}</Td>
                   <Td>
-                    <StatusBadge status={row.status} label={statusLabel(row.status)} />
+                    <StatusBadge status={row.status} label={scopedStatusLabel("login", row.status)} />
                   </Td>
                 </tr>
               ))}
@@ -173,10 +171,10 @@ export default function AdminUsersPage() {
             pageSize={data.pageSize}
             total={data.total}
             onPageChange={setPage}
-            label="users"
+            label="accounts"
           />
         ) : null}
       </Section>
-    </section>
+    </AdminPage>
   );
 }

@@ -4,13 +4,12 @@ import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Alert,
   Button,
   Field,
   Input,
-  PageHeader,
   Section,
 } from "@nutrition-saas/ui";
+import { AdminPage } from "../../_components/admin-page";
 import { api } from "../../../../lib/api";
 import { errorMessage } from "../../../../lib/humanize-error";
 
@@ -58,19 +57,21 @@ export default function AdminCreatePlanPage() {
   }
 
   return (
-    <section>
-      <PageHeader
-        eyebrow="Commerce"
-        title="Create plan"
-        description="Add a new subscription plan. You can configure features after creation."
-        actions={
-          <Link href="/admin/plans" className="ui-btn ui-btn--secondary ui-btn--sm">
-            Back to plans
-          </Link>
-        }
-      />
-      {error ? <Alert tone="danger">{error}</Alert> : null}
-
+    <AdminPage
+      eyebrow="Product"
+      title="Create plan"
+      description="Add a new subscription plan. Configure entitlements after creation."
+      error={error}
+      crumbs={[
+        { href: "/admin/plans", label: "Plans" },
+        { label: "Create plan" },
+      ]}
+      actions={
+        <Link href="/admin/plans" className="ui-btn ui-btn--secondary ui-btn--sm">
+          Back to plans
+        </Link>
+      }
+    >
       <Section title="Plan details">
         <form onSubmit={(event) => void onCreate(event)} className="ui-stack" style={{ maxWidth: 480 }}>
           <Field label="Name">
@@ -121,6 +122,6 @@ export default function AdminCreatePlanPage() {
           </Button>
         </form>
       </Section>
-    </section>
+    </AdminPage>
   );
 }

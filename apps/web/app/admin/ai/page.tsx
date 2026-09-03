@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Alert, PageHeader, Section, Table, Td, TrendChart, type TrendPoint } from "@nutrition-saas/ui";
+import { Section, Table, Td, TrendChart, type TrendPoint } from "@nutrition-saas/ui";
+import { AdminPage } from "../_components/admin-page";
 import { api } from "../../../lib/api";
 import { errorMessage } from "../../../lib/humanize-error";
 
@@ -49,13 +50,12 @@ export default function AdminAiUsagePage() {
   );
 
   return (
-    <section className="ui-analytics">
-      <PageHeader
-        eyebrow="Operations"
-        title="AI usage"
-        description="Tokens, estimated USD, and request volume across all practices this month."
-      />
-      {error ? <Alert tone="danger">{error}</Alert> : null}
+    <AdminPage
+      eyebrow="System"
+      title="AI usage"
+      description="Tokens, estimated USD, and request volume across all practices this month."
+      error={error}
+    >
 
       <div className="ui-kpi-strip ui-kpi-strip--3">
         <div className="ui-kpi">
@@ -119,6 +119,6 @@ export default function AdminAiUsagePage() {
           </Table>
         )}
       </Section>
-    </section>
+    </AdminPage>
   );
 }

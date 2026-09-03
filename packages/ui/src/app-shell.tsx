@@ -11,6 +11,8 @@ export interface NavItem {
   icon?: ReactNode;
   /** Prefer exact pathname match (e.g. Dashboard at `/orgs/:id`). */
   exact?: boolean;
+  /** Extra path prefixes that should mark this item active. */
+  matchPrefixes?: string[];
   /** Optional section key when using flat `nav` (legacy). */
   section?: string;
   /** Unread / notification count shown on the right of the item. */
@@ -38,11 +40,20 @@ const DefaultLink: ShellLink = ({ href, className, children, onClick, title, ...
   </a>
 );
 
+function pathOnly(href: string): string {
+  const q = href.indexOf("?");
+  return q === -1 ? href : href.slice(0, q);
+}
+
 function isActive(pathname: string | undefined, item: NavItem, rootHref?: string): boolean {
   if (!pathname) return false;
-  if (item.exact) return pathname === item.href;
-  if (rootHref && item.href === rootHref) return pathname === item.href;
-  return pathname === item.href || pathname.startsWith(`${item.href}/`);
+  const href = pathOnly(item.href);
+  if (item.matchPrefixes?.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))) {
+    return true;
+  }
+  if (item.exact) return pathname === href;
+  if (rootHref && href === rootHref) return pathname === href;
+  return pathname === href || pathname.startsWith(`${href}/`);
 }
 
 export function AppShell({

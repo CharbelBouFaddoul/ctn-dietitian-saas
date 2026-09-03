@@ -138,6 +138,57 @@ describe("platform admin, entitlements, and audit", () => {
     expect(roleChange.body.platformRole).toBe("ADMIN");
   });
 
+  it("shows how many patients a clinic has and who they are", async () => {
+    const admin = await makePlatformUser("ADMIN");
+    const owner = await registerVerifyLogin();
+    const org = await createOrg(owner.cookie, "Patient Roster");
+    await activateStandardSubscription(ctx.prisma, org.id);
+
+    const created = await request(ctx.app.getHttpServer())
+      .post(`/api/v1/dietitian/${org.id}/clients`)
+      .set("Cookie", owner.cookie)
+      .send({
+        firstName: "Ada",
+        lastName: "Lovelace",
+        email: "ada.roster@example.com",
+        phone: "+961111111",
+      })
+      .expect(201);
+
+    const listed = await request(ctx.app.getHttpServer())
+      .get("/api/v1/admin/dietitians")
+      .set("Cookie", admin.cookie)
+      .expect(200);
+    const row = listed.body.find((item: { id: string }) => item.id === org.id);
+    expect(row.patientCount).toBe(1);
+
+    const detail = await request(ctx.app.getHttpServer())
+      .get(`/api/v1/admin/dietitians/${org.id}`)
+      .set("Cookie", admin.cookie)
+      .expect(200);
+    expect(detail.body.patientCount).toBe(1);
+
+    const roster = await request(ctx.app.getHttpServer())
+      .get(`/api/v1/admin/dietitians/${org.id}/clients`)
+      .set("Cookie", admin.cookie)
+      .expect(200);
+    expect(roster.body.total).toBe(1);
+    expect(roster.body.items).toHaveLength(1);
+    expect(roster.body.items[0]).toMatchObject({
+      id: created.body.id,
+      firstName: "Ada",
+      lastName: "Lovelace",
+      email: "ada.roster@example.com",
+      phone: "+961111111",
+      status: "ACTIVE",
+    });
+
+    const asOwner = await request(ctx.app.getHttpServer())
+      .get(`/api/v1/admin/dietitians/${org.id}/clients`)
+      .set("Cookie", owner.cookie);
+    expect(asOwner.status).toBe(403);
+  });
+
   it("allows platform admin to set platform roles", async () => {
     const platformAdmin = await makePlatformUser("ADMIN");
     const user = await registerVerifyLogin();

@@ -3515,6 +3515,154 @@
   align-items: center;
 }
 
+.ui-admin-page {
+  display: grid;
+  gap: 0;
+}
+
+.ui-admin-crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0 0 0.65rem;
+  font-size: 0.8rem;
+  color: var(--color-muted);
+}
+
+.ui-admin-crumbs__sep {
+  color: rgb(15 23 42 / 28%);
+  margin: 0 0.1rem;
+}
+
+.ui-admin-detail {
+  display: grid;
+  gap: 1rem;
+  align-items: start;
+}
+
+@media (min-width: 960px) {
+  .ui-admin-detail:not(.ui-admin-detail--plain) {
+    grid-template-columns: minmax(16rem, 0.34fr) minmax(0, 1fr);
+  }
+}
+
+.ui-admin-detail__meta {
+  padding: 1rem 1.05rem 1.1rem;
+  border-radius: 14px;
+  background: rgb(255 255 255 / 96%);
+  border: 1px solid rgb(15 23 42 / 7%);
+  box-shadow: 0 1px 2px rgb(15 23 42 / 3%), 0 8px 22px rgb(15 23 42 / 3%);
+}
+
+.ui-admin-detail__meta .ui-admin-meta {
+  margin-top: 0.85rem;
+}
+
+.ui-admin-detail__main {
+  min-width: 0;
+}
+
+.ui-admin-detail__main .ui-tabs--line {
+  margin-bottom: 0;
+}
+
+.ui-admin-detail__body > .ui-section:first-child {
+  margin-top: 0;
+}
+
+.ui-admin-roster {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+  padding-top: 0.85rem;
+}
+
+.ui-admin-roster__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.ui-admin-roster__head h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.ui-admin-roster__head p {
+  margin: 0.2rem 0 0;
+  font-size: 0.85rem;
+  color: var(--color-muted);
+}
+
+.ui-admin-roster .ui-admin-metrics {
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+  margin-bottom: 0;
+}
+
+button.ui-admin-metric {
+  appearance: none;
+  margin: 0;
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ui-admin-metric.is-active {
+  border-color: rgb(13 148 136 / 34%);
+  background: linear-gradient(160deg, #f0fdfa 0%, #ffffff 70%);
+  box-shadow: 0 0 0 1px rgb(13 148 136 / 16%), 0 4px 12px rgb(15 23 42 / 4%);
+}
+
+.ui-admin-roster .ui-list-cards__main .ui-admin-roster__name {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.ui-admin-roster .ui-list-cards__main .ui-admin-roster__name strong {
+  min-width: 0;
+}
+
+.ui-admin-roster .ui-list-cards__main .ui-badge {
+  flex: 0 0 auto;
+}
+
+.ui-admin-queue {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ui-admin-queue li {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.ui-admin-queue li:first-child {
+  border-top: 0;
+  padding-top: 0.1rem;
+}
+
+.ui-admin-product-flags {
+  display: grid;
+  gap: 0.75rem;
+}
+
+@media (min-width: 720px) {
+  .ui-admin-product-flags {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 900px) {
   .ui-admin-editor-row {
     grid-template-columns: 1fr;

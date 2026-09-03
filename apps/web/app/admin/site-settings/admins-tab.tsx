@@ -110,7 +110,7 @@ export function SiteSettingsAdminsTab() {
 
       <Section
         title="Platform admins"
-        description="Users with access to the platform console. There is a single admin type."
+        description="These accounts can open the platform console. Removing access does not delete the login."
       >
         {rows === null ? <LoadingState>Loading admins…</LoadingState> : null}
         {rows && rows.length === 0 ? (

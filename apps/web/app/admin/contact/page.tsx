@@ -3,19 +3,19 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  Alert,
   Button,
   EmptyState,
   Field,
   Input,
   LoadingState,
-  PageHeader,
   Section,
   Select,
   StatusBadge,
   Table,
   Td,
 } from "@nutrition-saas/ui";
+import { AdminListToolbar } from "../_components/admin-list-toolbar";
+import { AdminPage } from "../_components/admin-page";
 import { AdminPagination } from "../_components/admin-pagination";
 import { statusLabel } from "../../../lib/admin-labels";
 import { api } from "../../../lib/api";
@@ -88,14 +88,12 @@ export default function AdminContactPage() {
   const rows = data?.items ?? null;
 
   return (
-    <section>
-      <PageHeader
-        eyebrow="Operations"
-        title="Contact"
-        description="Messages sent from the public contact page. New ones stay at the top until you open them."
-      />
-      {error ? <Alert tone="danger">{error}</Alert> : null}
-
+    <AdminPage
+      eyebrow="Website"
+      title="Inbox"
+      description="Messages sent from the public contact form. New ones stay at the top until you open them."
+      error={error}
+    >
       <Section title={data ? `${data.total} in this view` : "Inbox"}>
         {data && data.newCount > 0 ? (
           <p className="ui-muted" style={{ marginTop: 0 }}>
@@ -103,7 +101,7 @@ export default function AdminContactPage() {
           </p>
         ) : null}
 
-        <form onSubmit={onSearch} className="ui-admin-toolbar">
+        <AdminListToolbar onSubmit={onSearch}>
           <Field label="Search">
             <Input
               value={q}
@@ -127,7 +125,7 @@ export default function AdminContactPage() {
             </Select>
           </Field>
           <Button type="submit">Search</Button>
-        </form>
+        </AdminListToolbar>
 
         {rows === null && !error ? <LoadingState>Loading messages…</LoadingState> : null}
         {rows && rows.length === 0 ? (
@@ -182,6 +180,6 @@ export default function AdminContactPage() {
           />
         ) : null}
       </Section>
-    </section>
+    </AdminPage>
   );
 }

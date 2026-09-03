@@ -2,18 +2,19 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import {
-  Alert,
   Button,
   EmptyState,
   Field,
   Input,
   LoadingState,
-  PageHeader,
   Section,
+  Select,
   StatusBadge,
   Table,
   Td,
 } from "@nutrition-saas/ui";
+import { AdminListToolbar } from "../_components/admin-list-toolbar";
+import { AdminPage } from "../_components/admin-page";
 import { auditActionLabel, statusLabel } from "../../../lib/admin-labels";
 import { api } from "../../../lib/api";
 import { formatDate } from "../../../lib/format";
@@ -26,19 +27,31 @@ interface AuditRow {
   targetType: string | null;
   createdAt: string;
   actor: { email: string } | null;
-  dietitianAccount: { name: string } | null;
+  dietitianAccount: { id?: string; name: string } | null;
   metadata: Record<string, unknown> | null;
+}
+
+interface ClinicOption {
+  id: string;
+  name: string;
 }
 
 export default function AdminAuditPage() {
   const [rows, setRows] = useState<AuditRow[] | null>(null);
+  const [clinics, setClinics] = useState<ClinicOption[]>([]);
   const [q, setQ] = useState("");
+  const [action, setAction] = useState("");
+  const [clinicId, setClinicId] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  async function load(search = q) {
+  async function load() {
     try {
-      const path = search ? `/api/v1/admin/audit?q=${encodeURIComponent(search)}` : "/api/v1/admin/audit";
-      setRows(await api<AuditRow[]>(path));
+      const params = new URLSearchParams();
+      if (q.trim()) params.set("q", q.trim());
+      if (action.trim()) params.set("action", action.trim());
+      if (clinicId) params.set("dietitianAccountId", clinicId);
+      const suffix = params.toString() ? `?${params.toString()}` : "";
+      setRows(await api<AuditRow[]>(`/api/v1/admin/audit${suffix}`));
       setError(null);
     } catch (err) {
       setError(errorMessage(err, "Unable to load audit logs"));
@@ -46,30 +59,44 @@ export default function AdminAuditPage() {
   }
 
   useEffect(() => {
-    void load("");
+    void load();
+    void api<ClinicOption[]>("/api/v1/admin/dietitians")
+      .then(setClinics)
+      .catch(() => setClinics([]));
   }, []);
 
   function onSearch(event: FormEvent) {
     event.preventDefault();
-    void load(q);
+    void load();
   }
 
   return (
-    <section>
-      <PageHeader
-        eyebrow="Operations"
-        title="Audit"
-        description="Readable history of platform actions across dietitians and users."
-      />
-      {error ? <Alert tone="danger">{error}</Alert> : null}
-
+    <AdminPage
+      eyebrow="System"
+      title="Audit"
+      description="Readable history of platform actions across clinics and accounts."
+      error={error}
+    >
       <Section title="Activity history">
-        <form onSubmit={onSearch} className="ui-admin-toolbar">
+        <AdminListToolbar onSubmit={onSearch}>
           <Field label="Search">
-            <Input value={q} onChange={(event) => setQ(event.target.value)} placeholder="Search action" />
+            <Input value={q} onChange={(event) => setQ(event.target.value)} placeholder="Action or target" />
+          </Field>
+          <Field label="Action">
+            <Input value={action} onChange={(event) => setAction(event.target.value)} placeholder="Exact action key" />
+          </Field>
+          <Field label="Clinic">
+            <Select value={clinicId} onChange={(event) => setClinicId(event.target.value)}>
+              <option value="">All clinics</option>
+              {clinics.map((clinic) => (
+                <option key={clinic.id} value={clinic.id}>
+                  {clinic.name}
+                </option>
+              ))}
+            </Select>
           </Field>
           <Button type="submit">Search</Button>
-        </form>
+        </AdminListToolbar>
 
         {rows === null ? <LoadingState>Loading audit…</LoadingState> : null}
         {rows && rows.length === 0 ? (
@@ -112,7 +139,11 @@ export default function AdminAuditPage() {
                           {Object.entries(row.metadata).map(([key, value]) => (
                             <div key={key} className="ui-admin-meta__row">
                               <dt>{auditActionLabel(key)}</dt>
-                              <dd>{typeof value === "string" || typeof value === "number" || typeof value === "boolean" ? String(value) : "—"}</dd>
+                              <dd>
+                                {typeof value === "string" || typeof value === "number" || typeof value === "boolean"
+                                  ? String(value)
+                                  : "—"}
+                              </dd>
                             </div>
                           ))}
                         </dl>
@@ -127,6 +158,6 @@ export default function AdminAuditPage() {
           </Table>
         ) : null}
       </Section>
-    </section>
+    </AdminPage>
   );
 }

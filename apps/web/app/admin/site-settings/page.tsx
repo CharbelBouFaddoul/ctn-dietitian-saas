@@ -1,35 +1,40 @@
 "use client";
 
 import { FormEvent, Suspense, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Alert,
   Button,
   Field,
   Input,
   LoadingState,
-  PageHeader,
   Section,
   Tabs,
   Textarea,
 } from "@nutrition-saas/ui";
+import { AdminPage } from "../_components/admin-page";
 import { api } from "../../../lib/api";
 import { errorMessage } from "../../../lib/humanize-error";
 import type { SiteFooterGroup, SiteNavItem, SiteSettings, SiteSocialLink } from "../../../lib/marketing/site-settings";
-import { SiteSettingsAdminsTab } from "./admins-tab";
 
 const SETTINGS_TABS = [
-  { id: "general", label: "General" },
+  { id: "brand", label: "Brand" },
+  { id: "access", label: "Access" },
   { id: "navigation", label: "Navigation" },
   { id: "footer", label: "Footer" },
-  { id: "contact", label: "Contact" },
-  { id: "admins", label: "Admins" },
+  { id: "contact", label: "Public contact" },
 ] as const;
 
 type SettingsTab = (typeof SETTINGS_TABS)[number]["id"];
 
 function isSettingsTab(value: string | null): value is SettingsTab {
   return SETTINGS_TABS.some((tab) => tab.id === value);
+}
+
+function resolveTab(value: string | null): SettingsTab {
+  if (value === "general") return "brand";
+  return isSettingsTab(value) ? value : "brand";
 }
 
 function emptyNavItem(order: number): SiteNavItem {
@@ -45,26 +50,22 @@ function emptySocialLink(): SiteSocialLink {
 }
 
 function AdminSiteSettingsForm() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const initialTab = searchParams.get("tab");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [tab, setTab] = useState<SettingsTab>(isSettingsTab(initialTab) ? initialTab : "general");
+  const [tab, setTab] = useState<SettingsTab>(resolveTab(initialTab));
   const [brandText, setBrandText] = useState("");
   const [ctaText, setCtaText] = useState("");
   const [ctaHref, setCtaHref] = useState("");
   const [ctaVisible, setCtaVisible] = useState(true);
   const [dietitianRegistrationEnabled, setDietitianRegistrationEnabled] = useState(false);
   const [patientRegistrationEnabled, setPatientRegistrationEnabled] = useState(false);
-  const [plansPageEnabled, setPlansPageEnabled] = useState(false);
   const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState(false);
   const [emailVerificationRequired, setEmailVerificationRequired] = useState(false);
-  const [onlineCheckoutEnabled, setOnlineCheckoutEnabled] = useState(false);
-  const [trialSignupEnabled, setTrialSignupEnabled] = useState(true);
-  const [trialDurationDays, setTrialDurationDays] = useState("14");
-  const [trialPlanSlug, setTrialPlanSlug] = useState("trial");
   const [dietitianSignInLabel, setDietitianSignInLabel] = useState("");
   const [patientSignInLabel, setPatientSignInLabel] = useState("");
   const [footerDescription, setFooterDescription] = useState("");
@@ -86,13 +87,8 @@ function AdminSiteSettingsForm() {
       data.dietitianRegistrationEnabled ?? data.registrationEnabled,
     );
     setPatientRegistrationEnabled(data.patientRegistrationEnabled ?? data.registrationEnabled);
-    setPlansPageEnabled(data.plansPageEnabled === true);
     setEmailNotificationsEnabled(data.emailNotificationsEnabled === true);
     setEmailVerificationRequired(data.emailVerificationRequired === true);
-    setOnlineCheckoutEnabled(data.onlineCheckoutEnabled === true);
-    setTrialSignupEnabled(data.trialSignupEnabled !== false);
-    setTrialDurationDays(String(data.trialDurationDays ?? 14));
-    setTrialPlanSlug(data.trialPlanSlug || "trial");
     setDietitianSignInLabel(data.dietitianSignInLabel);
     setPatientSignInLabel(data.patientSignInLabel);
     setFooterDescription(data.footerDescription);
@@ -129,10 +125,12 @@ function AdminSiteSettingsForm() {
   }, []);
 
   useEffect(() => {
-    if (isSettingsTab(initialTab)) {
-      setTab(initialTab);
+    if (initialTab === "admins") {
+      router.replace("/admin/admins");
+      return;
     }
-  }, [initialTab]);
+    setTab(resolveTab(initialTab));
+  }, [initialTab, router]);
 
   async function onSave(event: FormEvent) {
     event.preventDefault();
@@ -171,13 +169,8 @@ function AdminSiteSettingsForm() {
           ctaVisible,
           dietitianRegistrationEnabled,
           patientRegistrationEnabled,
-          plansPageEnabled,
           emailNotificationsEnabled,
           emailVerificationRequired,
-          onlineCheckoutEnabled,
-          trialSignupEnabled,
-          trialDurationDays: Number(trialDurationDays) || 14,
-          trialPlanSlug: trialPlanSlug.trim() || "trial",
           dietitianSignInLabel,
           patientSignInLabel,
           footerDescription,
@@ -205,115 +198,22 @@ function AdminSiteSettingsForm() {
   }
 
   return (
-    <section>
-      <PageHeader
-        eyebrow="Configuration"
-        title="Site settings"
-        description="Configure public website brand, navigation, CTAs, footer, contact details, and platform admins."
-      />
-      {tab !== "admins" && error ? <Alert tone="danger">{error}</Alert> : null}
-      {tab !== "admins" && message ? <Alert tone="success">{message}</Alert> : null}
+    <AdminPage
+      eyebrow="Website"
+      title="Site"
+      description="Brand, registration, navigation, and public contact details shown on the marketing site."
+      error={error}
+    >
+      {message ? <Alert tone="success">{message}</Alert> : null}
 
-      <Tabs
-        items={[...SETTINGS_TABS]}
-        value={tab}
-        onChange={(id) => setTab(id as SettingsTab)}
-      />
+      <Tabs items={[...SETTINGS_TABS]} value={tab} onChange={(id) => setTab(id as SettingsTab)} />
 
-      {tab === "admins" ? (
-        <div style={{ marginTop: 16 }}>
-          <SiteSettingsAdminsTab />
-        </div>
-      ) : (
       <form onSubmit={(event) => void onSave(event)} className="ui-stack" style={{ marginTop: 16 }}>
-        {tab === "general" ? (
-          <Section title="General" description="Brand, registration, sign-in labels, and header CTA.">
+        {tab === "brand" ? (
+          <Section title="Brand" description="Public name, sign-in labels, and header CTA.">
             <div className="ui-stack" style={{ maxWidth: 520, gap: 16 }}>
               <Field label="Brand text">
                 <Input value={brandText} onChange={(event) => setBrandText(event.target.value)} required />
-              </Field>
-              <Field label="Self-serve registration">
-                <div className="ui-stack" style={{ gap: 10 }}>
-                  <label className="ui-check">
-                    <input
-                      type="checkbox"
-                      checked={dietitianRegistrationEnabled}
-                      onChange={(event) => setDietitianRegistrationEnabled(event.target.checked)}
-                    />
-                    <span>Allow dietitian (clinic) registration</span>
-                  </label>
-                  <label className="ui-check">
-                    <input
-                      type="checkbox"
-                      checked={patientRegistrationEnabled}
-                      onChange={(event) => setPatientRegistrationEnabled(event.target.checked)}
-                    />
-                    <span>Allow patient registration</span>
-                  </label>
-                </div>
-              </Field>
-              <Field label="Plans page">
-                <label className="ui-check">
-                  <input
-                    type="checkbox"
-                    checked={plansPageEnabled}
-                    onChange={(event) => setPlansPageEnabled(event.target.checked)}
-                  />
-                  <span>Show the public Plans marketing page (when off, Get Started goes to Contact; admin plan entitlements are unchanged)</span>
-                </label>
-              </Field>
-              <Field label="Trial & checkout">
-                <div className="ui-stack" style={{ gap: 10 }}>
-                  <label className="ui-check">
-                    <input
-                      type="checkbox"
-                      checked={trialSignupEnabled}
-                      onChange={(event) => setTrialSignupEnabled(event.target.checked)}
-                    />
-                    <span>Give new dietitian signups a free trial subscription</span>
-                  </label>
-                  <label className="ui-check">
-                    <input
-                      type="checkbox"
-                      checked={onlineCheckoutEnabled}
-                      onChange={(event) => setOnlineCheckoutEnabled(event.target.checked)}
-                    />
-                    <span>Online payment is available (plan buttons go to checkout instead of Contact)</span>
-                  </label>
-                  <label className="ui-check">
-                    <input
-                      type="checkbox"
-                      checked={emailVerificationRequired}
-                      onChange={(event) => setEmailVerificationRequired(event.target.checked)}
-                    />
-                    <span>Require email verification before sign-in</span>
-                  </label>
-                  <Field label="Trial length (days)">
-                    <Input
-                      type="number"
-                      min={1}
-                      value={trialDurationDays}
-                      onChange={(event) => setTrialDurationDays(event.target.value)}
-                    />
-                  </Field>
-                  <Field label="Trial plan slug">
-                    <Input
-                      value={trialPlanSlug}
-                      onChange={(event) => setTrialPlanSlug(event.target.value)}
-                      placeholder="trial"
-                    />
-                  </Field>
-                </div>
-              </Field>
-              <Field label="Product email notifications">
-                <label className="ui-check">
-                  <input
-                    type="checkbox"
-                    checked={emailNotificationsEnabled}
-                    onChange={(event) => setEmailNotificationsEnabled(event.target.checked)}
-                  />
-                  <span>Send product emails (invoices, automation). Auth emails always send.</span>
-                </label>
               </Field>
               <Field label="Dietitian sign-in label">
                 <Input
@@ -343,6 +243,53 @@ function AdminSiteSettingsForm() {
                 />
                 <span>Show CTA button</span>
               </label>
+            </div>
+          </Section>
+        ) : null}
+
+        {tab === "access" ? (
+          <Section title="Access" description="Who can register, and how email is handled.">
+            <div className="ui-stack" style={{ maxWidth: 520, gap: 16 }}>
+              <Field label="Self-serve registration">
+                <div className="ui-stack" style={{ gap: 10 }}>
+                  <label className="ui-check">
+                    <input
+                      type="checkbox"
+                      checked={dietitianRegistrationEnabled}
+                      onChange={(event) => setDietitianRegistrationEnabled(event.target.checked)}
+                    />
+                    <span>Allow dietitian (clinic) registration</span>
+                  </label>
+                  <label className="ui-check">
+                    <input
+                      type="checkbox"
+                      checked={patientRegistrationEnabled}
+                      onChange={(event) => setPatientRegistrationEnabled(event.target.checked)}
+                    />
+                    <span>Allow patient registration</span>
+                  </label>
+                </div>
+              </Field>
+              <Field label="Email verification">
+                <label className="ui-check">
+                  <input
+                    type="checkbox"
+                    checked={emailVerificationRequired}
+                    onChange={(event) => setEmailVerificationRequired(event.target.checked)}
+                  />
+                  <span>Require email verification before sign-in</span>
+                </label>
+              </Field>
+              <Field label="Product email notifications">
+                <label className="ui-check">
+                  <input
+                    type="checkbox"
+                    checked={emailNotificationsEnabled}
+                    onChange={(event) => setEmailNotificationsEnabled(event.target.checked)}
+                  />
+                  <span>Send product emails (invoices, automation). Auth emails always send.</span>
+                </label>
+              </Field>
             </div>
           </Section>
         ) : null}
@@ -620,7 +567,15 @@ function AdminSiteSettingsForm() {
         ) : null}
 
         {tab === "contact" ? (
-          <Section title="Contact" description="Shown on the public contact page and footer.">
+          <Section
+            title="Public contact"
+            description="Shown on the website contact page and footer. Incoming form messages go to Inbox."
+          >
+            <p className="ui-muted" style={{ marginTop: 0 }}>
+              <Link href="/admin/contact" className="ui-link">
+                Open inbox
+              </Link>
+            </p>
             <div className="ui-stack" style={{ maxWidth: 520, gap: 16 }}>
               <Field label="Contact email">
                 <Input type="email" value={contactEmail} onChange={(event) => setContactEmail(event.target.value)} />
@@ -648,8 +603,7 @@ function AdminSiteSettingsForm() {
           </Button>
         </div>
       </form>
-      )}
-    </section>
+    </AdminPage>
   );
 }
 

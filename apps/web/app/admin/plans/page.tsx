@@ -2,15 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import {
-  Alert,
-  EmptyState,
-  LoadingState,
-  PageHeader,
-  Section,
-  StatusBadge,
-} from "@nutrition-saas/ui";
-import { statusLabel } from "../../../lib/admin-labels";
+import { EmptyState, LoadingState, Section, StatusBadge } from "@nutrition-saas/ui";
+import { AdminPage } from "../_components/admin-page";
+import { ProductSettingsPanel } from "../_components/product-settings-panel";
+import { scopedStatusLabel } from "../../../lib/admin-labels";
 import { api } from "../../../lib/api";
 import { errorMessage } from "../../../lib/humanize-error";
 
@@ -45,20 +40,20 @@ export default function AdminPlansPage() {
   }, []);
 
   return (
-    <section>
-      <PageHeader
-        eyebrow="Commerce"
-        title="Plans"
-        description="Referenced plans cannot be deleted. Deactivate or archive instead — existing subscriptions keep working."
-        actions={
-          <Link href="/admin/plans/new" className="ui-btn ui-btn--primary ui-btn--sm">
-            Create plan
-          </Link>
-        }
-      />
-      {error ? <Alert tone="danger">{error}</Alert> : null}
+    <AdminPage
+      eyebrow="Product"
+      title="Plans"
+      description="Plans define price, duration, and default entitlements. Referenced plans cannot be deleted."
+      error={error}
+      actions={
+        <Link href="/admin/plans/new" className="ui-btn ui-btn--primary ui-btn--sm">
+          Create plan
+        </Link>
+      }
+    >
+      <ProductSettingsPanel />
 
-      <Section title="All plans">
+      <Section title="Plan catalog">
         {rows === null ? <LoadingState>Loading plans…</LoadingState> : null}
         {rows && rows.length === 0 ? (
           <EmptyState title="No plans yet">Create a plan to get started.</EmptyState>
@@ -73,7 +68,7 @@ export default function AdminPlansPage() {
                       {row.name}
                     </Link>
                   </h3>
-                  <StatusBadge status={row.status} label={statusLabel(row.status)} />
+                  <StatusBadge status={row.status} label={scopedStatusLabel("plan", row.status)} />
                 </div>
                 <p className="ui-muted" style={{ margin: "0 0 0.5rem", fontSize: 13 }}>
                   {row.slug}
@@ -94,6 +89,6 @@ export default function AdminPlansPage() {
           </div>
         ) : null}
       </Section>
-    </section>
+    </AdminPage>
   );
 }

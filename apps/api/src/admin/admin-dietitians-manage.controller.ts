@@ -59,6 +59,12 @@ export class AdminDietitiansManageController {
     return this.dietitians.get(dietitianAccountId);
   }
 
+  @Get(":dietitianAccountId/clients")
+  @ApiOperation({ summary: "List patients for a dietitian clinic" })
+  listClients(@Param("dietitianAccountId", ParseUUIDPipe) dietitianAccountId: string) {
+    return this.dietitians.listClients(dietitianAccountId);
+  }
+
   @Get(":dietitianAccountId/ai/usage")
   @ApiOperation({ summary: "Inspect dietitian AI usage and entitlement" })
   aiUsage(

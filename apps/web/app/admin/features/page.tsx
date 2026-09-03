@@ -3,17 +3,16 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
-  Alert,
   Button,
   EmptyState,
   LoadingState,
-  PageHeader,
   Section,
   StatusBadge,
   Table,
   Td,
   humanizeLabel,
 } from "@nutrition-saas/ui";
+import { AdminPage } from "../_components/admin-page";
 import { featureLabel, statusLabel } from "../../../lib/admin-labels";
 import { api } from "../../../lib/api";
 import { errorMessage } from "../../../lib/humanize-error";
@@ -35,7 +34,7 @@ export default function AdminFeaturesPage() {
       setRows(await api<FeatureRow[]>("/api/v1/admin/features"));
       setError(null);
     } catch (err) {
-      setError(errorMessage(err, "Unable to load features"));
+      setError(errorMessage(err, "Unable to load entitlements"));
     }
   }
 
@@ -52,50 +51,48 @@ export default function AdminFeaturesPage() {
       });
       await load();
     } catch (err) {
-      setError(errorMessage(err, "Unable to update feature"));
+      setError(errorMessage(err, "Unable to update entitlement"));
     }
   }
 
   return (
-    <section>
-      <PageHeader
-        eyebrow="Catalog"
-        title="Features"
-        description="Global catalog status is separate from clinic entitlement. Disabling a feature globally still denies access through entitlements."
-        actions={
-          <Link href="/admin/features/new" className="ui-btn ui-btn--primary ui-btn--sm">
-            Add feature
-          </Link>
-        }
-      />
-      {error ? <Alert tone="danger">{error}</Alert> : null}
-
-      <Section title="Feature catalog">
-        {rows === null ? <LoadingState>Loading features…</LoadingState> : null}
+    <AdminPage
+      eyebrow="Product"
+      title="Entitlements"
+      description="Global catalog first, then plan defaults, then a clinic override. Turning a key off here denies it everywhere."
+      error={error}
+      actions={
+        <Link href="/admin/features/new" className="ui-btn ui-btn--primary ui-btn--sm">
+          Add entitlement
+        </Link>
+      }
+    >
+      <Section title="Catalog">
+        {rows === null ? <LoadingState>Loading entitlements…</LoadingState> : null}
         {rows && rows.length === 0 ? (
-          <EmptyState title="No features yet">Create a feature to define plan capabilities.</EmptyState>
+          <EmptyState title="No entitlements yet">Create a key to define plan capabilities.</EmptyState>
         ) : null}
         {rows && rows.length > 0 ? (
           <Table>
             <thead>
               <tr>
-                <th>Feature</th>
+                <th>Entitlement</th>
                 <th>Type</th>
-                <th>Status</th>
+                <th>Global status</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row) => (
                 <tr key={row.id}>
-                  <Td label="Feature">
+                  <Td label="Entitlement">
                     <strong>{row.name || featureLabel(row.key)}</strong>
                     <div className="ui-muted" style={{ fontSize: 12 }}>
                       {featureLabel(row.key)}
                     </div>
                   </Td>
                   <Td label="Type">{humanizeLabel(row.valueType)}</Td>
-                  <Td label="Status">
+                  <Td label="Global status">
                     <StatusBadge status={row.status} label={statusLabel(row.status)} />
                   </Td>
                   <Td label="Actions">
@@ -113,6 +110,6 @@ export default function AdminFeaturesPage() {
           </Table>
         ) : null}
       </Section>
-    </section>
+    </AdminPage>
   );
 }

@@ -7,7 +7,7 @@ import { LoadingState } from "@nutrition-saas/ui";
 export default function AdminProvisionDietitianRedirect() {
   const router = useRouter();
   useEffect(() => {
-    router.replace("/admin/users/new?type=dietitian");
+    router.replace("/admin/dietitians/new");
   }, [router]);
-  return <LoadingState>Opening add user…</LoadingState>;
+  return <LoadingState>Opening add clinic…</LoadingState>;
 }
