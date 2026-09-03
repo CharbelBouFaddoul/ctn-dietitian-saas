@@ -210,7 +210,7 @@ export default function CalendarPage() {
   const dietitianAccountId = params.dietitianAccountId;
   const deepLinkId = searchParams.get("appointmentId");
 
-  const [view, setView] = useState<CalendarView>("week");
+  const [view, setView] = useState<CalendarView>("month");
   const [anchor, setAnchor] = useState(() => startOfDay(new Date()));
   const [rows, setRows] = useState<AppointmentRow[] | null>(null);
   const [tasks, setTasks] = useState<TaskRow[]>([]);

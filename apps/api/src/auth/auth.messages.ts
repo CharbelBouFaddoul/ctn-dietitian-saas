@@ -2,6 +2,7 @@ export const AUTH_MESSAGES = {
   invalidCredentials: "Invalid email or password",
   authenticationRequired: "Authentication required",
   register: "If this email can be registered, we sent a verification link.",
+  registerReady: "If this email can be registered, your account is ready.",
   registrationDisabled: "Self-registration is currently disabled",
   forgotPassword: "If an account exists for that email, we sent a reset link.",
   resendVerification: "If a verification email is needed, we sent one.",

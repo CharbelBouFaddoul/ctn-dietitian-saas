@@ -357,10 +357,6 @@ export default function PracticeMessagesPage() {
       {error ? <Alert tone="danger">{error}</Alert> : null}
       {rows === null && !error ? (
         <LoadingState />
-      ) : (rows ?? []).length === 0 ? (
-        <EmptyState title="No conversations yet">
-          Messages appear here once a client sends a message or you start a conversation from their profile.
-        </EmptyState>
       ) : (
         <div className="ui-wa-shell ui-wa-shell--fill">
           <aside className="ui-wa-inbox" aria-label="Conversations">
@@ -380,7 +376,9 @@ export default function PracticeMessagesPage() {
             </div>
             <div className="ui-wa-inbox__list">
               {filteredRows.length === 0 ? (
-                <p className="ui-wa-inbox__empty">No chats match your search.</p>
+                <p className="ui-wa-inbox__empty">
+                  {(rows ?? []).length === 0 ? "No conversations yet." : "No chats match your search."}
+                </p>
               ) : (
                 filteredRows.map((row) => {
                   const name = row.clientName || "Client";
@@ -542,7 +540,13 @@ export default function PracticeMessagesPage() {
               </>
             ) : (
               <div className="ui-wa-thread__empty">
-                <EmptyState title="Select a conversation">Choose a client on the left to view messages.</EmptyState>
+                <EmptyState
+                  title={(rows ?? []).length === 0 ? "No conversations yet" : "Select a conversation"}
+                >
+                  {(rows ?? []).length === 0
+                    ? "Messages appear here once a client writes, or you start a chat from their profile."
+                    : "Choose a client on the left to view messages."}
+                </EmptyState>
               </div>
             )}
           </div>

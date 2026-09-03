@@ -202,6 +202,14 @@ enum DietitianAccountStatus {
   ARCHIVED
 }
 
+enum TrialSeedStatus {
+  NONE
+  PENDING
+  READY
+  FAILED
+  CLEARED
+}
+
 model DietitianAccount {
   id                String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId            String                 @unique @map("user_id") @db.Uuid
@@ -214,6 +222,7 @@ model DietitianAccount {
   country           String?
   licenseNumber     String?                @map("license_number")
   photoStorageKey   String?                @map("photo_storage_key")
+  trialSeedStatus   TrialSeedStatus        @default(NONE) @map("trial_seed_status")
   createdAt         DateTime               @default(now()) @map("created_at") @db.Timestamptz
   updatedAt         DateTime               @updatedAt @map("updated_at") @db.Timestamptz
   archivedAt        DateTime?              @map("archived_at") @db.Timestamptz
@@ -353,8 +362,9 @@ model Plan {
   status       CatalogStatus @default(ACTIVE)
   priceCents   Int?          @map("price_cents")
   currency     String        @default("USD") @map("currency")
-  showPrice    Boolean       @default(true) @map("show_price")
-  durationDays Int           @default(30) @map("duration_days")
+  showPrice      Boolean       @default(true) @map("show_price")
+  listedPublicly Boolean       @default(true) @map("listed_publicly")
+  durationDays   Int           @default(30) @map("duration_days")
   createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz
   updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -754,6 +764,7 @@ model Client {
   dateOfBirth        DateTime?    @map("date_of_birth") @db.Date
   sex                ClientSex?
   status             ClientStatus @default(ACTIVE)
+  isTrialSeed        Boolean      @default(false) @map("is_trial_seed")
   createdById        String?      @map("created_by_id") @db.Uuid
   createdAt          DateTime     @default(now()) @map("created_at") @db.Timestamptz
   updatedAt          DateTime     @updatedAt @map("updated_at") @db.Timestamptz
@@ -790,6 +801,7 @@ model Client {
   @@unique([dietitianAccountId, code])
   @@index([dietitianAccountId, status])
   @@index([dietitianAccountId, lastName])
+  @@index([dietitianAccountId, isTrialSeed])
   @@map("clients")
 }
 
@@ -1905,6 +1917,35 @@ enum BrandDisplayMode {
   LOGO_AND_TEXT
 }
 
+enum ContactSubmissionStatus {
+  NEW
+  READ
+  ARCHIVED
+}
+
+/// Public marketing contact-form submissions, reviewed in the admin inbox.
+model ContactSubmission {
+  id        String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String
+  email     String
+  subject   String
+  message   String                   @db.Text
+  planSlug  String?                  @map("plan_slug")
+  planName  String?                  @map("plan_name")
+  status    ContactSubmissionStatus  @default(NEW)
+  readAt    DateTime?                @map("read_at") @db.Timestamptz
+  archivedAt DateTime?               @map("archived_at") @db.Timestamptz
+  ip        String?
+  userAgent String?                  @map("user_agent") @db.Text
+  createdAt DateTime                 @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime                 @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([status, createdAt])
+  @@index([createdAt])
+  @@index([email])
+  @@map("contact_submissions")
+}
+
 /// Singleton platform-wide settings for the public marketing website.
 model PlatformSettings {
   id                        String           @id @db.Uuid
@@ -1929,6 +1970,11 @@ model PlatformSettings {
   patientRegistrationEnabled   Boolean       @default(false) @map("patient_registration_enabled")
   plansPageEnabled          Boolean          @default(false) @map("plans_page_enabled")
   emailNotificationsEnabled Boolean          @default(false) @map("email_notifications_enabled")
+  emailVerificationRequired Boolean          @default(false) @map("email_verification_required")
+  onlineCheckoutEnabled     Boolean          @default(false) @map("online_checkout_enabled")
+  trialSignupEnabled        Boolean          @default(true) @map("trial_signup_enabled")
+  trialDurationDays         Int              @default(14) @map("trial_duration_days")
+  trialPlanSlug             String           @default("trial") @map("trial_plan_slug")
   createdAt                 DateTime         @default(now()) @map("created_at") @db.Timestamptz
   updatedAt                 DateTime         @updatedAt @map("updated_at") @db.Timestamptz
 

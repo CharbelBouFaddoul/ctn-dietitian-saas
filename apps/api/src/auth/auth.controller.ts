@@ -40,6 +40,7 @@ import { AcceptInvitationDto } from "./dto/accept-invitation.dto";
 import {
   AuthMeResponseDto,
   MessageResponseDto,
+  RegisterResponseDto,
   UnauthorizedErrorResponseDto,
   ValidationErrorResponseDto,
 } from "./dto/responses.dto";
@@ -69,16 +70,24 @@ export class AuthController {
   @ApiOperation({
     summary: "Register an identity",
     description:
-      "Creates a PENDING user and sends a verification email. Always returns a generic message so callers cannot enumerate accounts. Does not create organizations or client records.",
+      "Creates a user. When email verification is off, the account is activated immediately and a session cookie may be set. Dietitian signups with a clinic name also create the practice and trial subscription. Duplicate emails return the same generic message.",
   })
-  @ApiOkResponse({ type: MessageResponseDto })
+  @ApiOkResponse({ type: RegisterResponseDto })
   @ApiBadRequestResponse({ type: ValidationErrorResponseDto })
   async register(
     @Body() body: RegisterDto,
     @Req() req: Request,
-  ): Promise<MessageResponseDto> {
-    await this.auth.register(body, this.meta(req));
-    return { message: AUTH_MESSAGES.register };
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<RegisterResponseDto> {
+    const result = await this.auth.register(body, this.meta(req));
+    if (result.rawToken) {
+      setSessionCookie(res, result.rawToken, this.cookieSettings());
+    }
+    return {
+      message: result.emailVerificationRequired ? AUTH_MESSAGES.register : AUTH_MESSAGES.registerReady,
+      emailVerificationRequired: result.emailVerificationRequired,
+      dietitianAccountId: result.dietitianAccountId,
+    };
   }
 
   @Post("login")

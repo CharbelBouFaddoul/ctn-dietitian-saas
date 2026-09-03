@@ -12,6 +12,7 @@ import {
 } from "./constants";
 import { importDemoFoodCatalog, importDemoRecipes, type CatalogImportMode } from "./imports";
 import { seedPlatformBootstrap } from "./wipe";
+import { DEFAULT_PLATFORM_SETTINGS } from "../platform-settings/platform-settings.defaults";
 import {
   applyAliceHarborSettings,
   createEmmaRacePrepPlan,
@@ -532,6 +533,24 @@ export async function seedDemoWorld(
   const catalogMode: CatalogImportMode = options.catalog ?? "full";
 
   await seedPlatformBootstrap(prisma, { registrationEnabled: false });
+  const defaults = DEFAULT_PLATFORM_SETTINGS;
+  await prisma.platformSettings.updateMany({
+    data: {
+      dietitianRegistrationEnabled: true,
+      patientRegistrationEnabled: true,
+      plansPageEnabled: true,
+      trialSignupEnabled: true,
+      emailVerificationRequired: false,
+      onlineCheckoutEnabled: false,
+      trialDurationDays: defaults.trialDurationDays,
+      trialPlanSlug: defaults.trialPlanSlug,
+      ctaText: defaults.ctaText,
+      ctaHref: defaults.ctaHref,
+      ctaVisible: true,
+      navItems: defaults.navItems as unknown as Prisma.InputJsonValue,
+      footerGroups: defaults.footerGroups as unknown as Prisma.InputJsonValue,
+    },
+  });
 
   if (catalogMode !== "none") {
     await importDemoFoodCatalog(prisma, catalogMode);

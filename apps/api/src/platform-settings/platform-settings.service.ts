@@ -16,10 +16,12 @@ import { seedPlatformSettings } from "./platform-settings.seed";
 export class PlatformSettingsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getPublic(): Promise<Omit<PlatformSettingsPayload, "emailNotificationsEnabled">> {
+  async getPublic(): Promise<
+    Omit<PlatformSettingsPayload, "emailNotificationsEnabled" | "trialPlanSlug">
+  > {
     const row = await this.ensureSingleton();
     const full = this.toPayload(row);
-    const { emailNotificationsEnabled: _email, ...publicPayload } = full;
+    const { emailNotificationsEnabled: _email, trialPlanSlug: _trialPlan, ...publicPayload } = full;
     return publicPayload;
   }
 
@@ -57,6 +59,15 @@ export class PlatformSettingsService {
     if (input.emailNotificationsEnabled !== undefined) {
       data.emailNotificationsEnabled = input.emailNotificationsEnabled;
     }
+    if (input.emailVerificationRequired !== undefined) {
+      data.emailVerificationRequired = input.emailVerificationRequired;
+    }
+    if (input.onlineCheckoutEnabled !== undefined) {
+      data.onlineCheckoutEnabled = input.onlineCheckoutEnabled;
+    }
+    if (input.trialSignupEnabled !== undefined) data.trialSignupEnabled = input.trialSignupEnabled;
+    if (input.trialDurationDays !== undefined) data.trialDurationDays = input.trialDurationDays;
+    if (input.trialPlanSlug !== undefined) data.trialPlanSlug = input.trialPlanSlug.trim() || "trial";
     if (input.dietitianSignInLabel !== undefined) data.dietitianSignInLabel = input.dietitianSignInLabel;
     if (input.patientSignInLabel !== undefined) data.patientSignInLabel = input.patientSignInLabel;
     if (input.footerDescription !== undefined) data.footerDescription = input.footerDescription;
@@ -103,6 +114,11 @@ export class PlatformSettingsService {
     patientRegistrationEnabled: boolean;
     plansPageEnabled: boolean;
     emailNotificationsEnabled: boolean;
+    emailVerificationRequired: boolean;
+    onlineCheckoutEnabled: boolean;
+    trialSignupEnabled: boolean;
+    trialDurationDays: number;
+    trialPlanSlug: string;
     dietitianSignInLabel: string;
     patientSignInLabel: string;
     footerDescription: string;
@@ -132,6 +148,12 @@ export class PlatformSettingsService {
       plansPageEnabled: row.plansPageEnabled ?? DEFAULT_PLATFORM_SETTINGS.plansPageEnabled,
       emailNotificationsEnabled:
         row.emailNotificationsEnabled ?? DEFAULT_PLATFORM_SETTINGS.emailNotificationsEnabled,
+      emailVerificationRequired:
+        row.emailVerificationRequired ?? DEFAULT_PLATFORM_SETTINGS.emailVerificationRequired,
+      onlineCheckoutEnabled: row.onlineCheckoutEnabled ?? DEFAULT_PLATFORM_SETTINGS.onlineCheckoutEnabled,
+      trialSignupEnabled: row.trialSignupEnabled ?? DEFAULT_PLATFORM_SETTINGS.trialSignupEnabled,
+      trialDurationDays: row.trialDurationDays ?? DEFAULT_PLATFORM_SETTINGS.trialDurationDays,
+      trialPlanSlug: row.trialPlanSlug?.trim() || DEFAULT_PLATFORM_SETTINGS.trialPlanSlug,
       dietitianSignInLabel: row.dietitianSignInLabel || DEFAULT_PLATFORM_SETTINGS.dietitianSignInLabel,
       patientSignInLabel: row.patientSignInLabel || DEFAULT_PLATFORM_SETTINGS.patientSignInLabel,
       footerDescription: row.footerDescription || DEFAULT_PLATFORM_SETTINGS.footerDescription,

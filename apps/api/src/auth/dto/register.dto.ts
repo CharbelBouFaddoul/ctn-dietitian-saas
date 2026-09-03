@@ -65,4 +65,11 @@ export class RegisterDto {
   @IsOptional()
   @IsEnum(["dietitian", "patient"])
   audience?: "dietitian" | "patient";
+
+  @ApiPropertyOptional({ description: "Clinic display name. When set on dietitian signup, creates the practice and trial." })
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(80)
+  clinicName?: string;
 }

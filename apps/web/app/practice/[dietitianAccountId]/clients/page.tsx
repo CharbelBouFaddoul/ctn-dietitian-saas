@@ -35,6 +35,7 @@ interface ClientRow {
   tags: Array<{ id: string; name: string }>;
   portalStatus: string | null;
   connectionStatus?: string | null;
+  isTrialSeed?: boolean;
 }
 
 interface ListResponse {
@@ -386,6 +387,11 @@ export default function ClientsPage() {
                   >
                     {row.displayName ?? `${row.firstName} ${row.lastName}`}
                   </Link>
+                  {row.isTrialSeed ? (
+                    <span style={{ marginLeft: 8 }}>
+                      <Badge tone="neutral">Sample</Badge>
+                    </span>
+                  ) : null}
                 </Td>
                 <Td label="Email">
                   {row.email ? <span className="ui-muted">{row.email}</span> : <span className="ui-muted">—</span>}

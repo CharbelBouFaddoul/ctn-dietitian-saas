@@ -10,6 +10,9 @@ import { AdminAuditService } from "./admin-audit.service";
 import { AdminCatalogController } from "./admin-catalog.controller";
 import { AdminCatalogService } from "./admin-catalog.service";
 import { PublicPlansController } from "./public-plans.controller";
+import { PublicContactController } from "./public-contact.controller";
+import { AdminContactController } from "./admin-contact.controller";
+import { ContactSubmissionService } from "./contact-submission.service";
 import { AdminFoodsController } from "./admin-foods.controller";
 import { AdminListsController } from "./admin-lists.controller";
 import { AdminMeController } from "./admin-me.controller";
@@ -45,6 +48,8 @@ import { PlatformRolesGuard } from "./guards/platform-roles.guard";
     AdminPatientsController,
     AdminCatalogController,
     PublicPlansController,
+    PublicContactController,
+    AdminContactController,
     AdminListsController,
     AdminFoodsController,
   ],
@@ -58,6 +63,7 @@ import { PlatformRolesGuard } from "./guards/platform-roles.guard";
     AdminPatientService,
     AdminCatalogService,
     AdminAuditService,
+    ContactSubmissionService,
   ],
 })
 export class AdminModule {}

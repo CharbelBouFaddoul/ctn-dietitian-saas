@@ -141,6 +141,9 @@ export class DietitianAccountResponseDto {
   @ApiPropertyOptional({ nullable: true, type: String })
   photoStorageKey?: string | null;
 
+  @ApiPropertyOptional({ enum: ["NONE", "PENDING", "READY", "FAILED", "CLEARED"] })
+  trialSeedStatus?: string;
+
   @ApiProperty()
   createdAt!: string;
 

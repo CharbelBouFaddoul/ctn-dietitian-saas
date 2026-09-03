@@ -68,7 +68,14 @@ function withMarketingDefaults(settings: SiteSettings): SiteSettings {
     ctaHref = "/contact";
   }
 
-  return { ...settings, plansPageEnabled, navItems, footerGroups, ctaHref };
+  return {
+    ...settings,
+    plansPageEnabled,
+    navItems,
+    footerGroups,
+    ctaHref,
+    footerDescription: settings.footerDescription.replaceAll(" — ", ": ").replaceAll("—", ", "),
+  };
 }
 
 export function SiteFrame({ children }: { children: ReactNode }) {

@@ -188,15 +188,20 @@ export function PracticeShell({ children }: { children: ReactNode }) {
       <main style={{ padding: 32, maxWidth: 560, margin: "0 auto" }}>
         <Alert tone="danger">
           This clinic is locked because the subscription has expired
-          {access?.planName ? ` (${access.planName})` : ""}. Contact a platform administrator to renew
-          access. Your data is preserved.
+          {access?.planName ? ` (${access.planName})` : ""}. Contact us to activate a paid plan. Your data is
+          preserved.
         </Alert>
         <div style={{ marginTop: 16, display: "flex", gap: 12 }}>
           <Button variant="secondary" onClick={() => void onLogout()}>
             Sign out
           </Button>
-          <Link href="/contact" className="ui-btn ui-btn--primary">
-            Contact support
+          <Link
+            href={
+              access?.planSlug ? `/contact?plan=${encodeURIComponent(access.planSlug)}` : "/contact"
+            }
+            className="ui-btn ui-btn--primary"
+          >
+            Contact us to pay
           </Link>
         </div>
       </main>
@@ -257,7 +262,7 @@ export function PracticeShell({ children }: { children: ReactNode }) {
         {access.daysRemainingInPhase != null
           ? ` — ${access.daysRemainingInPhase} day${access.daysRemainingInPhase === 1 ? "" : "s"} left in grace`
           : ""}
-        . Contact an administrator to renew. Clinic remains fully usable during grace.
+        . Contact us to renew. Clinic remains fully usable during grace.
       </Alert>
     ) : access?.accessState === "READ_ONLY" ? (
       <Alert tone="warning">
@@ -265,7 +270,7 @@ export function PracticeShell({ children }: { children: ReactNode }) {
         {access.daysRemainingInPhase != null
           ? ` — ${access.daysRemainingInPhase} day${access.daysRemainingInPhase === 1 ? "" : "s"} remaining`
           : ""}
-        . You can view data but cannot make changes until the subscription is renewed.
+        . You can view data but cannot make changes until you contact us to renew.
       </Alert>
     ) : null;
 

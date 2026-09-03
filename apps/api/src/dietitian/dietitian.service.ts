@@ -5,6 +5,7 @@ import { randomBytes } from "node:crypto";
 import { slugify } from "@nutrition-saas/utilities";
 import { PrismaService } from "../prisma/prisma.service";
 import { SecurityEventLogger } from "../auth/security-event.logger";
+import { TrialProvisioningService } from "../entitlements/trial-provisioning.service";
 import type {
   CreateDietitianDto,
   DietitianSettingsInputDto,
@@ -30,6 +31,7 @@ export class DietitianService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly security: SecurityEventLogger,
+    private readonly trialProvisioning: TrialProvisioningService,
   ) {}
 
   async create(userId: string, input: CreateDietitianDto) {
@@ -68,6 +70,9 @@ export class DietitianService {
       userId,
       dietitianAccountId: account.id,
     });
+
+    await this.trialProvisioning.ensureTrialSubscription(account.id);
+    await this.trialProvisioning.seedSampleData(account.id, userId);
 
     return this.getForUser(userId, account.id);
   }
@@ -296,6 +301,7 @@ export class DietitianService {
       country?: string | null;
       licenseNumber?: string | null;
       photoStorageKey?: string | null;
+      trialSeedStatus?: string;
       user?: { email: string; firstName: string | null; lastName: string | null };
     },
     settings?: Parameters<DietitianService["toSettingsResponse"]>[0] | null,
@@ -315,6 +321,7 @@ export class DietitianService {
       country: account.country ?? null,
       licenseNumber: account.licenseNumber ?? null,
       photoStorageKey: account.photoStorageKey ?? null,
+      trialSeedStatus: account.trialSeedStatus ?? "NONE",
       ...(settings ? { settings: this.toSettingsResponse(settings) } : {}),
     };
   }

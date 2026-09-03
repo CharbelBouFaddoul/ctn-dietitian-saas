@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { Module, forwardRef } from "@nestjs/common";
 import { AuthController } from "./auth.controller";
 import { AuthService } from "./auth.service";
 import { ConsentService } from "./consent.service";
@@ -10,8 +10,10 @@ import { PasswordService } from "./password.service";
 import { SecurityEventLogger } from "./security-event.logger";
 import { SessionService } from "./session.service";
 import { TokenService } from "./token.service";
+import { DietitianModule } from "../dietitian/dietitian.module";
 
 @Module({
+  imports: [forwardRef(() => DietitianModule)],
   controllers: [AuthController],
   providers: [
     AuthService,

@@ -15,43 +15,60 @@ function ProductPreview() {
         </div>
         <div className="ui-mkt__preview-body">
           <aside className="ui-mkt__preview-side">
+            <span className="ui-mkt__preview-group">Overview</span>
             <span className="is-active">Dashboard</span>
+            <span className="ui-mkt__preview-group">Patients</span>
             <span>Clients</span>
+            <span>Habit library</span>
             <span>Messages</span>
+            <span className="ui-mkt__preview-group">Nutrition</span>
             <span>Meal Plans</span>
-            <span>Meal library</span>
+            <span>Recipes</span>
             <span>Foods</span>
+            <span className="ui-mkt__preview-group">Clinic</span>
             <span>Calendar</span>
             <span>Tasks</span>
             <span>Invoices</span>
+            <span className="ui-mkt__preview-group">Insights</span>
             <span>Analytics</span>
-            <span>Settings</span>
+            <span>AI</span>
+            <span>Automations</span>
+            <span className="ui-mkt__preview-group">System</span>
+            <span>Profile</span>
           </aside>
           <div className="ui-mkt__preview-main">
-            <div className="ui-mkt__preview-line">
-              <span>Active clients</span>
-              <span className="ui-muted">42</span>
+            <div className="ui-mkt__preview-kpis">
+              <div className="ui-mkt__preview-kpi">
+                <span>Clients</span>
+                <strong>28 / 40</strong>
+                <em>3 new this month</em>
+              </div>
+              <div className="ui-mkt__preview-kpi">
+                <span>Unread messages</span>
+                <strong>5</strong>
+                <em>4 open tasks</em>
+              </div>
+              <div className="ui-mkt__preview-kpi">
+                <span>Outstanding</span>
+                <strong>2</strong>
+                <em>1 overdue</em>
+              </div>
+              <div className="ui-mkt__preview-kpi">
+                <span>Paid this month</span>
+                <strong>$1,240</strong>
+                <em>Invoiced $1,860</em>
+              </div>
             </div>
-            <div className="ui-mkt__preview-line">
-              <span>Today’s appointments</span>
-              <span className="ui-muted">3 scheduled</span>
-            </div>
-            <div>
+            <div className="ui-mkt__preview-list">
+              <span className="ui-mkt__preview-list-label">Today’s appointments</span>
               <div className="ui-mkt__preview-line">
-                <span>Tasks due</span>
-                <span className="ui-muted">2 overdue</span>
+                <span>10:00 · Follow-up</span>
+                <span className="ui-muted">Confirmed</span>
               </div>
-              <div className="ui-mkt__preview-meter">
-                <span />
+              <div className="ui-mkt__preview-line">
+                <span>14:30 · Initial visit</span>
+                <span className="ui-muted">Confirmed</span>
               </div>
-            </div>
-            <div className="ui-mkt__preview-line">
-              <span>Recent messages</span>
-              <span className="ui-muted">4 unread</span>
-            </div>
-            <div className="ui-mkt__preview-line">
-              <span>Invoices</span>
-              <span className="ui-muted">Open · paid</span>
             </div>
           </div>
         </div>
@@ -73,8 +90,20 @@ export default function HomePage() {
     void fetch(`${API_URL}/api/v1/public/site-settings`)
       .then(async (res) => {
         if (!res.ok) return;
-        const data = (await res.json()) as { plansPageEnabled?: boolean };
-        setGetStartedHref(data.plansPageEnabled === true ? "/plans" : "/contact");
+        const data = (await res.json()) as {
+          plansPageEnabled?: boolean;
+          dietitianRegistrationEnabled?: boolean;
+          registrationEnabled?: boolean;
+          trialSignupEnabled?: boolean;
+        };
+        const dietitianOn =
+          data.dietitianRegistrationEnabled === true ||
+          (data.dietitianRegistrationEnabled === undefined && data.registrationEnabled === true);
+        if (dietitianOn) {
+          setGetStartedHref("/auth/dietitian/register");
+        } else {
+          setGetStartedHref(data.plansPageEnabled === true ? "/plans" : "/contact");
+        }
       })
       .catch(() => undefined);
   }, []);
@@ -86,14 +115,15 @@ export default function HomePage() {
           <div className="ui-mkt__hero-grid">
             <div>
               <p className="ui-eyebrow">Nutrition clinic platform</p>
-              <h1>Everything you need to run a modern nutrition clinic.</h1>
+              <h1>One workspace for the whole clinic.</h1>
               <p>
-                Manage clients, meal plans, tracking, appointments, messaging, documents, invoices, and analytics in one
-                workspace — while patients use a focused portal to follow their plan and stay connected.
+                Most dietitians still run care across spreadsheets, chat threads, and shared folders. This platform
+                keeps the record, the meal plan, patient logs, messaging, visits, and invoices together. Patients follow
+                care in a simple portal.
               </p>
               <div className="ui-mkt__hero-ctas">
                 <Link href={getStartedHref} className="ui-btn ui-btn--primary ui-btn--lg">
-                  Get Started
+                  Start free trial
                 </Link>
                 <Link href="/auth/dietitian/login" className="ui-btn ui-btn--secondary ui-btn--lg">
                   Sign in as Dietitian
@@ -110,7 +140,7 @@ export default function HomePage() {
           <div className="ui-mkt__section-head">
             <p className="ui-eyebrow">Two experiences</p>
             <h2>Built for dietitians and the patients they support.</h2>
-            <p>One platform, two clear sides of care — connected by a simple clinic join code.</p>
+            <p>One platform with two clear sides of care, connected by a simple clinic join code.</p>
           </div>
           <div className="ui-mkt__split">
             <article className="ui-mkt__experience ui-mkt__experience--dietitian">
@@ -150,29 +180,31 @@ export default function HomePage() {
         <div className="ui-mkt__section">
           <div className="ui-mkt__section-head">
             <p className="ui-eyebrow">How it works</p>
-            <h2>From clinic setup to shared care.</h2>
-            <p>Patients create their own account. You share a short clinic code. They connect once — then care stays in sync.</p>
+            <h2>From the first client to the next visit.</h2>
+            <p>
+              Patients join with a clinic code. You publish the plan and review tracking on the same record.
+            </p>
           </div>
           <div className="ui-mkt__steps">
             <article className="ui-mkt__step">
               <div className="ui-mkt__step-num">01</div>
-              <h3>Choose a plan</h3>
-              <p>Pick a plan that fits your clinic, contact us to get set up, then open your workspace.</p>
+              <h3>Add the client</h3>
+              <p>Share a clinic join code. The patient creates an account and appears on your roster.</p>
             </article>
             <article className="ui-mkt__step">
               <div className="ui-mkt__step-num">02</div>
-              <h3>Share a join code</h3>
-              <p>Generate a clinic code and send it to your client — no complicated invitation links required.</p>
+              <h3>Publish the plan</h3>
+              <p>Build the meal plan on the chart. The current version is available in the patient portal.</p>
             </article>
             <article className="ui-mkt__step">
               <div className="ui-mkt__step-num">03</div>
-              <h3>Care together</h3>
-              <p>Publish meal plans, review tracking, message, share documents, and manage the journey in one place.</p>
+              <h3>Review progress</h3>
+              <p>Read the logs before the visit. Messages, appointments, and invoices stay on the same record.</p>
             </article>
           </div>
           <div style={{ marginTop: 28 }}>
             <Link href="/how-it-works" className="ui-link">
-              See the full workflow →
+              See how it works →
             </Link>
           </div>
         </div>
@@ -181,21 +213,30 @@ export default function HomePage() {
       <section className="ui-mkt__band ui-mkt__band--slate">
         <div className="ui-mkt__section">
           <div className="ui-mkt__section-head">
-            <p className="ui-eyebrow">Why one platform</p>
-            <h2>Replace spreadsheets, chat threads, and scattered files.</h2>
+            <p className="ui-eyebrow">The problem we solve</p>
+            <h2>Spreadsheets, chats, and folders are not a clinic.</h2>
+            <p>We replace that patchwork so care and the practice live on the same client record.</p>
           </div>
           <ul className="ui-mkt__why-list">
             <li>
-              <strong>Client care stays together</strong>
-              <span>Charts, plans, tracking, messages, documents, and invoices live on the same client record.</span>
+              <strong>The chart stays complete</strong>
+              <span>
+                Notes, measurements, meal plans, messages, documents, and invoices sit together, instead of across
+                files and inboxes. Print or download PDF from the main chart sections when you need a paper copy.
+              </span>
             </li>
             <li>
-              <strong>Patients join themselves</strong>
-              <span>They register, enter your clinic code, and appear on your roster — without password handoffs.</span>
+              <strong>You can see follow-through</strong>
+              <span>
+                Patients join with a clinic code and log food, habits, and progress in the portal, so you review what
+                happened instead of chasing recaps.
+              </span>
             </li>
             <li>
-              <strong>Clinic operations included</strong>
-              <span>Calendar, tasks, analytics, and optional automations when your plan includes them.</span>
+              <strong>The practice still runs</strong>
+              <span>
+                Calendar, tasks, analytics, and invoicing are part of the same workspace, not a separate pile of tools.
+              </span>
             </li>
           </ul>
         </div>
@@ -203,8 +244,8 @@ export default function HomePage() {
 
       <section className="ui-mkt__band ui-mkt__band--cta">
         <div className="ui-mkt__cta-band">
-          <h2>Ready to modernize your nutrition clinic?</h2>
-          <p>Dietitians run the workspace. Patients use the portal. One connected platform for both.</p>
+          <h2>Ready to leave the patchwork behind?</h2>
+          <p>Start a 14-day trial, open the workspace the same day, and keep the clinic in one place.</p>
           <div className="ui-mkt__hero-ctas" style={{ justifyContent: "center" }}>
             <Link href={getStartedHref} className="ui-btn ui-btn--primary ui-btn--lg">
               Get Started

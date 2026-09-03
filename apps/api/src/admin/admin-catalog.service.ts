@@ -49,6 +49,7 @@ export class AdminCatalogService {
       priceCents?: number | null;
       currency?: string;
       showPrice?: boolean;
+      listedPublicly?: boolean;
       durationDays?: number;
     },
     actor: AdminActor,
@@ -63,6 +64,7 @@ export class AdminCatalogService {
           priceCents: input.priceCents ?? null,
           currency: input.currency?.trim().toUpperCase() || "USD",
           showPrice: input.showPrice ?? true,
+          listedPublicly: input.listedPublicly ?? true,
           durationDays: input.durationDays ?? 30,
         },
       });
@@ -95,6 +97,7 @@ export class AdminCatalogService {
       priceCents?: number | null;
       currency?: string;
       showPrice?: boolean;
+      listedPublicly?: boolean;
       durationDays?: number;
     },
     actor: AdminActor,
@@ -109,6 +112,7 @@ export class AdminCatalogService {
         priceCents: input.priceCents === undefined ? undefined : input.priceCents,
         currency: input.currency === undefined ? undefined : input.currency.trim().toUpperCase(),
         showPrice: input.showPrice,
+        listedPublicly: input.listedPublicly,
         durationDays: input.durationDays,
       },
     });
@@ -126,18 +130,24 @@ export class AdminCatalogService {
     return plan;
   }
 
-  async listPublicFeatureKeys() {
+  async listPublicFeatures() {
     const features = await this.prisma.feature.findMany({
       where: { status: "ACTIVE" },
-      select: { key: true },
-      orderBy: { key: "asc" },
+      select: { key: true, name: true, description: true, valueType: true },
     });
-    return features.map((feature) => feature.key);
+    return features.sort((a, b) => {
+      const ai = PLAN_FEATURE_DISPLAY_ORDER.indexOf(a.key);
+      const bi = PLAN_FEATURE_DISPLAY_ORDER.indexOf(b.key);
+      if (ai === -1 && bi === -1) return a.name.localeCompare(b.name);
+      if (ai === -1) return 1;
+      if (bi === -1) return -1;
+      return ai - bi;
+    });
   }
 
   async listPublicPlans() {
     const plans = await this.prisma.plan.findMany({
-      where: { status: "ACTIVE" },
+      where: { status: "ACTIVE", listedPublicly: true },
       include: {
         planFeatures: {
           include: { feature: true },

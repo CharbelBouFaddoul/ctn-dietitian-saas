@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import type { PrismaClient } from "@prisma/client";
 import { importFoodDataset } from "../foods/import/importer";
@@ -6,6 +6,7 @@ import {
   datasetFromFoundationDump,
   resolveFoundationDumpPath,
 } from "../foods/import/foundation-dataset";
+import { datasetFromSrLegacyDump } from "../foods/import/sr-legacy-dataset";
 import { lebanonFct2021Dataset } from "../foods/import/lebanon-fct-2021-dataset";
 import type { FoodDatasetFile } from "../foods/import/dataset.types";
 import { importRecipeDataset } from "../recipes/import/importer";
@@ -21,6 +22,28 @@ function apiRoot(): string {
 function loadSampleCatalog(): FoodDatasetFile {
   const filePath = resolve(apiRoot(), "food-data/usda-foundation-sample.json");
   return JSON.parse(readFileSync(filePath, "utf8")) as FoodDatasetFile;
+}
+
+function resolveSrLegacyDumpPath(): string | null {
+  const preferred = [
+    resolve(apiRoot(), "food-data/.fdc-cache/FoodData_Central_sr_legacy_food_json_2018-04.json"),
+    resolve(process.cwd(), "apps/api/food-data/.fdc-cache/FoodData_Central_sr_legacy_food_json_2018-04.json"),
+  ];
+  for (const path of preferred) {
+    if (existsSync(path)) return path;
+  }
+  const cacheDirs = [
+    resolve(apiRoot(), "food-data/.fdc-cache"),
+    resolve(process.cwd(), "apps/api/food-data/.fdc-cache"),
+  ];
+  for (const dir of cacheDirs) {
+    if (!existsSync(dir)) continue;
+    const match = readdirSync(dir).find(
+      (name) => name.toLowerCase().includes("sr_legacy") && name.endsWith(".json"),
+    );
+    if (match) return resolve(dir, match);
+  }
+  return null;
 }
 
 export async function importDemoFoodCatalog(
@@ -41,9 +64,17 @@ export async function importDemoFoodCatalog(
     dataset = loadSampleCatalog();
   }
   const report = await importFoodDataset(prisma, dataset);
+  let extra = 0;
+  if (mode === "full") {
+    const srLegacyPath = resolveSrLegacyDumpPath();
+    if (srLegacyPath) {
+      const srLegacy = await importFoodDataset(prisma, datasetFromSrLegacyDump(srLegacyPath));
+      extra += srLegacy.imported + srLegacy.updated;
+    }
+  }
   const lebanon = await importFoodDataset(prisma, lebanonFct2021Dataset());
   return {
-    foods: report.imported + report.updated + lebanon.imported + lebanon.updated,
+    foods: report.imported + report.updated + extra + lebanon.imported + lebanon.updated,
     sourceKey: dataset.source.key,
   };
 }

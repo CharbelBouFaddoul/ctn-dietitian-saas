@@ -8,6 +8,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
   Min,
   ValidateNested,
@@ -137,6 +138,41 @@ export class UpdatePlatformSettingsDto {
   @IsOptional()
   @IsBoolean()
   emailNotificationsEnabled?: boolean;
+
+  @ApiPropertyOptional({
+    description: "When true, new accounts must verify email before sign-in.",
+  })
+  @IsOptional()
+  @IsBoolean()
+  emailVerificationRequired?: boolean;
+
+  @ApiPropertyOptional({
+    description: "When true, plan buttons go to online checkout; when false they go to Contact.",
+  })
+  @IsOptional()
+  @IsBoolean()
+  onlineCheckoutEnabled?: boolean;
+
+  @ApiPropertyOptional({
+    description: "When true, self-serve dietitian signup receives a trial subscription.",
+  })
+  @IsOptional()
+  @IsBoolean()
+  trialSignupEnabled?: boolean;
+
+  @ApiPropertyOptional({ description: "Trial length in days." })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(3650)
+  trialDurationDays?: number;
+
+  @ApiPropertyOptional({ description: "Plan slug assigned to new trial practices." })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  trialPlanSlug?: string;
 
   @ApiPropertyOptional()
   @IsOptional()

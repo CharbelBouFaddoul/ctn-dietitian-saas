@@ -39,6 +39,7 @@ import { DietitianLifecycleService } from "./dietitian-lifecycle.service";
 import { DietitianService } from "./dietitian.service";
 import { EntitlementService, publicEntitlement } from "../entitlements/entitlement.service";
 import { SubscriptionLifecycleService } from "../entitlements/subscription-lifecycle.service";
+import { TrialProvisioningService } from "../entitlements/trial-provisioning.service";
 import { NotificationService } from "../notifications/notification.service";
 import { PlatformSettingsService } from "../platform-settings/platform-settings.service";
 import type { DietitianTenantContext } from "./dietitian.types";
@@ -54,6 +55,7 @@ export class DietitianController {
     private readonly lifecycle: DietitianLifecycleService,
     private readonly entitlements: EntitlementService,
     private readonly subscriptionLifecycle: SubscriptionLifecycleService,
+    private readonly trialProvisioning: TrialProvisioningService,
     private readonly notifications: NotificationService,
     private readonly platformSettings: PlatformSettingsService,
     private readonly prisma: PrismaService,
@@ -156,6 +158,28 @@ export class DietitianController {
   ): Promise<DietitianSettingsResponseDto> {
     const settings = await this.dietitians.updateSettings(dietitianAccountId, body);
     return this.withProductEmailFlag(this.dietitians.toSettingsResponse(settings));
+  }
+
+  @Get(":dietitianAccountId/trial-seed")
+  @UseGuards(DietitianGuard)
+  @ApiOperation({ summary: "Trial sample-data status for this practice" })
+  trialSeed(
+    @Param("dietitianAccountId", ParseUUIDPipe) dietitianAccountId: string,
+  ) {
+    return this.trialProvisioning.getSeedStatus(dietitianAccountId);
+  }
+
+  @Post(":dietitianAccountId/trial-seed/remove")
+  @HttpCode(201)
+  @UseGuards(DietitianGuard)
+  @ApiOperation({
+    summary: "Archive trial sample clients",
+    description: "Archives clients flagged as trial sample data. Real clients are not touched.",
+  })
+  removeTrialSeed(
+    @Param("dietitianAccountId", ParseUUIDPipe) dietitianAccountId: string,
+  ) {
+    return this.trialProvisioning.removeSampleData(dietitianAccountId);
   }
 
   @Get(":dietitianAccountId/entitlements")

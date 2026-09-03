@@ -12,13 +12,14 @@ export default function TermsPage() {
     <LegalDocument
       eyebrow="Terms"
       title="Terms of use"
-      summary={`These terms govern use of the ${LEGAL_PRODUCT} platform operated by ${LEGAL_OPERATOR}. They are a software agreement — not a treatment contract.`}
+      summary={`These terms govern use of the ${LEGAL_PRODUCT} platform operated by ${LEGAL_OPERATOR}. They are a software agreement, not a treatment contract.`}
     >
       <h2>1. The service</h2>
       <p>
         {LEGAL_PRODUCT} is clinic software: dietitians get a workspace; patients get a portal after they register and
         join a clinic with a join code. Features depend on the clinic’s plan (for example automations may be
-        add-ons). Online card checkout is not built in; plans and billing are arranged with us.
+        add-ons). New dietitian accounts may start with a time-limited trial. Paid plans are activated by us
+        unless online checkout is turned on.
       </p>
       <p>
         By creating an account, signing in, or using the site, you agree to these terms and to the{" "}

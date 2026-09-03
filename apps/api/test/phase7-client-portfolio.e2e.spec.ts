@@ -108,8 +108,8 @@ describe("phase7 client portfolio evolution assessments", () => {
       .send({
         title: "Follow-up",
         category: "FOLLOW_UP",
-        startAt: "2026-09-01T10:00:00.000Z",
-        endAt: "2026-09-01T11:00:00.000Z",
+        startAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        endAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000 + 60 * 60 * 1000).toISOString(),
       })
       .expect(201);
 

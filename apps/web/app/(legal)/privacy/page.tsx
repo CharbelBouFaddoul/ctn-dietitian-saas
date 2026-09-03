@@ -30,7 +30,7 @@ export default function PrivacyPage() {
         When a patient is connected to a clinic, that <strong>clinic is responsible</strong> for the professional
         relationship and for the chart it keeps (meal plans, notes, measurements, messages, documents, invoices, and
         similar records). We provide the system the clinic uses. We process that data to run the service they subscribed
-        to — not to treat patients ourselves.
+        to, not to treat patients ourselves.
       </p>
       <p>
         Account data you create to sign in (email, name, password) is processed by us so you can use the product.
@@ -81,7 +81,7 @@ export default function PrivacyPage() {
           invoices, and similar portal items.
         </li>
         <li>
-          <strong>Dietitians</strong> see the charts and operations for clients connected to their clinic — not other
+          <strong>Dietitians</strong> see the charts and operations for clients connected to their clinic, not other
           clinics’ patients.
         </li>
         <li>

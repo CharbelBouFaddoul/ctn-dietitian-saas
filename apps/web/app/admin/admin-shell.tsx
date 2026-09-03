@@ -108,6 +108,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
     {
       label: "Operations",
       items: [
+        { href: "/admin/contact", label: "Contact", icon: AdminNavIcons.contact },
         { href: "/admin/audit", label: "Audit", icon: AdminNavIcons.audit },
         { href: "/admin/ai", label: "AI usage", icon: AdminNavIcons.ai },
         { href: "/admin/health", label: "System health", icon: AdminNavIcons.health },

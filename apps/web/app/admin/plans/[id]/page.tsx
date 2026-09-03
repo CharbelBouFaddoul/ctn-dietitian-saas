@@ -36,6 +36,7 @@ interface PlanDetail {
   priceCents: number | null;
   currency: string;
   showPrice: boolean;
+  listedPublicly: boolean;
   durationDays: number;
   planFeatures: Array<{ featureId: string; enabled: boolean; limitValue: number | null; feature: Feature }>;
   _count?: { subscriptions: number };
@@ -51,6 +52,7 @@ export default function AdminPlanDetailPage() {
   const [price, setPrice] = useState("");
   const [currency, setCurrency] = useState("USD");
   const [showPrice, setShowPrice] = useState(true);
+  const [listedPublicly, setListedPublicly] = useState(true);
   const [durationDays, setDurationDays] = useState("30");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -67,6 +69,7 @@ export default function AdminPlanDetailPage() {
       setPrice(detail.priceCents == null ? "" : (detail.priceCents / 100).toFixed(2));
       setCurrency(detail.currency || "USD");
       setShowPrice(detail.showPrice);
+      setListedPublicly(detail.listedPublicly !== false);
       setDurationDays(String(detail.durationDays ?? 30));
       setFeatures(catalog);
       const next: Record<string, { enabled: boolean; limitValue: string }> = {};
@@ -121,6 +124,7 @@ export default function AdminPlanDetailPage() {
           priceCents,
           currency: currency.trim() || "USD",
           showPrice,
+          listedPublicly,
           durationDays: Number(durationDays) || 30,
         }),
       });
@@ -235,6 +239,10 @@ export default function AdminPlanDetailPage() {
           <label className="ui-row" style={{ gap: 8, alignItems: "center" }}>
             <input type="checkbox" checked={showPrice} onChange={(event) => setShowPrice(event.target.checked)} />
             <span>Show price on public Plans page</span>
+          </label>
+          <label className="ui-row" style={{ gap: 8, alignItems: "center" }}>
+            <input type="checkbox" checked={listedPublicly} onChange={(event) => setListedPublicly(event.target.checked)} />
+            <span>List on public Plans page</span>
           </label>
           <Button type="submit" disabled={busy}>
             {busy ? "Saving…" : "Save plan details"}

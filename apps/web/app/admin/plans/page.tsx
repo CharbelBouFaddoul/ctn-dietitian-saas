@@ -21,6 +21,7 @@ interface PlanRow {
   status: string;
   durationDays?: number;
   showPrice?: boolean;
+  listedPublicly?: boolean;
   priceCents?: number | null;
   currency?: string;
   _count?: { subscriptions: number };
@@ -82,6 +83,7 @@ export default function AdminPlansPage() {
                     : row.showPrice === false
                       ? " · price hidden"
                       : ""}
+                  {row.listedPublicly === false ? " · hidden from website" : ""}
                 </p>
                 <p style={{ margin: 0, fontWeight: 650 }}>
                   {row._count?.subscriptions ?? 0} subscription

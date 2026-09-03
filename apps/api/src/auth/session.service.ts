@@ -4,6 +4,7 @@ import type { Session, User } from "@prisma/client";
 import type { AppEnv } from "@nutrition-saas/validation";
 import { PrismaService } from "../prisma/prisma.service";
 import { CLIENT_ACCESS_DENIED, CLIENT_NOT_AVAILABLE } from "../clients/client.messages";
+import { loadPlatformFlags } from "../platform-settings/platform-flags";
 import type { AuthenticatedRequestUser, AuthenticatedSession, RequestMeta } from "./auth.types";
 import { TokenService } from "./token.service";
 
@@ -43,7 +44,11 @@ export class SessionService {
       return null;
     }
 
-    if (session.user.status !== "ACTIVE" || !session.user.emailVerifiedAt) {
+    const flags = await loadPlatformFlags(this.prisma);
+    if (
+      session.user.status !== "ACTIVE" ||
+      (flags.emailVerificationRequired && !session.user.emailVerifiedAt)
+    ) {
       await this.revoke(session.id);
       return null;
     }

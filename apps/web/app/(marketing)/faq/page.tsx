@@ -2,121 +2,102 @@ import { FaqAccordionItem } from "../faq-accordion";
 
 const FAQ_CATEGORIES = [
   {
-    name: "General",
+    name: "Getting started",
     items: [
       {
-        q: "What is this platform?",
-        a: "It is a nutrition clinic SaaS for dietitians and the patients they work with. Dietitians use a clinic workspace; patients use a client portal connected by a clinic join code.",
+        q: "How do I open a clinic?",
+        a: "Create a dietitian account from Start free trial. Your workspace opens the same day, with a 14-day trial and a few sample clients so you can look around. No card is required.",
       },
       {
-        q: "Who is it for?",
-        a: "Dietitians and nutrition clinics who want client charts, meal plans, tracking, messaging, documents, invoices, and related clinic tools in one place — and patients who need a simple portal to follow care.",
+        q: "What are the sample clients?",
+        a: "They are example charts included with the trial so you can click through a real workflow. Remove them from Practice in clinic settings when you are ready to add your own clients.",
       },
       {
-        q: "Is there a separate admin product on the public website?",
-        a: "No. The public website is for dietitians and patients only. Platform administration is not offered as a public sign-in option.",
+        q: "How does a patient connect to my clinic?",
+        a: "Share your clinic join code. The patient creates their own account, signs in, and enters the code once. They then appear on your Clients list. You can also create a chart yourself without waiting for them to join.",
       },
       {
-        q: "Is this medical advice?",
-        a: "No. The platform is clinic software. Care, meal plans, and advice come from the dietitian — not from CTN Solution. Do not use it for emergencies; call local emergency services.",
-      },
-      {
-        q: "Where are the privacy policy and terms?",
-        a: "See Privacy policy and Terms of use in the website footer. Signup requires that you agree to both.",
-      },
-      {
-        q: "Where can I see pricing?",
-        a: "Contact us for current plans and included features. Online checkout is not built in yet — we will help you get set up.",
-      },
-    ],
-  },
-  {
-    name: "Dietitians",
-    items: [
-      {
-        q: "Can a dietitian manage multiple clients?",
-        a: "Yes. The clinic workspace includes a client roster with search, filters, tags, and full client charts.",
-      },
-      {
-        q: "Can dietitians create meal plans and recipes?",
-        a: "Yes. You can draft and publish meal plans per client, use a meal library (recipes), foods, and a habit library for tracking.",
-      },
-      {
-        q: "What clinic operations are included?",
-        a: "A practice dashboard, appointments and calendar, messaging, chart-scoped documents and assessments, invoices, tasks, analytics, and clinic settings. Automations are available on plans that include them.",
-      },
-    ],
-  },
-  {
-    name: "Patients",
-    items: [
-      {
-        q: "How does a patient join a dietitian?",
-        a: "Patients create their own account, verify email, sign in, then enter the clinic join code provided by their dietitian. That connects them to the correct clinic roster.",
-      },
-      {
-        q: "What can patients track?",
-        a: "Food, water, exercise, sleep, and habits from the client portal daily log.",
-      },
-      {
-        q: "Can patients see invoices?",
-        a: "Yes — invoices are viewable in the portal. Online payment is not built into the product; clinics manage payment status from the clinic side.",
-      },
-    ],
-  },
-  {
-    name: "Accounts & Security",
-    items: [
-      {
-        q: "Do patients need an invitation link with a temporary password?",
-        a: "No. Patients register with their own credentials, then use a short clinic join code to connect. That is the supported onboarding path.",
-      },
-      {
-        q: "Is email verification required?",
-        a: "Yes. New accounts go through email verification before normal use of the product.",
-      },
-      {
-        q: "Can I reset my password?",
-        a: "Yes. Use the forgot-password flow on the sign-in screens to request a reset email.",
-      },
-    ],
-  },
-  {
-    name: "Meal Plans & Tracking",
-    items: [
-      {
-        q: "How do meal plans reach patients?",
-        a: "Dietitians draft meal plans in the clinic workspace and publish them. Patients see the published plan in My Plan on the portal.",
-      },
-      {
-        q: "Can dietitians review what patients log?",
-        a: "Yes. Food, water, exercise, sleep, and habit logs appear on the client chart tracking area for clinic review.",
-      },
-    ],
-  },
-  {
-    name: "Automation",
-    items: [
-      {
-        q: "What do automations do?",
-        a: "On plans that include automations, practices can create rules for events such as upcoming appointments, client inactivity, overdue invoices, due tasks, meal-plan endings, and check-ins — with actions like notifications, email, tasks, or portal notices.",
-      },
-    ],
-  },
-  {
-    name: "Getting Started",
-    items: [
-      {
-        q: "How do I start as a dietitian?",
-        a: "Contact us so we can activate your clinic. When self-registration is enabled, you can also create an account directly — your plan is still assigned through our team.",
+        q: "Where is the join code?",
+        a: "On the Clients page in the clinic workspace. Generate the code, copy it, and send it to the person you work with. You can also issue a code from a client chart.",
       },
       {
         q: "How do I start as a patient?",
-        a: "Create a patient account, verify your email, sign in, then enter the join code from your dietitian. If you already have an account, use Patient sign in.",
+        a: "Create a patient account, sign in, then enter the join code your dietitian gave you. If you already have an account, use Patient sign in.",
       },
       {
-        q: "Where do I learn the full join-code flow?",
-        a: "See the How it works page for the step-by-step relationship between clinic and patient.",
+        q: "What happens when the trial ends?",
+        a: "You choose Standard or Pro to keep the clinic running. Compare what is included on the Plans page, then continue on the plan that fits your practice.",
+      },
+    ],
+  },
+  {
+    name: "Clinic workspace",
+    items: [
+      {
+        q: "Where do I work day to day?",
+        a: "After you sign in as a dietitian, you land in the clinic dashboard. From there you open Clients, Meal Plans, Messages, Calendar, Invoices, and the rest of the workspace.",
+      },
+      {
+        q: "How do I add a client?",
+        a: "Open Clients and create a chart, or share the clinic join code so they connect themselves. Each client has one record for notes, measurements, plans, messages, visits, and invoices.",
+      },
+      {
+        q: "How do I share a meal plan?",
+        a: "Build the plan on the client chart from foods, recipes, and habits, then publish it. The current version appears in the patient portal under My Plan.",
+      },
+      {
+        q: "How do I see what a patient logged?",
+        a: "Open the client chart and go to tracking. Food, water, exercise, sleep, and habits from the portal show there, so you can review progress before a visit.",
+      },
+      {
+        q: "How do messaging and appointments work?",
+        a: "Messages stay on the client record. Appointments are on the clinic calendar. Patients can message you and request visits from the portal.",
+      },
+      {
+        q: "What is the difference between Standard and Pro?",
+        a: "Both include the clinic workspace and patient portal. Pro adds automations and AI assistance. Compare them on the Plans page. Start with the trial, then continue on the plan you need.",
+      },
+      {
+        q: "Does AI write care on its own?",
+        a: "No. On Pro, AI can help draft notes, plans, and messages. You review and decide what to keep. Care still comes from the dietitian.",
+      },
+    ],
+  },
+  {
+    name: "Patient portal",
+    items: [
+      {
+        q: "What will I see after I join?",
+        a: "Your home view, the published meal plan, a daily log, messages, appointments, forms, documents, and invoices from your dietitian.",
+      },
+      {
+        q: "What can I log each day?",
+        a: "Food, water, exercise, sleep, habits, and weight from the daily log. Your dietitian can review this on your chart.",
+      },
+      {
+        q: "I lost the join code. What should I do?",
+        a: "Ask your dietitian for a new code from their Clients page. Older codes can expire or be replaced.",
+      },
+      {
+        q: "Can I connect to more than one clinic?",
+        a: "Yes. After you have a patient account, you can enter another join code to connect to an additional dietitian.",
+      },
+    ],
+  },
+  {
+    name: "Account",
+    items: [
+      {
+        q: "Can I reset my password?",
+        a: "Yes. Use Forgot password on the dietitian or patient sign-in screen. We send a reset email to the address on the account.",
+      },
+      {
+        q: "Does the platform give medical advice?",
+        a: "No. This is clinic software. Care and meal plans come from the dietitian. Do not use it for emergencies. Call local emergency services.",
+      },
+      {
+        q: "Where are the privacy policy and terms?",
+        a: "Privacy policy and Terms of use are in the website footer. You agree to both when you create an account.",
       },
     ],
   },
@@ -128,8 +109,8 @@ export default function FaqPage() {
       <section className="ui-mkt__band ui-mkt__band--warm">
         <div className="ui-mkt__hero">
           <p className="ui-eyebrow">FAQ</p>
-          <h1>Questions? We’ve got answers.</h1>
-          <p>Straightforward answers based on how the product works today — no invented capabilities.</p>
+          <h1>Common questions.</h1>
+          <p>How to open the workspace, connect patients, and use the clinic day to day.</p>
         </div>
       </section>
 

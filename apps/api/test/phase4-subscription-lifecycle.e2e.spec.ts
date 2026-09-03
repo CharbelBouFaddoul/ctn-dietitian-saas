@@ -100,7 +100,7 @@ describe("phase4 subscription lifecycle", () => {
     const plans = await ctx.prisma.plan.findMany({ where: { status: "ACTIVE" } });
     const bySlug = Object.fromEntries(plans.map((p) => [p.slug, p]));
 
-    for (const slug of ["standard", "pro", "premium"] as const) {
+    for (const slug of ["trial", "standard", "pro"] as const) {
       const assigned = await request(ctx.app.getHttpServer())
         .put(`/api/v1/admin/dietitians/${org.id}/subscription`)
         .set("Cookie", admin.cookie)
@@ -114,7 +114,7 @@ describe("phase4 subscription lifecycle", () => {
       where: { dietitianAccountId: org.id },
     });
     expect(row.dietitianAccountId).toBe(org.id);
-    expect(row.planId).toBe(bySlug.premium!.id);
+    expect(row.planId).toBe(bySlug.pro!.id);
   });
 
   it("enforces CLIENT_LIMIT and does not delete clients on downgrade", async () => {

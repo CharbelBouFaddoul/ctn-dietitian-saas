@@ -364,6 +364,11 @@ export class CreatePlanDto {
   @IsBoolean()
   showPrice?: boolean;
 
+  @ApiPropertyOptional({ default: true, description: "When false, the plan is hidden from the public Plans page." })
+  @IsOptional()
+  @IsBoolean()
+  listedPublicly?: boolean;
+
   @ApiPropertyOptional({ default: 30 })
   @IsOptional()
   @IsInt()
@@ -408,6 +413,11 @@ export class UpdatePlanDto {
   @IsOptional()
   @IsBoolean()
   showPrice?: boolean;
+
+  @ApiPropertyOptional({ description: "When false, the plan is hidden from the public Plans page." })
+  @IsOptional()
+  @IsBoolean()
+  listedPublicly?: boolean;
 
   @ApiPropertyOptional()
   @IsOptional()

@@ -33,7 +33,7 @@ export const SUPPORTED_CURRENCIES = [
 
 export const PLATFORM_ROLES = ["SUPER_ADMIN", "ADMIN"] as const;
 
-export const PLAN_SLUGS = ["standard", "pro", "premium"] as const;
+export const PLAN_SLUGS = ["trial", "standard", "pro", "premium"] as const;
 
 export const FEATURE_KEYS = {
   AI: "AI",
@@ -104,7 +104,8 @@ export const SUBSCRIPTION_READ_ONLY_DAYS = 7;
 export const DIETITIAN_ACCESS_STATES = ["ACTIVE", "GRACE", "READ_ONLY", "LOCKED"] as const;
 
 export const CLIENT_LIMIT_BY_PLAN_SLUG = {
-  standard: 25,
+  trial: 10,
+  standard: 40,
   pro: 100,
   premium: 300,
 } as const;

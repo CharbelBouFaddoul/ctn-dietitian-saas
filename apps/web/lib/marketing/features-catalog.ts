@@ -15,10 +15,10 @@ export interface MarketingFeature {
 /**
  * Single source of truth for marketing feature presentation.
  * Derived from real product surfaces (practice nav, client portal, known APIs).
- * Not a CMS and not an entitlement system — update here when product capabilities change.
+ * Not a CMS and not an entitlement system. Update here when product capabilities change.
  */
 export const MARKETING_FEATURES: MarketingFeature[] = [
-  // Dietitian — Overview
+  // Dietitian: Overview
   {
     id: "d-dashboard",
     audience: "dietitian",
@@ -67,7 +67,7 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     category: "Clinic & clients",
     title: "Custom forms",
     summary:
-      "Build questionnaires, assign them to patients, and review in-progress or submitted answers — kept separate from the default clinical profile.",
+      "Build questionnaires, assign them to patients, and review in-progress or submitted answers. Kept separate from the default clinical profile.",
   },
   {
     id: "d-join-codes",
@@ -241,7 +241,7 @@ export const MARKETING_FEATURES: MarketingFeature[] = [
     summary: "Practice profile, timezone, locale, currency, units, appointment defaults, and invoice defaults.",
   },
 
-  // Patient — Home
+  // Patient: Home
   {
     id: "p-home",
     audience: "patient",

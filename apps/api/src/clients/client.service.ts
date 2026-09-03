@@ -116,6 +116,7 @@ export class ClientService {
           sex: input.sex ?? null,
           status: input.status ?? "ACTIVE",
           createdById: tenant.userId,
+          isTrialSeed: false,
         },
       });
 
@@ -306,6 +307,7 @@ export class ClientService {
     email: string | null;
     status: string;
     createdAt: Date;
+    isTrialSeed?: boolean;
     dietitianAccount: { id: string; user: { email: string } } | null;
     tags: Array<{ tag: { id: string; name: string; color: string | null } }>;
     account: { status: string } | null;
@@ -320,6 +322,7 @@ export class ClientService {
       email: client.email,
       status: client.status,
       createdAt: client.createdAt.toISOString(),
+      isTrialSeed: client.isTrialSeed === true,
       assignedTo: client.dietitianAccount
         ? { dietitianAccountId: client.dietitianAccount.id, email: client.dietitianAccount.user.email }
         : null,
@@ -350,6 +353,7 @@ export class ClientService {
       status: client.status,
       archivedAt: client.archivedAt?.toISOString() ?? null,
       createdAt: client.createdAt.toISOString(),
+      isTrialSeed: client.isTrialSeed === true,
       profile: client.profile,
       portalStatus: client.account?.status ?? null,
       portalActivatedAt: client.account?.activatedAt?.toISOString() ?? null,

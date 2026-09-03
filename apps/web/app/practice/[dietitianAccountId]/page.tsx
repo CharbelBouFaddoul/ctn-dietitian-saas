@@ -199,7 +199,7 @@ export default function PracticeDashboardPage() {
         <div className="ui-practice-welcome__copy">
           <p className="ui-practice-welcome__eyebrow">{dateLabel}</p>
           <h1>{greeting}</h1>
-          <p>Here’s what’s happening in {practice.name} today — clients, schedule, and follow-ups.</p>
+          <p>Here’s what’s happening in {practice.name} today: clients, schedule, and follow-ups.</p>
           <div className="ui-practice-welcome__actions">
             <Link href={`/practice/${dietitianAccountId}/clients`} className="ui-btn ui-btn--primary ui-btn--sm">
               Open clients

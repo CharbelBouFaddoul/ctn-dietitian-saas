@@ -41,6 +41,8 @@ export interface MarketingSiteSettings {
   patientRegistrationEnabled?: boolean;
   registrationEnabled?: boolean;
   plansPageEnabled?: boolean;
+  trialSignupEnabled?: boolean;
+  onlineCheckoutEnabled?: boolean;
   dietitianSignInLabel: string;
   patientSignInLabel: string;
   footerDescription: string;
@@ -81,17 +83,17 @@ const DEFAULT_SETTINGS: MarketingSiteSettings = {
     { href: "/faq", label: "FAQ", visible: true, order: 3 },
     { href: "/contact", label: "Contact", visible: true, order: 4 },
   ],
-  ctaText: "Get Started",
-  ctaHref: "/plans",
+  ctaText: "Start free trial",
+  ctaHref: "/auth/dietitian/register",
   ctaVisible: true,
-  dietitianRegistrationEnabled: false,
-  patientRegistrationEnabled: false,
-  registrationEnabled: false,
+  dietitianRegistrationEnabled: true,
+  patientRegistrationEnabled: true,
+  registrationEnabled: true,
   plansPageEnabled: true,
   dietitianSignInLabel: "Sign in as Dietitian",
   patientSignInLabel: "Sign in as Patient",
   footerDescription:
-    "A nutrition clinic platform for dietitians and the clients they care for — meal plans, tracking, messaging, and practice tools in one place.",
+    "Clinic software for dietitians who are done running care in spreadsheets and chat. Charts, plans, tracking, and practice tools in one place.",
   footerGroups: [
     {
       title: "Product",

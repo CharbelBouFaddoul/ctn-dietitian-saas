@@ -21,7 +21,8 @@ export default function AdminCreatePlanPage() {
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
   const [currency, setCurrency] = useState("USD");
-  const [showPrice, setShowPrice] = useState(true);
+  const [showPrice, setShowPrice] = useState(false);
+  const [listedPublicly, setListedPublicly] = useState(true);
   const [durationDays, setDurationDays] = useState("30");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -45,6 +46,7 @@ export default function AdminCreatePlanPage() {
           priceCents,
           currency: currency.trim() || "USD",
           showPrice,
+          listedPublicly,
           durationDays: Number(durationDays) || 30,
         }),
       });
@@ -109,6 +111,10 @@ export default function AdminCreatePlanPage() {
           <label className="ui-row" style={{ gap: 8, alignItems: "center" }}>
             <input type="checkbox" checked={showPrice} onChange={(event) => setShowPrice(event.target.checked)} />
             <span>Show price on public Plans page</span>
+          </label>
+          <label className="ui-row" style={{ gap: 8, alignItems: "center" }}>
+            <input type="checkbox" checked={listedPublicly} onChange={(event) => setListedPublicly(event.target.checked)} />
+            <span>List on public Plans page</span>
           </label>
           <Button type="submit" disabled={busy}>
             {busy ? "Creating…" : "Create plan"}

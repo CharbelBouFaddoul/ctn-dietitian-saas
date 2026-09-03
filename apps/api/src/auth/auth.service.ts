@@ -1,8 +1,10 @@
-import { BadRequestException, Injectable, UnauthorizedException } from "@nestjs/common";
+import { BadRequestException, Inject, Injectable, UnauthorizedException, forwardRef } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { normalizeEmail } from "@nutrition-saas/utilities";
 import { PrismaService } from "../prisma/prisma.service";
 import { assertRegistrationEnabled } from "../platform-settings/registration-gate";
+import { loadPlatformFlags } from "../platform-settings/platform-flags";
+import { DietitianService } from "../dietitian/dietitian.service";
 import { AUTH_MESSAGES } from "./auth.messages";
 import type { RequestMeta } from "./auth.types";
 import { ConsentService } from "./consent.service";
@@ -18,6 +20,7 @@ export interface RegisterInput {
   firstName?: string;
   lastName?: string;
   audience?: "dietitian" | "patient";
+  clinicName?: string;
   consents?: Array<{ type: "TERMS_OF_SERVICE" | "PRIVACY_POLICY"; policyVersion: string }>;
 }
 
@@ -31,21 +34,36 @@ export class AuthService {
     private readonly consents: ConsentService,
     private readonly invitations: InvitationService,
     private readonly security: SecurityEventLogger,
+    @Inject(forwardRef(() => DietitianService))
+    private readonly dietitians: DietitianService,
   ) {}
 
-  async register(input: RegisterInput, meta: RequestMeta = {}): Promise<void> {
+  async register(
+    input: RegisterInput,
+    meta: RequestMeta = {},
+  ): Promise<{
+    emailVerificationRequired: boolean;
+    dietitianAccountId: string | null;
+    rawToken?: string;
+  }> {
     await assertRegistrationEnabled(this.prisma, input.audience ?? "dietitian");
     this.passwords.assertPolicy(input.password);
     const emailNormalized = normalizeEmail(input.email);
     const passwordHash = await this.passwords.hash(input.password);
+    const flags = await loadPlatformFlags(this.prisma);
+    const verify = flags.emailVerificationRequired;
+    const audience = input.audience ?? "dietitian";
+    const clinicName = input.clinicName?.trim();
 
     try {
+      const now = new Date();
       const user = await this.prisma.user.create({
         data: {
           email: input.email.trim(),
           emailNormalized,
           passwordHash,
-          status: "PENDING",
+          status: verify ? "PENDING" : "ACTIVE",
+          emailVerifiedAt: verify ? null : now,
           firstName: input.firstName?.trim() || null,
           lastName: input.lastName?.trim() || null,
         },
@@ -62,7 +80,26 @@ export class AuthService {
         }
       }
 
-      await this.verification.issueAndSend(user.id, user.email);
+      let dietitianAccountId: string | null = null;
+      if (audience === "dietitian" && clinicName) {
+        const created = await this.dietitians.create(user.id, {
+          name: clinicName,
+          settings: {
+            timezone: "UTC",
+            locale: "en",
+            currency: "USD",
+            weightUnit: "kg",
+            heightUnit: "cm",
+            dateFormat: "YYYY_MM_DD",
+          },
+        });
+        dietitianAccountId = created?.id ?? null;
+      }
+
+      if (verify) {
+        await this.verification.issueAndSend(user.id, user.email);
+      }
+
       await this.security.record({
         type: "register",
         outcome: "success",
@@ -70,12 +107,19 @@ export class AuthService {
         emailNormalized,
         ipAddress: meta.ipAddress,
       });
+
+      if (!verify && user.status === "ACTIVE") {
+        const { rawToken } = await this.sessions.create(user.id, meta);
+        return { emailVerificationRequired: false, dietitianAccountId, rawToken };
+      }
+
+      return { emailVerificationRequired: verify, dietitianAccountId };
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
         const existing = await this.prisma.user.findUnique({
           where: { emailNormalized },
         });
-        if (existing && !existing.emailVerifiedAt && existing.status === "PENDING") {
+        if (existing && !existing.emailVerifiedAt && existing.status === "PENDING" && verify) {
           await this.verification.issueAndSend(existing.id, existing.email);
         }
         await this.security.record({
@@ -85,7 +129,7 @@ export class AuthService {
           ipAddress: meta.ipAddress,
           reason: "email_already_registered",
         });
-        return;
+        return { emailVerificationRequired: verify, dietitianAccountId: null };
       }
       throw error;
     }
@@ -103,11 +147,12 @@ export class AuthService {
 
     const passwordOk = await this.passwords.verify(password, user?.passwordHash ?? null);
     const portalOk = user ? await this.sessions.clientPortalMayAuthenticate(user.id) : true;
+    const flags = await loadPlatformFlags(this.prisma);
     const canAuthenticate =
       !!user &&
       passwordOk &&
       user.status === "ACTIVE" &&
-      user.emailVerifiedAt !== null &&
+      (!flags.emailVerificationRequired || user.emailVerifiedAt !== null) &&
       portalOk;
 
     if (!canAuthenticate) {
@@ -116,7 +161,7 @@ export class AuthService {
         outcome: "failure",
         emailNormalized,
         ipAddress: meta.ipAddress,
-        reason: this.loginFailureReason(user, passwordOk),
+        reason: this.loginFailureReason(user, passwordOk, flags.emailVerificationRequired),
       });
       throw new UnauthorizedException(AUTH_MESSAGES.invalidCredentials);
     }
@@ -295,6 +340,7 @@ export class AuthService {
   private loginFailureReason(
     user: { status: string; emailVerifiedAt: Date | null } | null,
     passwordOk: boolean,
+    emailVerificationRequired: boolean,
   ): string {
     if (!user) {
       return "unknown_user";
@@ -308,7 +354,7 @@ export class AuthService {
     if (user.status === "ARCHIVED") {
       return "archived";
     }
-    if (user.status !== "ACTIVE" || !user.emailVerifiedAt) {
+    if (user.status !== "ACTIVE" || (emailVerificationRequired && !user.emailVerifiedAt)) {
       return "not_active";
     }
     return "portal_inactive";

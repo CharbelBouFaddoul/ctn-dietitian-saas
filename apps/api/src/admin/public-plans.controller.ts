@@ -15,9 +15,9 @@ export class PublicPlansController {
   }
 
   @Get("features")
-  @ApiOperation({ summary: "List active feature catalog keys for marketing" })
+  @ApiOperation({ summary: "List active catalog features for marketing" })
   @ApiOkResponse()
   listFeatures() {
-    return this.catalog.listPublicFeatureKeys();
+    return this.catalog.listPublicFeatures();
   }
 }

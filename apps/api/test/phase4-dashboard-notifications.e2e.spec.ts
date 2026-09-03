@@ -152,7 +152,7 @@ describe("phase4 dashboard + notifications gaps", () => {
       .expect(200);
 
     expect(dashA.body.clientCount).toBe(1);
-    expect(dashA.body.clientLimit).toBe(25);
+    expect(dashA.body.clientLimit).toBe(40);
     expect(dashA.body.unreadMessageCount).toBeGreaterThanOrEqual(1);
     expect(dashA.body.upcomingAppointments.length + dashA.body.todayAppointments.length).toBeGreaterThanOrEqual(1);
     const appt =

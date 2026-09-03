@@ -115,12 +115,6 @@ function AuthFooter({ audience }: { audience: AuthAudience }) {
           </span>
         )}
         <span className="ui-muted" style={{ display: "block", marginTop: 8 }}>
-          Dietitian?{" "}
-          <Link href="/auth/dietitian/login" className="ui-link">
-            Sign in as Dietitian
-          </Link>
-        </span>
-        <span className="ui-muted" style={{ display: "block", marginTop: 8 }}>
           <Link href="/privacy" className="ui-link">
             Privacy
           </Link>
@@ -168,12 +162,6 @@ function AuthFooter({ audience }: { audience: AuthAudience }) {
           {link}
         </span>
       ))}
-      <span className="ui-muted" style={{ display: "block", marginTop: 8 }}>
-        Patient?{" "}
-        <Link href="/auth/client/login" className="ui-link">
-          Sign in as Patient
-        </Link>
-      </span>
       <span className="ui-muted" style={{ display: "block", marginTop: 8 }}>
         <Link href="/privacy" className="ui-link">
           Privacy

@@ -1,7 +1,7 @@
 import { FEATURE_KEYS, PLAN_FEATURE_DISPLAY_ORDER } from "@nutrition-saas/config";
 import type { PrismaClient } from "@prisma/client";
 
-export const SEEDED_PLAN_SLUGS = ["standard", "pro", "premium"] as const;
+export const SEEDED_PLAN_SLUGS = ["trial", "standard", "pro", "premium"] as const;
 
 const CORE_CAPABILITIES: Array<{ key: string; name: string; description: string }> = [
   {
@@ -78,40 +78,81 @@ const CORE_CAPABILITIES: Array<{ key: string; name: string; description: string 
 ];
 
 export async function seedEntitlementCatalog(prisma: PrismaClient): Promise<void> {
+  const trial = await prisma.plan.upsert({
+    where: { slug: "trial" },
+    update: {
+      name: "Trial",
+      description: "14-day self-serve trial with full clinic features and tight AI/automation limits.",
+      status: "ACTIVE",
+      durationDays: 14,
+      showPrice: false,
+      listedPublicly: false,
+    },
+    create: {
+      name: "Trial",
+      slug: "trial",
+      description: "14-day self-serve trial with full clinic features and tight AI/automation limits.",
+      status: "ACTIVE",
+      durationDays: 14,
+      showPrice: false,
+      listedPublicly: false,
+    },
+  });
   const standard = await prisma.plan.upsert({
     where: { slug: "standard" },
-    update: { durationDays: 30 },
+    update: {
+      durationDays: 30,
+      showPrice: false,
+      listedPublicly: true,
+      status: "ACTIVE",
+      description: "Full clinic software without AI or automations.",
+    },
     create: {
       name: "Standard",
       slug: "standard",
-      description: "Standard practice plan. AI is disabled.",
+      description: "Full clinic software without AI or automations.",
       status: "ACTIVE",
       durationDays: 30,
-      showPrice: true,
+      showPrice: false,
+      listedPublicly: true,
     },
   });
   const pro = await prisma.plan.upsert({
     where: { slug: "pro" },
-    update: { durationDays: 30 },
+    update: {
+      durationDays: 30,
+      showPrice: false,
+      listedPublicly: true,
+      status: "ACTIVE",
+      description: "Busy solo and small practices. AI and automations with practical caps.",
+    },
     create: {
       name: "Pro",
       slug: "pro",
-      description: "Pro practice plan. AI enabled with a monthly request quota.",
+      description: "Busy solo and small practices. AI and automations with practical caps.",
       status: "ACTIVE",
       durationDays: 30,
-      showPrice: true,
+      showPrice: false,
+      listedPublicly: true,
     },
   });
   const premium = await prisma.plan.upsert({
     where: { slug: "premium" },
-    update: { durationDays: 30 },
+    update: {
+      durationDays: 30,
+      showPrice: false,
+      listedPublicly: false,
+      status: "INACTIVE",
+      description: "Legacy high-volume plan. Hidden from marketing.",
+    },
     create: {
       name: "Premium",
       slug: "premium",
-      description: "Premium practice plan. AI enabled with a higher monthly request quota.",
-      status: "ACTIVE",
+      description: "Legacy high-volume plan. Hidden from marketing.",
+      status: "INACTIVE",
       durationDays: 30,
-      showPrice: true,
+      showPrice: false,
+      listedPublicly: false,
     },
   });
 
@@ -222,7 +263,7 @@ export async function seedEntitlementCatalog(prisma: PrismaClient): Promise<void
     },
   });
 
-  const planIds = [standard.id, pro.id, premium.id];
+  const planIds = [trial.id, standard.id, pro.id, premium.id];
   const rows: Array<{
     planId: string;
     featureId: string;
@@ -237,10 +278,17 @@ export async function seedEntitlementCatalog(prisma: PrismaClient): Promise<void
   }
 
   rows.push(
+    { planId: trial.id, featureId: ai.id, enabled: true, limitValue: null },
+    { planId: trial.id, featureId: aiLimit.id, enabled: true, limitValue: 50 },
+    { planId: trial.id, featureId: aiTokenLimit.id, enabled: true, limitValue: 250_000 },
+    { planId: trial.id, featureId: clientLimit.id, enabled: true, limitValue: 10 },
+    { planId: trial.id, featureId: automation.id, enabled: true, limitValue: null },
+    { planId: trial.id, featureId: automationRuleLimit.id, enabled: true, limitValue: 5 },
+    { planId: trial.id, featureId: automationExecutionLimit.id, enabled: true, limitValue: 100 },
     { planId: standard.id, featureId: ai.id, enabled: false, limitValue: null },
     { planId: standard.id, featureId: aiLimit.id, enabled: false, limitValue: 0 },
     { planId: standard.id, featureId: aiTokenLimit.id, enabled: false, limitValue: 0 },
-    { planId: standard.id, featureId: clientLimit.id, enabled: true, limitValue: 25 },
+    { planId: standard.id, featureId: clientLimit.id, enabled: true, limitValue: 40 },
     { planId: standard.id, featureId: automation.id, enabled: false, limitValue: null },
     { planId: standard.id, featureId: automationRuleLimit.id, enabled: false, limitValue: 0 },
     { planId: standard.id, featureId: automationExecutionLimit.id, enabled: false, limitValue: 0 },
@@ -249,15 +297,15 @@ export async function seedEntitlementCatalog(prisma: PrismaClient): Promise<void
     { planId: pro.id, featureId: aiTokenLimit.id, enabled: true, limitValue: 1_500_000 },
     { planId: pro.id, featureId: clientLimit.id, enabled: true, limitValue: 100 },
     { planId: pro.id, featureId: automation.id, enabled: true, limitValue: null },
-    { planId: pro.id, featureId: automationRuleLimit.id, enabled: true, limitValue: 25 },
-    { planId: pro.id, featureId: automationExecutionLimit.id, enabled: true, limitValue: 2000 },
+    { planId: pro.id, featureId: automationRuleLimit.id, enabled: true, limitValue: 15 },
+    { planId: pro.id, featureId: automationExecutionLimit.id, enabled: true, limitValue: 1000 },
     { planId: premium.id, featureId: ai.id, enabled: true, limitValue: null },
     { planId: premium.id, featureId: aiLimit.id, enabled: true, limitValue: 1000 },
     { planId: premium.id, featureId: aiTokenLimit.id, enabled: true, limitValue: 5_000_000 },
     { planId: premium.id, featureId: clientLimit.id, enabled: true, limitValue: 300 },
     { planId: premium.id, featureId: automation.id, enabled: true, limitValue: null },
-    { planId: premium.id, featureId: automationRuleLimit.id, enabled: true, limitValue: 100 },
-    { planId: premium.id, featureId: automationExecutionLimit.id, enabled: true, limitValue: 10000 },
+    { planId: premium.id, featureId: automationRuleLimit.id, enabled: true, limitValue: 30 },
+    { planId: premium.id, featureId: automationExecutionLimit.id, enabled: true, limitValue: 2000 },
   );
 
   for (const row of rows) {

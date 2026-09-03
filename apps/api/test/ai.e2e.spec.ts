@@ -400,7 +400,7 @@ describe("Phase 11 AI assistance", () => {
 
   it("rejects globally inactive AI feature", async () => {
     const owner = await registerVerifyLogin();
-    const org = await createOrg(owner.cookie, "Global Off", "premium");
+    const org = await createOrg(owner.cookie, "Global Off", "pro");
     const client = await createClient(owner.cookie, org.id);
     await ctx.prisma.feature.update({ where: { key: FEATURE_KEYS.AI }, data: { status: "INACTIVE" } });
 

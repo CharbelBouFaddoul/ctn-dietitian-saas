@@ -38,6 +38,11 @@ export interface SiteSettings {
   registrationEnabled: boolean;
   plansPageEnabled?: boolean;
   emailNotificationsEnabled?: boolean;
+  emailVerificationRequired?: boolean;
+  onlineCheckoutEnabled?: boolean;
+  trialSignupEnabled?: boolean;
+  trialDurationDays?: number;
+  trialPlanSlug?: string;
   dietitianSignInLabel: string;
   patientSignInLabel: string;
   footerDescription: string;
@@ -57,28 +62,33 @@ export const FALLBACK_SITE_SETTINGS: SiteSettings = {
   navItems: [
     { href: "/how-it-works", label: "How it works", visible: true, order: 0 },
     { href: "/features", label: "Features", visible: true, order: 1 },
-    { href: "/plans", label: "Plans", visible: false, order: 2 },
+    { href: "/plans", label: "Plans", visible: true, order: 2 },
     { href: "/faq", label: "FAQ", visible: true, order: 3 },
     { href: "/contact", label: "Contact", visible: true, order: 4 },
   ],
-  ctaText: "Get Started",
-  ctaHref: "/contact",
+  ctaText: "Start free trial",
+  ctaHref: "/auth/dietitian/register",
   ctaVisible: true,
-  dietitianRegistrationEnabled: false,
-  patientRegistrationEnabled: false,
-  registrationEnabled: false,
-  plansPageEnabled: false,
+  dietitianRegistrationEnabled: true,
+  patientRegistrationEnabled: true,
+  registrationEnabled: true,
+  plansPageEnabled: true,
   emailNotificationsEnabled: false,
+  emailVerificationRequired: false,
+  onlineCheckoutEnabled: false,
+  trialSignupEnabled: true,
+  trialDurationDays: 14,
   dietitianSignInLabel: "Sign in as Dietitian",
   patientSignInLabel: "Sign in as Patient",
   footerDescription:
-    "A nutrition clinic platform for dietitians and the clients they care for — meal plans, tracking, messaging, and practice tools in one place.",
+    "Clinic software for dietitians who are done running care in spreadsheets and chat. Charts, plans, tracking, and practice tools in one place.",
   footerGroups: [
     {
       title: "Product",
       links: [
         { href: "/how-it-works", label: "How it works" },
         { href: "/features", label: "Features" },
+        { href: "/plans", label: "Plans" },
         { href: "/faq", label: "FAQ" },
         { href: "/contact", label: "Contact" },
       ],
@@ -87,7 +97,7 @@ export const FALLBACK_SITE_SETTINGS: SiteSettings = {
       title: "For Dietitians",
       links: [
         { href: "/auth/dietitian/login", label: "Dietitian sign in" },
-        { href: "/contact", label: "Contact us" },
+        { href: "/auth/dietitian/register", label: "Start free trial" },
       ],
     },
     {

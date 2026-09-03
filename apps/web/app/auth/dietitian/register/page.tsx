@@ -15,6 +15,7 @@ export default function DietitianRegisterPage() {
   const router = useRouter();
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [email, setEmail] = useState("");
+  const [clinicName, setClinicName] = useState("");
   const [password, setPassword] = useState("");
   const [agreed, setAgreed] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -55,18 +56,31 @@ export default function DietitianRegisterPage() {
       return;
     }
     try {
-      const result = await api<{ message: string }>("/api/v1/auth/register", {
+      const result = await api<{
+        message: string;
+        emailVerificationRequired?: boolean;
+        dietitianAccountId?: string | null;
+      }>("/api/v1/auth/register", {
         method: "POST",
         body: JSON.stringify({
           email,
           password,
           audience: "dietitian",
+          clinicName,
           consents: [
             { type: "TERMS_OF_SERVICE", policyVersion: LEGAL_POLICY_VERSION },
             { type: "PRIVACY_POLICY", policyVersion: LEGAL_POLICY_VERSION },
           ],
         }),
       });
+      if (!result.emailVerificationRequired && result.dietitianAccountId) {
+        router.replace(`/practice/${result.dietitianAccountId}`);
+        return;
+      }
+      if (!result.emailVerificationRequired) {
+        router.replace("/practice");
+        return;
+      }
       setMessage(result.message);
     } catch (err) {
       setError(errorMessage(err, "Registration failed"));
@@ -104,9 +118,18 @@ export default function DietitianRegisterPage() {
     <AuthShell
       title="Create your clinic account"
       audience="dietitian"
-      description="Start your nutrition SaaS workspace for client care, meal plans, tracking, messaging, and clinic operations. We’ll send a verification email — then you can sign in and open your clinic."
+      description="Start a 14-day trial of your nutrition clinic workspace. When email verification is off, you can open the clinic right away."
     >
       <form onSubmit={(event) => void onSubmit(event)}>
+        <Field label="Clinic name">
+          <Input
+            autoComplete="organization"
+            value={clinicName}
+            onChange={(event) => setClinicName(event.target.value)}
+            required
+            minLength={2}
+          />
+        </Field>
         <Field label="Email">
           <Input
             type="email"
@@ -132,12 +155,7 @@ export default function DietitianRegisterPage() {
       </form>
       {message ? (
         <div style={{ marginTop: 12 }}>
-          <Alert tone="success">
-            {message}{" "}
-            <Link href="/auth/verify-email" className="ui-link">
-              Verify email
-            </Link>
-          </Alert>
+          <Alert tone="success">{message}</Alert>
         </div>
       ) : null}
       {error ? (

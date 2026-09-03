@@ -191,7 +191,7 @@ describe("platform admin, entitlements, and audit", () => {
     const orgB = await createOrg(b.cookie, "Plan B");
     const standard = await planBySlug("standard");
     const pro = await planBySlug("pro");
-    const premium = await planBySlug("premium");
+    const premium = await planBySlug("pro");
 
     await request(ctx.app.getHttpServer())
       .put(`/api/v1/admin/dietitians/${orgA.id}/subscription`)
@@ -215,7 +215,7 @@ describe("platform admin, entitlements, and audit", () => {
       .expect(200);
 
     expect(await ctx.entitlements.can(orgA.id, FEATURE_KEYS.AI)).toBe(true);
-    expect(await ctx.entitlements.limit(orgA.id, FEATURE_KEYS.AI_REQUEST_LIMIT)).toBe(1000);
+    expect(await ctx.entitlements.limit(orgA.id, FEATURE_KEYS.AI_REQUEST_LIMIT)).toBe(300);
     expect(await ctx.entitlements.limit(orgB.id, FEATURE_KEYS.AI_REQUEST_LIMIT)).toBe(300);
 
     await request(ctx.app.getHttpServer())
@@ -233,7 +233,7 @@ describe("platform admin, entitlements, and audit", () => {
       .set("Cookie", admin.cookie)
       .expect(200);
 
-    expect(await ctx.entitlements.limit(orgA.id, FEATURE_KEYS.AI_REQUEST_LIMIT)).toBe(1000);
+    expect(await ctx.entitlements.limit(orgA.id, FEATURE_KEYS.AI_REQUEST_LIMIT)).toBe(300);
     expect((await ctx.entitlements.resolve(orgA.id, FEATURE_KEYS.AI_REQUEST_LIMIT)).source).toBe("plan");
   });
 

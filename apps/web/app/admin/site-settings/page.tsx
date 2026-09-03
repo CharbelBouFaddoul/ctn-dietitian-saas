@@ -60,6 +60,11 @@ function AdminSiteSettingsForm() {
   const [patientRegistrationEnabled, setPatientRegistrationEnabled] = useState(false);
   const [plansPageEnabled, setPlansPageEnabled] = useState(false);
   const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState(false);
+  const [emailVerificationRequired, setEmailVerificationRequired] = useState(false);
+  const [onlineCheckoutEnabled, setOnlineCheckoutEnabled] = useState(false);
+  const [trialSignupEnabled, setTrialSignupEnabled] = useState(true);
+  const [trialDurationDays, setTrialDurationDays] = useState("14");
+  const [trialPlanSlug, setTrialPlanSlug] = useState("trial");
   const [dietitianSignInLabel, setDietitianSignInLabel] = useState("");
   const [patientSignInLabel, setPatientSignInLabel] = useState("");
   const [footerDescription, setFooterDescription] = useState("");
@@ -83,6 +88,11 @@ function AdminSiteSettingsForm() {
     setPatientRegistrationEnabled(data.patientRegistrationEnabled ?? data.registrationEnabled);
     setPlansPageEnabled(data.plansPageEnabled === true);
     setEmailNotificationsEnabled(data.emailNotificationsEnabled === true);
+    setEmailVerificationRequired(data.emailVerificationRequired === true);
+    setOnlineCheckoutEnabled(data.onlineCheckoutEnabled === true);
+    setTrialSignupEnabled(data.trialSignupEnabled !== false);
+    setTrialDurationDays(String(data.trialDurationDays ?? 14));
+    setTrialPlanSlug(data.trialPlanSlug || "trial");
     setDietitianSignInLabel(data.dietitianSignInLabel);
     setPatientSignInLabel(data.patientSignInLabel);
     setFooterDescription(data.footerDescription);
@@ -163,6 +173,11 @@ function AdminSiteSettingsForm() {
           patientRegistrationEnabled,
           plansPageEnabled,
           emailNotificationsEnabled,
+          emailVerificationRequired,
+          onlineCheckoutEnabled,
+          trialSignupEnabled,
+          trialDurationDays: Number(trialDurationDays) || 14,
+          trialPlanSlug: trialPlanSlug.trim() || "trial",
           dietitianSignInLabel,
           patientSignInLabel,
           footerDescription,
@@ -246,6 +261,49 @@ function AdminSiteSettingsForm() {
                   />
                   <span>Show the public Plans marketing page (when off, Get Started goes to Contact; admin plan entitlements are unchanged)</span>
                 </label>
+              </Field>
+              <Field label="Trial & checkout">
+                <div className="ui-stack" style={{ gap: 10 }}>
+                  <label className="ui-check">
+                    <input
+                      type="checkbox"
+                      checked={trialSignupEnabled}
+                      onChange={(event) => setTrialSignupEnabled(event.target.checked)}
+                    />
+                    <span>Give new dietitian signups a free trial subscription</span>
+                  </label>
+                  <label className="ui-check">
+                    <input
+                      type="checkbox"
+                      checked={onlineCheckoutEnabled}
+                      onChange={(event) => setOnlineCheckoutEnabled(event.target.checked)}
+                    />
+                    <span>Online payment is available (plan buttons go to checkout instead of Contact)</span>
+                  </label>
+                  <label className="ui-check">
+                    <input
+                      type="checkbox"
+                      checked={emailVerificationRequired}
+                      onChange={(event) => setEmailVerificationRequired(event.target.checked)}
+                    />
+                    <span>Require email verification before sign-in</span>
+                  </label>
+                  <Field label="Trial length (days)">
+                    <Input
+                      type="number"
+                      min={1}
+                      value={trialDurationDays}
+                      onChange={(event) => setTrialDurationDays(event.target.value)}
+                    />
+                  </Field>
+                  <Field label="Trial plan slug">
+                    <Input
+                      value={trialPlanSlug}
+                      onChange={(event) => setTrialPlanSlug(event.target.value)}
+                      placeholder="trial"
+                    />
+                  </Field>
+                </div>
               </Field>
               <Field label="Product email notifications">
                 <label className="ui-check">

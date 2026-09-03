@@ -1,5 +1,16 @@
 import { ApiProperty } from "@nestjs/swagger";
 
+export class RegisterResponseDto {
+  @ApiProperty()
+  message!: string;
+
+  @ApiProperty()
+  emailVerificationRequired!: boolean;
+
+  @ApiProperty({ nullable: true, type: String })
+  dietitianAccountId!: string | null;
+}
+
 export class MessageResponseDto {
   @ApiProperty()
   message!: string;

@@ -20,7 +20,7 @@ export default function DietitianLoginPage() {
     <SignInForm
       audience="dietitian"
       title="Sign in as Dietitian"
-      description="Access your nutrition clinic workspace — clients, meal plans, tracking, messaging, and more."
+      description="Access your nutrition clinic workspace: clients, meal plans, tracking, messaging, and more."
     />
   );
 }

@@ -5,6 +5,7 @@ import { seedPlatformSettings } from "../platform-settings/platform-settings.see
 
 /** Deletes all application rows. Caller must assert DB safety first. */
 export async function wipeApplicationData(prisma: PrismaClient): Promise<void> {
+  await prisma.contactSubmission.deleteMany();
   await prisma.automationRun.deleteMany();
   await prisma.automationRule.deleteMany();
   await prisma.automationUsage.deleteMany();
@@ -68,10 +69,12 @@ export async function wipeApplicationData(prisma: PrismaClient): Promise<void> {
 
 export async function seedPlatformBootstrap(
   prisma: PrismaClient,
-  options?: {
+    options?: {
     registrationEnabled?: boolean;
     dietitianRegistrationEnabled?: boolean;
     patientRegistrationEnabled?: boolean;
+    trialSignupEnabled?: boolean;
+    emailVerificationRequired?: boolean;
   },
 ): Promise<void> {
   await seedEntitlementCatalog(prisma);
@@ -85,6 +88,8 @@ export async function seedPlatformBootstrap(
       patientRegistrationEnabled: options?.patientRegistrationEnabled ?? both,
       emailNotificationsEnabled: false,
       plansPageEnabled: false,
+      trialSignupEnabled: options?.trialSignupEnabled ?? false,
+      emailVerificationRequired: options?.emailVerificationRequired ?? true,
     },
   });
 }
