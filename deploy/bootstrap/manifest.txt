@@ -1,5 +1,8 @@
-source=local-docker dietitian-postgres-1
-purpose=coolify-one-shot-bootstrap
-note=Imported only when production DB has zero users. Safe on later deploys.
-exported=2026-09-03T09:00:00Z
-includes=trial/standard/pro catalog, marketing flags, demo world, full food catalogs (USDA Foundation, SR Legacy, CNF, CoFID, Lebanon), 30 starter recipes
+source=local-docker postgres
+purpose=coolify-replace-clone
+exported=2026-09-03T12:21:09Z
+users=17
+database_bytes=2653080
+storage_bytes=111980
+includes=all tables, all users, platform settings, catalogs, clinic data
+note=Restore on Coolify with CONFIRM_REPLACE=1 pnpm bootstrap:prod -- --replace --skip-admin

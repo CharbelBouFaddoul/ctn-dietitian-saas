@@ -2,14 +2,12 @@
  * Manual one-shot production bootstrap (Coolify execute command — not on deploy).
  *
  * 1) prisma migrate deploy
- * 2) import deploy/bootstrap/database.dump only if User count is 0 (never overwrites)
- * 3) create SUPER_ADMIN from CLI flags
+ * 2) import deploy/bootstrap/database.dump (empty DB, or --replace with CONFIRM_REPLACE=1)
+ * 3) optionally create SUPER_ADMIN from CLI flags
  *
  * Usage (Coolify → API → Execute Command):
  *   pnpm bootstrap:prod -- --email you@ctnsolution.com --password 'YourStrongPass1'
- *   pnpm bootstrap:prod -- --email you@ctnsolution.com --password 'YourStrongPass1' --first-name Your --last-name Name
- *   pnpm bootstrap:prod -- --email you@ctnsolution.com --password 'YourStrongPass1' --force
- *   pnpm bootstrap:prod -- --email you@ctnsolution.com --password 'YourStrongPass1' --skip-import
+ *   CONFIRM_REPLACE=1 pnpm bootstrap:prod -- --replace --skip-admin
  */
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -34,6 +32,8 @@ type Args = {
   lastName: string;
   force: boolean;
   skipImport: boolean;
+  skipAdmin: boolean;
+  replace: boolean;
   dump: string;
   storageArchive: string;
 };
@@ -43,6 +43,12 @@ function printUsage(): void {
     [
       "Usage:",
       "  pnpm bootstrap:prod -- --email <email> --password <password> [--first-name N] [--last-name N] [--force] [--skip-import]",
+      "  CONFIRM_REPLACE=1 pnpm bootstrap:prod -- --replace --skip-admin",
+      "",
+      "  --replace       Overwrite the production database with deploy/bootstrap/database.dump",
+      "                  (requires CONFIRM_REPLACE=1). Use this to clone local → Coolify.",
+      "  --skip-admin    Do not create/update a SUPER_ADMIN (use when the dump already has users).",
+      "  --skip-import   Skip dump restore (migrate + admin only).",
       "",
     ].join("\n"),
   );
@@ -54,6 +60,8 @@ function parseArgs(argv: string[]): Args {
     lastName: "Admin",
     force: false,
     skipImport: false,
+    skipAdmin: false,
+    replace: false,
     dump: DEFAULT_DUMP,
     storageArchive: DEFAULT_STORAGE,
   };
@@ -83,6 +91,10 @@ function parseArgs(argv: string[]): Args {
       out.force = true;
     } else if (arg === "--skip-import") {
       out.skipImport = true;
+    } else if (arg === "--skip-admin") {
+      out.skipAdmin = true;
+    } else if (arg === "--replace") {
+      out.replace = true;
     } else if (arg === "--help" || arg === "-h") {
       printUsage();
       process.exit(0);
@@ -151,7 +163,34 @@ function migrateDeploy(): void {
   run("pnpm", ["exec", "prisma", "migrate", "deploy"]);
 }
 
-function importDumpIfEmpty(dump: string, storageArchive: string): void {
+function countUsers(databaseUrl: string): number {
+  const tableExists = runCapture("psql", [
+    databaseUrl,
+    "-Atqc",
+    "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'users';",
+  ]);
+  if (tableExists !== "1") return 0;
+  return Number(runCapture("psql", [databaseUrl, "-Atqc", 'SELECT COUNT(*) FROM "users";']) || "0");
+}
+
+function restoreStorage(storageArchive: string): void {
+  const resolvedStorage = resolveExistingPath(storageArchive, [
+    resolve(process.cwd(), "deploy/bootstrap/storage.tar.gz"),
+    resolve(process.cwd(), "../../deploy/bootstrap/storage.tar.gz"),
+    DEFAULT_STORAGE,
+  ]);
+  if (!existsSync(resolvedStorage)) return;
+  const fileStoragePath = process.env.FILE_STORAGE_PATH || DEFAULT_FILE_STORAGE;
+  const parent = resolve(fileStoragePath, "..");
+  process.stdout.write(`[bootstrap:prod] Restoring storage to ${fileStoragePath}…\n`);
+  run("mkdir", ["-p", parent]);
+  if (existsSync(fileStoragePath)) {
+    run("rm", ["-rf", fileStoragePath]);
+  }
+  run("tar", ["-xzf", resolvedStorage, "-C", parent]);
+}
+
+function importDump(dump: string, storageArchive: string, replace: boolean): void {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) throw new Error("DATABASE_URL is required (already set by Coolify for the API).");
 
@@ -164,41 +203,52 @@ function importDumpIfEmpty(dump: string, storageArchive: string): void {
     throw new Error(`Dump not found: ${resolvedDump}`);
   }
 
-  const tableExists = runCapture("psql", [
-    databaseUrl,
-    "-Atqc",
-    "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'User';",
-  ]);
-
-  let userCount = 0;
-  if (tableExists === "1") {
-    userCount = Number(
-      runCapture("psql", [databaseUrl, "-Atqc", 'SELECT COUNT(*) FROM "User";']) || "0",
-    );
-  }
-
-  if (userCount > 0) {
+  const userCount = countUsers(databaseUrl);
+  if (userCount > 0 && !replace) {
     process.stdout.write(
-      `[bootstrap:prod] Database already has ${userCount} user(s) — skipping dump import (will never overwrite).\n`,
+      `[bootstrap:prod] Database already has ${userCount} user(s) — skipping dump import.\n` +
+        "Pass --replace and CONFIRM_REPLACE=1 to overwrite with the local snapshot.\n",
     );
     return;
   }
 
-  process.stdout.write(`[bootstrap:prod] Empty DB — restoring ${resolvedDump} once…\n`);
-  run("pg_restore", ["--clean", "--if-exists", "--no-owner", `--dbname=${databaseUrl}`, resolvedDump]);
-
-  const resolvedStorage = resolveExistingPath(storageArchive, [
-    resolve(process.cwd(), "deploy/bootstrap/storage.tar.gz"),
-    resolve(process.cwd(), "../../deploy/bootstrap/storage.tar.gz"),
-    DEFAULT_STORAGE,
-  ]);
-  if (existsSync(resolvedStorage)) {
-    const fileStoragePath = process.env.FILE_STORAGE_PATH || DEFAULT_FILE_STORAGE;
-    const parent = resolve(fileStoragePath, "..");
-    process.stdout.write(`[bootstrap:prod] Restoring storage to ${fileStoragePath}…\n`);
-    run("mkdir", ["-p", parent]);
-    run("tar", ["-xzf", resolvedStorage, "-C", parent]);
+  if (replace) {
+    if (process.env.CONFIRM_REPLACE !== "1") {
+      throw new Error(
+        "Refusing to overwrite production data. Re-run with CONFIRM_REPLACE=1 and --replace.",
+      );
+    }
+    process.stdout.write(
+      `[bootstrap:prod] CONFIRM_REPLACE=1 — replacing ${userCount} existing user(s) from ${resolvedDump}…\n`,
+    );
+    run("psql", [
+      databaseUrl,
+      "-q",
+      "-c",
+      "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid();",
+    ]);
+  } else {
+    process.stdout.write(`[bootstrap:prod] Empty DB — restoring ${resolvedDump} once…\n`);
   }
+
+  const restore = spawnSync(
+    "pg_restore",
+    [
+      "--clean",
+      "--if-exists",
+      "--no-owner",
+      "--no-acl",
+      `--dbname=${databaseUrl}`,
+      resolvedDump,
+    ],
+    { stdio: "inherit", env: process.env, shell: false },
+  );
+  if (restore.error) throw restore.error;
+  // pg_restore exits 1 when some DROP IF EXISTS notices fire; 0/1 are acceptable.
+  if (restore.status != null && restore.status > 1) {
+    throw new Error(`pg_restore failed (${restore.status}): ${resolvedDump}`);
+  }
+  restoreStorage(storageArchive);
 }
 
 async function createAdmin(args: Args): Promise<void> {
@@ -258,20 +308,24 @@ async function createAdmin(args: Args): Promise<void> {
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
-  if (!args.email || !args.password) {
+  if (!args.skipAdmin && (!args.email || !args.password)) {
     printUsage();
-    throw new Error("--email and --password are required.");
+    throw new Error("--email and --password are required unless you pass --skip-admin.");
   }
 
   migrateDeploy();
 
   if (!args.skipImport) {
-    importDumpIfEmpty(args.dump, args.storageArchive);
+    importDump(args.dump, args.storageArchive, args.replace);
     migrateDeploy();
   }
 
-  await createAdmin(args);
-  process.stdout.write("[bootstrap:prod] Done.\n");
+  if (!args.skipAdmin) {
+    await createAdmin(args);
+  } else {
+    process.stdout.write("[bootstrap:prod] Skipping admin upsert (--skip-admin).\n");
+  }
+  process.stdout.write("[bootstrap:prod] Done. Log in with the same accounts as local.\n");
 }
 
 void main().catch((error: unknown) => {

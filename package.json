@@ -23,6 +23,7 @@
     "recipe:import": "pnpm --filter @nutrition-saas/api recipe:import",
     "demo:reset": "pnpm --filter @nutrition-saas/api demo:reset",
     "demo:seed": "pnpm --filter @nutrition-saas/api demo:seed",
+    "export:coolify": "./scripts/export-coolify-clone.sh",
     "bootstrap:prod": "pnpm --filter @nutrition-saas/api bootstrap:prod",
     "test": "pnpm --filter @nutrition-saas/api test"
   },

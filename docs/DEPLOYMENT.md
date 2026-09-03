@@ -150,15 +150,17 @@ pnpm test
 
 Treat backup artifacts as sensitive (full tenant data).
 
-To seed a **new** deploy from the local development database (demo accounts, catalog foods, admin plans):
+To clone the **local Docker database** (users, settings, clinics, catalogs, uploads) onto Coolify:
 
 ```bash
-./scripts/export-local-db.sh
-# Copy backups/local-db-*.sql onto the server, then:
-psql "$DATABASE_URL" < backups/local-db-<timestamp>.sql
+pnpm export:coolify
+# commit and push deploy/bootstrap, wait for the API image rebuild, then in Coolify → API → Execute Command:
+CONFIRM_REPLACE=1 pnpm bootstrap:prod -- --replace --skip-admin
 ```
 
-Do not run `pnpm demo:reset` in production (`NODE_ENV=production` is refused). Prefer this dump/restore for a one-time copy of the local world.
+`--replace` overwrites production. It requires `CONFIRM_REPLACE=1`. After restore, log in with the same local emails and passwords.
+
+Do not run `pnpm demo:reset` in production (`NODE_ENV=production` is refused). See `deploy/bootstrap/README.md`.
 
 ## Monitoring
 

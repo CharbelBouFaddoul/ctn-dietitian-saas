@@ -1,5 +1,5 @@
-# One-shot Coolify bootstrap dump (local DB snapshot).
-# Imported only when production has zero users — never overwrites later.
+# Coolify clone dump (local DB snapshot).
+# Restore with CONFIRM_REPLACE=1 pnpm bootstrap:prod -- --replace --skip-admin
 *
 !.gitignore
 !database.dump
