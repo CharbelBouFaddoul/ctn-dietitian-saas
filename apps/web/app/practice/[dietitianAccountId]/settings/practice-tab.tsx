@@ -1,10 +1,19 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
-import { Alert, Button, Field, Input, Section } from "@nutrition-saas/ui";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { Alert, Button, Field, Input, Section, Select } from "@nutrition-saas/ui";
 import { api } from "../../../../lib/api";
 import { errorMessage } from "../../../../lib/humanize-error";
-import { PROFILE_FORM_ID, settingsPayload, type DietitianSettings, type ProfileEditorMode } from "./profile-types";
+import { groupTimezones, timezoneChoices } from "../../../../lib/timezones";
+import { SettingsAffects, SettingsLead } from "./settings-copy";
+import {
+  CURRENCY_OPTIONS,
+  DATE_FORMAT_OPTIONS,
+  PROFILE_FORM_ID,
+  settingsPayload,
+  type DietitianSettings,
+  type ProfileEditorMode,
+} from "./profile-types";
 
 export function PracticeTab({
   dietitianAccountId,
@@ -25,6 +34,10 @@ export function PracticeTab({
   } | null>(null);
   const [removing, setRemoving] = useState(false);
   const [seedMessage, setSeedMessage] = useState<string | null>(null);
+  const timezoneGroups = useMemo(
+    () => groupTimezones(timezoneChoices(settings.timezone)),
+    [settings.timezone],
+  );
 
   function set<K extends keyof DietitianSettings>(key: K, value: DietitianSettings[K]) {
     onSettings({ ...settings, [key]: value });
@@ -79,73 +92,169 @@ export function PracticeTab({
       onSettings(updated);
       onSaved();
     } catch (err) {
-      setError(errorMessage(err, "Unable to save practice details"));
+      setError(errorMessage(err, "Unable to save clinic details"));
     } finally {
       onSaving(false);
     }
   }
 
   return (
-    <>
-    <form id={PROFILE_FORM_ID} onSubmit={(event) => void onSave(event)} className="ui-profile-hub__stack">
-      <fieldset disabled={!editing}>
-      <Section title="Clinic">
-        <Field label="Clinic name">
-          <Input value={str("practiceName")} onChange={(event) => set("practiceName", event.target.value || null)} />
-        </Field>
-        <div className="ui-profile-grid ui-profile-grid--2">
-          <Field label="Email">
-            <Input
-              type="email"
-              value={str("contactEmail")}
-              onChange={(event) => set("contactEmail", event.target.value || null)}
-            />
-          </Field>
-          <Field label="Phone">
-            <Input value={str("contactPhone")} onChange={(event) => set("contactPhone", event.target.value || null)} />
-          </Field>
-        </div>
-      </Section>
-      <Section title="Address">
-        <Field label="Address line 1">
-          <Input value={str("addressLine1")} onChange={(event) => set("addressLine1", event.target.value || null)} />
-        </Field>
-        <Field label="Address line 2">
-          <Input value={str("addressLine2")} onChange={(event) => set("addressLine2", event.target.value || null)} />
-        </Field>
-        <div className="ui-profile-grid ui-profile-grid--3">
-          <Field label="City">
-            <Input value={str("city")} onChange={(event) => set("city", event.target.value || null)} />
-          </Field>
-          <Field label="Region">
-            <Input value={str("region")} onChange={(event) => set("region", event.target.value || null)} />
-          </Field>
-          <Field label="Postal code">
-            <Input value={str("postalCode")} onChange={(event) => set("postalCode", event.target.value || null)} />
-          </Field>
-        </div>
-        <Field label="Country">
-          <Input value={str("country")} onChange={(event) => set("country", event.target.value || null)} />
-        </Field>
-      </Section>
-      </fieldset>
-      {error ? <Alert tone="danger">{error}</Alert> : null}
-    </form>
-    {seedStatus && (seedStatus.trialSeedStatus === "READY" || seedStatus.activeSampleClients > 0) ? (
-      <Section
-        title="Sample trial data"
-        description="Your trial included sample clients so you could click around. They stay until you remove them — paying does not delete them."
-      >
-        {seedMessage ? <Alert tone="success">{seedMessage}</Alert> : null}
-        <p className="ui-muted" style={{ marginTop: 0 }}>
-          {seedStatus.activeSampleClients} active sample client
-          {seedStatus.activeSampleClients === 1 ? "" : "s"} in this clinic.
-        </p>
-        <Button variant="secondary" disabled={removing} onClick={() => void removeSamples()}>
-          {removing ? "Removing…" : "Remove sample data"}
-        </Button>
-      </Section>
-    ) : null}
-    </>
+    <div className="ui-profile-hub__stack">
+      <SettingsLead affects={["Invoices", "Printed charts", "Calendar", "Measurement", "Nutrition Analysis"]}>
+        How the clinic is named and how numbers are displayed. These defaults apply across the dashboard — not to a
+        single client.
+      </SettingsLead>
+      <form id={PROFILE_FORM_ID} onSubmit={(event) => void onSave(event)}>
+        <fieldset disabled={!editing}>
+          <Section
+            title="Clinic"
+            description={
+              <>
+                Letterhead for invoices, printed charts, and outgoing mail.
+                <SettingsAffects items={["Invoices", "Printed charts", "Emails"]} />
+              </>
+            }
+          >
+            <Field label="Clinic name">
+              <Input value={str("practiceName")} onChange={(event) => set("practiceName", event.target.value || null)} />
+            </Field>
+            <div className="ui-profile-grid ui-profile-grid--2">
+              <Field label="Email">
+                <Input
+                  type="email"
+                  value={str("contactEmail")}
+                  onChange={(event) => set("contactEmail", event.target.value || null)}
+                />
+              </Field>
+              <Field label="Phone">
+                <Input
+                  value={str("contactPhone")}
+                  onChange={(event) => set("contactPhone", event.target.value || null)}
+                />
+              </Field>
+            </div>
+          </Section>
+          <Section
+            title="Address"
+            description={
+              <>
+                Shown on invoices and printed documents.
+                <SettingsAffects items={["Invoices", "Printed charts"]} />
+              </>
+            }
+          >
+            <Field label="Address line 1">
+              <Input value={str("addressLine1")} onChange={(event) => set("addressLine1", event.target.value || null)} />
+            </Field>
+            <Field label="Address line 2">
+              <Input value={str("addressLine2")} onChange={(event) => set("addressLine2", event.target.value || null)} />
+            </Field>
+            <div className="ui-profile-grid ui-profile-grid--3">
+              <Field label="City">
+                <Input value={str("city")} onChange={(event) => set("city", event.target.value || null)} />
+              </Field>
+              <Field label="Region">
+                <Input value={str("region")} onChange={(event) => set("region", event.target.value || null)} />
+              </Field>
+              <Field label="Postal code">
+                <Input value={str("postalCode")} onChange={(event) => set("postalCode", event.target.value || null)} />
+              </Field>
+            </div>
+            <Field label="Country">
+              <Input value={str("country")} onChange={(event) => set("country", event.target.value || null)} />
+            </Field>
+          </Section>
+          <Section
+            title="Locale"
+            description={
+              <>
+                Clinic clock, date order, and currency. The workspace stays in English.
+                <SettingsAffects items={["Calendar", "Invoices", "Tracking", "Analytics"]} />
+              </>
+            }
+          >
+            <Field label="Timezone">
+              <Select value={settings.timezone} onChange={(event) => set("timezone", event.target.value)}>
+                {timezoneGroups.map((group) => (
+                  <optgroup key={group.region} label={group.region}>
+                    {group.zones.map((zone) => (
+                      <option key={zone.id} value={zone.id}>
+                        {zone.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </Select>
+            </Field>
+            <div className="ui-profile-grid ui-profile-grid--2">
+              <Field label="Date format">
+                <Select value={settings.dateFormat} onChange={(event) => set("dateFormat", event.target.value)}>
+                  {DATE_FORMAT_OPTIONS.map((row) => (
+                    <option key={row.value} value={row.value}>
+                      {row.label}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Currency">
+                <Select value={settings.currency} onChange={(event) => set("currency", event.target.value)}>
+                  {CURRENCY_OPTIONS.map((row) => (
+                    <option key={row} value={row}>
+                      {row}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            </div>
+          </Section>
+          <Section
+            title="Units"
+            description={
+              <>
+                How weight, height, and energy are entered and shown on every chart.
+                <SettingsAffects items={["Measurement", "Prescription", "Nutrition Analysis"]} />
+              </>
+            }
+          >
+            <div className="ui-profile-grid ui-profile-grid--3">
+              <Field label="Weight">
+                <Select value={settings.weightUnit} onChange={(event) => set("weightUnit", event.target.value)}>
+                  <option value="kg">Kilogram (kg)</option>
+                  <option value="lb">Pound (lb)</option>
+                </Select>
+              </Field>
+              <Field label="Height">
+                <Select value={settings.heightUnit} onChange={(event) => set("heightUnit", event.target.value)}>
+                  <option value="cm">Centimeters (cm)</option>
+                  <option value="in">Inches (in)</option>
+                </Select>
+              </Field>
+              <Field label="Energy">
+                <Select value={settings.energyUnit} onChange={(event) => set("energyUnit", event.target.value)}>
+                  <option value="kcal">Kilocalorie (kcal)</option>
+                  <option value="kj">Kilojoule (kJ)</option>
+                </Select>
+              </Field>
+            </div>
+          </Section>
+        </fieldset>
+        {error ? <Alert tone="danger">{error}</Alert> : null}
+      </form>
+      {seedStatus && (seedStatus.trialSeedStatus === "READY" || seedStatus.activeSampleClients > 0) ? (
+        <Section
+          title="Sample trial data"
+          description="Demo clients from your trial. They stay until you remove them — upgrading does not delete them."
+        >
+          {seedMessage ? <Alert tone="success">{seedMessage}</Alert> : null}
+          <p className="ui-muted" style={{ marginTop: 0 }}>
+            {seedStatus.activeSampleClients} active sample client
+            {seedStatus.activeSampleClients === 1 ? "" : "s"} in this clinic.
+          </p>
+          <Button variant="secondary" disabled={removing} onClick={() => void removeSamples()}>
+            {removing ? "Removing…" : "Remove sample data"}
+          </Button>
+        </Section>
+      ) : null}
+    </div>
   );
 }

@@ -1,3 +1,5 @@
+import { sanitizeNutritionMethod, type NutritionMethod } from "./faculty-nutrition";
+
 const TEXT_MAX = 4000;
 const CODE_MAX = 80;
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -94,8 +96,63 @@ export type ClinicalData = {
     energyFormula: string;
     beginDate: string;
     forecastFinishDate: string;
+    nutritionMethod: NutritionMethod;
+    usualWeightKg: number | null;
+    useAdjustedWeightForEnergy: boolean;
+    exchanges: FacultyExchanges;
   };
 };
+
+export type FacultyExchangeId =
+  | "milkFatFree"
+  | "milkReduced"
+  | "milkWhole"
+  | "fruit"
+  | "bread"
+  | "vegetable"
+  | "meatLean"
+  | "meatMedium"
+  | "meatHigh"
+  | "fatMufa"
+  | "fatPufa"
+  | "fatSafa"
+  | "sugar";
+
+export type FacultyExchanges = Record<FacultyExchangeId, number>;
+
+const FACULTY_EXCHANGE_IDS: FacultyExchangeId[] = [
+  "milkFatFree",
+  "milkReduced",
+  "milkWhole",
+  "fruit",
+  "bread",
+  "vegetable",
+  "meatLean",
+  "meatMedium",
+  "meatHigh",
+  "fatMufa",
+  "fatPufa",
+  "fatSafa",
+  "sugar",
+];
+
+export function emptyFacultyExchanges(): FacultyExchanges {
+  return {
+    milkFatFree: 0,
+    milkReduced: 0,
+    milkWhole: 0,
+    fruit: 0,
+    bread: 0,
+    vegetable: 0,
+    meatLean: 0,
+    meatMedium: 0,
+    meatHigh: 0,
+    fatMufa: 0,
+    fatPufa: 0,
+    fatSafa: 0,
+    sugar: 0,
+  };
+}
 
 function text(value: unknown, max = TEXT_MAX): string {
   if (typeof value !== "string") return "";
@@ -116,6 +173,20 @@ function positiveNumber(value: unknown, max = 20000): number | null {
   const n = typeof value === "number" ? value : Number(String(value).trim());
   if (!Number.isFinite(n) || n < 0 || n > max) return null;
   return Math.round(n * 10) / 10;
+}
+
+function flag(value: unknown): boolean {
+  return value === true;
+}
+
+function sanitizeExchanges(value: unknown): FacultyExchanges {
+  const next = emptyFacultyExchanges();
+  const record = asRecord(value);
+  for (const id of FACULTY_EXCHANGE_IDS) {
+    const raw = positiveNumber(record[id], 200);
+    next[id] = raw == null ? 0 : Math.min(50, raw);
+  }
+  return next;
 }
 
 export function emptyClinicalData(): ClinicalData {
@@ -205,6 +276,10 @@ export function emptyClinicalData(): ClinicalData {
       energyFormula: "",
       beginDate: "",
       forecastFinishDate: "",
+      nutritionMethod: "iom",
+      usualWeightKg: null,
+      useAdjustedWeightForEnergy: false,
+      exchanges: emptyFacultyExchanges(),
     },
   };
 }
@@ -331,6 +406,10 @@ export function sanitizeClinicalData(input: unknown): ClinicalData {
       energyFormula: code(prescription.energyFormula),
       beginDate: code(prescription.beginDate),
       forecastFinishDate: code(prescription.forecastFinishDate),
+      nutritionMethod: sanitizeNutritionMethod(prescription.nutritionMethod),
+      usualWeightKg: positiveNumber(prescription.usualWeightKg, 1000),
+      useAdjustedWeightForEnergy: flag(prescription.useAdjustedWeightForEnergy),
+      exchanges: sanitizeExchanges(prescription.exchanges),
     },
   };
 }

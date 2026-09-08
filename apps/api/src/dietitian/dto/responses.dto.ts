@@ -91,6 +91,9 @@ export class DietitianSettingsResponseDto {
   @ApiProperty()
   deduceMeasurements!: boolean;
 
+  @ApiProperty({ enum: ["iom", "faculty_lebanon"] })
+  defaultNutritionMethod!: "iom" | "faculty_lebanon";
+
   @ApiProperty()
   portalPresets!: Record<string, unknown>;
 

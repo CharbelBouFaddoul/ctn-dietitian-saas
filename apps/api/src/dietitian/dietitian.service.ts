@@ -17,6 +17,7 @@ import {
   normalizeAppointmentReminders,
   normalizeEnabledMeasurements,
   normalizeMealPlanShare,
+  normalizeNutritionMethod,
   normalizePortalPresets,
 } from "./profile-settings";
 
@@ -186,6 +187,7 @@ export class DietitianService {
     mealPlanShare?: Prisma.JsonValue | null;
     enabledMeasurements?: Prisma.JsonValue | null;
     deduceMeasurements?: boolean;
+    defaultNutritionMethod?: string;
     portalPresets?: Prisma.JsonValue | null;
   }) {
     const reminders = normalizeAppointmentReminders(
@@ -223,6 +225,7 @@ export class DietitianService {
       mealPlanShare: normalizeMealPlanShare(settings.mealPlanShare),
       enabledMeasurements: normalizeEnabledMeasurements(settings.enabledMeasurements),
       deduceMeasurements: settings.deduceMeasurements ?? true,
+      defaultNutritionMethod: normalizeNutritionMethod(settings.defaultNutritionMethod),
       portalPresets: normalizePortalPresets(settings.portalPresets),
     };
   }
@@ -242,12 +245,12 @@ export class DietitianService {
     const portalPresets =
       update.portalPresets !== undefined ? normalizePortalPresets(update.portalPresets) : undefined;
     return {
-      timezone: settings.timezone,
-      locale: settings.locale,
-      currency: settings.currency,
-      weightUnit: settings.weightUnit as WeightUnit,
-      heightUnit: settings.heightUnit as HeightUnit,
-      dateFormat: settings.dateFormat as DateFormat,
+      ...(settings.timezone !== undefined ? { timezone: settings.timezone } : {}),
+      ...(settings.locale !== undefined ? { locale: settings.locale } : {}),
+      ...(settings.currency !== undefined ? { currency: settings.currency } : {}),
+      ...(settings.weightUnit !== undefined ? { weightUnit: settings.weightUnit as WeightUnit } : {}),
+      ...(settings.heightUnit !== undefined ? { heightUnit: settings.heightUnit as HeightUnit } : {}),
+      ...(settings.dateFormat !== undefined ? { dateFormat: settings.dateFormat as DateFormat } : {}),
       ...(update.practiceName !== undefined ? { practiceName: update.practiceName } : {}),
       ...(update.logoStorageKey !== undefined ? { logoStorageKey: update.logoStorageKey } : {}),
       ...(update.contactEmail !== undefined ? { contactEmail: update.contactEmail } : {}),
@@ -284,6 +287,9 @@ export class DietitianService {
       ...(mealPlanShare !== undefined ? { mealPlanShare } : {}),
       ...(enabled !== undefined ? { enabledMeasurements: enabled === null ? Prisma.DbNull : enabled } : {}),
       ...(update.deduceMeasurements !== undefined ? { deduceMeasurements: update.deduceMeasurements } : {}),
+      ...(update.defaultNutritionMethod !== undefined
+        ? { defaultNutritionMethod: normalizeNutritionMethod(update.defaultNutritionMethod) }
+        : {}),
       ...(portalPresets !== undefined ? { portalPresets } : {}),
     };
   }

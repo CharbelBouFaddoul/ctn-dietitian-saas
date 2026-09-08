@@ -57,6 +57,24 @@ export function PrescriptionBody({ body }: { body: PrescriptionPrintBody }) {
       ? { label: "Forecast finish", value: formatDateOnly(body.duration.forecastFinishDate) }
       : null,
   ]);
+  const faculty = filled([
+    body.faculty?.ibwKg != null ? { label: "IBW", value: measureText(body.faculty.ibwKg, "kg") } : null,
+    body.faculty?.percentIbw != null ? { label: "% IBW", value: `${body.faculty.percentIbw}%` } : null,
+    body.faculty?.abwKg != null ? { label: "ABW", value: measureText(body.faculty.abwKg, "kg") } : null,
+    body.faculty?.whr != null ? { label: "WHR", value: String(body.faculty.whr) } : null,
+    body.faculty?.frame ? { label: "Frame", value: body.faculty.frame } : null,
+    body.faculty?.palLabel ? { label: "Activity level", value: body.faculty.palLabel } : null,
+    body.faculty?.exchangeKcal != null
+      ? { label: "Exchange energy", value: measureText(body.faculty.exchangeKcal, "kcal") }
+      : null,
+    body.faculty?.carbohydrateG != null
+      ? { label: "Exchange carbohydrate", value: measureText(body.faculty.carbohydrateG, "g") }
+      : null,
+    body.faculty?.proteinG != null
+      ? { label: "Exchange protein", value: measureText(body.faculty.proteinG, "g") }
+      : null,
+    body.faculty?.fatG != null ? { label: "Exchange fat", value: measureText(body.faculty.fatG, "g") } : null,
+  ]);
 
   return (
     <>
@@ -75,6 +93,11 @@ export function PrescriptionBody({ body }: { body: PrescriptionPrintBody }) {
       <DocSection title="Duration">
         <DocFields fields={duration} />
       </DocSection>
+      {faculty.length > 0 ? (
+        <DocSection title="Lebanese faculty method">
+          <DocFields fields={faculty} />
+        </DocSection>
+      ) : null}
     </>
   );
 }

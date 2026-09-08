@@ -317,6 +317,18 @@ export function ClientClinicalProfilePanel({
           ...(profile.clinicalData?.nutrition?.targets ?? {}),
         },
       },
+      prescription: {
+        ...emptyClinicalData().prescription,
+        ...(profile.clinicalData?.prescription ?? {}),
+        macro: {
+          ...emptyClinicalData().prescription.macro,
+          ...(profile.clinicalData?.prescription?.macro ?? {}),
+        },
+        exchanges: {
+          ...emptyClinicalData().prescription.exchanges,
+          ...(profile.clinicalData?.prescription?.exchanges ?? {}),
+        },
+      },
       identity: {
         ...emptyClinicalData().identity,
         ...(profile.clinicalData?.identity ?? {}),

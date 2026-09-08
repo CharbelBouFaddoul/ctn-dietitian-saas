@@ -1,3 +1,12 @@
+import {
+  DEFAULT_NUTRITION_METHOD,
+  emptyFacultyExchanges,
+  type FacultyExchanges,
+  type NutritionMethod,
+} from "./faculty-nutrition";
+
+export type { NutritionMethod };
+
 export type ClinicalData = {
   visit: {
     reason: string;
@@ -93,6 +102,10 @@ export type PrescriptionData = {
   energyFormula: string;
   beginDate: string;
   forecastFinishDate: string;
+  nutritionMethod: NutritionMethod;
+  usualWeightKg: number | null;
+  useAdjustedWeightForEnergy: boolean;
+  exchanges: FacultyExchanges;
 };
 
 export type PrescriptionActivity = {
@@ -122,6 +135,10 @@ export function emptyPrescription(): PrescriptionData {
     energyFormula: "",
     beginDate: "",
     forecastFinishDate: "",
+    nutritionMethod: DEFAULT_NUTRITION_METHOD,
+    usualWeightKg: null,
+    useAdjustedWeightForEnergy: false,
+    exchanges: emptyFacultyExchanges(),
   };
 }
 

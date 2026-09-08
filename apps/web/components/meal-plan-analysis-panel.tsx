@@ -1,7 +1,9 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { DonutChart, TargetBar } from "@nutrition-saas/ui";
+import { Badge, DonutChart, TargetBar } from "@nutrition-saas/ui";
+import { FacultyExchangeEditor } from "./faculty-exchange-editor";
+import { FACULTY_METHOD_LABEL, type FacultyExchangeId, type FacultyExchanges } from "../lib/faculty-nutrition";
 import type { ExtraNutrients } from "../lib/micronutrients";
 import type { DailyMacroTargets } from "../lib/nutrition-targets";
 
@@ -139,6 +141,9 @@ export function MealPlanAnalysisPanel({
   macroTargets,
   macroTargetsFromClient,
   compact = false,
+  exchanges,
+  allowManage = false,
+  onExchangeChange,
 }: {
   dayLabel: string;
   presented: Nutrition | undefined;
@@ -147,6 +152,9 @@ export function MealPlanAnalysisPanel({
   macroTargets: DailyMacroTargets;
   macroTargetsFromClient: boolean;
   compact?: boolean;
+  exchanges?: FacultyExchanges;
+  allowManage?: boolean;
+  onExchangeChange?: (id: FacultyExchangeId, value: number) => void;
 }) {
   const sugar = n(presented?.sugarG);
   const carbs = n(presented?.carbohydrateG);
@@ -176,14 +184,41 @@ export function MealPlanAnalysisPanel({
 
   return (
     <>
+      {exchanges ? (
+        <section className="ui-mp__card ui-faculty-analysis">
+          <div className="ui-evo__faculty-head">
+            <h3>Exchange plan</h3>
+            <Badge tone="success">{FACULTY_METHOD_LABEL}</Badge>
+            <p className="ui-muted">
+              Meals are compared to this plan. The bars below use the same totals.
+            </p>
+          </div>
+          <FacultyExchangeEditor
+            exchanges={exchanges}
+            readOnly={compact || !allowManage || !onExchangeChange}
+            dayTotals={{
+              energyKcal: presented?.energyKcal ?? null,
+              carbohydrateG: presented?.carbohydrateG ?? null,
+              proteinG: presented?.proteinG ?? null,
+              fatG: presented?.fatG ?? null,
+            }}
+            hint="Lebanese catalog dishes (Lebanon FCT 2021) can fill these exchanges from the food picker."
+            onChange={onExchangeChange ?? (() => undefined)}
+          />
+        </section>
+      ) : null}
       <section className="ui-mp__card ui-mp__global-analysis">
         <h3>Global analysis</h3>
         <p className="ui-muted ui-mp__source">
           {dayLabel}
           {" · "}
-          {macroTargetsFromClient
-            ? "Compared to this client’s daily targets"
-            : "Using default targets — set daily targets in Prescription"}
+          {exchanges
+            ? macroTargetsFromClient
+              ? "Compared to this client’s exchange plan"
+              : "Using default targets — set the exchange plan in Prescription"
+            : macroTargetsFromClient
+              ? "Compared to this client’s daily targets"
+              : "Using default targets — set daily targets in Prescription"}
         </p>
         <div className="ui-mp__macro-strip">
           <TargetBar

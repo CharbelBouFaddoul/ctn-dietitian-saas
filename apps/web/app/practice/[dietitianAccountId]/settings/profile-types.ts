@@ -1,17 +1,28 @@
 export const PROFILE_TABS = [
-  { id: "profile", label: "Your profile" },
-  { id: "practice", label: "Practice" },
-  { id: "preferences", label: "Preferences" },
-  { id: "appointments", label: "Appointments" },
+  { id: "profile", label: "Personal data" },
+  { id: "practice", label: "Clinic" },
+  { id: "clinical", label: "Care" },
   { id: "documents", label: "Documents" },
-  { id: "clinical", label: "Clinical" },
-  { id: "portal", label: "Client portal" },
-  { id: "account", label: "Account" },
 ] as const;
 
 export type ProfileTabId = (typeof PROFILE_TABS)[number]["id"];
 
+const PROFILE_TAB_ALIASES: Record<string, ProfileTabId> = {
+  appearance: "profile",
+  account: "profile",
+  preferences: "practice",
+  appointments: "clinical",
+  portal: "clinical",
+};
+
+export function resolveProfileTab(value: string | null): ProfileTabId {
+  if (value && PROFILE_TABS.some((tab) => tab.id === value)) return value as ProfileTabId;
+  if (value && value in PROFILE_TAB_ALIASES) return PROFILE_TAB_ALIASES[value]!;
+  return "profile";
+}
+
 export const PROFILE_FORM_ID = "profile-hub-form";
+export const PROFILE_PASSWORD_FORM_ID = "profile-password-form";
 
 export type ProfileEditorMode = {
   editing: boolean;
@@ -19,43 +30,6 @@ export type ProfileEditorMode = {
   onSaved: () => void;
   onSaving: (saving: boolean) => void;
 };
-
-export function isProfileTab(value: string | null): value is ProfileTabId {
-  return PROFILE_TABS.some((tab) => tab.id === value);
-}
-
-export const TIMEZONE_OPTIONS = [
-  "UTC",
-  "America/New_York",
-  "America/Chicago",
-  "America/Denver",
-  "America/Los_Angeles",
-  "America/Sao_Paulo",
-  "Europe/London",
-  "Europe/Paris",
-  "Europe/Berlin",
-  "Europe/Athens",
-  "Asia/Beirut",
-  "Asia/Dubai",
-  "Asia/Riyadh",
-  "Asia/Tokyo",
-  "Asia/Singapore",
-  "Australia/Sydney",
-  "Africa/Cairo",
-  "Africa/Johannesburg",
-];
-
-export const LOCALE_OPTIONS = [
-  { value: "en", label: "English" },
-  { value: "en-US", label: "English (US)" },
-  { value: "en-GB", label: "English (UK)" },
-  { value: "en-LB", label: "English (Lebanon)" },
-  { value: "fr", label: "French" },
-  { value: "ar", label: "Arabic" },
-  { value: "ar-LB", label: "Arabic (Lebanon)" },
-  { value: "es", label: "Spanish" },
-  { value: "de", label: "German" },
-];
 
 export const DATE_FORMAT_OPTIONS = [
   { value: "YYYY_MM_DD", label: "YYYY-MM-DD" },
@@ -117,6 +91,7 @@ export type DietitianSettings = {
   mealPlanShare: MealPlanShare;
   enabledMeasurements: string[] | null;
   deduceMeasurements: boolean;
+  defaultNutritionMethod: "iom" | "faculty_lebanon";
   portalPresets: PortalPresets;
   productEmailEnabled: boolean;
 };

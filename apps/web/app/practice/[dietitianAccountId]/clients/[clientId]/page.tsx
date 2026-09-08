@@ -25,7 +25,9 @@ import { ClientClinicalProfilePanel } from "../../../../../components/client-cli
 import { ClientEvolutionPanel } from "../../../../../components/client-evolution-panel";
 import { ClientTrackingPanel } from "../../../../../components/client-tracking-panel";
 import { ClientNutritionPanel } from "../../../../../components/client-nutrition-panel";
+import { ClinicNutritionMethodSwitch } from "../../../../../components/clinic-nutrition-method-switch";
 import { ClientPrescriptionPanel } from "../../../../../components/client-prescription-panel";
+import { sanitizeNutritionMethod, type NutritionMethod } from "../../../../../lib/faculty-nutrition";
 import { chartPrintActions } from "../../../../../components/chart-document/types";
 import { api } from "../../../../../lib/api";
 import { ageInYears, formatDate, formatFullDate } from "../../../../../lib/format";
@@ -345,6 +347,7 @@ function ClientWorkspacePage() {
 
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [nutritionMethod, setNutritionMethod] = useState<NutritionMethod>("iom");
   const [showCreatedTip, setShowCreatedTip] = useState(() => searchParams.get("created") === "1");
 
   const [orgTags, setOrgTags] = useState<Array<{ id: string; name: string }>>([]);
@@ -498,14 +501,18 @@ function ClientWorkspacePage() {
   async function load() {
     setError(null);
     try {
-      const [portfolioData, account, tagRows] = await Promise.all([
+      const [portfolioData, account, tagRows, settings] = await Promise.all([
         api<Portfolio>(`${base}/portfolio`),
         api<NonNullable<typeof portalAccount>>(`${base}/account`),
         api<Array<{ id: string; name: string }>>(`${orgBase}/tags`),
+        api<{ defaultNutritionMethod?: string }>(`/api/v1/dietitian/${dietitianAccountId}/settings`).catch(
+          () => null,
+        ),
       ]);
       applyPortfolio(portfolioData);
       setPortalAccount(account);
       setOrgTags(tagRows);
+      if (settings) setNutritionMethod(sanitizeNutritionMethod(settings.defaultNutritionMethod));
     } catch (err) {
       setError(errorMessage(err, "Unable to load client"));
     }
@@ -687,6 +694,14 @@ function ClientWorkspacePage() {
           actions={
             client ? (
               <div className="ui-client-chart__header-actions">
+                <ClinicNutritionMethodSwitch
+                  dietitianAccountId={dietitianAccountId}
+                  value={nutritionMethod}
+                  allowManage={allowManage}
+                  variant="banner"
+                  onChange={setNutritionMethod}
+                  onError={setError}
+                />
                 <ChartPrintControl
                   dietitianAccountId={dietitianAccountId}
                   clientId={clientId}
@@ -993,6 +1008,9 @@ function ClientWorkspacePage() {
           <ClientEvolutionPanel
             base={base}
             allowManage={allowManage}
+            clinicMethod={nutritionMethod}
+            sex={client?.sex ?? null}
+            dateOfBirth={client?.dateOfBirth ?? null}
             onError={setError}
             initialMetric={searchParams.get("metric")}
             onMetricChange={(metric) => {
@@ -1051,6 +1069,7 @@ function ClientWorkspacePage() {
           <ClientPrescriptionPanel
             base={base}
             allowManage={allowManage}
+            clinicMethod={nutritionMethod}
             client={{
               sex: portfolio.client.sex ?? null,
               dateOfBirth: portfolio.client.dateOfBirth ?? null,
@@ -1068,6 +1087,7 @@ function ClientWorkspacePage() {
           clientId={clientId}
           clientName={portfolio.client.displayName ?? `${portfolio.client.firstName} ${portfolio.client.lastName}`}
           allowManage={allowManage}
+          clinicMethod={nutritionMethod}
           initialPlanId={searchParams.get("planId") ?? portfolio.activeMealPlan?.id ?? null}
           initialView={tab === "nutrition-analysis" ? "analysis" : "plan"}
           hideViewToggle

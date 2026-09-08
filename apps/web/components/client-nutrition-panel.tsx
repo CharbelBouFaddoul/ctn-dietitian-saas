@@ -5,6 +5,7 @@ import { Button, Dialog, EmptyState, Field, Input, LoadingState, Select } from "
 import { api } from "../lib/api";
 import { errorMessage } from "../lib/humanize-error";
 import { ClientMealPlanWorkspace, type MealPlanView } from "./client-meal-plan-workspace";
+import { type NutritionMethod } from "../lib/faculty-nutrition";
 
 type PlanRow = {
   id: string;
@@ -28,6 +29,7 @@ type Props = {
   clientId: string;
   clientName: string;
   allowManage: boolean;
+  clinicMethod?: NutritionMethod;
   initialPlanId?: string | null;
   initialView?: MealPlanView;
   hideViewToggle?: boolean;
@@ -41,6 +43,7 @@ export function ClientNutritionPanel({
   clientId,
   clientName,
   allowManage,
+  clinicMethod,
   initialPlanId,
   initialView = "plan",
   hideViewToggle = false,
@@ -173,6 +176,7 @@ export function ClientNutritionPanel({
           clientId={clientId}
           compact
           allowManage={allowManage}
+          clinicMethod={clinicMethod}
           initialView={initialView}
           hideViewToggle={hideViewToggle}
           plans={plans}

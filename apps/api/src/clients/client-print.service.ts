@@ -5,6 +5,20 @@ import { parseAssessmentSchema } from "../assessments/assessment-schema";
 import { computeBmi } from "../client-measurements/client-measurement.service";
 import { STORED_MEASUREMENT_TYPES } from "../client-measurements/measurement-types";
 import { migrateLegacyIntoClinical, type ClinicalData } from "../client-profiles/clinical-data";
+import {
+  FACULTY_PAL_OPTIONS,
+  computeFacultyAbw,
+  computeFacultyIbw,
+  computeFrameRatio,
+  computeWhr,
+  facultyFrameSize,
+  facultyTargetsFromExchanges,
+  isFacultyMethod,
+  isFacultyPalKey,
+  percentOf,
+  sanitizeNutritionMethod,
+  tallyExchanges,
+} from "../client-profiles/faculty-nutrition";
 import type { DietitianTenantContext } from "../dietitian/dietitian.types";
 import { tenantWhere } from "../dietitian/tenant-scope";
 import { PrismaService } from "../prisma/prisma.service";
@@ -144,6 +158,7 @@ export class ClientPrintService {
       latestByType,
       enabled,
       timezone: settings?.timezone ?? "UTC",
+      nutritionMethod: sanitizeNutritionMethod(settings?.defaultNutritionMethod),
     });
 
     return { ...header, body };
@@ -160,6 +175,7 @@ export class ClientPrintService {
       latestByType: Map<string, { type: string; value: Prisma.Decimal; unit: string; measuredAt: Date }>;
       enabled: string[];
       timezone: string;
+      nutritionMethod: ReturnType<typeof sanitizeNutritionMethod>;
     },
   ) {
     if (doc === "clinical") return this.clinicalBody(ctx);
@@ -404,11 +420,25 @@ export class ClientPrintService {
   private prescriptionBody(ctx: {
     clinical: ClinicalData;
     latestByType: Map<string, { value: Prisma.Decimal; unit: string }>;
+    client?: { sex: string | null; dateOfBirth: Date | null };
+    nutritionMethod: ReturnType<typeof sanitizeNutritionMethod>;
   }) {
     const rx = ctx.clinical.prescription;
     const weight = ctx.latestByType.get("WEIGHT");
     const height = ctx.latestByType.get("HEIGHT");
     const bodyFat = ctx.latestByType.get("BODY_FAT");
+    const waist = ctx.latestByType.get("WAIST");
+    const hips = ctx.latestByType.get("HIPS");
+    const wrist = ctx.latestByType.get("WRIST");
+    const weightKg = weight ? toKg(Number(weight.value), weight.unit) : null;
+    const heightCm = height ? toCm(Number(height.value), height.unit) : null;
+    const ageYearsValue = ctx.client?.dateOfBirth ? ageYears(ctx.client.dateOfBirth) : null;
+    const facultySelected = isFacultyMethod(ctx.nutritionMethod);
+    const ibwKg = facultySelected ? computeFacultyIbw(heightCm, ctx.client?.sex ?? null, ageYearsValue) : null;
+    const tally = facultySelected ? tallyExchanges(rx.exchanges) : null;
+    const palOption = facultySelected
+      ? FACULTY_PAL_OPTIONS.find((option) => option.key === rx.palCurrentKey)
+      : undefined;
     return {
       current: {
         weightKg: weight ? Number(weight.value) : null,
@@ -426,7 +456,7 @@ export class ClientPrintService {
       goals: {
         weightKg: rx.weightGoalKg,
         bodyFatPct: rx.bodyFatGoalPct,
-        energyKcal: rx.energyGoalKcal,
+        energyKcal: facultySelected ? (tally?.atwaterKcal || null) : rx.energyGoalKcal,
       },
       energy: {
         bmrFormula: rx.bmrFormula || null,
@@ -446,6 +476,26 @@ export class ClientPrintService {
         beginDate: rx.beginDate || null,
         forecastFinishDate: rx.forecastFinishDate || null,
       },
+      faculty: facultySelected
+        ? {
+            ibwKg,
+            percentIbw: percentOf(weightKg, ibwKg),
+            abwKg: computeFacultyAbw(weightKg, ibwKg),
+            whr: computeWhr(
+              waist ? toCm(Number(waist.value), waist.unit) : null,
+              hips ? toCm(Number(hips.value), hips.unit) : null,
+            ),
+            frame: facultyFrameSize(
+              computeFrameRatio(heightCm, wrist ? toCm(Number(wrist.value), wrist.unit) : null),
+              ctx.client?.sex ?? null,
+            ),
+            palLabel: palOption?.label ?? (isFacultyPalKey(rx.palCurrentKey) ? rx.palCurrentKey : null),
+            exchangeKcal: tally?.exchangeKcal || null,
+            carbohydrateG: tally?.carbohydrateG || null,
+            proteinG: tally?.proteinG || null,
+            fatG: tally?.fatG || null,
+          }
+        : null,
     };
   }
 
@@ -498,24 +548,36 @@ export class ClientPrintService {
     };
   }
 
-  private async nutritionAnalysisBody(ctx: { clientId: string; orgId: string; clinical: ClinicalData }) {
+  private async nutritionAnalysisBody(ctx: {
+    clientId: string;
+    orgId: string;
+    clinical: ClinicalData;
+    nutritionMethod: ReturnType<typeof sanitizeNutritionMethod>;
+  }) {
     const loaded = await this.loadMealPlan(ctx);
-    const targets = resolvePrintMacroTargets(ctx.clinical.nutrition.targets);
+    const faculty = isFacultyMethod(ctx.nutritionMethod);
+    const facultyTargets = faculty ? facultyTargetsFromExchanges(ctx.clinical.prescription.exchanges) : null;
+    const sourceTargets = faculty ? facultyTargets : ctx.clinical.nutrition.targets;
+    const targets = resolvePrintMacroTargets(sourceTargets ?? ctx.clinical.nutrition.targets);
     const targetsFromClient = Boolean(
-      [
-        ctx.clinical.nutrition.targets.energyKcal,
-        ctx.clinical.nutrition.targets.fatG,
-        ctx.clinical.nutrition.targets.carbohydrateG,
-        ctx.clinical.nutrition.targets.proteinG,
-        ctx.clinical.nutrition.targets.fiberG,
-      ].some((value) => value != null && value > 0),
+      sourceTargets &&
+        [sourceTargets.energyKcal, sourceTargets.fatG, sourceTargets.carbohydrateG, sourceTargets.proteinG, sourceTargets.fiberG].some(
+          (value) => value != null && value > 0,
+        ),
     );
+    const exchanges = faculty ? ctx.clinical.prescription.exchanges : undefined;
     if (!loaded) {
-      return { plan: null, targets, targetsFromClient, days: [] as unknown[] };
+      return { plan: null, targets, targetsFromClient, exchanges, days: [] as unknown[] };
     }
     const { plan, version } = loaded;
     if (!version) {
-      return { plan: { name: plan.name, status: plan.status, version: null }, targets, targetsFromClient, days: [] };
+      return {
+        plan: { name: plan.name, status: plan.status, version: null },
+        targets,
+        targetsFromClient,
+        exchanges,
+        days: [],
+      };
     }
     const snapshotDays = snapshotAnalysisDays(version.snapshot);
     const days =
@@ -551,6 +613,7 @@ export class ClientPrintService {
       },
       targets,
       targetsFromClient,
+      exchanges,
       // Analysis tab shows one focused day; printing every snapshot day stacked the same report.
       days: days.slice(0, 1),
     };
@@ -574,6 +637,18 @@ export class ClientPrintService {
       }));
     return { plan, version };
   }
+}
+
+function toKg(value: number, unit: string) {
+  const u = unit.toLowerCase();
+  if (u === "lb" || u === "lbs") return value * 0.45359237;
+  return value;
+}
+
+function toCm(value: number, unit: string) {
+  const u = unit.toLowerCase();
+  if (u === "in" || u === "inch" || u === "inches") return value * 2.54;
+  return value;
 }
 
 function ageYears(dob: Date | null): number | null {

@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional, PartialType } from "@nestjs/swagger";
 import {
   DATE_FORMATS,
   DISPLAY_ENERGY_UNITS,
@@ -124,7 +124,7 @@ export class UpdateDietitianDto {
   licenseNumber?: string | null;
 }
 
-export class UpdateDietitianSettingsDto extends DietitianSettingsInputDto {
+export class UpdateDietitianSettingsDto extends PartialType(DietitianSettingsInputDto) {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
@@ -265,6 +265,11 @@ export class UpdateDietitianSettingsDto extends DietitianSettingsInputDto {
   @IsOptional()
   @IsBoolean()
   deduceMeasurements?: boolean;
+
+  @ApiPropertyOptional({ enum: ["iom", "faculty_lebanon"] })
+  @IsOptional()
+  @IsIn(["iom", "faculty_lebanon"])
+  defaultNutritionMethod?: "iom" | "faculty_lebanon";
 
   @ApiPropertyOptional()
   @IsOptional()

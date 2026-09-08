@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Button, Field, Input, LineChart, Select } from "@nutrition-saas/ui";
+import { Badge, Button, Field, Input, LineChart, Select } from "@nutrition-saas/ui";
 import { api } from "../lib/api";
 import { formatFullDate } from "../lib/format";
 import { errorMessage } from "../lib/humanize-error";
@@ -15,6 +15,19 @@ import {
   STORED_MEASUREMENT_METRICS,
   type MeasurementMetricId,
 } from "../lib/measurements";
+import {
+  FACULTY_METHOD_HINT,
+  FACULTY_METHOD_TITLE,
+  computeFacultyIbw,
+  computeFrameRatio,
+  computeWhr,
+  facultyFrameSize,
+  isFacultyMethod,
+  percentOf,
+  sanitizeNutritionMethod,
+  whrElevated,
+  type NutritionMethod,
+} from "../lib/faculty-nutrition";
 
 type Point = { at: string; value: number; unit: string; id?: string };
 
@@ -41,8 +54,11 @@ type Comparison = {
 type Props = {
   base: string;
   allowManage: boolean;
+  clinicMethod?: NutritionMethod;
   allowLog?: boolean;
   enabledMeasurements?: string[] | null;
+  sex?: string | null;
+  dateOfBirth?: string | null;
   onError: (message: string) => void;
   initialMetric?: string | null;
   onMetricChange?: (metric: string) => void;
@@ -60,11 +76,37 @@ function unitLabel(unit: string) {
   return unit;
 }
 
+function toKg(value: number, unit: string) {
+  const u = unit.toLowerCase();
+  if (u === "lb" || u === "lbs") return value * 0.45359237;
+  return value;
+}
+
+function toCm(value: number, unit: string) {
+  const u = unit.toLowerCase();
+  if (u === "in" || u === "inch" || u === "inches") return value * 2.54;
+  return value;
+}
+
+function ageFromDob(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const dob = new Date(`${value.slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(dob.getTime())) return null;
+  const now = new Date();
+  let age = now.getFullYear() - dob.getFullYear();
+  const month = now.getMonth() - dob.getMonth();
+  if (month < 0 || (month === 0 && now.getDate() < dob.getDate())) age -= 1;
+  return age >= 0 && age < 130 ? age : null;
+}
+
 export function ClientEvolutionPanel({
   base,
   allowManage,
+  clinicMethod,
   allowLog = false,
   enabledMeasurements,
+  sex,
+  dateOfBirth,
   onError,
   initialMetric,
   onMetricChange,
@@ -81,6 +123,7 @@ export function ClientEvolutionPanel({
   const [multiOpen, setMultiOpen] = useState(false);
   const [multiAt, setMultiAt] = useState(() => localDateKey());
   const [multiValues, setMultiValues] = useState<Record<string, string>>({});
+  const [nutritionMethod, setNutritionMethod] = useState<NutritionMethod>("iom");
   const [multiSaving, setMultiSaving] = useState(false);
   const [enabledMetricIds, setEnabledMetricIds] = useState<string[] | null>(null);
 
@@ -100,6 +143,35 @@ export function ClientEvolutionPanel({
 
   const selected = findMeasurementMetric(metric) ?? ALL_MEASUREMENT_METRICS[0]!;
 
+  const faculty = useMemo(() => {
+    const latest = data?.latest;
+    if (!latest) return null;
+    const weight = latest.WEIGHT;
+    const height = latest.HEIGHT;
+    const waist = latest.WAIST;
+    const hips = latest.HIPS;
+    const wrist = latest.WRIST;
+    const weightKg = weight ? toKg(weight.value, weight.unit) : null;
+    const heightCm = height ? toCm(height.value, height.unit) : null;
+    const waistCm = waist ? toCm(waist.value, waist.unit) : null;
+    const hipCm = hips ? toCm(hips.value, hips.unit) : null;
+    const wristCm = wrist ? toCm(wrist.value, wrist.unit) : null;
+    const ibw = computeFacultyIbw(heightCm, sex ?? null, ageFromDob(dateOfBirth));
+    const whr = computeWhr(waistCm, hipCm);
+    const frameRatio = computeFrameRatio(heightCm, wristCm);
+    const frame = facultyFrameSize(frameRatio, sex ?? null);
+    if (!isFacultyMethod(clinicMethod ?? nutritionMethod)) return null;
+    if (ibw == null && whr == null && frame == null) return null;
+    return {
+      ibw,
+      percentIbw: percentOf(weightKg, ibw),
+      whr,
+      whrHigh: whrElevated(whr, sex ?? null),
+      frame,
+      frameRatio,
+    };
+  }, [data?.latest, sex, dateOfBirth, clinicMethod, nutritionMethod]);
+
   async function load() {
     const row = await api<EvolutionResponse>(`${base}/evolution`);
     setData(row);
@@ -112,12 +184,18 @@ export function ClientEvolutionPanel({
   useEffect(() => {
     if (enabledMeasurements !== undefined) {
       setEnabledMetricIds(enabledMeasurements);
-      return;
     }
     const dietitianId = /\/dietitian\/([^/]+)\//.exec(base)?.[1];
     if (!dietitianId) return;
-    void api<{ enabledMeasurements: string[] | null }>(`/api/v1/dietitian/${dietitianId}/settings`)
-      .then((row) => setEnabledMetricIds(row.enabledMeasurements))
+    void api<{ enabledMeasurements?: string[] | null; defaultNutritionMethod?: string }>(
+      `/api/v1/dietitian/${dietitianId}/settings`,
+    )
+      .then((settings) => {
+        if (enabledMeasurements === undefined) {
+          setEnabledMetricIds(settings.enabledMeasurements ?? null);
+        }
+        setNutritionMethod(sanitizeNutritionMethod(settings.defaultNutritionMethod));
+      })
       .catch(() => undefined);
   }, [base, enabledMeasurements]);
 
@@ -313,6 +391,38 @@ export function ClientEvolutionPanel({
         </aside>
 
         <div className="ui-evo__detail">
+          {faculty ? (
+            <section className="ui-evo__faculty">
+              <div className="ui-evo__faculty-head">
+                <h3>{FACULTY_METHOD_TITLE}</h3>
+                <p className="ui-muted">{FACULTY_METHOD_HINT}</p>
+              </div>
+              <dl className="ui-faculty__stats">
+                <div>
+                  <dt>IBW</dt>
+                  <dd>{faculty.ibw != null ? `${faculty.ibw} kg` : "—"}</dd>
+                </div>
+                <div>
+                  <dt>% IBW</dt>
+                  <dd>{faculty.percentIbw != null ? `${faculty.percentIbw}%` : "—"}</dd>
+                </div>
+                <div>
+                  <dt>WHR</dt>
+                  <dd>
+                    {faculty.whr != null ? faculty.whr : "—"}
+                    {faculty.whrHigh ? <Badge tone="warning">elevated</Badge> : null}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Frame</dt>
+                  <dd>
+                    {faculty.frame ?? "—"}
+                    {faculty.frameRatio != null ? <span className="ui-muted"> r {faculty.frameRatio}</span> : null}
+                  </dd>
+                </div>
+              </dl>
+            </section>
+          ) : null}
           <header className="ui-evo__detail-head">
             <h2>{selected.label}</h2>
             {!selected.stored ? (

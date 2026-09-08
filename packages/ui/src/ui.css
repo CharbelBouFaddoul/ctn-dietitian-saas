@@ -923,13 +923,33 @@
   gap: 1.35rem;
 }
 
-.ui-profile-hub .ui-tabs--line {
+.ui-profile-hub__toolbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.ui-profile-hub__toolbar .ui-tabs--line {
+  flex: 1 1 auto;
+  min-width: 0;
   margin: 0;
+  border-bottom: 0;
   flex-wrap: nowrap;
   overflow-x: auto;
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
+}
+
+.ui-profile-hub__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  flex-shrink: 0;
+  padding: 0 0 0.45rem;
 }
 
 .ui-profile-hub fieldset {
@@ -977,12 +997,18 @@
 }
 
 .ui-profile-hub:not(.is-editing) .ui-profile-chip,
+.ui-profile-hub:not(.is-editing) .ui-profile-toggle,
+.ui-profile-hub:not(.is-editing) .ui-profile-choice,
 .ui-profile-hub:not(.is-editing) .ui-profile-preset,
 .ui-profile-hub:not(.is-editing) .ui-check,
 .ui-profile-hub:not(.is-editing) .ui-switch-row,
 .ui-profile-hub:not(.is-editing) input[type="checkbox"] {
   cursor: default;
   pointer-events: none;
+}
+
+.ui-profile-hub:not(.is-editing) .ui-profile-tag__remove {
+  display: none;
 }
 
 .ui-profile-hub:not(.is-editing) .ui-check,
@@ -1055,6 +1081,80 @@
   gap: 1.35rem;
 }
 
+.ui-profile-hub__lead {
+  display: grid;
+  gap: 0.7rem;
+  padding: 1rem 1.15rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface-muted);
+}
+
+.ui-profile-hub__lead > p {
+  margin: 0;
+  max-width: 44rem;
+  color: var(--color-text);
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+.ui-profile-hub__affects {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.ui-section__desc .ui-profile-hub__affects {
+  margin-top: 0.55rem;
+}
+
+.ui-section__desc:has(.ui-profile-hub__affects) {
+  max-width: 46rem;
+}
+
+.ui-profile-hub__affects-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  margin-right: 0.1rem;
+}
+
+.ui-profile-hub__affects-item {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.5rem;
+  padding: 0.12rem 0.55rem;
+  border-radius: 999px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  font-size: 0.74rem;
+  font-weight: 550;
+  line-height: 1.2;
+}
+
+.ui-profile-hub__note {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.ui-profile-hub__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.ui-profile-hub__subblock {
+  display: grid;
+  gap: 0.7rem;
+}
+
 .ui-profile-hub__stack .ui-section {
   margin-bottom: 0;
 }
@@ -1099,6 +1199,162 @@
   border-color: rgb(13 148 136 / 40%);
   background: rgb(13 148 136 / 10%);
   color: var(--practice-deep-teal, #0f766e);
+}
+
+.ui-profile-toggle {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2.15rem;
+  padding: 0.3rem 0.65rem 0.3rem 0.4rem;
+  border: 1px dashed var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  color: var(--color-muted);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.ui-profile-toggle.is-on {
+  border-style: solid;
+  border-color: rgb(13 148 136 / 45%);
+  background: rgb(13 148 136 / 10%);
+  color: var(--color-text);
+}
+
+.ui-profile-toggle__box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.05rem;
+  height: 1.05rem;
+  border: 1.5px solid currentColor;
+  border-radius: 4px;
+  flex: 0 0 auto;
+  color: inherit;
+}
+
+.ui-profile-toggle.is-on .ui-profile-toggle__box {
+  background: var(--practice-deep-teal, #0f766e);
+  border-color: var(--practice-deep-teal, #0f766e);
+  color: #fff;
+}
+
+.ui-profile-toggle__label {
+  font-weight: 600;
+  color: inherit;
+}
+
+.ui-profile-toggle__state {
+  margin-left: 0.1rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.ui-profile-toggle.is-on .ui-profile-toggle__state {
+  color: var(--practice-deep-teal, #0f766e);
+}
+
+.ui-profile-choice-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+.ui-profile-choice {
+  appearance: none;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  width: 100%;
+  min-height: 4.4rem;
+  padding: 0.85rem 0.95rem;
+  text-align: left;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.ui-profile-choice.is-on {
+  border-color: rgb(13 148 136 / 50%);
+  background: rgb(13 148 136 / 8%);
+  box-shadow: inset 0 0 0 1px rgb(13 148 136 / 20%);
+}
+
+.ui-profile-choice__mark {
+  width: 1.05rem;
+  height: 1.05rem;
+  margin-top: 0.15rem;
+  flex: 0 0 auto;
+  border: 1.5px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+}
+
+.ui-profile-choice.is-on .ui-profile-choice__mark {
+  border-color: var(--practice-deep-teal, #0f766e);
+  box-shadow: inset 0 0 0 4px var(--practice-deep-teal, #0f766e);
+}
+
+.ui-profile-choice__copy {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.ui-profile-choice__copy strong {
+  font-size: 0.92rem;
+}
+
+.ui-profile-choice__copy span {
+  font-size: 0.78rem;
+  color: var(--color-muted);
+  line-height: 1.4;
+}
+
+.ui-profile-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 2rem;
+  padding: 0.25rem 0.3rem 0.25rem 0.7rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.ui-profile-tag__remove {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--color-surface-muted);
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.ui-profile-tag__remove:hover {
+  background: rgb(220 38 38 / 12%);
+  color: #b91c1c;
+}
+
+@media (max-width: 720px) {
+  .ui-profile-choice-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 .ui-profile-preset-list {
@@ -6750,6 +7006,8 @@ button.ui-admin-metric {
 .ui-client-chart__header-actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 0.45rem;
 }
 
@@ -7043,12 +7301,17 @@ button.ui-admin-metric {
   position: relative;
   z-index: 40;
   margin: 0 0 1.5rem;
+  padding: 0.85rem var(--practice-main-pad-x, 1.5rem) 0;
+  background:
+    linear-gradient(135deg, var(--color-surface), var(--color-surface-muted)),
+    radial-gradient(420px 160px at 100% 0%, rgb(13 148 136 / 14%), transparent 70%);
+  border-bottom: 1px solid rgb(13 148 136 / 12%);
 }
 
 [data-theme="practice"] .ui-client-chart__chrome > .ui-page-header {
   margin: 0;
   align-items: flex-end;
-  padding: 0.85rem 1.1rem 0.8rem;
+  padding: 0 0 0.65rem;
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -7067,6 +7330,7 @@ button.ui-admin-metric {
   scrollbar-width: none;
   padding-left: 0;
   padding-right: 0;
+  border-bottom: 0;
 }
 
 [data-theme="practice"] .ui-client-chart__chrome .ui-tabs::-webkit-scrollbar,
@@ -20789,6 +21053,199 @@ a.ui-list-cards__main {
   color: var(--color-muted);
 }
 
+.ui-clinic-method {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0 0 0.85rem;
+  padding: 0.95rem 1.15rem 1.1rem;
+  border: 1px solid rgb(15 23 42 / 6%);
+  border-radius: 16px;
+  background: var(--color-surface);
+  box-shadow:
+    0 1px 2px rgb(15 23 42 / 3%),
+    0 10px 28px rgb(15 23 42 / 3.5%);
+}
+
+.ui-clinic-method--settings {
+  margin: 0;
+  box-shadow: none;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.ui-clinic-method__head {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.ui-clinic-method__title {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.ui-clinic-method__help {
+  margin: 0;
+  font-size: var(--text-xs);
+  line-height: 1.45;
+  color: var(--color-muted);
+}
+
+.ui-clinic-method__options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.ui-clinic-method__option {
+  appearance: none;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  width: 100%;
+  min-height: 4.1rem;
+  padding: 0.8rem 0.9rem;
+  text-align: left;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.ui-clinic-method__option:disabled {
+  cursor: default;
+}
+
+.ui-clinic-method__option.is-on {
+  border-color: rgb(13 148 136 / 50%);
+  background: rgb(13 148 136 / 8%);
+  box-shadow: inset 0 0 0 1px rgb(13 148 136 / 20%);
+}
+
+.ui-clinic-method__mark {
+  width: 1.05rem;
+  height: 1.05rem;
+  margin-top: 0.15rem;
+  flex: 0 0 auto;
+  border: 1.5px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+}
+
+.ui-clinic-method__option.is-on .ui-clinic-method__mark {
+  border-color: var(--practice-deep-teal, #0f766e);
+  box-shadow: inset 0 0 0 4px var(--practice-deep-teal, #0f766e);
+}
+
+.ui-clinic-method__copy {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.ui-clinic-method__copy strong {
+  font-size: 0.92rem;
+}
+
+.ui-clinic-method__copy span {
+  font-size: 0.78rem;
+  color: var(--color-muted);
+  line-height: 1.4;
+}
+
+@media (max-width: 720px) {
+  .ui-clinic-method__options {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ui-clinic-method--banner {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.ui-clinic-method__banner-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.ui-clinic-method__banner-options {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface-muted);
+}
+
+.ui-clinic-method__banner-option {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--color-muted);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 650;
+  line-height: 1;
+  padding: 0.42rem 0.75rem;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ui-clinic-method__banner-option.is-on {
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: 0 1px 2px rgb(15 23 42 / 8%);
+}
+
+.ui-clinic-method__banner-option:disabled {
+  cursor: default;
+}
+
+.ui-clinic-method--banner .ui-tooltip {
+  display: inline-flex;
+  z-index: 50;
+}
+
+.ui-client-chart__header-actions .ui-clinic-method--banner .ui-tooltip[data-tip]::after,
+.ui-clinic-method--banner .ui-tooltip[data-tip]::after {
+  left: 50%;
+  right: auto;
+  top: calc(100% + 8px);
+  bottom: auto;
+  transform: translateX(-50%);
+  white-space: normal;
+  width: max-content;
+  max-width: 17rem;
+  padding: 0.5rem 0.65rem;
+  line-height: 1.4;
+  text-align: left;
+  z-index: 50;
+}
+
+.ui-clinic-method__banner-options .ui-tooltip:last-child[data-tip]::after {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+
 /* Notice */
 .ui-prescription__notice {
   display: flex;
@@ -20850,6 +21307,10 @@ a.ui-list-cards__main {
 
 .ui-prescription__section-title {
   margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
   font-size: var(--text-md);
   font-weight: 700;
   color: var(--color-text);
@@ -20859,6 +21320,12 @@ a.ui-list-cards__main {
   margin: 0.1rem 0 0;
   font-size: var(--text-xs);
   color: var(--color-muted);
+  max-width: 46rem;
+  line-height: 1.45;
+}
+
+.ui-prescription__section-body {
+  padding: 1.15rem 1.3rem 1.4rem;
 }
 
 /* Shared table grid */
@@ -21007,6 +21474,14 @@ a.ui-list-cards__main {
   flex: 1 1 auto;
   min-width: 0;
   width: 100%;
+}
+
+.ui-prescription__field .ui-input {
+  max-width: 8.5rem;
+  min-height: 2.2rem;
+  padding: 0.38rem 0.6rem;
+  background: var(--color-surface-muted);
+  border-radius: 10px;
 }
 
 .ui-prescription__unit {
@@ -21224,6 +21699,203 @@ a.ui-list-cards__main {
   .ui-prescription__duration-caret {
     transform: rotate(90deg);
   }
+}
+
+.ui-faculty {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem 1.15rem 1.15rem;
+}
+
+.ui-faculty__fields {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.ui-faculty__field {
+  display: grid;
+  gap: 0.3rem;
+  font-size: var(--text-sm);
+  font-weight: 650;
+  color: var(--color-text);
+}
+
+.ui-faculty__check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+}
+
+.ui-faculty__check input {
+  margin-top: 0.2rem;
+}
+
+.ui-prescription__cell .ui-faculty__check {
+  max-width: 12rem;
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.ui-faculty__stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+  gap: 0.65rem;
+  margin: 0;
+}
+
+.ui-faculty__stats div {
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface-muted);
+}
+
+.ui-faculty__stats dt {
+  margin: 0;
+  font-size: var(--text-xs);
+  font-weight: 650;
+  color: var(--color-muted);
+}
+
+.ui-faculty__stats dd {
+  margin: 0.2rem 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.ui-faculty-exchanges {
+  display: grid;
+  gap: 1rem;
+}
+
+.ui-faculty-exchanges__table {
+  display: grid;
+  gap: 0;
+  overflow-x: auto;
+  padding: 0.35rem 0.2rem 0.25rem;
+  border: 1px solid rgb(15 23 42 / 7%);
+  border-radius: 14px;
+  background: var(--color-surface-muted);
+}
+
+.ui-faculty-exchanges__hrow,
+.ui-faculty-exchanges__row {
+  display: grid;
+  grid-template-columns: minmax(9.5rem, 1.7fr) 6.25rem repeat(4, minmax(3.6rem, 1fr));
+  gap: 0.6rem 0.75rem;
+  align-items: center;
+  padding: 0.55rem 0.9rem;
+  font-size: var(--text-sm);
+}
+
+.ui-faculty-exchanges__hrow {
+  font-size: var(--text-xs);
+  font-weight: 650;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  padding-top: 0.7rem;
+  padding-bottom: 0.55rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.ui-faculty-exchanges__section + .ui-faculty-exchanges__section {
+  border-top: 1px dashed rgb(15 23 42 / 8%);
+  margin-top: 0.15rem;
+  padding-top: 0.15rem;
+}
+
+.ui-faculty-exchanges__section-label {
+  padding: 0.55rem 0.9rem 0.15rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.ui-faculty-exchanges__row--total {
+  font-weight: 700;
+  border-top: 1px solid var(--color-border);
+  margin-top: 0.2rem;
+  padding-top: 0.7rem;
+  padding-bottom: 0.7rem;
+}
+
+.ui-faculty-exchanges__name {
+  color: var(--color-text);
+  font-weight: 550;
+}
+
+.ui-faculty-exchanges__value,
+.ui-faculty-exchanges__row span:not(.ui-faculty-exchanges__name) {
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.ui-faculty-exchanges__row .ui-input {
+  width: 100%;
+  max-width: 5.75rem;
+  min-height: 2.15rem;
+  padding: 0.35rem 0.45rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  background: var(--color-surface);
+  border-radius: 10px;
+}
+
+.ui-faculty-exchanges__summary {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.9rem 1.05rem;
+  border-radius: 12px;
+  background: rgb(13 148 136 / 6%);
+  border: 1px solid rgb(13 148 136 / 12%);
+}
+
+.ui-faculty-exchanges__summary p {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  line-height: 1.45;
+}
+
+.ui-mp__card.ui-faculty-analysis {
+  padding: 1.15rem 1.25rem 1.3rem;
+}
+
+.ui-evo__faculty {
+  margin: 0 0 1rem;
+  padding: 0.95rem 1.05rem;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface);
+}
+
+.ui-evo__faculty-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+}
+
+.ui-evo__faculty-head h3 {
+  margin: 0;
+  font-size: var(--text-md);
+}
+
+.ui-evo__faculty-head p {
+  margin: 0;
+  width: 100%;
+  font-size: var(--text-xs);
 }
 
 /* Activity level cell (current) */
@@ -22041,6 +22713,19 @@ a.ui-list-cards__main {
     box-shadow: 0 10px 30px rgb(0 0 0 / 22%);
   }
 
+  html[data-appearance="dark"] [data-theme="practice"] .ui-client-chart__chrome {
+    background:
+      linear-gradient(135deg, rgb(20 27 45 / 92%), rgb(19 38 31 / 78%)),
+      radial-gradient(420px 160px at 100% 0%, rgb(45 212 191 / 12%), transparent 70%);
+    border-bottom-color: rgb(45 212 191 / 16%);
+  }
+
+  html[data-appearance="dark"] [data-theme="practice"] .ui-client-chart__chrome > .ui-page-header {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+  }
+
   html[data-appearance="dark"] [data-theme="practice"] .ui-section,
   html[data-appearance="dark"] [data-theme="client"] .ui-section {
     background: rgb(20 27 45 / 92%);
@@ -22368,9 +23053,20 @@ a.ui-list-cards__main {
   html[data-appearance="dark"] [data-theme="practice"] .ui-clinic-tags__row,
   html[data-appearance="dark"] [data-theme="practice"] .ui-clinic-tags__icon-btn,
   html[data-appearance="dark"] [data-theme="practice"] .ui-clinic-tags__check,
-  html[data-appearance="dark"] [data-theme="practice"] .ui-profile-chip {
+  html[data-appearance="dark"] [data-theme="practice"] .ui-profile-chip,
+  html[data-appearance="dark"] [data-theme="practice"] .ui-profile-toggle,
+  html[data-appearance="dark"] [data-theme="practice"] .ui-profile-choice,
+  html[data-appearance="dark"] [data-theme="practice"] .ui-profile-tag {
     background: var(--color-surface);
     border-color: var(--color-border);
+    color: var(--color-text);
+  }
+
+  html[data-appearance="dark"] [data-theme="practice"] .ui-profile-toggle.is-on,
+  html[data-appearance="dark"] [data-theme="practice"] .ui-profile-choice.is-on,
+  html[data-appearance="dark"] [data-theme="practice"] .ui-profile-chip.is-on {
+    background: rgb(13 148 136 / 16%);
+    border-color: rgb(13 148 136 / 45%);
     color: var(--color-text);
   }
 

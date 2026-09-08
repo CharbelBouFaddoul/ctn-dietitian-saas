@@ -1,5 +1,6 @@
 import { EmptyState, RdaBarList, Table, Td } from "@nutrition-saas/ui";
 import { MealPlanAnalysisPanel } from "../meal-plan-analysis-panel";
+import { emptyFacultyExchanges, type FacultyExchanges } from "../../lib/faculty-nutrition";
 import type { ExtraNutrients } from "../../lib/micronutrients";
 import { MICRONUTRIENT_DEFS } from "../../lib/micronutrients";
 import {
@@ -90,6 +91,11 @@ export function NutritionAnalysisBody({ body }: { body: NutritionAnalysisPrintBo
               }))}
               macroTargets={macroTargets}
               macroTargetsFromClient={Boolean(body.targetsFromClient)}
+              exchanges={
+                body.exchanges
+                  ? { ...emptyFacultyExchanges(), ...(body.exchanges as Partial<FacultyExchanges>) }
+                  : undefined
+              }
             />
 
             <section className="ui-mp__card">

@@ -38,7 +38,20 @@ import { FoodInformationDialog } from "./food-information-dialog";
 import { MealFoodPicker } from "./meal-food-picker";
 import { MealItemNutritionDialog } from "./meal-item-nutrition-dialog";
 import { MealMacroDonuts } from "./meal-macro-donuts";
+import { ClinicNutritionMethodSwitch } from "./clinic-nutrition-method-switch";
 import { MealPlanAnalysisPanel } from "./meal-plan-analysis-panel";
+import { emptyClinicalData, type ClinicalData } from "../lib/clinical-profile";
+import {
+  emptyFacultyExchanges,
+  facultyMacroPercents,
+  facultyTargetsFromExchanges,
+  isFacultyMethod,
+  sanitizeNutritionMethod,
+  tallyExchanges,
+  type FacultyExchangeId,
+  type FacultyExchanges,
+  type NutritionMethod,
+} from "../lib/faculty-nutrition";
 
 export type MealPlanView = "plan" | "analysis";
 
@@ -498,6 +511,7 @@ type Props = {
   clientId?: string;
   compact?: boolean;
   allowManage?: boolean;
+  clinicMethod?: NutritionMethod;
   initialView?: MealPlanView;
   hideViewToggle?: boolean;
   versionId?: string | null;
@@ -516,6 +530,7 @@ export function ClientMealPlanWorkspace({
   clientId,
   compact = false,
   allowManage = true,
+  clinicMethod,
   initialView = "plan",
   hideViewToggle = false,
   versionId: versionIdProp,
@@ -552,6 +567,10 @@ export function ClientMealPlanWorkspace({
   const [weightKg, setWeightKg] = useState<number | null>(null);
   const [macroTargets, setMacroTargets] = useState(() => resolveDailyMacroTargets().targets);
   const [macroTargetsFromClient, setMacroTargetsFromClient] = useState(false);
+  const [facultyExchanges, setFacultyExchanges] = useState<FacultyExchanges>(emptyFacultyExchanges);
+  const [nutritionMethod, setNutritionMethod] = useState<NutritionMethod>("iom");
+  const clinicalRef = useRef<ClinicalData>(emptyClinicalData());
+  const facultySaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [rdaProfileId, setRdaProfileId] = useState<RdaProfileId>(DEFAULT_RDA_PROFILE_ID);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [switcherOpen, setSwitcherOpen] = useState(false);
@@ -665,21 +684,38 @@ export function ClientMealPlanWorkspace({
         setWeightKg(weight ? weightToKg(weight.value, weight.unit) : null);
       })
       .catch(() => setWeightKg(null));
-    void api<{
-      clinicalData?: {
-        nutrition?: {
-          targets?: {
-            energyKcal?: number | null;
-            fatG?: number | null;
-            carbohydrateG?: number | null;
-            proteinG?: number | null;
-            fiberG?: number | null;
-          };
+    void Promise.all([
+      api<{ clinicalData?: ClinicalData }>(`${clientBase}/profile`),
+      api<{ defaultNutritionMethod?: string }>(`/api/v1/dietitian/${dietitianAccountId}/settings`).catch(() => null),
+    ])
+      .then(([profile, settings]) => {
+        const baseClinical = emptyClinicalData();
+        const method = clinicMethod ?? sanitizeNutritionMethod(settings?.defaultNutritionMethod);
+        const merged: ClinicalData = {
+          ...baseClinical,
+          ...(profile.clinicalData ?? {}),
+          nutrition: {
+            ...baseClinical.nutrition,
+            ...(profile.clinicalData?.nutrition ?? {}),
+            targets: { ...baseClinical.nutrition.targets, ...(profile.clinicalData?.nutrition?.targets ?? {}) },
+          },
+          prescription: {
+            ...baseClinical.prescription,
+            ...(profile.clinicalData?.prescription ?? {}),
+            nutritionMethod: method,
+            macro: { ...baseClinical.prescription.macro, ...(profile.clinicalData?.prescription?.macro ?? {}) },
+            exchanges: {
+              ...emptyFacultyExchanges(),
+              ...(profile.clinicalData?.prescription?.exchanges ?? {}),
+            },
+          },
         };
-      };
-    }>(`${clientBase}/profile`)
-      .then((profile) => {
-        const resolved = resolveDailyMacroTargets(profile.clinicalData?.nutrition?.targets);
+        clinicalRef.current = merged;
+        setNutritionMethod(method);
+        setFacultyExchanges(merged.prescription.exchanges);
+        const resolved = isFacultyMethod(method)
+          ? resolveDailyMacroTargets(facultyTargetsFromExchanges(merged.prescription.exchanges))
+          : resolveDailyMacroTargets(merged.nutrition.targets);
         setMacroTargets(resolved.targets);
         setMacroTargetsFromClient(resolved.fromClient);
       })
@@ -689,6 +725,48 @@ export function ClientMealPlanWorkspace({
         setMacroTargetsFromClient(false);
       });
   }, [dietitianAccountId, trackingClientId]);
+
+  function patchFacultyExchange(id: FacultyExchangeId, value: number) {
+    if (!allowManage || !trackingClientId) return;
+    setFacultyExchanges((prev) => {
+      const next = { ...prev, [id]: value };
+      const targets = facultyTargetsFromExchanges(next);
+      const percents = facultyMacroPercents(tallyExchanges(next));
+      const clinical: ClinicalData = {
+        ...clinicalRef.current,
+        prescription: {
+          ...clinicalRef.current.prescription,
+          exchanges: next,
+          energyGoalKcal: targets.energyKcal,
+          ...(targets.energyKcal != null
+            ? {
+                macro: {
+                  fatPct: percents.fatPct,
+                  carbPct: percents.carbPct,
+                  proteinPct: percents.proteinPct,
+                },
+              }
+            : {}),
+        },
+        nutrition: {
+          ...clinicalRef.current.nutrition,
+          targets: { ...clinicalRef.current.nutrition.targets, ...targets },
+        },
+      };
+      clinicalRef.current = clinical;
+      const resolved = resolveDailyMacroTargets(targets);
+      setMacroTargets(resolved.targets);
+      setMacroTargetsFromClient(resolved.fromClient);
+      if (facultySaveTimer.current) clearTimeout(facultySaveTimer.current);
+      facultySaveTimer.current = setTimeout(() => {
+        void api(`/api/v1/dietitian/${dietitianAccountId}/clients/${trackingClientId}/profile`, {
+          method: "PATCH",
+          body: JSON.stringify({ clinicalData: clinical }),
+        }).catch((err) => setError(errorMessage(err, "Unable to save exchange plan")));
+      }, 700);
+      return next;
+    });
+  }
 
   useEffect(() => {
     if (!switcherOpen && !versionOpen) return;
@@ -1349,6 +1427,24 @@ export function ClientMealPlanWorkspace({
     }
   }, []);
 
+  function applyClinicMethod(method: NutritionMethod) {
+    setNutritionMethod(method);
+    clinicalRef.current = {
+      ...clinicalRef.current,
+      prescription: { ...clinicalRef.current.prescription, nutritionMethod: method },
+    };
+    const resolved = isFacultyMethod(method)
+      ? resolveDailyMacroTargets(facultyTargetsFromExchanges(clinicalRef.current.prescription.exchanges))
+      : resolveDailyMacroTargets(clinicalRef.current.nutrition.targets);
+    setMacroTargets(resolved.targets);
+    setMacroTargetsFromClient(resolved.fromClient);
+  }
+
+  useEffect(() => {
+    if (!clinicMethod) return;
+    applyClinicMethod(clinicMethod);
+  }, [clinicMethod]);
+
   function selectRdaProfile(id: RdaProfileId) {
     setRdaProfileId(id);
     try {
@@ -1395,8 +1491,19 @@ export function ClientMealPlanWorkspace({
     importTargetMealId ? meal.id !== importTargetMealId : true,
   );
 
+  const activeMethod = clinicMethod ?? nutritionMethod;
+
   return (
     <>
+    {clinicMethod == null ? (
+      <ClinicNutritionMethodSwitch
+        dietitianAccountId={dietitianAccountId}
+        value={nutritionMethod}
+        allowManage={allowManage}
+        onChange={applyClinicMethod}
+        onError={(message) => setError(message)}
+      />
+    ) : null}
     <div className={`ui-mp${compact ? " ui-mp--compact" : ""}${editingMealId ? " ui-mp--picking" : ""}`}>
       <header className="ui-mp__top">
         <div className="ui-mp__identity">
@@ -2112,6 +2219,9 @@ export function ClientMealPlanWorkspace({
             meals={focusedDay.meals}
             macroTargets={macroTargets}
             macroTargetsFromClient={macroTargetsFromClient}
+            exchanges={isFacultyMethod(activeMethod) ? facultyExchanges : undefined}
+            allowManage={allowManage}
+            onExchangeChange={patchFacultyExchange}
           />
 
           <section className="ui-mp__card">

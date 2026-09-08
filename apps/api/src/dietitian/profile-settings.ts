@@ -13,6 +13,16 @@ export const DEFAULT_MEAL_LABELS = ["Appetizer", "Dish", "Dessert", "Beverage"] 
 
 export const NEW_APPOINTMENT_STATUSES = ["SCHEDULED"] as const;
 
+export const NUTRITION_METHODS = ["iom", "faculty_lebanon"] as const;
+
+export type NutritionMethod = (typeof NUTRITION_METHODS)[number];
+
+export function normalizeNutritionMethod(value: unknown): NutritionMethod {
+  if (value === "iom" || value === "faculty_lebanon") return value;
+  if (value == null || value === "") return "iom";
+  throw new BadRequestException("defaultNutritionMethod must be iom or faculty_lebanon");
+}
+
 export type MealPlanShare = {
   emailSubject: string;
   emailBody: string;

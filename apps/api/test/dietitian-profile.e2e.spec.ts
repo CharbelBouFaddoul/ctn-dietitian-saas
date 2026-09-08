@@ -124,6 +124,7 @@ describe("dietitian profile hub", () => {
         },
         enabledMeasurements: ["WEIGHT", "HEIGHT", "NECK"],
         deduceMeasurements: false,
+        defaultNutritionMethod: "faculty_lebanon",
         portalPresets: { messaging: false, tracking: true, mealPlans: true },
       })
       .expect(200);
@@ -135,7 +136,17 @@ describe("dietitian profile hub", () => {
     expect(saved.body.mealPlanShare.includeSections).toEqual(["meals", "signature"]);
     expect(saved.body.enabledMeasurements).toEqual(["WEIGHT", "HEIGHT", "NECK"]);
     expect(saved.body.deduceMeasurements).toBe(false);
+    expect(saved.body.defaultNutritionMethod).toBe("faculty_lebanon");
     expect(saved.body.portalPresets.messaging).toBe(false);
+
+    const methodOnly = await request(ctx.app.getHttpServer())
+      .patch(`/api/v1/dietitian/${org.id}/settings`)
+      .set("Cookie", owner.cookie)
+      .send({ defaultNutritionMethod: "iom" })
+      .expect(200);
+    expect(methodOnly.body.defaultNutritionMethod).toBe("iom");
+    expect(methodOnly.body.timezone).toBe(SETTINGS.timezone);
+    expect(methodOnly.body.locale).toBe(SETTINGS.locale);
 
     const badUnit = await request(ctx.app.getHttpServer())
       .patch(`/api/v1/dietitian/${org.id}/settings`)

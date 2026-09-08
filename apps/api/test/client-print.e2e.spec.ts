@@ -33,7 +33,7 @@ const BODY_KEYS: Record<(typeof PRINT_DOCS)[number], string[]> = {
   assessments: ["submitted", "inProgress"],
   measurement: ["latest", "history"],
   tracking: ["from", "to", "days"],
-  prescription: ["current", "goals", "energy", "macros", "duration"],
+  prescription: ["current", "goals", "energy", "macros", "duration", "faculty"],
   nutrition: ["plan", "days"],
   "nutrition-analysis": ["plan", "targets", "targetsFromClient", "days"],
 };
@@ -241,6 +241,18 @@ describe("client chart print payload", () => {
       .expect(200);
     expect(prescription.body.body.goals.weightKg).toBe(72);
     expect(prescription.body.body.macros.proteinPct).toBe(30);
+    expect(prescription.body.body.faculty).toBeNull();
+
+    await request(ctx.app.getHttpServer())
+      .patch(`/api/v1/dietitian/${orgA.id}/settings`)
+      .set("Cookie", a.cookie)
+      .send({ ...SETTINGS, defaultNutritionMethod: "faculty_lebanon" })
+      .expect(200);
+    const facultyPrescription = await request(ctx.app.getHttpServer())
+      .get(printPath(orgA.id, client.id, "prescription"))
+      .set("Cookie", a.cookie)
+      .expect(200);
+    expect(facultyPrescription.body.body.faculty).toBeTruthy();
 
     const emptyNutrition = await request(ctx.app.getHttpServer())
       .get(printPath(orgA.id, client.id, "nutrition"))

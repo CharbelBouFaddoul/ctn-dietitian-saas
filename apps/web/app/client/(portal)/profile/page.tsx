@@ -74,24 +74,34 @@ type PersonalForm = {
   emergencyContactPhone: string;
 };
 
-type ProfileTab = "about" | "care" | "account";
+type ProfileTab = "about" | "care" | "appearance" | "account";
 
 const PROFILE_TABS: Array<{ id: ProfileTab; label: string }> = [
   { id: "about", label: "About you" },
   { id: "care", label: "Care notes" },
+  { id: "appearance", label: "Appearance" },
   { id: "account", label: "Clinic and security" },
 ];
 
 const PROFILE_FORM_ID = "portal-profile-form";
 
 function isProfileTab(value: string | null): value is ProfileTab {
-  return value === "about" || value === "care" || value === "account" || value === "personal" || value === "clinic-notes";
+  return (
+    value === "about" ||
+    value === "care" ||
+    value === "appearance" ||
+    value === "account" ||
+    value === "personal" ||
+    value === "clinic-notes"
+  );
 }
 
 function normalizeTab(value: string | null): ProfileTab {
   if (value === "personal") return "about";
   if (value === "clinic-notes") return "care";
-  if (isProfileTab(value) && (value === "about" || value === "care" || value === "account")) return value;
+  if (isProfileTab(value) && (value === "about" || value === "care" || value === "appearance" || value === "account")) {
+    return value;
+  }
   return "about";
 }
 
@@ -348,7 +358,7 @@ function ClientProfilePageInner() {
                 </Button>
               </>
             ) : (
-              <Button type="button" variant="secondary" onClick={startEdit}>
+              <Button type="button" onClick={startEdit}>
                 Edit
               </Button>
             )
@@ -368,13 +378,6 @@ function ClientProfilePageInner() {
           </p>
         </div>
       </div>
-
-      <Section
-        title="Appearance"
-        description="Light, dark, or match this device. Saved in this browser for the clinic and patient portal."
-      >
-        <AppearanceToggle />
-      </Section>
 
       <Tabs items={PROFILE_TABS} value={tab} onChange={selectTab} variant="line" />
 
@@ -531,6 +534,15 @@ function ClientProfilePageInner() {
             )}
           </Section>
         </div>
+      ) : null}
+
+      {tab === "appearance" ? (
+        <Section
+          title="Theme"
+          description="Light, dark, or match this device. Saved in this browser for the clinic and patient portal."
+        >
+          <AppearanceToggle />
+        </Section>
       ) : null}
 
       {tab === "account" ? (

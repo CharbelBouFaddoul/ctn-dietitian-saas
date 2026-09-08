@@ -2,20 +2,16 @@
 
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Alert, AppearanceToggle, Button, LoadingState, PageHeader, Section, Tabs } from "@nutrition-saas/ui";
+import { Alert, Button, LoadingState, Tabs } from "@nutrition-saas/ui";
 import { api } from "../../../../lib/api";
 import { errorMessage } from "../../../../lib/humanize-error";
-import { AccountTab } from "./account-tab";
-import { AppointmentsTab } from "./appointments-tab";
 import { ClinicalTab } from "./clinical-tab";
 import { DocumentsTab } from "./documents-tab";
-import { PortalTab } from "./portal-tab";
 import { PracticeTab } from "./practice-tab";
-import { PreferencesTab } from "./preferences-tab";
 import { ProfileTab } from "./profile-tab";
 import {
   PROFILE_TABS,
-  isProfileTab,
+  resolveProfileTab,
   type DietitianProfile,
   type DietitianSettings,
   type ProfileTabId,
@@ -36,8 +32,7 @@ function PracticeSettingsPageInner() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const tabParam = searchParams.get("tab");
-  const tab: ProfileTabId = isProfileTab(tabParam) ? tabParam : "profile";
+  const tab: ProfileTabId = resolveProfileTab(searchParams.get("tab"));
 
   const [profile, setProfile] = useState<DietitianProfile | null>(null);
   const [settings, setSettings] = useState<DietitianSettings | null>(null);
@@ -109,64 +104,37 @@ function PracticeSettingsPageInner() {
 
   return (
     <section className={`ui-profile-hub${editing ? " is-editing" : ""}`}>
-      <PageHeader
-        title="Profile"
-        actions={
-          editing ? (
+      <div className="ui-profile-hub__toolbar">
+        <Tabs items={[...PROFILE_TABS]} value={tab} onChange={setTab} variant="line" />
+        <div className="ui-profile-hub__actions">
+          {editing ? (
             <>
-              <Button type="button" variant="ghost" disabled={saving} onClick={cancelEdit}>
+              <Button type="button" variant="ghost" size="sm" disabled={saving} onClick={cancelEdit}>
                 Cancel
               </Button>
-              <Button type="submit" form={PROFILE_FORM_ID} disabled={saving}>
+              <Button type="submit" form={PROFILE_FORM_ID} size="sm" disabled={saving}>
                 {saving ? "Saving…" : "Save"}
               </Button>
             </>
           ) : (
-            <Button type="button" variant="secondary" onClick={enterEdit}>
+            <Button type="button" variant="secondary" size="sm" onClick={enterEdit}>
               Edit
             </Button>
-          )
-        }
-      />
-      <Section
-        title="Appearance"
-        description="Light, dark, or match this device. Saved in this browser for the clinic and patient portal."
-      >
-        <AppearanceToggle />
-      </Section>
-      <Tabs items={[...PROFILE_TABS]} value={tab} onChange={setTab} variant="line" />
+          )}
+        </div>
+      </div>
       {tab === "profile" ? (
         <ProfileTab dietitianAccountId={dietitianAccountId} profile={profile} onProfile={setProfile} {...editor} />
       ) : null}
       {tab === "practice" ? (
         <PracticeTab dietitianAccountId={dietitianAccountId} settings={settings} onSettings={setSettings} {...editor} />
       ) : null}
-      {tab === "preferences" ? (
-        <PreferencesTab
-          dietitianAccountId={dietitianAccountId}
-          settings={settings}
-          onSettings={setSettings}
-          {...editor}
-        />
-      ) : null}
-      {tab === "appointments" ? (
-        <AppointmentsTab
-          dietitianAccountId={dietitianAccountId}
-          settings={settings}
-          onSettings={setSettings}
-          {...editor}
-        />
+      {tab === "clinical" ? (
+        <ClinicalTab dietitianAccountId={dietitianAccountId} settings={settings} onSettings={setSettings} {...editor} />
       ) : null}
       {tab === "documents" ? (
         <DocumentsTab dietitianAccountId={dietitianAccountId} settings={settings} onSettings={setSettings} {...editor} />
       ) : null}
-      {tab === "clinical" ? (
-        <ClinicalTab dietitianAccountId={dietitianAccountId} settings={settings} onSettings={setSettings} {...editor} />
-      ) : null}
-      {tab === "portal" ? (
-        <PortalTab dietitianAccountId={dietitianAccountId} settings={settings} onSettings={setSettings} {...editor} />
-      ) : null}
-      {tab === "account" ? <AccountTab email={profile.email} {...editor} /> : null}
     </section>
   );
 }

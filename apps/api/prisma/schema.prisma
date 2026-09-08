@@ -316,6 +316,7 @@ model DietitianSettings {
   mealPlanShare             Json?      @map("meal_plan_share")
   enabledMeasurements       Json?      @map("enabled_measurements")
   deduceMeasurements        Boolean    @default(true) @map("deduce_measurements")
+  defaultNutritionMethod    String     @default("iom") @map("default_nutrition_method")
   portalPresets             Json?      @map("portal_presets")
   createdAt                 DateTime   @default(now()) @map("created_at") @db.Timestamptz
   updatedAt                 DateTime   @updatedAt @map("updated_at") @db.Timestamptz

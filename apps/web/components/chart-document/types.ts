@@ -70,6 +70,18 @@ export type PrescriptionPrintBody = {
     fiberGoalG: number | null;
   };
   duration: { beginDate: string | null; forecastFinishDate: string | null };
+  faculty: {
+    ibwKg: number | null;
+    percentIbw: number | null;
+    abwKg: number | null;
+    whr: number | null;
+    frame: string | null;
+    palLabel: string | null;
+    exchangeKcal: number | null;
+    carbohydrateG: number | null;
+    proteinG: number | null;
+    fatG: number | null;
+  } | null;
 };
 
 export type NutritionPrintBody = {
@@ -116,6 +128,7 @@ export type NutritionAnalysisPrintBody = {
   plan: { name: string; status: string; version: number | null; versionStatus?: string } | null;
   targets: NutritionMacroTotals;
   targetsFromClient?: boolean;
+  exchanges?: Record<string, number>;
   days: Array<{
     title: string | null;
     weekday: string | null;

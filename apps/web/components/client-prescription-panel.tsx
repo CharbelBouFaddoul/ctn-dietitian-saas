@@ -12,6 +12,28 @@ import {
 } from "../lib/clinical-profile";
 import { errorMessage } from "../lib/humanize-error";
 import { ACTIVITY_COMPENDIUM, compendiumMet } from "../lib/activity-compendium";
+import { FacultyExchangeEditor } from "./faculty-exchange-editor";
+import {
+  FACULTY_PAL_OPTIONS,
+  computeFacultyAbw,
+  computeFacultyIbw,
+  computeFrameRatio,
+  computeWhr,
+  emptyFacultyExchanges,
+  facultyFrameSize,
+  facultyMacroPercents,
+  facultyObeseForAbw,
+  facultyTargetsFromExchanges,
+  isFacultyMethod,
+  isFacultyPalKey,
+  percentOf,
+  percentWeightChange,
+  sanitizeNutritionMethod,
+  tallyExchanges,
+  whrElevated,
+  type FacultyExchangeId,
+  type NutritionMethod,
+} from "../lib/faculty-nutrition";
 import {
   AMDR,
   BMR_FORMULAS,
@@ -53,6 +75,7 @@ import {
 type Props = {
   base: string;
   allowManage: boolean;
+  clinicMethod?: NutritionMethod;
   client: {
     sex: string | null;
     dateOfBirth: string | null;
@@ -116,6 +139,13 @@ function ageFromDob(value: string | null): number | null {
 function fmt(value: number | null | undefined, decimals = 1): string {
   if (value == null || !Number.isFinite(value)) return "—";
   return value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: decimals });
+}
+
+function facultyPlanVsNeed(planKcal: number, needKcal: number): string {
+  const diff = Math.round(planKcal - needKcal);
+  if (diff === 0) return "Plan matches estimated need";
+  const amount = fmt(Math.abs(diff), 0);
+  return diff > 0 ? `${amount} kcal above estimated need` : `${amount} kcal below estimated need`;
 }
 
 function numberOrNull(raw: string): number | null {
@@ -189,7 +219,14 @@ function categoryTone(category: string | null): "success" | "warning" | "danger"
   }
 }
 
-export function ClientPrescriptionPanel({ base, allowManage, client, latestMeasurements, onError }: Props) {
+export function ClientPrescriptionPanel({
+  base,
+  allowManage,
+  clinicMethod,
+  client,
+  latestMeasurements,
+  onError,
+}: Props) {
   const [clinical, setClinical] = useState<ClinicalData>(() => emptyClinicalData());
   const [loaded, setLoaded] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
@@ -227,8 +264,18 @@ export function ClientPrescriptionPanel({ base, allowManage, client, latestMeasu
     let cancelled = false;
     (async () => {
       try {
-        const profile = await api<{ clinicalData?: ClinicalData }>(`${base}/profile`);
+        const dietitianId = /\/dietitian\/([^/]+)\//.exec(base)?.[1];
+        const [profile, settings] = await Promise.all([
+          api<{ clinicalData?: ClinicalData }>(`${base}/profile`),
+          dietitianId
+            ? api<{ defaultNutritionMethod?: string }>(`/api/v1/dietitian/${dietitianId}/settings`).catch(
+                () => null,
+              )
+            : Promise.resolve(null),
+        ]);
         if (cancelled) return;
+        const method = clinicMethod ?? sanitizeNutritionMethod(settings?.defaultNutritionMethod);
+        const storedMethod = profile.clinicalData?.prescription?.nutritionMethod;
         const base0 = emptyClinicalData();
         const merged: ClinicalData = {
           ...base0,
@@ -241,11 +288,22 @@ export function ClientPrescriptionPanel({ base, allowManage, client, latestMeasu
           prescription: {
             ...emptyPrescription(),
             ...(profile.clinicalData?.prescription ?? {}),
+            nutritionMethod: method,
             macro: { ...emptyPrescription().macro, ...(profile.clinicalData?.prescription?.macro ?? {}) },
+            exchanges: {
+              ...emptyFacultyExchanges(),
+              ...(profile.clinicalData?.prescription?.exchanges ?? {}),
+            },
           },
         };
         setClinical(merged);
         setLoaded(true);
+        if (allowManage && storedMethod !== method) {
+          void api(`${base}/profile`, {
+            method: "PATCH",
+            body: JSON.stringify({ clinicalData: merged }),
+          }).catch((err) => onError(errorMessage(err, "Unable to save prescription")));
+        }
       } catch (err) {
         onError(errorMessage(err, "Unable to load prescription"));
       }
@@ -290,28 +348,51 @@ export function ClientPrescriptionPanel({ base, allowManage, client, latestMeasu
     () => BMR_FORMULAS.filter((f) => computeBmr(f.id, inputs, currentBodyFat) != null),
     [inputs, currentBodyFat],
   );
-  const bmrFormula: BmrFormulaId = availableBmrFormulas.some((f) => f.id === rx.bmrFormula)
-    ? (rx.bmrFormula as BmrFormulaId)
-    : availableBmrFormulas.find((f) => f.id === DEFAULT_BMR_FORMULA)?.id ?? availableBmrFormulas[0]?.id ?? DEFAULT_BMR_FORMULA;
-
-  const palCurrent = rx.palCurrentKey || DEFAULT_PAL_KEY;
+  const isFaculty = isFacultyMethod(clinicMethod ?? rx.nutritionMethod);
+  const bmrFormula: BmrFormulaId = isFaculty
+    ? availableBmrFormulas.find((f) => f.id === "mifflin")?.id ??
+      availableBmrFormulas.find((f) => f.id === DEFAULT_BMR_FORMULA)?.id ??
+      availableBmrFormulas[0]?.id ??
+      DEFAULT_BMR_FORMULA
+    : availableBmrFormulas.some((f) => f.id === rx.bmrFormula)
+      ? (rx.bmrFormula as BmrFormulaId)
+      : availableBmrFormulas.find((f) => f.id === DEFAULT_BMR_FORMULA)?.id ??
+        availableBmrFormulas[0]?.id ??
+        DEFAULT_BMR_FORMULA;
+  const palCurrent = rx.palCurrentKey || (isFaculty ? FACULTY_PAL_OPTIONS[0]!.key : DEFAULT_PAL_KEY);
   const palGoal = rx.palGoalKey || palCurrent;
-  const palCurrentNumeric = rx.palCurrentValue ?? palValue(palCurrent);
+  const palCurrentNumeric = isFaculty ? palValue(palCurrent) : (rx.palCurrentValue ?? palValue(palCurrent));
   const palGoalNumeric = palValue(palGoal);
-  const bmr = computeBmr(bmrFormula, inputs, currentBodyFat);
+  const ageYears = inputs.ageYears;
+  const facultyIbw = computeFacultyIbw(inputs.heightCm, inputs.sex, ageYears);
+  const facultyPctIbw = percentOf(weightKg, facultyIbw);
+  const facultyAbw = computeFacultyAbw(weightKg, facultyIbw);
+  const facultyUseAbw =
+    isFaculty && rx.useAdjustedWeightForEnergy && facultyObeseForAbw(bmi, facultyPctIbw) && facultyAbw != null;
+  const energyInputs: PrescriptionInputs = {
+    ...inputs,
+    weightKg: facultyUseAbw ? facultyAbw : inputs.weightKg,
+  };
+  const bmr = computeBmr(bmrFormula, energyInputs, currentBodyFat);
   const refBmr = computeBmr(bmrFormula, { ...inputs, weightKg: refWeight }, rx.bodyFatGoalPct ?? currentBodyFat);
   const energyFormula = (rx.energyFormula || DEFAULT_ENERGY_FORMULA) as EnergyFormulaId;
-  const isEer = energyFormula === "eer_iom";
+  const isEer = !isFaculty && energyFormula === "eer_iom";
   const tdeeCurrent = isEer
-    ? computeEer(inputs, palCurrentNumeric)
+    ? computeEer(energyInputs, palCurrentNumeric)
     : bmr != null && palCurrentNumeric != null
       ? Math.round(bmr * palCurrentNumeric)
       : null;
-  const tdeeGoalComputed = isEer ? computeEer(inputs, palGoalNumeric) : computeTdee(bmr, palGoal);
+  const tdeeGoalComputed = isEer ? computeEer(energyInputs, palGoalNumeric) : computeTdee(bmr, palGoal);
   const energyGoal = rx.energyGoalKcal ?? tdeeGoalComputed;
   const refTdee = isEer
     ? computeEer({ ...inputs, weightKg: refWeight }, palGoalNumeric)
     : computeTdee(refBmr, palGoal);
+  const facultyWhr = computeWhr(inputs.waistCm, inputs.hipsCm);
+  const facultyFrameRatio = computeFrameRatio(inputs.heightCm, measurementValue("WRIST"));
+  const facultyFrame = facultyFrameSize(facultyFrameRatio, inputs.sex);
+  const facultyPctUbw = percentOf(weightKg, rx.usualWeightKg);
+  const facultyWeightChange = percentWeightChange(rx.usualWeightKg, weightKg);
+  const facultyTally = tallyExchanges(rx.exchanges);
 
   const macro = {
     fatPct: rx.macro.fatPct ?? DEFAULT_MACRO_SPLIT.fatPct,
@@ -345,14 +426,41 @@ export function ClientPrescriptionPanel({ base, allowManage, client, latestMeasu
     if (!allowManage) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
-      const nextEnergy = next.prescription.energyGoalKcal ?? energyGoal;
-      const grams = macroGramsFromEnergy(nextEnergy, {
-        fatPct: next.prescription.macro.fatPct ?? DEFAULT_MACRO_SPLIT.fatPct,
-        carbPct: next.prescription.macro.carbPct ?? DEFAULT_MACRO_SPLIT.carbPct,
-        proteinPct: next.prescription.macro.proteinPct ?? DEFAULT_MACRO_SPLIT.proteinPct,
-      });
+      const faculty = isFacultyMethod(clinicMethod ?? next.prescription.nutritionMethod);
+      const facultyTargets = faculty ? facultyTargetsFromExchanges(next.prescription.exchanges) : null;
+      const facultyPercents = faculty ? facultyMacroPercents(tallyExchanges(next.prescription.exchanges)) : null;
+      const nextEnergy = faculty ? facultyTargets?.energyKcal ?? null : (next.prescription.energyGoalKcal ?? energyGoal);
+      const grams = faculty
+        ? {
+            fatG: facultyTargets?.fatG ?? null,
+            carbohydrateG: facultyTargets?.carbohydrateG ?? null,
+            proteinG: facultyTargets?.proteinG ?? null,
+          }
+        : macroGramsFromEnergy(nextEnergy, {
+            fatPct: next.prescription.macro.fatPct ?? DEFAULT_MACRO_SPLIT.fatPct,
+            carbPct: next.prescription.macro.carbPct ?? DEFAULT_MACRO_SPLIT.carbPct,
+            proteinPct: next.prescription.macro.proteinPct ?? DEFAULT_MACRO_SPLIT.proteinPct,
+          });
       const withTargets: ClinicalData = {
         ...next,
+        prescription: {
+          ...next.prescription,
+          nutritionMethod: clinicMethod ?? next.prescription.nutritionMethod,
+          ...(faculty
+            ? {
+                energyGoalKcal: facultyTargets?.energyKcal ?? null,
+                ...(facultyTargets?.energyKcal != null && facultyPercents
+                  ? {
+                      macro: {
+                        fatPct: facultyPercents.fatPct,
+                        carbPct: facultyPercents.carbPct,
+                        proteinPct: facultyPercents.proteinPct,
+                      },
+                    }
+                  : {}),
+              }
+            : {}),
+        },
         nutrition: {
           ...next.nutrition,
           targets: {
@@ -360,7 +468,7 @@ export function ClientPrescriptionPanel({ base, allowManage, client, latestMeasu
             fatG: grams.fatG,
             carbohydrateG: grams.carbohydrateG,
             proteinG: grams.proteinG,
-            fiberG: next.prescription.fiberGoalG ?? null,
+            fiberG: faculty ? null : (next.prescription.fiberGoalG ?? null),
           },
         },
       };
@@ -379,6 +487,11 @@ export function ClientPrescriptionPanel({ base, allowManage, client, latestMeasu
     });
   }
 
+  useEffect(() => {
+    if (!loaded || !clinicMethod || clinicMethod === rx.nutritionMethod) return;
+    patchRx({ nutritionMethod: clinicMethod });
+  }, [clinicMethod, loaded]);
+
   function pushMacroHistory() {
     if (readOnly) return;
     macroHistoryRef.current = [
@@ -394,6 +507,10 @@ export function ClientPrescriptionPanel({ base, allowManage, client, latestMeasu
     macroHistoryRef.current = macroHistoryRef.current.slice(0, -1);
     setCanUndoMacros(macroHistoryRef.current.length > 0);
     patchRx({ macro: last.macro, proteinPerKg: last.proteinPerKg });
+  }
+
+  function patchExchange(id: FacultyExchangeId, value: number) {
+    patchRx({ exchanges: { ...rx.exchanges, [id]: value } });
   }
 
   function setMacroPct(key: MacroKey, value: number) {
@@ -456,11 +573,14 @@ export function ClientPrescriptionPanel({ base, allowManage, client, latestMeasu
       {/* ── BODY COMPOSITION ── */}
       <Section
         title="Body composition"
-        subtitle="Measured now vs. your goal, with a healthy reference."
+        subtitle={
+          isFaculty
+            ? "Ideal and adjusted body weight for this method. You still set the goal weight."
+            : "Measured now vs. your goal, with a healthy reference."
+        }
         icon={<IconBody />}
       >
         <MetricTable>
-          {/* Weight */}
           <Row
             name="Weight"
             current={<Value>{weightKg != null ? `${fmt(weightKg)} kg` : "—"}</Value>}
@@ -473,64 +593,134 @@ export function ClientPrescriptionPanel({ base, allowManage, client, latestMeasu
               />
             }
             reference={
-              <Value muted>
-                {refWeight != null ? `${fmt(refWeight)} kg` : "—"}
-                {weightDelta != null && weightDelta !== 0 ? (
-                  <Badge tone={weightDelta < 0 ? "success" : "warning"}>
-                    {Math.abs(weightDelta)} kg {weightDelta < 0 ? "to lose" : "to gain"}
-                  </Badge>
-                ) : null}
-              </Value>
-            }
-          />
-
-          {/* Body fat */}
-          <Row
-            name="Body fat"
-            method={
-              <MethodSelect
-                readOnly={readOnly}
-                ariaLabel="Body fat method"
-                value={bodyFatFormula}
-                onChange={(value) => patchRx({ bodyFatFormula: value })}
-              >
-                {availableBodyFatFormulas.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.label}
-                  </option>
-                ))}
-                <option value={MANUAL_BODY_FAT}>Manual entry</option>
-              </MethodSelect>
-            }
-            current={
-              isManualBodyFat ? (
-                <NumberField
-                  readOnly={readOnly}
-                  value={rx.bodyFatCurrentPct}
-                  unit="%"
-                  placeholder={measuredBodyFat != null ? `${fmt(measuredBodyFat)}` : "%"}
-                  onChange={(v) => patchRx({ bodyFatCurrentPct: v })}
-                />
+              isFaculty ? (
+                <Value muted>{facultyIbw != null ? `IBW ${fmt(facultyIbw)} kg` : "—"}</Value>
               ) : (
-                <Value>{computedBodyFat != null ? `${fmt(computedBodyFat)} %` : "—"}</Value>
+                <Value muted>
+                  {refWeight != null ? `${fmt(refWeight)} kg` : "—"}
+                  {weightDelta != null && weightDelta !== 0 ? (
+                    <Badge tone={weightDelta < 0 ? "success" : "warning"}>
+                      {Math.abs(weightDelta)} kg {weightDelta < 0 ? "to lose" : "to gain"}
+                    </Badge>
+                  ) : null}
+                </Value>
               )
             }
-            goal={
-              <NumberField
-                readOnly={readOnly}
-                value={rx.bodyFatGoalPct}
-                unit="%"
-                onChange={(v) => patchRx({ bodyFatGoalPct: v })}
-              />
-            }
-            reference={
-              <Value muted>
-                {fmt(bfRange.min)} – {fmt(bfRange.max)} %
-              </Value>
-            }
           />
 
-          {/* BMI */}
+          {isFaculty ? (
+            <>
+              <Row
+                name="Usual weight"
+                current={
+                  <NumberField
+                    readOnly={readOnly}
+                    value={rx.usualWeightKg}
+                    unit="kg"
+                    onChange={(v) => patchRx({ usualWeightKg: v })}
+                  />
+                }
+                goal={<Value muted>—</Value>}
+                reference={
+                  <Value muted>
+                    {facultyPctUbw != null ? `${fmt(facultyPctUbw)}% usual` : "—"}
+                    {facultyWeightChange != null ? ` · ${fmt(facultyWeightChange)}% change` : ""}
+                  </Value>
+                }
+              />
+              <Row
+                name="Ideal body weight"
+                current={<Value>{facultyIbw != null ? `${fmt(facultyIbw)} kg` : "—"}</Value>}
+                goal={<Value>{facultyPctIbw != null ? `${fmt(facultyPctIbw)}% IBW` : "—"}</Value>}
+                reference={<Value muted>Hamwi, adults</Value>}
+              />
+              <Row
+                name="Adjusted body weight"
+                method={
+                  <label className="ui-faculty__check">
+                    <input
+                      type="checkbox"
+                      disabled={readOnly}
+                      checked={rx.useAdjustedWeightForEnergy}
+                      onChange={(event) => patchRx({ useAdjustedWeightForEnergy: event.target.checked })}
+                    />
+                    <span>Use for energy if obese</span>
+                  </label>
+                }
+                current={
+                  <Value>
+                    {facultyAbw != null ? `${fmt(facultyAbw)} kg` : "—"}
+                    {facultyUseAbw ? <Badge tone="warning">used for energy</Badge> : null}
+                  </Value>
+                }
+                goal={<Value muted>—</Value>}
+                reference={<Value muted>%IBW ≥ 125 or BMI ≥ 30</Value>}
+              />
+              <Row
+                name="Waist–hip / frame"
+                current={
+                  <Value>
+                    {facultyWhr != null ? fmt(facultyWhr, 2) : "—"}
+                    {facultyWhr != null && whrElevated(facultyWhr, inputs.sex) ? (
+                      <Badge tone="warning">elevated</Badge>
+                    ) : null}
+                  </Value>
+                }
+                goal={<Value>{facultyFrame ?? "—"}</Value>}
+                reference={
+                  <Value muted>
+                    {facultyFrameRatio != null ? `r ${fmt(facultyFrameRatio, 2)}` : "Waist, hips, wrist"}
+                  </Value>
+                }
+              />
+            </>
+          ) : (
+            <Row
+              name="Body fat"
+              method={
+                <MethodSelect
+                  readOnly={readOnly}
+                  ariaLabel="Body fat method"
+                  value={bodyFatFormula}
+                  onChange={(value) => patchRx({ bodyFatFormula: value })}
+                >
+                  {availableBodyFatFormulas.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.label}
+                    </option>
+                  ))}
+                  <option value={MANUAL_BODY_FAT}>Manual entry</option>
+                </MethodSelect>
+              }
+              current={
+                isManualBodyFat ? (
+                  <NumberField
+                    readOnly={readOnly}
+                    value={rx.bodyFatCurrentPct}
+                    unit="%"
+                    placeholder={measuredBodyFat != null ? `${fmt(measuredBodyFat)}` : "%"}
+                    onChange={(v) => patchRx({ bodyFatCurrentPct: v })}
+                  />
+                ) : (
+                  <Value>{computedBodyFat != null ? `${fmt(computedBodyFat)} %` : "—"}</Value>
+                )
+              }
+              goal={
+                <NumberField
+                  readOnly={readOnly}
+                  value={rx.bodyFatGoalPct}
+                  unit="%"
+                  onChange={(v) => patchRx({ bodyFatGoalPct: v })}
+                />
+              }
+              reference={
+                <Value muted>
+                  {fmt(bfRange.min)} – {fmt(bfRange.max)} %
+                </Value>
+              }
+            />
+          )}
+
           <Row
             name="Body mass index"
             current={
@@ -547,7 +737,17 @@ export function ClientPrescriptionPanel({ base, allowManage, client, latestMeasu
                 ) : null}
               </Value>
             }
-            reference={<Value muted>{healthy != null ? `${fmt(healthy.min)} – ${fmt(healthy.max)} kg` : "18.5 – 24.9"}</Value>}
+            reference={
+              <Value muted>
+                {isFaculty
+                  ? facultyPctIbw != null
+                    ? `${fmt(facultyPctIbw)}% IBW`
+                    : "—"
+                  : healthy != null
+                    ? `${fmt(healthy.min)} – ${fmt(healthy.max)} kg`
+                    : "18.5 – 24.9"}
+              </Value>
+            }
           />
         </MetricTable>
       </Section>
@@ -555,7 +755,11 @@ export function ClientPrescriptionPanel({ base, allowManage, client, latestMeasu
       {/* ── ENERGY NEEDS ── */}
       <Section
         title="Energy needs"
-        subtitle="Reference is calculated at a healthy body weight."
+        subtitle={
+          isFaculty
+            ? "Estimated need uses Mifflin-St Jeor and the activity level above. Nutrition follows the exchange plan, not this estimate."
+            : "Reference is calculated at a healthy body weight."
+        }
         icon={<IconEnergy />}
       >
         <MetricTable>
@@ -563,15 +767,17 @@ export function ClientPrescriptionPanel({ base, allowManage, client, latestMeasu
           <Row
             name="Activity level"
             method={
-              <ActivityModeToggle
-                mode={rx.palCurrentValue != null ? "day" : "band"}
-                readOnly={readOnly}
-                onChange={selectActivityMode}
-              />
+              isFaculty ? null : (
+                <ActivityModeToggle
+                  mode={rx.palCurrentValue != null ? "day" : "band"}
+                  readOnly={readOnly}
+                  onChange={selectActivityMode}
+                />
+              )
             }
             current={
               <span className="ui-prescription__activity">
-                {rx.palCurrentValue != null ? (
+                {!isFaculty && rx.palCurrentValue != null ? (
                   <>
                     <Value>
                       PAL {fmt(rx.palCurrentValue, 2)}
@@ -586,33 +792,35 @@ export function ClientPrescriptionPanel({ base, allowManage, client, latestMeasu
                     ) : null}
                   </>
                 ) : (
-                  <SelectField
+                  <PalSelect
+                    method={clinicMethod ?? rx.nutritionMethod}
                     readOnly={readOnly}
-                    value={palCurrent}
+                    value={isFaculty && !isFacultyPalKey(palCurrent) ? FACULTY_PAL_OPTIONS[0]!.key : palCurrent}
                     onChange={(value) => patchRx({ palCurrentKey: value })}
-                    options={PAL_OPTIONS.map((o) => ({ value: o.key, label: o.label }))}
-                    badge={`PAL ${palValue(palCurrent)}`}
+                    badge={`PAL ${palValue(isFaculty && !isFacultyPalKey(palCurrent) ? FACULTY_PAL_OPTIONS[0]!.key : palCurrent)}`}
                   />
                 )}
               </span>
             }
             goal={
-              <SelectField
+              <PalSelect
+                method={clinicMethod ?? rx.nutritionMethod}
                 readOnly={readOnly}
-                value={palGoal}
+                value={isFaculty && !isFacultyPalKey(palGoal) ? FACULTY_PAL_OPTIONS[0]!.key : palGoal}
                 onChange={(value) => patchRx({ palGoalKey: value })}
-                options={PAL_OPTIONS.map((o) => ({ value: o.key, label: o.label }))}
-                badge={`PAL ${palValue(palGoal)}`}
+                badge={`PAL ${palValue(isFaculty && !isFacultyPalKey(palGoal) ? FACULTY_PAL_OPTIONS[0]!.key : palGoal)}`}
               />
             }
-            reference={<Value muted>1.2–2.2</Value>}
+            reference={<Value muted>{isFaculty ? "Typical range 1.3–1.9" : "Typical range 1.2–2.2"}</Value>}
           />
 
           {/* BMR */}
           <Row
             name="Basal metabolic rate"
             method={
-              availableBmrFormulas.length ? (
+              isFaculty ? (
+                <Value muted>Mifflin-St Jeor</Value>
+              ) : availableBmrFormulas.length ? (
                 <MethodSelect
                   readOnly={readOnly}
                   ariaLabel="BMR formula"
@@ -642,37 +850,75 @@ export function ClientPrescriptionPanel({ base, allowManage, client, latestMeasu
 
           {/* TDEE / energy target */}
           <Row
-            name="Daily energy target"
+            name={isFaculty ? "Daily energy" : "Daily energy target"}
             method={
-              <MethodSelect
-                readOnly={readOnly}
-                ariaLabel="Energy formula"
-                value={energyFormula}
-                onChange={(value) => patchRx({ energyFormula: value })}
-              >
-                {ENERGY_FORMULAS.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.label}
-                  </option>
-                ))}
-              </MethodSelect>
+              isFaculty ? (
+                <Value muted>Estimated need</Value>
+              ) : (
+                <MethodSelect
+                  readOnly={readOnly}
+                  ariaLabel="Energy formula"
+                  value={energyFormula}
+                  onChange={(value) => patchRx({ energyFormula: value })}
+                >
+                  {ENERGY_FORMULAS.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.label}
+                    </option>
+                  ))}
+                </MethodSelect>
+              )
             }
             current={<Value>{tdeeCurrent != null ? `${fmt(tdeeCurrent, 0)} kcal` : "—"}</Value>}
             goal={
-              <NumberField
-                readOnly={readOnly}
-                value={rx.energyGoalKcal}
-                unit="kcal"
-                placeholder={tdeeGoalComputed != null ? `${fmt(tdeeGoalComputed, 0)}` : "kcal"}
-                onChange={(v) => patchRx({ energyGoalKcal: v })}
-              />
+              isFaculty ? (
+                <Value>
+                  {facultyTally.atwaterKcal > 0 ? `${fmt(facultyTally.atwaterKcal, 0)} kcal` : "—"}
+                  {facultyTally.atwaterKcal > 0 ? (
+                    <span className="ui-prescription__subvalue">Exchange plan</span>
+                  ) : null}
+                </Value>
+              ) : (
+                <NumberField
+                  readOnly={readOnly}
+                  value={rx.energyGoalKcal}
+                  unit="kcal"
+                  placeholder={tdeeGoalComputed != null ? `${fmt(tdeeGoalComputed, 0)}` : "kcal"}
+                  onChange={(v) => patchRx({ energyGoalKcal: v })}
+                />
+              )
             }
-            reference={<Value muted>{refTdee != null ? `${fmt(refTdee, 0)} kcal` : "—"}</Value>}
+            reference={
+              isFaculty ? (
+                <Value muted>
+                  {tdeeCurrent != null && facultyTally.atwaterKcal > 0
+                    ? facultyPlanVsNeed(facultyTally.atwaterKcal, tdeeCurrent)
+                    : "—"}
+                </Value>
+              ) : (
+                <Value muted>{refTdee != null ? `${fmt(refTdee, 0)} kcal` : "—"}</Value>
+              )
+            }
           />
         </MetricTable>
       </Section>
 
-      {/* ── MACRO TARGETS ── */}
+      {/* ── MACRO / EXCHANGES ── */}
+      {isFaculty ? (
+      <Section
+        title="Exchange plan"
+        subtitle="Set the daily food-group plan. Nutrition Analysis uses these totals as the meal targets."
+        icon={<IconMacros />}
+      >
+        <FacultyExchangeEditor
+          exchanges={rx.exchanges ?? emptyFacultyExchanges()}
+          readOnly={readOnly}
+          onChange={patchExchange}
+          needKcal={tdeeCurrent}
+          hint="These totals become the Nutrition targets. The estimate above is only for comparison."
+        />
+      </Section>
+      ) : (
       <Section
         title="Macro targets"
         subtitle={`Based on a ${energyGoal != null ? `${fmt(energyGoal, 0)} kcal` : "—"} daily target. These are sent to Nutrition → Analysis.`}
@@ -833,13 +1079,16 @@ export function ClientPrescriptionPanel({ base, allowManage, client, latestMeasu
           </aside>
         </div>
       </Section>
+      )}
 
-      <ActivityDialog
-        open={activityOpen}
-        initial={rx.activities}
-        onClose={() => setActivityOpen(false)}
-        onApply={applyActivities}
-      />
+      {!isFaculty ? (
+        <ActivityDialog
+          open={activityOpen}
+          initial={rx.activities}
+          onClose={() => setActivityOpen(false)}
+          onApply={applyActivities}
+        />
+      ) : null}
 
       {/* ── DURATION ── */}
       <Section title="Duration" subtitle="Track the plan window and how long it runs." icon={<IconDuration />}>
@@ -887,11 +1136,13 @@ export function ClientPrescriptionPanel({ base, allowManage, client, latestMeasu
 function Section({
   title,
   subtitle,
+  badge,
   icon,
   children,
 }: {
   title: string;
   subtitle?: string;
+  badge?: string;
   icon?: ReactNode;
   children: ReactNode;
 }) {
@@ -900,11 +1151,14 @@ function Section({
       <div className="ui-prescription__section-head">
         {icon ? <span className="ui-prescription__section-icon">{icon}</span> : null}
         <div className="ui-prescription__section-heading">
-          <h3 className="ui-prescription__section-title">{title}</h3>
+          <h3 className="ui-prescription__section-title">
+            {title}
+            {badge ? <Badge tone="success">{badge}</Badge> : null}
+          </h3>
           {subtitle ? <p className="ui-prescription__section-sub">{subtitle}</p> : null}
         </div>
       </div>
-      {children}
+      <div className="ui-prescription__section-body">{children}</div>
     </section>
   );
 }
@@ -1120,6 +1374,35 @@ function SelectField({
       <Select disabled={readOnly} value={value} onChange={(event) => onChange(event.target.value)}>
         {options.map((option) => (
           <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </Select>
+      {badge ? <span className="ui-prescription__unit">{badge}</span> : null}
+    </span>
+  );
+}
+
+function PalSelect({
+  value,
+  badge,
+  readOnly,
+  method,
+  onChange,
+}: {
+  value: string;
+  badge?: string;
+  readOnly: boolean;
+  method: NutritionMethod;
+  onChange: (value: string) => void;
+}) {
+  const faculty = isFacultyMethod(method);
+  const options = faculty ? FACULTY_PAL_OPTIONS : PAL_OPTIONS;
+  return (
+    <span className="ui-prescription__field">
+      <Select disabled={readOnly} value={value} onChange={(event) => onChange(event.target.value)}>
+        {options.map((option) => (
+          <option key={option.key} value={option.key}>
             {option.label}
           </option>
         ))}

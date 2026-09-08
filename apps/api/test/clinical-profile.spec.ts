@@ -19,6 +19,35 @@ describe("clinical data", () => {
     });
   });
 
+  it("keeps Faculty / Lebanon prescription fields", () => {
+    const data = sanitizeClinicalData({
+      prescription: {
+        nutritionMethod: "faculty_lebanon",
+        usualWeightKg: 70,
+        useAdjustedWeightForEnergy: true,
+        exchanges: { milkFatFree: 1, fruit: 3, bread: 99, sugar: -2, extra: 4 },
+      },
+    });
+    expect(data.prescription.nutritionMethod).toBe("faculty_lebanon");
+    expect(data.prescription.usualWeightKg).toBe(70);
+    expect(data.prescription.useAdjustedWeightForEnergy).toBe(true);
+    expect(data.prescription.exchanges.milkFatFree).toBe(1);
+    expect(data.prescription.exchanges.fruit).toBe(3);
+    expect(data.prescription.exchanges.bread).toBe(50);
+    expect(data.prescription.exchanges.sugar).toBe(0);
+    expect(data.prescription.exchanges).not.toHaveProperty("extra");
+  });
+
+  it("accepts IOM nutrition method and falls back on unknown values", () => {
+    expect(sanitizeClinicalData({ prescription: { nutritionMethod: "iom" } }).prescription.nutritionMethod).toBe(
+      "iom",
+    );
+    expect(sanitizeClinicalData({ prescription: {} }).prescription.nutritionMethod).toBe("iom");
+    expect(
+      sanitizeClinicalData({ prescription: { nutritionMethod: "hamwi" } }).prescription.nutritionMethod,
+    ).toBe("iom");
+  });
+
   it("drops unknown keys and caps strings", () => {
     const data = sanitizeClinicalData({
       visit: { reason: "a".repeat(5000), extra: "nope" },

@@ -14,6 +14,8 @@
  * - PAL bands & AMDR: IOM/DRI.
  */
 
+import { facultyPalValue } from "./faculty-nutrition";
+
 export type PrescriptionSex = "MALE" | "FEMALE" | "OTHER" | "UNSPECIFIED";
 
 export type SkinfoldSite =
@@ -533,7 +535,10 @@ export const PAL_OPTIONS: PalOption[] = [
 export const DEFAULT_PAL_KEY = "low_active";
 
 export function palValue(key: string): number | null {
-  return PAL_OPTIONS.find((option) => option.key === key)?.value ?? null;
+  return (
+    PAL_OPTIONS.find((option) => option.key === key)?.value ??
+    facultyPalValue(key)
+  );
 }
 
 /** Total daily energy expenditure = BMR x PAL (kcal/day). */
