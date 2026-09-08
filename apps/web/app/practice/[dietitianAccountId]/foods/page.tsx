@@ -173,11 +173,11 @@ export default function FoodsPage() {
       <ListFilters
         search={searchDraft}
         onSearchChange={setSearchDraft}
-        searchPlaceholder="Search foods"
+        searchPlaceholder="Search foods — whole milk, chicken breast…"
         hasFilters={hasFilters}
         onClear={clearFilters}
         count={data?.total ?? 0}
-        countNoun="food"
+        countNoun={search ? "match" : "food"}
         loading={!data && !error}
       >
         <FilterPopover

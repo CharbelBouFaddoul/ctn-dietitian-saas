@@ -11,6 +11,9 @@ import {
   foodQuantityScaleFactor,
   IncompatibleFoodUnitError,
   normalizeFoodName,
+  rankFoodsForSearch,
+  tokenizeFoodQuery,
+  foodSearchTokenClauses,
   roundNutrition,
   sanitizeExtraNutrients,
   scaleExtraNutrients,
@@ -46,6 +49,27 @@ const FOOD_SORT_FIELD: Record<Exclude<FoodSort, "name">, "energyKcal" | "fatG" |
   carbohydrate: "carbohydrateG",
   protein: "proteinG",
 };
+
+/** Candidate cap for global relevance ranking (typical queries stay well under this). */
+const SEARCH_FETCH_CAP = 8000;
+
+function searchTextFilter(q: string): Prisma.FoodWhereInput | undefined {
+  const tokens = tokenizeFoodQuery(q);
+  if (tokens.length === 0) return undefined;
+  const compact = tokens.join("");
+  if (compact.length < 2) {
+    const token = tokens[0]!;
+    return {
+      OR: [
+        { nameNormalized: { startsWith: token, mode: "insensitive" } },
+        { name: { startsWith: q.trim(), mode: "insensitive" } },
+      ],
+    };
+  }
+  return {
+    AND: tokens.map((token) => ({ OR: foodSearchTokenClauses(token) })),
+  };
+}
 
 @Injectable()
 export class FoodService {
@@ -85,17 +109,8 @@ export class FoodService {
             };
 
     const q = query.q?.trim() ?? "";
-    const normalized = q ? normalizeFoodName(q) : "";
-    const textFilter: Prisma.FoodWhereInput | undefined = q
-      ? {
-          OR: [
-            { nameNormalized: { startsWith: normalized, mode: "insensitive" } },
-            { name: { startsWith: q, mode: "insensitive" } },
-            { nameNormalized: { contains: normalized, mode: "insensitive" } },
-            { name: { contains: q, mode: "insensitive" } },
-          ],
-        }
-      : undefined;
+    const rankByRelevance = Boolean(q) && sort === "name";
+    const textFilter = q ? searchTextFilter(q) : undefined;
 
     const where: Prisma.FoodWhereInput = {
       status: "ACTIVE",
@@ -108,40 +123,43 @@ export class FoodService {
       ],
     };
 
-    const [total, rows] = await this.prisma.$transaction([
-      this.prisma.food.count({ where }),
-      this.prisma.food.findMany({
-        where,
-        include: { source: true },
-        orderBy,
-        skip: (page - 1) * pageSize,
-        take: pageSize,
-      }),
-    ]);
+    const [total, rows] = rankByRelevance
+      ? await this.prisma.$transaction([
+          this.prisma.food.count({ where }),
+          this.prisma.food.findMany({
+            where,
+            include: { source: true },
+            take: SEARCH_FETCH_CAP,
+          }),
+        ])
+      : await this.prisma.$transaction([
+          this.prisma.food.count({ where }),
+          this.prisma.food.findMany({
+            where,
+            include: { source: true },
+            orderBy,
+            skip: (page - 1) * pageSize,
+            take: pageSize,
+          }),
+        ]);
 
-    // Prefer prefix matches when searching by name.
-    const sorted =
-      q && sort === "name"
-        ? [...rows].sort((a, b) => {
-            const aPrefix =
-              a.nameNormalized.startsWith(normalized) || a.name.toLowerCase().startsWith(q.toLowerCase())
-                ? 0
-                : 1;
-            const bPrefix =
-              b.nameNormalized.startsWith(normalized) || b.name.toLowerCase().startsWith(q.toLowerCase())
-                ? 0
-                : 1;
-            if (aPrefix !== bPrefix) return aPrefix - bPrefix;
-            const byName = a.nameNormalized.localeCompare(b.nameNormalized);
-            return sortDir === "desc" ? -byName : byName;
-          })
-        : rows;
+    const ranked = rankByRelevance
+      ? rankFoodsForSearch(
+          rows.map((row) => ({
+            ...row,
+            sourceKey: row.source.key,
+            isCustom: Boolean(row.dietitianAccountId),
+          })),
+          q,
+        )
+      : rows;
+    const pageRows = rankByRelevance ? ranked.slice((page - 1) * pageSize, page * pageSize) : ranked;
 
     return {
       page,
       pageSize,
       total,
-      items: sorted.map((row) => {
+      items: pageRows.map((row) => {
         const nutrition = nutritionFromRow(row);
         const isCustom = Boolean(row.dietitianAccountId);
         const extras = nutritionPayloadExtras(row);

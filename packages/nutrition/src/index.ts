@@ -55,16 +55,6 @@ const GRAMS_PER_OZ = 28.349523125;
 const GRAMS_PER_LB = 453.59237;
 const ML_PER_FL_OZ = 29.5735295625;
 
-export function normalizeFoodName(name: string): string {
-  return name
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim()
-    .replace(/\s+/g, " ");
-}
-
 export function roundHalfUp(value: number, decimals: number): number {
   const factor = 10 ** decimals;
   return Math.round((value + Number.EPSILON) * factor) / factor;
@@ -277,4 +267,15 @@ export {
   type MicronutrientDef,
   type MicronutrientKey,
 } from "./micronutrients";
+
+export {
+  expandFoodSearchToken,
+  foodNameMatchesQuery,
+  foodSearchTokenClauses,
+  normalizeFoodName,
+  rankFoodsForSearch,
+  scoreFoodSearch,
+  tokenizeFoodQuery,
+  type FoodSearchSubject,
+} from "./food-search";
 

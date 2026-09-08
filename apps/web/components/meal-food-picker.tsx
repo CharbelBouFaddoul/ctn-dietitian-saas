@@ -347,21 +347,23 @@ export function MealFoodPicker({
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder={tab === "food" ? "Search food" : "Search recipes"}
+            placeholder={tab === "food" ? "Search foods — whole milk, chicken breast…" : "Search recipes"}
             autoComplete="off"
-            aria-label={tab === "food" ? "Search food" : "Search recipes"}
+            aria-label={tab === "food" ? "Search foods" : "Search recipes"}
           />
         </label>
         {tab === "food" ? (
           <>
-            <button
-              type="button"
-              className="ui-food-pick__sort-dir"
-              aria-label={sortDir === "asc" ? "Sort descending" : "Sort ascending"}
-              onClick={() => setSortDir((dir) => (dir === "asc" ? "desc" : "asc"))}
-            >
-              <SortDirIcon dir={sortDir} />
-            </button>
+            {!(debounced && sort === "name") ? (
+              <button
+                type="button"
+                className="ui-food-pick__sort-dir"
+                aria-label={sortDir === "asc" ? "Sort descending" : "Sort ascending"}
+                onClick={() => setSortDir((dir) => (dir === "asc" ? "desc" : "asc"))}
+              >
+                <SortDirIcon dir={sortDir} />
+              </button>
+            ) : null}
             <select
               className="ui-food-pick__select"
               value={sort}
@@ -372,7 +374,7 @@ export function MealFoodPicker({
                 setSortDir(next === "name" ? "asc" : "desc");
               }}
             >
-              <option value="name">Sort by name</option>
+              <option value="name">{debounced ? "Best match" : "Sort by name"}</option>
               <option value="energy">Sort by energy</option>
               <option value="fat">Sort by fat</option>
               <option value="carbohydrate">Sort by carbohydrate</option>

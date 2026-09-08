@@ -398,12 +398,19 @@ function ClientWorkspacePage() {
   } | null>(null);
   const [trackingDate, setTrackingDate] = useState("");
   const [habitCatalog, setHabitCatalog] = useState<
-    Array<{ id: string; name: string; scope: string; defaultTargetValue: number | null; defaultTargetUnit: string | null }>
+    Array<{
+      id: string;
+      name: string;
+      scope: string;
+      description?: string | null;
+      category?: string | null;
+      defaultTargetValue: number | null;
+      defaultTargetUnit: string | null;
+    }>
   >([]);
   const [clientHabits, setClientHabits] = useState<
     Array<{ habitDefinitionId: string; name: string; targetValue: number | null; targetUnit: string | null }>
   >([]);
-  const [assignHabitId, setAssignHabitId] = useState("");
 
   function shiftTrackingDate(days: number) {
     if (!trackingDate) return;
@@ -1081,36 +1088,37 @@ function ClientWorkspacePage() {
             onShiftDate={shiftTrackingDate}
             habitCatalog={habitCatalog}
             clientHabits={clientHabits}
-            assignHabitId={assignHabitId}
-            onAssignHabitIdChange={setAssignHabitId}
             allowManage={allowManage}
-            onAssignHabit={() => {
-              void api(`${base}/habits`, {
-                method: "POST",
-                body: JSON.stringify({ habitDefinitionId: assignHabitId }),
-              })
-                .then(() => api<typeof clientHabits>(`${base}/habits`))
-                .then((rows) => {
-                  setClientHabits(rows);
-                  setAssignHabitId("");
-                  return api<NonNullable<typeof trackingSummary>>(
-                    `${base}/tracking/summary${trackingDate ? `?date=${trackingDate}` : ""}`,
-                  );
-                })
-                .then(setTrackingSummary)
-                .catch((err) => setError(errorMessage(err, "Unable to assign habit")));
+            onAssignHabit={async (habitDefinitionId) => {
+              try {
+                await api(`${base}/habits`, {
+                  method: "POST",
+                  body: JSON.stringify({ habitDefinitionId }),
+                });
+                const rows = await api<typeof clientHabits>(`${base}/habits`);
+                setClientHabits(rows);
+                const next = await api<NonNullable<typeof trackingSummary>>(
+                  `${base}/tracking/summary${trackingDate ? `?date=${trackingDate}` : ""}`,
+                );
+                setTrackingSummary(next);
+              } catch (err) {
+                setError(errorMessage(err, "Unable to assign habit"));
+                throw err;
+              }
             }}
-            onRemoveHabit={(habitDefinitionId) => {
-              void api(`${base}/habits/${habitDefinitionId}`, { method: "DELETE" })
-                .then(() => api<typeof clientHabits>(`${base}/habits`))
-                .then((rows) => {
-                  setClientHabits(rows);
-                  return api<NonNullable<typeof trackingSummary>>(
-                    `${base}/tracking/summary${trackingDate ? `?date=${trackingDate}` : ""}`,
-                  );
-                })
-                .then(setTrackingSummary)
-                .catch((err) => setError(errorMessage(err, "Unable to unassign habit")));
+            onRemoveHabit={async (habitDefinitionId) => {
+              try {
+                await api(`${base}/habits/${habitDefinitionId}`, { method: "DELETE" });
+                const rows = await api<typeof clientHabits>(`${base}/habits`);
+                setClientHabits(rows);
+                const next = await api<NonNullable<typeof trackingSummary>>(
+                  `${base}/tracking/summary${trackingDate ? `?date=${trackingDate}` : ""}`,
+                );
+                setTrackingSummary(next);
+              } catch (err) {
+                setError(errorMessage(err, "Unable to unassign habit"));
+                throw err;
+              }
             }}
             activities={timeline}
             activitiesLoading={timelineLoading}

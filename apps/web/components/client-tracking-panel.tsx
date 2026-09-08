@@ -21,6 +21,7 @@ import {
   typesForTimelineCategory,
   type TimelineCategoryId,
 } from "../lib/timeline-care";
+import { SearchIcon } from "./list-filters";
 import { useOverflowHint } from "../lib/use-overflow-hint";
 
 export type TrackingSummaryView = {
@@ -83,6 +84,8 @@ type HabitCatalogItem = {
   id: string;
   name: string;
   scope: string;
+  description?: string | null;
+  category?: string | null;
   defaultTargetValue: number | null;
   defaultTargetUnit: string | null;
 };
@@ -103,11 +106,9 @@ type Props = {
   onShiftDate: (days: number) => void;
   habitCatalog: HabitCatalogItem[];
   clientHabits: ClientHabit[];
-  assignHabitId: string;
-  onAssignHabitIdChange: (id: string) => void;
   allowManage: boolean;
-  onAssignHabit: () => void;
-  onRemoveHabit: (habitDefinitionId: string) => void;
+  onAssignHabit: (habitDefinitionId: string) => Promise<void> | void;
+  onRemoveHabit: (habitDefinitionId: string) => Promise<void> | void;
   activities: TrackingActivityRow[];
   activitiesLoading: boolean;
   activitiesPage: number;
@@ -143,6 +144,18 @@ function formatActivityDate(iso: string) {
     day: "2-digit",
     year: "numeric",
   });
+}
+
+function habitTargetLabel(habit: {
+  targetValue?: number | null;
+  targetUnit?: string | null;
+  defaultTargetValue?: number | null;
+  defaultTargetUnit?: string | null;
+}) {
+  const value = habit.targetValue ?? habit.defaultTargetValue;
+  const unit = habit.targetUnit ?? habit.defaultTargetUnit;
+  if (value == null) return null;
+  return `${value}${unit ? ` ${unit}` : ""}`;
 }
 
 function formatActivityTime(iso: string) {
@@ -190,8 +203,6 @@ export function ClientTrackingPanel({
   onShiftDate,
   habitCatalog,
   clientHabits,
-  assignHabitId,
-  onAssignHabitIdChange,
   allowManage,
   onAssignHabit,
   onRemoveHabit,
@@ -206,7 +217,8 @@ export function ClientTrackingPanel({
 }: Props) {
   const [openMeals, setOpenMeals] = useState<Record<string, boolean>>({});
   const [activityFilter, setActivityFilter] = useState<TimelineCategoryId>("all");
-  const [habitsOpen, setHabitsOpen] = useState(false);
+  const [habitQuery, setHabitQuery] = useState("");
+  const [pendingHabitId, setPendingHabitId] = useState<string | null>(null);
   const [infoFoodId, setInfoFoodId] = useState<string | null>(null);
   const mainHint = useOverflowHint();
   const railHint = useOverflowHint();
@@ -217,6 +229,12 @@ export function ClientTrackingPanel({
   const availableToAssign = habitCatalog.filter(
     (h) => !clientHabits.some((c) => c.habitDefinitionId === h.id),
   );
+  const habitNeedle = habitQuery.trim().toLowerCase();
+  const libraryHabits = availableToAssign.filter((habit) => {
+    if (!habitNeedle) return true;
+    const haystack = `${habit.name} ${habit.category ?? ""} ${habit.description ?? ""}`.toLowerCase();
+    return haystack.includes(habitNeedle);
+  });
 
   const macros = useMemo(() => {
     const p = summary?.food.presented;
@@ -246,6 +264,26 @@ export function ClientTrackingPanel({
   function mealOpen(category: string) {
     if (openMeals[category] != null) return openMeals[category]!;
     return true;
+  }
+
+  async function assignHabit(habitDefinitionId: string) {
+    if (!allowManage || pendingHabitId) return;
+    setPendingHabitId(habitDefinitionId);
+    try {
+      await onAssignHabit(habitDefinitionId);
+    } finally {
+      setPendingHabitId(null);
+    }
+  }
+
+  async function removeHabit(habitDefinitionId: string) {
+    if (!allowManage || pendingHabitId) return;
+    setPendingHabitId(habitDefinitionId);
+    try {
+      await onRemoveHabit(habitDefinitionId);
+    } finally {
+      setPendingHabitId(null);
+    }
   }
 
   return (
@@ -464,103 +502,118 @@ export function ClientTrackingPanel({
                   </section>
                 </div>
 
-                <section className="ui-track__card">
-                  <button
-                    type="button"
-                    className="ui-track__assign-toggle"
-                    aria-expanded={habitsOpen}
-                    onClick={() => setHabitsOpen((v) => !v)}
-                  >
-                    <span>
-                      <strong>Assign habits</strong>
-                      <span className="ui-muted">
-                        {clientHabits.length} assigned · patient completes in portal
-                      </span>
-                    </span>
-                    <span aria-hidden="true">{habitsOpen ? "▾" : "▸"}</span>
-                  </button>
-                  {habitsOpen ? (
-                    <div className="ui-track__assign-body">
-                      <div className="ui-track__assign-actions">
-                        <Link href={libraryHref} className="ui-btn ui-btn--secondary ui-btn--sm">
-                          Habit library
-                        </Link>
-                      </div>
-                      {habitCatalog.length === 0 ? (
-                        <EmptyState
-                          title="Habit library is empty"
-                          action={
-                            <Link href={libraryHref} className="ui-btn ui-btn--primary ui-btn--sm">
-                              Create habits
-                            </Link>
-                          }
-                        >
-                          Create habits in the library first, then assign them here.
-                        </EmptyState>
-                      ) : (
-                        <>
-                          <div className="ui-track__assign">
-                            <Field label="Assign from library">
-                              <Select
-                                value={assignHabitId}
-                                onChange={(e) => onAssignHabitIdChange(e.target.value)}
-                                disabled={!allowManage || availableToAssign.length === 0}
-                              >
-                                <option value="">
-                                  {availableToAssign.length === 0
-                                    ? "All library habits assigned"
-                                    : "Select a habit…"}
-                                </option>
-                                {availableToAssign.map((habit) => (
-                                  <option key={habit.id} value={habit.id}>
-                                    {habit.name}
-                                    {habit.scope === "global" ? " (global)" : ""}
-                                  </option>
-                                ))}
-                              </Select>
-                            </Field>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="secondary"
-                              disabled={!assignHabitId || !allowManage}
-                              onClick={onAssignHabit}
-                            >
-                              Assign to client
-                            </Button>
-                          </div>
-                          {clientHabits.length === 0 ? (
-                            <p className="ui-muted" style={{ margin: "0.75rem 0 0" }}>
-                              No habits assigned to this client yet.
-                            </p>
-                          ) : (
-                            <ul className="ui-track__assigned">
-                              {clientHabits.map((habit) => (
-                                <li key={habit.habitDefinitionId}>
-                                  <span>
-                                    {habit.name}
-                                    {habit.targetValue != null
-                                      ? ` · ${habit.targetValue}${habit.targetUnit ? ` ${habit.targetUnit}` : ""}`
-                                      : ""}
+                <section className="ui-track__card ui-track__assign-card">
+                  <header className="ui-track__card-head ui-track__card-head--assign">
+                    <div>
+                      <h3>Assign habits</h3>
+                      <p className="ui-muted">
+                        {clientHabits.length} on this client · completed in the patient portal
+                      </p>
+                    </div>
+                    <Link href={libraryHref} className="ui-btn ui-btn--secondary ui-btn--sm">
+                      Habit library
+                    </Link>
+                  </header>
+
+                  {habitCatalog.length === 0 ? (
+                    <EmptyState
+                      title="Habit library is empty"
+                      action={
+                        allowManage ? (
+                          <Link href={libraryHref} className="ui-btn ui-btn--primary ui-btn--sm">
+                            Create habits
+                          </Link>
+                        ) : undefined
+                      }
+                    >
+                      Create habits in the library first, then assign them here.
+                    </EmptyState>
+                  ) : (
+                    <div className="ui-track__assign-grid">
+                      <div className="ui-track__assign-col">
+                        <h4>On this client</h4>
+                        {clientHabits.length === 0 ? (
+                          <p className="ui-track__assign-empty">No habits assigned yet. Add from the library.</p>
+                        ) : (
+                          <ul className="ui-track__habit-rows">
+                            {clientHabits.map((habit) => {
+                              const target = habitTargetLabel(habit);
+                              const busy = pendingHabitId === habit.habitDefinitionId;
+                              return (
+                                <li key={habit.habitDefinitionId} className="ui-track__habit-row is-assigned">
+                                  <span className="ui-track__habit-copy">
+                                    <strong>{habit.name}</strong>
+                                    {target ? <span className="ui-muted">{target}</span> : null}
                                   </span>
                                   {allowManage ? (
                                     <Button
                                       type="button"
                                       size="sm"
                                       variant="ghost"
-                                      onClick={() => onRemoveHabit(habit.habitDefinitionId)}
+                                      disabled={busy || pendingHabitId != null}
+                                      onClick={() => void removeHabit(habit.habitDefinitionId)}
                                     >
-                                      Remove
+                                      {busy ? "Removing…" : "Remove"}
                                     </Button>
                                   ) : null}
                                 </li>
-                              ))}
-                            </ul>
-                          )}
-                        </>
-                      )}
+                              );
+                            })}
+                          </ul>
+                        )}
+                      </div>
+
+                      <div className="ui-track__assign-col">
+                        <h4>Library</h4>
+                        <label className="ui-track__assign-search">
+                          <SearchIcon />
+                          <input
+                            type="search"
+                            value={habitQuery}
+                            onChange={(event) => setHabitQuery(event.target.value)}
+                            placeholder="Search habits"
+                            autoComplete="off"
+                            aria-label="Search habit library"
+                          />
+                        </label>
+                        {availableToAssign.length === 0 ? (
+                          <p className="ui-track__assign-empty">All library habits are assigned to this client.</p>
+                        ) : libraryHabits.length === 0 ? (
+                          <p className="ui-track__assign-empty">No library habits match this search.</p>
+                        ) : (
+                          <ul className="ui-track__habit-rows">
+                            {libraryHabits.map((habit) => {
+                              const target = habitTargetLabel(habit);
+                              const busy = pendingHabitId === habit.id;
+                              return (
+                                <li key={habit.id} className="ui-track__habit-row">
+                                  <span className="ui-track__habit-copy">
+                                    <strong>{habit.name}</strong>
+                                    <span className="ui-muted">
+                                      {[habit.scope === "global" ? "Global" : "Clinic", target, habit.category]
+                                        .filter(Boolean)
+                                        .join(" · ")}
+                                    </span>
+                                  </span>
+                                  {allowManage ? (
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="secondary"
+                                      disabled={busy || pendingHabitId != null}
+                                      onClick={() => void assignHabit(habit.id)}
+                                    >
+                                      {busy ? "Assigning…" : "Assign"}
+                                    </Button>
+                                  ) : null}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        )}
+                      </div>
                     </div>
-                  ) : null}
+                  )}
                 </section>
               </div>
             )}
