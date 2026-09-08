@@ -9,6 +9,7 @@ import {
   Field,
   Input,
   LoadingState,
+  AppearanceToggle,
   PageHeader,
   PasswordInput,
   Section,
@@ -367,6 +368,13 @@ function ClientProfilePageInner() {
           </p>
         </div>
       </div>
+
+      <Section
+        title="Appearance"
+        description="Light, dark, or match this device. Saved in this browser for the clinic and patient portal."
+      >
+        <AppearanceToggle />
+      </Section>
 
       <Tabs items={PROFILE_TABS} value={tab} onChange={selectTab} variant="line" />
 

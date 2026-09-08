@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Alert, Button, LoadingState, PageHeader, Tabs } from "@nutrition-saas/ui";
+import { Alert, AppearanceToggle, Button, LoadingState, PageHeader, Section, Tabs } from "@nutrition-saas/ui";
 import { api } from "../../../../lib/api";
 import { errorMessage } from "../../../../lib/humanize-error";
 import { AccountTab } from "./account-tab";
@@ -128,6 +128,12 @@ function PracticeSettingsPageInner() {
           )
         }
       />
+      <Section
+        title="Appearance"
+        description="Light, dark, or match this device. Saved in this browser for the clinic and patient portal."
+      >
+        <AppearanceToggle />
+      </Section>
       <Tabs items={[...PROFILE_TABS]} value={tab} onChange={setTab} variant="line" />
       {tab === "profile" ? (
         <ProfileTab dietitianAccountId={dietitianAccountId} profile={profile} onProfile={setProfile} {...editor} />

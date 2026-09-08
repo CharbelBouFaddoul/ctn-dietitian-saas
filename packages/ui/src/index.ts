@@ -29,6 +29,18 @@ export { Dialog, ConfirmDialog, Dropdown, DropdownItem } from "./overlay";
 export { ToastProvider, useToast, Toast } from "./toast";
 export { AppShell, Sidebar } from "./app-shell";
 export type { NavItem, NavSection, ShellLink } from "./app-shell";
+export {
+  APPEARANCE_BOOTSTRAP_SCRIPT,
+  APPEARANCE_PREFERENCES,
+  APPEARANCE_STORAGE_KEY,
+  applyAppearance,
+  parseAppearancePreference,
+  readAppearancePreference,
+  resolveAppearance,
+  writeAppearancePreference,
+} from "./appearance";
+export type { AppearancePreference, AppearanceResolved } from "./appearance";
+export { AppearanceToggle, useAppearance } from "./appearance-toggle";
 export { MarketingShell, AuthLayout } from "./marketing";
 export type {
   MarketingSiteSettings,

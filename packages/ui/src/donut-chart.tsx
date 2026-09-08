@@ -145,7 +145,7 @@ export function DonutChart({
                   key={arc.label}
                   d={wedgePath(cx, cy, innerR, outerR, start, end)}
                   fill={arc.color}
-                  stroke="#fff"
+                  stroke="var(--color-surface)"
                   strokeWidth={1}
                   paintOrder="fill stroke"
                   className={`ui-donut__slice${interactive ? "" : " ui-donut__slice--static"}${active && active !== arc.label ? " is-dim" : ""}${active === arc.label ? " is-active" : ""}`}

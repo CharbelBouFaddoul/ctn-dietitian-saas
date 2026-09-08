@@ -2,6 +2,7 @@
 
 import type { ComponentType, ReactNode } from "react";
 import { useEffect, useState } from "react";
+import { AppearanceToggle } from "./appearance-toggle";
 import { Button } from "./button";
 import { cn } from "./cn";
 
@@ -158,7 +159,13 @@ export function AppShell({
         </div>
         <div className="ui-app__topbar-actions">
           {topbarActions}
-          <Button variant="secondary" size="sm" onClick={() => setOpen(true)} aria-label="Open navigation">
+          <Button
+            variant="secondary"
+            size="sm"
+            className="ui-app__menu-btn"
+            onClick={() => setOpen(true)}
+            aria-label="Open navigation"
+          >
             Menu
           </Button>
         </div>
@@ -181,6 +188,7 @@ export function AppShell({
               <p className="ui-app__brand">{brand}</p>
               {meta ? <p className="ui-app__meta">{meta}</p> : null}
             </div>
+            {theme === "practice" || theme === "client" ? <AppearanceToggle variant="menu" /> : null}
             <button
               type="button"
               className="ui-app__drawer-close"

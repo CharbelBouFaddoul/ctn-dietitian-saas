@@ -17,7 +17,7 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src --max-warnings=0",
-    "test": "node --experimental-strip-types --test src/humanize.test.ts"
+    "test": "node --experimental-strip-types --test src/humanize.test.ts src/appearance.test.ts"
   },
   "peerDependencies": {
     "react": "^19.0.0",
