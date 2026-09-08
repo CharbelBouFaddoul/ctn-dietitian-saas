@@ -17,6 +17,11 @@ function parseCalendarDate(value: string | Date): Date | null {
     const date = new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]));
     return Number.isNaN(date.getTime()) ? null : date;
   }
+  const monthOnly = /^(\d{4})-(\d{2})$/.exec(value.trim());
+  if (monthOnly) {
+    const date = new Date(Number(monthOnly[1]), Number(monthOnly[2]) - 1, 1);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
 }

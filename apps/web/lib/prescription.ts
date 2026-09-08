@@ -592,6 +592,9 @@ export const AMDR = {
   protein: { min: 10, max: 35 },
 } as const;
 
+/** IOM adequate intake for dietary fiber in adults (g/day). */
+export const FIBER_AI = { min: 25, max: 38 } as const;
+
 export const DEFAULT_MACRO_SPLIT = { fatPct: 30, carbPct: 50, proteinPct: 20 } as const;
 
 export type MacroGrams = {
@@ -624,48 +627,6 @@ export function gramsPerKg(grams: number | null, weightKg: number | null): numbe
   const w = num(weightKg);
   if (g == null || w == null || w <= 0) return null;
   return round(g / w, 2);
-}
-
-// ── Dietary fiber ─────────────────────────────────────────────────────────────
-
-// ── Fiber references ─────────────────────────────────────────────────────────
-
-export type FiberSourceId = "iom" | "sacn" | "anses" | "sinu" | "nhmrc";
-
-export const FIBER_SOURCES: Array<{ id: FiberSourceId; label: string; note: string }> = [
-  { id: "iom", label: "IOM / FNB 2005", note: "14 g / 1000 kcal" },
-  { id: "sacn", label: "SACN 2015", note: "30 g / day" },
-  { id: "anses", label: "ANSES 2016", note: "30 g / day" },
-  { id: "sinu", label: "SINU 2014", note: "25 g / day" },
-  { id: "nhmrc", label: "NHMRC 2006 (2017)", note: "30 g men / 25 g women" },
-];
-
-export const DEFAULT_FIBER_SOURCE: FiberSourceId = "iom";
-
-/**
- * Reference daily fiber intake by authority. IOM scales with energy
- * (14 g / 1000 kcal); the others are fixed adequate-intake targets.
- */
-export function fiberReferenceG(
-  source: string,
-  energyKcal: number | null,
-  sex: PrescriptionSex | null | undefined,
-): number | null {
-  switch (source as FiberSourceId) {
-    case "sacn":
-    case "anses":
-      return 30;
-    case "sinu":
-      return 25;
-    case "nhmrc":
-      return sex === "FEMALE" ? 25 : 30;
-    case "iom":
-    default: {
-      const energy = num(energyKcal);
-      if (energy == null || energy <= 0) return null;
-      return round((energy / 1000) * 14, 1);
-    }
-  }
 }
 
 // ── Activity / MET builder (factorial PAL method) ────────────────────────────

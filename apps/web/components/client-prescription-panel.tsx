@@ -20,11 +20,10 @@ import {
   DEFAULT_BMR_FORMULA,
   DEFAULT_BODY_FAT_CONVERSION,
   DEFAULT_ENERGY_FORMULA,
-  DEFAULT_FIBER_SOURCE,
   DEFAULT_MACRO_SPLIT,
   DEFAULT_PAL_KEY,
   ENERGY_FORMULAS,
-  FIBER_SOURCES,
+  FIBER_AI,
   MACRO_PRESETS,
   PAL_OPTIONS,
   bmiCategory,
@@ -34,7 +33,6 @@ import {
   computeBodyFat,
   computeEer,
   computeTdee,
-  fiberReferenceG,
   gramsPerKg,
   healthyWeightRange,
   macroGramsFromEnergy,
@@ -80,8 +78,6 @@ const MACRO_COLORS = {
   carbohydrate: "#e89a6a",
   protein: "#4f8fe0",
 } as const;
-
-const FIBER_COLOR = "#1f9a82";
 
 type MacroSplit = { fatPct: number; carbPct: number; proteinPct: number };
 type MacroKey = keyof MacroSplit;
@@ -129,26 +125,54 @@ function numberOrNull(raw: string): number | null {
   return Number.isFinite(value) && value >= 0 ? value : null;
 }
 
-/** Human label for the months between two YYYY-MM values. */
+/** YYYY-MM-DD for `<input type="date">`; maps legacy YYYY-MM values to the 1st. */
+function dateFieldValue(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+  const month = /^(\d{4})-(\d{2})$/.exec(trimmed);
+  return month ? `${month[1]}-${month[2]}-01` : "";
+}
+
+function parsePlanDate(value: string): Date | null {
+  const input = dateFieldValue(value);
+  if (!input) return null;
+  const [year, month, day] = input.split("-").map(Number);
+  const date = new Date(year ?? 0, (month ?? 1) - 1, day ?? 1);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/** Human label for the span between two plan dates. */
 function planLengthLabel(begin: string, finish: string): string {
-  const parse = (value: string): number | null => {
-    const match = /^(\d{4})-(\d{2})$/.exec(value.trim());
-    if (!match) return null;
-    return Number(match[1]) * 12 + Number(match[2]);
-  };
-  const a = parse(begin);
-  const b = parse(finish);
-  if (a == null || b == null) return "—";
-  const months = b - a;
-  if (months <= 0) return "—";
+  const start = parsePlanDate(begin);
+  const end = parsePlanDate(finish);
+  if (!start || !end) return "—";
+  const days = Math.round((end.getTime() - start.getTime()) / 86_400_000);
+  if (days <= 0) return "—";
+  if (days < 14) return `${days} d`;
+  if (days < 60) {
+    const weeks = Math.floor(days / 7);
+    const rest = days % 7;
+    return rest === 0 ? `${weeks} wk` : `${weeks} wk ${rest} d`;
+  }
+  const months = Math.round(days / 30.44);
   if (months < 12) return `${months} mo`;
   const years = Math.floor(months / 12);
   const rest = months % 12;
   return rest === 0 ? `${years} yr` : `${years} yr ${rest} mo`;
 }
 
-function fiberSourceNote(sourceId: string): string {
-  return FIBER_SOURCES.find((source) => source.id === sourceId)?.note ?? "14 g / 1000 kcal";
+function nearestPalBand(pal: number): string | null {
+  let best: (typeof PAL_OPTIONS)[number] | null = null;
+  let distance = Infinity;
+  for (const option of PAL_OPTIONS) {
+    const next = Math.abs(option.value - pal);
+    if (next < distance) {
+      best = option;
+      distance = next;
+    }
+  }
+  return best?.label ?? null;
 }
 
 function categoryTone(category: string | null): "success" | "warning" | "danger" | "neutral" {
@@ -296,9 +320,7 @@ export function ClientPrescriptionPanel({ base, allowManage, client, latestMeasu
   };
   const macroGrams = macroGramsFromEnergy(energyGoal, macro);
   const macroSum = roundTenth(macro.fatPct + macro.carbPct + macro.proteinPct);
-  const fiberSource = rx.fiberSource || DEFAULT_FIBER_SOURCE;
-  const fiberRef = fiberReferenceG(fiberSource, energyGoal, inputs.sex);
-  const fiberGoal = rx.fiberGoalG ?? fiberRef;
+  const fiberPerKg = gramsPerKg(rx.fiberGoalG, weightKg);
 
   const weightDelta =
     weightKg != null && rx.weightGoalKg != null ? Math.round((rx.weightGoalKg - weightKg) * 10) / 10 : null;
@@ -338,7 +360,7 @@ export function ClientPrescriptionPanel({ base, allowManage, client, latestMeasu
             fatG: grams.fatG,
             carbohydrateG: grams.carbohydrateG,
             proteinG: grams.proteinG,
-            fiberG: next.prescription.fiberGoalG ?? fiberRef ?? null,
+            fiberG: next.prescription.fiberGoalG ?? null,
           },
         },
       };
@@ -401,6 +423,16 @@ export function ClientPrescriptionPanel({ base, allowManage, client, latestMeasu
   function applyActivities(activities: PrescriptionActivity[], pal: number | null) {
     patchRx({ activities, palCurrentValue: pal });
     setActivityOpen(false);
+  }
+
+  function selectActivityMode(mode: "band" | "day") {
+    if (mode === "band") {
+      if (rx.palCurrentValue != null) patchRx({ palCurrentValue: null });
+      return;
+    }
+    if (rx.palCurrentValue != null) return;
+    const activities = typicalDayActivities(rx.activities);
+    patchRx({ activities, palCurrentValue: palFromActivities(activities) });
   }
 
   return (
@@ -530,13 +562,29 @@ export function ClientPrescriptionPanel({ base, allowManage, client, latestMeasu
           {/* Activity level */}
           <Row
             name="Activity level"
+            method={
+              <ActivityModeToggle
+                mode={rx.palCurrentValue != null ? "day" : "band"}
+                readOnly={readOnly}
+                onChange={selectActivityMode}
+              />
+            }
             current={
               <span className="ui-prescription__activity">
                 {rx.palCurrentValue != null ? (
-                  <Value>
-                    PAL {fmt(rx.palCurrentValue, 2)}
-                    <Badge tone="neutral">from activities</Badge>
-                  </Value>
+                  <>
+                    <Value>
+                      PAL {fmt(rx.palCurrentValue, 2)}
+                      {nearestPalBand(rx.palCurrentValue) ? (
+                        <span className="ui-prescription__activity-hint">≈ {nearestPalBand(rx.palCurrentValue)}</span>
+                      ) : null}
+                    </Value>
+                    {!readOnly ? (
+                      <button type="button" className="ui-prescription__link" onClick={() => setActivityOpen(true)}>
+                        Edit typical day
+                      </button>
+                    ) : null}
+                  </>
                 ) : (
                   <SelectField
                     readOnly={readOnly}
@@ -546,26 +594,6 @@ export function ClientPrescriptionPanel({ base, allowManage, client, latestMeasu
                     badge={`PAL ${palValue(palCurrent)}`}
                   />
                 )}
-                {!readOnly ? (
-                  <span className="ui-prescription__activity-actions">
-                    <button
-                      type="button"
-                      className="ui-prescription__link"
-                      onClick={() => setActivityOpen(true)}
-                    >
-                      {rx.palCurrentValue != null ? "Recalculate" : "Calculate from activities"}
-                    </button>
-                    {rx.palCurrentValue != null ? (
-                      <button
-                        type="button"
-                        className="ui-prescription__link ui-prescription__link--muted"
-                        onClick={() => patchRx({ palCurrentValue: null })}
-                      >
-                        Use band
-                      </button>
-                    ) : null}
-                  </span>
-                ) : null}
               </span>
             }
             goal={
@@ -577,7 +605,7 @@ export function ClientPrescriptionPanel({ base, allowManage, client, latestMeasu
                 badge={`PAL ${palValue(palGoal)}`}
               />
             }
-            reference={<Value muted>—</Value>}
+            reference={<Value muted>1.2–2.2</Value>}
           />
 
           {/* BMR */}
@@ -733,44 +761,31 @@ export function ClientPrescriptionPanel({ base, allowManage, client, latestMeasu
                 onBeginEdit={pushMacroHistory}
                 onPct={(v) => setMacroPct("proteinPct", v)}
               />
-              {/* Fiber */}
-              <div className="ui-prescription__row ui-prescription__row--macro" role="row">
-                <span className="ui-prescription__cell ui-prescription__cell--metric ui-prescription__cell--fiber">
-                  <span className="ui-prescription__metric-head">
-                    <span className="ui-prescription__dot" style={{ backgroundColor: FIBER_COLOR }} aria-hidden="true" />
-                    <span className="ui-prescription__name">Dietary fiber</span>
-                  </span>
-                  <MethodSelect
-                    readOnly={readOnly}
-                    ariaLabel="Fiber reference source"
-                    value={fiberSource}
-                    onChange={(value) => patchRx({ fiberSource: value })}
-                  >
-                    {FIBER_SOURCES.map((source) => (
-                      <option key={source.id} value={source.id}>
-                        {source.label} · {source.note}
-                      </option>
-                    ))}
-                  </MethodSelect>
-                </span>
-                <span className="ui-prescription__cell" data-label="% of energy">
-                  <Value muted>—</Value>
-                </span>
-                <span className="ui-prescription__cell" data-label="Amount">
-                  <NumberField
-                    readOnly={readOnly}
-                    value={rx.fiberGoalG}
-                    unit="g"
-                    placeholder={fiberRef != null ? `${fmt(fiberRef)}` : "g"}
-                    onChange={(v) => patchRx({ fiberGoalG: v })}
-                  />
-                </span>
-                <span className="ui-prescription__cell" data-label="Reference">
-                  <Value muted>{fiberRef != null ? `${fmt(fiberRef)} g` : fiberSourceNote(fiberSource)}</Value>
-                </span>
-              </div>
             </div>
             <div className="ui-prescription__macro-foot">
+              <label className="ui-prescription__perkg">
+                <span className="ui-prescription__perkg-copy">
+                  <span className="ui-prescription__perkg-label">Dietary fiber</span>
+                  <span className="ui-prescription__perkg-hint">
+                    {fiberPerKg != null
+                      ? `${fmt(fiberPerKg, 2)} g/kg · typical ${FIBER_AI.min}–${FIBER_AI.max} g/day`
+                      : `Typical adult intake ${FIBER_AI.min}–${FIBER_AI.max} g/day`}
+                  </span>
+                </span>
+                <span className="ui-prescription__field ui-prescription__perkg-input">
+                  <Input
+                    type="number"
+                    min={0}
+                    step="0.1"
+                    inputMode="decimal"
+                    disabled={readOnly}
+                    value={rx.fiberGoalG ?? ""}
+                    placeholder="28"
+                    onChange={(event) => patchRx({ fiberGoalG: numberOrNull(event.target.value) })}
+                  />
+                  <span className="ui-prescription__unit">g</span>
+                </span>
+              </label>
               <label className="ui-prescription__perkg">
                 <span className="ui-prescription__perkg-copy">
                   <span className="ui-prescription__perkg-label">Prescribe protein by body weight</span>
@@ -832,9 +847,9 @@ export function ClientPrescriptionPanel({ base, allowManage, client, latestMeasu
           <label className="ui-prescription__duration-card">
             <span className="ui-prescription__duration-label">Begin</span>
             <Input
-              type="month"
+              type="date"
               disabled={readOnly}
-              value={rx.beginDate}
+              value={dateFieldValue(rx.beginDate)}
               onChange={(event) => patchRx({ beginDate: event.target.value })}
             />
           </label>
@@ -849,9 +864,9 @@ export function ClientPrescriptionPanel({ base, allowManage, client, latestMeasu
           <label className="ui-prescription__duration-card">
             <span className="ui-prescription__duration-label">Forecast finish</span>
             <Input
-              type="month"
+              type="date"
               disabled={readOnly}
-              value={rx.forecastFinishDate}
+              value={dateFieldValue(rx.forecastFinishDate)}
               onChange={(event) => patchRx({ forecastFinishDate: event.target.value })}
             />
           </label>
@@ -1015,6 +1030,44 @@ function MethodSelect({
   );
 }
 
+function ActivityModeToggle({
+  mode,
+  readOnly,
+  onChange,
+}: {
+  mode: "band" | "day";
+  readOnly: boolean;
+  onChange: (mode: "band" | "day") => void;
+}) {
+  return (
+    <span className="ui-prescription__method">
+      <span className="ui-prescription__method-label">How to set current</span>
+      <span className="ui-segment ui-prescription__activity-mode" role="tablist" aria-label="How to set current activity level">
+        <button
+          type="button"
+          role="tab"
+          className={`ui-segment__btn${mode === "band" ? " is-active" : ""}`}
+          disabled={readOnly}
+          aria-selected={mode === "band"}
+          onClick={() => onChange("band")}
+        >
+          Lifestyle
+        </button>
+        <button
+          type="button"
+          role="tab"
+          className={`ui-segment__btn${mode === "day" ? " is-active" : ""}`}
+          disabled={readOnly}
+          aria-selected={mode === "day"}
+          onClick={() => onChange("day")}
+        >
+          Typical day
+        </button>
+      </span>
+    </span>
+  );
+}
+
 function Value({ children, muted }: { children: ReactNode; muted?: boolean }) {
   return <span className={muted ? "ui-prescription__value ui-prescription__value--muted" : "ui-prescription__value"}>{children}</span>;
 }
@@ -1087,9 +1140,20 @@ function nextRowId(): string {
 }
 
 const COMPENDIUM_LABEL = new Map(ACTIVITY_COMPENDIUM.map((a) => [a.key, a.label]));
+const COMPENDIUM_GROUP = new Map(ACTIVITY_COMPENDIUM.map((a) => [a.key, a.group]));
 
 function activityLabel(key: string): string {
   return COMPENDIUM_LABEL.get(key) ?? "Custom activity";
+}
+
+function activityGroup(key: string): string {
+  return COMPENDIUM_GROUP.get(key) ?? "Other";
+}
+
+function formatLoggedTime(totalMin: number): string {
+  const hours = Math.floor(Math.max(0, totalMin) / 60);
+  const mins = Math.round(Math.max(0, totalMin) % 60);
+  return `${hours}h ${String(mins).padStart(2, "0")}m`;
 }
 
 const DEFAULT_DAY: Array<{ key: string; minutes: number }> = [
@@ -1104,6 +1168,15 @@ const DEFAULT_DAY: Array<{ key: string; minutes: number }> = [
   { key: "tv", minutes: 240 },
 ];
 
+function typicalDayActivities(existing: PrescriptionActivity[]): PrescriptionActivity[] {
+  if (existing.length > 0) return existing;
+  return DEFAULT_DAY.map((entry) => ({
+    key: entry.key,
+    met: compendiumMet(entry.key),
+    minutes: entry.minutes,
+  }));
+}
+
 function seedRows(initial: PrescriptionActivity[]): ActivityRow[] {
   const source =
     initial.length > 0
@@ -1111,8 +1184,6 @@ function seedRows(initial: PrescriptionActivity[]): ActivityRow[] {
       : DEFAULT_DAY.map((entry) => ({ key: entry.key, met: compendiumMet(entry.key), minutes: entry.minutes }));
   return source.map((entry) => ({ id: nextRowId(), ...entry }));
 }
-
-const PICKER_PAGE_SIZE = 7;
 
 function ActivityDialog({
   open,
@@ -1128,15 +1199,12 @@ function ActivityDialog({
   const [rows, setRows] = useState<ActivityRow[]>(() => seedRows(initial));
   const [adding, setAdding] = useState(false);
   const [query, setQuery] = useState("");
-  const [page, setPage] = useState(0);
 
-  // Reseed whenever the dialog is (re)opened so it reflects saved data.
   useEffect(() => {
     if (open) {
       setRows(seedRows(initial));
       setAdding(false);
       setQuery("");
-      setPage(0);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -1144,19 +1212,9 @@ function ActivityDialog({
   const entries: PrescriptionActivity[] = rows.map((r) => ({ key: r.key, met: r.met, minutes: r.minutes }));
   const pal = palFromActivities(entries);
   const totalMin = totalActivityMinutes(entries);
-  const totalLabel = `${Math.floor(totalMin / 60)}h ${String(Math.round(totalMin % 60)).padStart(2, "0")}m`;
   const dayComplete = Math.abs(totalMin - 1440) <= 15;
-
-  const matches = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const list = q
-      ? ACTIVITY_COMPENDIUM.filter((a) => a.label.toLowerCase().includes(q) || a.group.toLowerCase().includes(q))
-      : ACTIVITY_COMPENDIUM;
-    return list;
-  }, [query]);
-
-  const pageCount = Math.max(1, Math.ceil(matches.length / PICKER_PAGE_SIZE));
-  const pageItems = matches.slice(page * PICKER_PAGE_SIZE, page * PICKER_PAGE_SIZE + PICKER_PAGE_SIZE);
+  const progressPct = Math.min(100, (totalMin / 1440) * 100);
+  const bandHint = pal != null ? nearestPalBand(pal) : null;
 
   function setRow(id: string, patch: Partial<ActivityRow>) {
     setRows((prev) => prev.map((row) => (row.id === id ? { ...row, ...patch } : row)));
@@ -1170,49 +1228,58 @@ function ActivityDialog({
     setRows((prev) => prev.filter((row) => row.id !== id));
   }
 
-  function addActivity(activity: ActivityMet, minutes: number) {
-    setRows((prev) => [...prev, { id: nextRowId(), key: activity.key, met: activity.met, minutes }]);
+  function addActivity(activity: ActivityMet) {
+    setRows((prev) => {
+      const existing = prev.find((row) => row.key === activity.key);
+      if (existing) {
+        return prev.map((row) =>
+          row.id === existing.id ? { ...row, minutes: (row.minutes ?? 0) + 30 } : row,
+        );
+      }
+      return [...prev, { id: nextRowId(), key: activity.key, met: activity.met, minutes: 30 }];
+    });
+    setAdding(false);
   }
-
-  function openPicker() {
-    setQuery("");
-    setPage(0);
-    setAdding(true);
-  }
-
-  const title = adding ? "Add physical activity" : "Build activity level (PAL)";
 
   return (
-    <Dialog open={open} title={title} onClose={onClose} className="ui-activity-dialog">
+    <Dialog
+      open={open}
+      title={adding ? "Add activity" : "Typical day"}
+      onClose={onClose}
+      className="ui-activity-dialog"
+    >
       {adding ? (
-        <ActivityPicker
-          items={pageItems}
-          query={query}
-          page={page}
-          pageCount={pageCount}
-          onQuery={(value) => {
-            setQuery(value);
-            setPage(0);
-          }}
-          onPage={setPage}
-          onAdd={addActivity}
-          onBack={() => setAdding(false)}
-        />
+        <ActivityPicker query={query} onQuery={setQuery} onAdd={addActivity} onBack={() => setAdding(false)} />
       ) : (
-        <>
-          <p className="ui-activity__intro">
-            Log a typical 24-hour day. PAL is the time-weighted average of each activity&apos;s MET value — a more
-            precise alternative to the activity band. MET values follow the Compendium of Physical Activities.
-          </p>
+        <div className="ui-activity">
+          <div className="ui-activity__hero">
+            <div className="ui-activity__stat">
+              <span className="ui-activity__stat-label">Logged</span>
+              <strong className={dayComplete ? undefined : "is-warn"}>{formatLoggedTime(totalMin)}</strong>
+              <span className="ui-activity__stat-hint">of 24h 00m</span>
+            </div>
+            <div className="ui-activity__stat">
+              <span className="ui-activity__stat-label">Activity level</span>
+              <strong>{pal != null ? pal.toFixed(2) : "—"}</strong>
+              <span className="ui-activity__stat-hint">{bandHint ? `≈ ${bandHint}` : "PAL from this day"}</span>
+            </div>
+            <div className="ui-activity__meter" aria-hidden="true">
+              <span className="ui-activity__meter-label">24-hour day</span>
+              <span className={`ui-activity__meter-track${dayComplete ? "" : " is-short"}`}>
+                <span className="ui-activity__meter-fill" style={{ width: `${progressPct}%` }} />
+              </span>
+            </div>
+          </div>
+
           <div className="ui-activity__table" role="table">
             <div className="ui-activity__hrow" role="row">
               <span>Activity</span>
-              <span>Time (h : m)</span>
+              <span>Duration</span>
               <span>MET</span>
-              <span aria-hidden="true" />
+              <span className="ui-activity__sr-only">Remove</span>
             </div>
             {rows.length === 0 ? (
-              <p className="ui-activity__empty">No activities yet — add one below.</p>
+              <p className="ui-activity__empty">No activities yet. Add sleep, work, and movement to fill the day.</p>
             ) : (
               rows.map((row) => {
                 const hours = Math.floor((row.minutes ?? 0) / 60);
@@ -1220,8 +1287,11 @@ function ActivityDialog({
                 const isCustom = !COMPENDIUM_LABEL.has(row.key) || row.key === "other";
                 return (
                   <div className="ui-activity__row" role="row" key={row.id}>
-                    <span className="ui-activity__name" title={activityLabel(row.key)}>
-                      {activityLabel(row.key)}
+                    <span className="ui-activity__identity">
+                      <span className="ui-activity__name" title={activityLabel(row.key)}>
+                        {activityLabel(row.key)}
+                      </span>
+                      <span className="ui-activity__group">{activityGroup(row.key)}</span>
                     </span>
                     <span className="ui-activity__time">
                       <Input
@@ -1229,193 +1299,162 @@ function ActivityDialog({
                         min={0}
                         max={24}
                         step={1}
-                        aria-label="Hours"
+                        aria-label={`${activityLabel(row.key)} hours`}
                         value={hours}
                         onChange={(event) => setMinutes(row.id, numberOrNull(event.target.value) ?? 0, mins)}
                       />
-                      <span className="ui-activity__colon">:</span>
+                      <span className="ui-activity__unit">h</span>
                       <Input
                         type="number"
                         min={0}
                         max={59}
                         step={5}
-                        aria-label="Minutes"
+                        aria-label={`${activityLabel(row.key)} minutes`}
                         value={mins}
                         onChange={(event) => setMinutes(row.id, hours, numberOrNull(event.target.value) ?? 0)}
                       />
+                      <span className="ui-activity__unit">m</span>
                     </span>
                     <span className="ui-activity__met">
-                      <Input
-                        type="number"
-                        min={0}
-                        step="0.1"
-                        aria-label="MET"
-                        disabled={!isCustom}
-                        value={row.met ?? ""}
-                        onChange={(event) => setRow(row.id, { met: numberOrNull(event.target.value) })}
-                      />
+                      {isCustom ? (
+                        <Input
+                          type="number"
+                          min={0}
+                          step="0.1"
+                          aria-label={`${activityLabel(row.key)} MET`}
+                          value={row.met ?? ""}
+                          onChange={(event) => setRow(row.id, { met: numberOrNull(event.target.value) })}
+                        />
+                      ) : (
+                        <span>{row.met != null ? row.met.toFixed(1) : "—"}</span>
+                      )}
                     </span>
                     <button
                       type="button"
                       className="ui-activity__remove"
-                      aria-label="Remove activity"
+                      aria-label={`Remove ${activityLabel(row.key)}`}
                       onClick={() => removeRow(row.id)}
                     >
-                      ×
+                      Remove
                     </button>
                   </div>
                 );
               })
             )}
           </div>
-          <button type="button" className="ui-activity__add" onClick={openPicker}>
-            + Add new physical activity component
-          </button>
+
+          <div className="ui-activity__toolbar">
+            <button
+              type="button"
+              className="ui-activity__add"
+              onClick={() => {
+                setQuery("");
+                setAdding(true);
+              }}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              Add activity
+            </button>
+            {!dayComplete ? (
+              <span className="ui-activity__balance">
+                {totalMin < 1440
+                  ? `${formatLoggedTime(1440 - totalMin)} still needed`
+                  : `${formatLoggedTime(totalMin - 1440)} over 24h`}
+              </span>
+            ) : (
+              <span className="ui-activity__balance is-ok">Day adds up to 24 hours</span>
+            )}
+          </div>
+
           <div className="ui-activity__foot">
-            <div className="ui-activity__summary">
-              <span className={`ui-activity__total${dayComplete ? "" : " ui-activity__total--warn"}`}>
-                {totalLabel} logged
-              </span>
-              <span className="ui-activity__pal">
-                PAL <strong>{pal != null ? pal.toFixed(3) : "—"}</strong>
-              </span>
-            </div>
+            <p className="ui-activity__note">
+              PAL is the time-weighted average MET for this day. Goal activity still uses a lifestyle band.
+            </p>
             <div className="ui-activity__buttons">
               <Button variant="secondary" onClick={onClose}>
                 Cancel
               </Button>
               <Button variant="primary" disabled={pal == null} onClick={() => onApply(entries, pal)}>
-                Set PAL
+                Use this PAL
               </Button>
             </div>
           </div>
-        </>
+        </div>
       )}
     </Dialog>
   );
 }
 
 function ActivityPicker({
-  items,
   query,
-  page,
-  pageCount,
   onQuery,
-  onPage,
   onAdd,
   onBack,
 }: {
-  items: ActivityMet[];
   query: string;
-  page: number;
-  pageCount: number;
   onQuery: (value: string) => void;
-  onPage: (page: number) => void;
-  onAdd: (activity: ActivityMet, minutes: number) => void;
+  onAdd: (activity: ActivityMet) => void;
   onBack: () => void;
 }) {
-  // Per-visible-row draft duration + unit, keyed by activity key.
-  const [drafts, setDrafts] = useState<Record<string, { amount: number; unit: "minutes" | "hours" }>>({});
-
-  function draftFor(key: string) {
-    return drafts[key] ?? { amount: 20, unit: "minutes" as const };
-  }
-
-  function setDraft(key: string, patch: Partial<{ amount: number; unit: "minutes" | "hours" }>) {
-    setDrafts((prev) => ({ ...prev, [key]: { ...draftFor(key), ...patch } }));
-  }
-
-  function add(activity: ActivityMet) {
-    const d = draftFor(activity.key);
-    const minutes = d.unit === "hours" ? Math.round(d.amount * 60) : Math.round(d.amount);
-    if (minutes > 0) onAdd(activity, minutes);
-  }
+  const grouped = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const list = q
+      ? ACTIVITY_COMPENDIUM.filter((a) => a.label.toLowerCase().includes(q) || a.group.toLowerCase().includes(q))
+      : ACTIVITY_COMPENDIUM;
+    const map = new Map<string, ActivityMet[]>();
+    for (const activity of list) {
+      const next = map.get(activity.group) ?? [];
+      next.push(activity);
+      map.set(activity.group, next);
+    }
+    return Array.from(map.entries());
+  }, [query]);
 
   return (
     <div className="ui-activity-picker">
+      <div className="ui-activity-picker__head">
+        <button type="button" className="ui-activity-picker__back" onClick={onBack}>
+          Typical day
+        </button>
+        <p className="ui-activity-picker__lead">Adds 30 minutes — adjust duration on the day log.</p>
+      </div>
       <div className="ui-activity-picker__search">
         <Input
           type="search"
-          placeholder="Search physical activity"
+          placeholder="Search sleep, work, walking…"
           value={query}
           autoFocus
           onChange={(event) => onQuery(event.target.value)}
         />
       </div>
       <div className="ui-activity-picker__list">
-        {items.length === 0 ? (
+        {grouped.length === 0 ? (
           <p className="ui-activity__empty">No activities match “{query}”.</p>
         ) : (
-          items.map((activity) => {
-            const d = draftFor(activity.key);
-            return (
-              <div className="ui-activity-picker__row" key={activity.key}>
-                <div className="ui-activity-picker__qty">
-                  <Input
-                    type="number"
-                    min={0}
-                    step={5}
-                    aria-label="Duration"
-                    value={d.amount}
-                    onChange={(event) => setDraft(activity.key, { amount: numberOrNull(event.target.value) ?? 0 })}
-                  />
-                  <Select
-                    aria-label="Unit"
-                    value={d.unit}
-                    onChange={(event) => setDraft(activity.key, { unit: event.target.value as "minutes" | "hours" })}
+          grouped.map(([group, activities]) => (
+            <section className="ui-activity-picker__section" key={group}>
+              <h3 className="ui-activity-picker__group">{group}</h3>
+              {activities.map((activity) => (
+                <div className="ui-activity-picker__row" key={activity.key}>
+                  <span className="ui-activity-picker__info">
+                    <span className="ui-activity-picker__name">{activity.label}</span>
+                    <span className="ui-activity-picker__met">{activity.met.toFixed(1)} MET</span>
+                  </span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => onAdd(activity)}
                   >
-                    <option value="minutes">minutes</option>
-                    <option value="hours">hours</option>
-                  </Select>
+                    Add
+                  </Button>
                 </div>
-                <div className="ui-activity-picker__info">
-                  <span className="ui-activity-picker__name">{activity.label}</span>
-                  <span className="ui-activity-picker__source">Compendium of physical activities</span>
-                </div>
-                <span className="ui-activity-picker__met">
-                  <strong>{activity.met.toFixed(1)}</strong>
-                  <span>MET</span>
-                </span>
-                <button
-                  type="button"
-                  className="ui-activity-picker__add"
-                  aria-label={`Add ${activity.label}`}
-                  onClick={() => add(activity)}
-                >
-                  +
-                </button>
-              </div>
-            );
-          })
+              ))}
+            </section>
+          ))
         )}
-      </div>
-      <div className="ui-activity-picker__foot">
-        <Button variant="secondary" onClick={onBack}>
-          ← Back to day
-        </Button>
-        <div className="ui-activity-picker__pager">
-          <button
-            type="button"
-            className="ui-activity-picker__page"
-            disabled={page <= 0}
-            aria-label="Previous page"
-            onClick={() => onPage(Math.max(0, page - 1))}
-          >
-            ‹
-          </button>
-          <span className="ui-activity-picker__page-info">
-            {page + 1} / {pageCount}
-          </span>
-          <button
-            type="button"
-            className="ui-activity-picker__page"
-            disabled={page >= pageCount - 1}
-            aria-label="Next page"
-            onClick={() => onPage(Math.min(pageCount - 1, page + 1))}
-          >
-            ›
-          </button>
-        </div>
       </div>
     </div>
   );

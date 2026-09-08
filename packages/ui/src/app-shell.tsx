@@ -56,6 +56,47 @@ function isActive(pathname: string | undefined, item: NavItem, rootHref?: string
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+function NavLinkRow({
+  item,
+  pathname,
+  rootHref,
+  collapsed,
+  Link,
+  onNavigate,
+}: {
+  item: NavItem;
+  pathname?: string;
+  rootHref?: string;
+  collapsed: boolean;
+  Link: ShellLink;
+  onNavigate: () => void;
+}) {
+  const active = isActive(pathname, item, rootHref);
+  return (
+    <Link
+      href={item.href}
+      className={cn("ui-nav-link", collapsed && "ui-nav-link--collapsed")}
+      data-active={active}
+      onClick={onNavigate}
+      aria-label={
+        collapsed
+          ? item.badge && item.badge > 0
+            ? `${item.label} (${item.badge} unread)`
+            : item.label
+          : undefined
+      }
+    >
+      {item.icon ? <span className="ui-nav-link__icon">{item.icon}</span> : null}
+      <span className="ui-nav-link__label">{item.label}</span>
+      {item.badge != null && item.badge > 0 ? (
+        <span className="ui-nav-link__badge" aria-label={`${item.badge} unread`}>
+          {item.badge > 99 ? "99+" : item.badge}
+        </span>
+      ) : null}
+    </Link>
+  );
+}
+
 export function AppShell({
   theme,
   brand,
@@ -154,33 +195,17 @@ export function AppShell({
             {sections.map((section) => (
               <div key={section.label || "main"} className="ui-app__nav-section">
                 {section.label ? <p className="ui-app__nav-label">{section.label}</p> : null}
-                {section.items.map((item) => {
-                  const active = isActive(pathname, item, rootHref);
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={cn("ui-nav-link", isCollapsed && "ui-nav-link--collapsed")}
-                      data-active={active}
-                      onClick={() => setOpen(false)}
-                      aria-label={
-                        isCollapsed
-                          ? item.badge && item.badge > 0
-                            ? `${item.label} (${item.badge} unread)`
-                            : item.label
-                          : undefined
-                      }
-                    >
-                      {item.icon ? <span className="ui-nav-link__icon">{item.icon}</span> : null}
-                      <span className="ui-nav-link__label">{item.label}</span>
-                      {item.badge != null && item.badge > 0 ? (
-                        <span className="ui-nav-link__badge" aria-label={`${item.badge} unread`}>
-                          {item.badge > 99 ? "99+" : item.badge}
-                        </span>
-                      ) : null}
-                    </Link>
-                  );
-                })}
+                {section.items.map((item) => (
+                  <NavLinkRow
+                    key={item.href}
+                    item={item}
+                    pathname={pathname}
+                    rootHref={rootHref}
+                    collapsed={isCollapsed}
+                    Link={Link}
+                    onNavigate={() => setOpen(false)}
+                  />
+                ))}
               </div>
             ))}
           </nav>

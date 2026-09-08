@@ -41,6 +41,8 @@ function AuthFooter({ audience }: { audience: AuthAudience }) {
   const pathname = usePathname() ?? "";
   const onPatientLogin = pathname.startsWith("/auth/client/login");
   const onDietitianLogin = pathname.startsWith("/auth/dietitian/login");
+  const onDietitianRegister =
+    pathname.startsWith("/auth/dietitian/register") || pathname === "/auth/register";
   const [patientRegistrationEnabled, setPatientRegistrationEnabled] = useState(false);
   const [dietitianRegistrationEnabled, setDietitianRegistrationEnabled] = useState(false);
 
@@ -136,11 +138,13 @@ function AuthFooter({ audience }: { audience: AuthAudience }) {
     );
   }
   if (dietitianRegistrationEnabled) {
-    links.push(
-      <Link key="dietitian-register" href="/auth/dietitian/register" className="ui-link">
-        Create clinic account
-      </Link>,
-    );
+    if (!onDietitianRegister) {
+      links.push(
+        <Link key="dietitian-register" href="/auth/dietitian/register" className="ui-link">
+          Create clinic account
+        </Link>,
+      );
+    }
   } else {
     links.push(
       <Link key="contact" href="/contact" className="ui-link">
