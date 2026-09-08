@@ -2067,8 +2067,10 @@
   left: 50%;
   bottom: calc(100% + 6px);
   transform: translateX(-50%);
-  background: var(--color-text);
-  color: #fff;
+  background: var(--color-tooltip, #0f172a);
+  color: var(--color-tooltip-text, #f8fafc);
+  border: 1px solid rgb(148 163 184 / 22%);
+  box-shadow: 0 8px 22px rgb(0 0 0 / 28%);
   font-size: var(--text-xs);
   padding: 4px 8px;
   border-radius: 6px;
@@ -2092,8 +2094,8 @@
 }
 
 .ui-toast {
-  background: var(--color-text);
-  color: #fff;
+  background: var(--color-tooltip, #0f172a);
+  color: var(--color-tooltip-text, #f8fafc);
   border-radius: var(--radius-sm);
   padding: 0.8rem 1rem;
   box-shadow: var(--shadow-md);
@@ -22726,6 +22728,21 @@ a.ui-list-cards__main {
     box-shadow: none;
   }
 
+  html[data-appearance="dark"] [data-theme="practice"] .ui-tooltip[data-tip]::after,
+  html[data-appearance="dark"] [data-theme="client"] .ui-tooltip[data-tip]::after {
+    background: var(--color-tooltip);
+    color: var(--color-tooltip-text);
+    border-color: rgb(148 163 184 / 22%);
+    box-shadow: 0 10px 24px rgb(0 0 0 / 45%);
+  }
+
+  html[data-appearance="dark"] [data-theme="practice"] .ui-chart-print-menu__panel,
+  html[data-appearance="dark"] [data-theme="client"] .ui-chart-print-menu__panel {
+    background: var(--color-surface);
+    border-color: var(--color-border);
+    box-shadow: 0 12px 32px rgb(0 0 0 / 40%);
+  }
+
   html[data-appearance="dark"] [data-theme="practice"] .ui-section,
   html[data-appearance="dark"] [data-theme="client"] .ui-section {
     background: rgb(20 27 45 / 92%);
@@ -23150,15 +23167,36 @@ a.ui-list-cards__main {
   html[data-appearance="dark"] [data-theme="practice"] .ui-food-info__stat-label,
   html[data-appearance="dark"] [data-theme="practice"] .ui-food-info__serving,
   html[data-appearance="dark"] [data-theme="practice"] .ui-client-cal__weekdays span,
-  html[data-appearance="dark"] [data-theme="practice"] .ui-client-cal__date,
   html[data-appearance="dark"] [data-theme="practice"] .ui-client-cal__card p,
   html[data-appearance="dark"] [data-theme="client"] .ui-client-cal__weekdays span,
-  html[data-appearance="dark"] [data-theme="client"] .ui-client-cal__date,
   html[data-appearance="dark"] [data-theme="client"] .ui-client-cal__card p,
   html[data-appearance="dark"] [data-theme="practice"] .ui-mp__foods-head th,
   html[data-appearance="dark"] [data-theme="practice"] .ui-invoice-builder__label,
   html[data-appearance="dark"] [data-theme="practice"] .ui-client-invoices__head p {
-    color: #cbd5e1;
+    color: #e2e8f0;
+  }
+
+  html[data-appearance="dark"] [data-theme="practice"] .ui-client-cal__cell.is-selected,
+  html[data-appearance="dark"] [data-theme="client"] .ui-client-cal__cell.is-selected,
+  html[data-appearance="dark"] [data-theme="practice"] .ui-cal-month__cell.is-today,
+  html[data-appearance="dark"] [data-theme="client"] .ui-cal-month__cell.is-today,
+  html[data-appearance="dark"] [data-theme="practice"] .ui-cal-time__dayhead.is-today,
+  html[data-appearance="dark"] [data-theme="client"] .ui-cal-time__dayhead.is-today {
+    background: color-mix(in srgb, var(--color-accent) 16%, var(--color-surface));
+    box-shadow: inset 0 0 0 1.5px rgb(45 212 191 / 42%);
+    color: var(--color-text);
+  }
+
+  html[data-appearance="dark"] [data-theme="practice"] .ui-client-cal__date,
+  html[data-appearance="dark"] [data-theme="client"] .ui-client-cal__date,
+  html[data-appearance="dark"] [data-theme="practice"] .ui-cal-month__date,
+  html[data-appearance="dark"] [data-theme="client"] .ui-cal-month__date {
+    color: #f8fafc;
+  }
+
+  html[data-appearance="dark"] [data-theme="practice"] .ui-client-cal__cell.is-muted .ui-client-cal__date,
+  html[data-appearance="dark"] [data-theme="client"] .ui-client-cal__cell.is-muted .ui-client-cal__date {
+    color: #94a3b8;
   }
 
   html[data-appearance="dark"] [data-theme="practice"] .ui-food-info__fact-value,
@@ -23261,10 +23299,15 @@ a.ui-list-cards__main {
     background: rgb(45 212 191 / 12%);
   }
 
+  html[data-appearance="dark"] [data-theme="practice"] .ui-cal-chip,
+  html[data-appearance="dark"] [data-theme="client"] .ui-cal-chip,
   html[data-appearance="dark"] [data-theme="practice"] .ui-cal-block,
-  html[data-appearance="dark"] [data-theme="client"] .ui-cal-block {
-    background: linear-gradient(160deg, #134e4a, #163a36);
-    color: #5eead4;
+  html[data-appearance="dark"] [data-theme="client"] .ui-cal-block,
+  html[data-appearance="dark"] [data-theme="practice"] .ui-client-cal__pill,
+  html[data-appearance="dark"] [data-theme="client"] .ui-client-cal__pill {
+    background: #0f3d38;
+    color: #f0fdfa;
+    border-color: rgb(45 212 191 / 32%);
   }
 
   html[data-appearance="dark"] [data-theme="practice"] .ui-cal-block.cat-FOLLOW_UP,
@@ -23273,9 +23316,9 @@ a.ui-list-cards__main {
   html[data-appearance="dark"] [data-theme="client"] .ui-cal-chip.cat-FOLLOW_UP,
   html[data-appearance="dark"] [data-theme="practice"] .ui-client-cal__pill.is-task,
   html[data-appearance="dark"] [data-theme="client"] .ui-client-cal__pill.is-task {
-    background: linear-gradient(160deg, #16364a, #1e3a5f);
-    color: #7dd3fc;
-    border-color: rgb(56 189 248 / 22%);
+    background: #0c4a6e;
+    color: #e0f2fe;
+    border-color: rgb(125 211 252 / 36%);
   }
 
   html[data-appearance="dark"] [data-theme="practice"] .ui-cal-block.cat-ASSESSMENT,
@@ -23284,27 +23327,50 @@ a.ui-list-cards__main {
   html[data-appearance="dark"] [data-theme="client"] .ui-cal-chip.cat-ASSESSMENT,
   html[data-appearance="dark"] [data-theme="practice"] .ui-client-cal__pill.is-pending,
   html[data-appearance="dark"] [data-theme="client"] .ui-client-cal__pill.is-pending {
-    background: linear-gradient(160deg, #3f2e12, #422006);
-    color: #fbbf24;
-    border-color: rgb(251 191 36 / 22%);
+    background: #78350f;
+    color: #fff7ed;
+    border-color: rgb(253 230 138 / 38%);
   }
 
   html[data-appearance="dark"] [data-theme="practice"] .ui-cal-block.cat-MEAL_PLAN,
   html[data-appearance="dark"] [data-theme="practice"] .ui-cal-chip.cat-MEAL_PLAN,
   html[data-appearance="dark"] [data-theme="client"] .ui-cal-block.cat-MEAL_PLAN,
   html[data-appearance="dark"] [data-theme="client"] .ui-cal-chip.cat-MEAL_PLAN {
-    background: linear-gradient(160deg, #2e2150, #1e1b4b);
-    color: #c4b5fd;
-    border-color: rgb(196 181 253 / 22%);
+    background: #3b0764;
+    color: #f3e8ff;
+    border-color: rgb(216 180 254 / 36%);
   }
 
   html[data-appearance="dark"] [data-theme="practice"] .ui-cal-block.cat-TASK,
   html[data-appearance="dark"] [data-theme="practice"] .ui-cal-chip.cat-TASK,
   html[data-appearance="dark"] [data-theme="client"] .ui-cal-block.cat-TASK,
   html[data-appearance="dark"] [data-theme="client"] .ui-cal-chip.cat-TASK {
-    background: linear-gradient(160deg, #14532d, #052e16);
-    color: #86efac;
-    border-color: rgb(74 222 128 / 22%);
+    background: #14532d;
+    color: #ecfdf5;
+    border-color: rgb(134 239 172 / 36%);
+  }
+
+  html[data-appearance="dark"] [data-theme="practice"] .ui-cal-block.cat-OTHER,
+  html[data-appearance="dark"] [data-theme="practice"] .ui-cal-chip.cat-OTHER,
+  html[data-appearance="dark"] [data-theme="client"] .ui-cal-block.cat-OTHER,
+  html[data-appearance="dark"] [data-theme="client"] .ui-cal-chip.cat-OTHER,
+  html[data-appearance="dark"] [data-theme="practice"] .ui-client-cal__pill.is-done,
+  html[data-appearance="dark"] [data-theme="client"] .ui-client-cal__pill.is-done {
+    background: #1e293b;
+    color: #e2e8f0;
+    border-color: rgb(148 163 184 / 28%);
+  }
+
+  html[data-appearance="dark"] [data-theme="practice"] .ui-client-cal__request,
+  html[data-appearance="dark"] [data-theme="client"] .ui-client-cal__request {
+    background: #422006;
+    border-color: rgb(251 191 36 / 38%);
+    color: #fffbeb;
+  }
+
+  html[data-appearance="dark"] [data-theme="practice"] .ui-client-cal__request span,
+  html[data-appearance="dark"] [data-theme="client"] .ui-client-cal__request span {
+    color: #fcd34d;
   }
 
   html[data-appearance="dark"] [data-theme="practice"] .ui-food-nutri__chip[data-tone="energy"],
