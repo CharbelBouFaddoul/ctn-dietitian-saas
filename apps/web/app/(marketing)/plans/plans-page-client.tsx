@@ -124,7 +124,7 @@ function pickFeaturedId(plans: PublicPlan[]): string | null {
   const withAdvanced = plans.find((plan) =>
     plan.features.some((feature) => feature.key === "AI" || feature.key === "AUTOMATION"),
   );
-  return (withAdvanced ?? plans[plans.length - 1]).id;
+  return (withAdvanced ?? plans[plans.length - 1])?.id ?? null;
 }
 
 export function PlansPageClient() {
