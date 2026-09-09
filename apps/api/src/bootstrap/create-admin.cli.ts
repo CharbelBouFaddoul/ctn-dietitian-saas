@@ -98,6 +98,8 @@ function parseArgs(argv: string[]): Args {
     } else if (arg === "--help" || arg === "-h") {
       printUsage();
       process.exit(0);
+    } else if (arg === "--") {
+      continue;
     } else {
       throw new Error(`Unknown argument: ${arg}`);
     }
@@ -183,10 +185,9 @@ function restoreStorage(storageArchive: string): void {
   const fileStoragePath = process.env.FILE_STORAGE_PATH || DEFAULT_FILE_STORAGE;
   const parent = resolve(fileStoragePath, "..");
   process.stdout.write(`[bootstrap:prod] Restoring storage to ${fileStoragePath}…\n`);
-  run("mkdir", ["-p", parent]);
-  if (existsSync(fileStoragePath)) {
-    run("rm", ["-rf", fileStoragePath]);
-  }
+  run("mkdir", ["-p", fileStoragePath]);
+  // Coolify mounts the volume at FILE_STORAGE_PATH — never delete the mount point.
+  run("find", [fileStoragePath, "-mindepth", "1", "-delete"]);
   run("tar", ["-xzf", resolvedStorage, "-C", parent]);
 }
 
@@ -241,9 +242,16 @@ function importDump(dump: string, storageArchive: string, replace: boolean): voi
       `--dbname=${databaseUrl}`,
       resolvedDump,
     ],
-    { stdio: "inherit", env: process.env, shell: false },
+    { encoding: "utf8", env: process.env, shell: false },
   );
+  const restoreLog = `${restore.stdout ?? ""}${restore.stderr ?? ""}`;
+  if (restoreLog) process.stderr.write(restoreLog);
   if (restore.error) throw restore.error;
+  if (restoreLog.includes("unsupported version")) {
+    throw new Error(
+      "pg_restore is too old for this dump (need PostgreSQL 16 client). Redeploy the API image, then re-run bootstrap.",
+    );
+  }
   // pg_restore exits 1 when some DROP IF EXISTS notices fire; 0/1 are acceptable.
   if (restore.status != null && restore.status > 1) {
     throw new Error(`pg_restore failed (${restore.status}): ${resolvedDump}`);

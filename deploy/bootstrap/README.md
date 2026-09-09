@@ -31,7 +31,7 @@ pnpm bootstrap:prod -- --email you@ctnsolution.com --password 'YourStrongPass1' 
 Replace production with this local snapshot (same users, passwords, settings):
 
 ```bash
-CONFIRM_REPLACE=1 pnpm bootstrap:prod -- --replace --skip-admin
+CONFIRM_REPLACE=1 pnpm bootstrap:prod --replace --skip-admin
 ```
 
 `--replace` wipes the production database. It will not run without `CONFIRM_REPLACE=1`.
