@@ -59,6 +59,12 @@ export class DietitianService {
         data: {
           dietitianAccountId: dietitianAccount.id,
           ...settings,
+          timezone: input.settings.timezone,
+          locale: input.settings.locale,
+          currency: input.settings.currency,
+          weightUnit: input.settings.weightUnit as WeightUnit,
+          heightUnit: input.settings.heightUnit as HeightUnit,
+          dateFormat: input.settings.dateFormat as DateFormat,
         },
       });
 
