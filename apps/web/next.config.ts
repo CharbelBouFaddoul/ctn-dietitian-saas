@@ -5,6 +5,8 @@ const nextConfig: NextConfig = {
   output: "standalone",
   outputFileTracingRoot: path.join(__dirname, "../.."),
   transpilePackages: ["@nutrition-saas/ui"],
+  // Coolify's web image does not copy eslint.config.mjs. Lint stays on `pnpm lint`.
+  eslint: { ignoreDuringBuilds: true },
   experimental: {
     optimizePackageImports: ["@nutrition-saas/ui"],
   },

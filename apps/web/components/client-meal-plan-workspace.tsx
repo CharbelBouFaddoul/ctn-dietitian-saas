@@ -1258,7 +1258,7 @@ export function ClientMealPlanWorkspace({
       const items = listed.items.filter((row) => row.status !== "ARCHIVED");
       setImportPlans(items);
       const chosen =
-        (preferPlanId && items.find((row) => row.id === preferPlanId)) ??
+        (preferPlanId ? items.find((row) => row.id === preferPlanId) : undefined) ??
         items.find((row) => row.status === "ACTIVE") ??
         items[0];
       setImportPlanId(chosen?.id ?? "");

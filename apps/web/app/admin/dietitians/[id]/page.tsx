@@ -21,7 +21,6 @@ import { AdminPage } from "../../_components/admin-page";
 import { ClinicPatientsPanel, type ClinicPatient } from "./clinic-patients-panel";
 import { featureLabel, scopedStatusLabel } from "../../../../lib/admin-labels";
 import { api } from "../../../../lib/api";
-import { formatDate } from "../../../../lib/format";
 import { errorMessage } from "../../../../lib/humanize-error";
 
 interface Plan {

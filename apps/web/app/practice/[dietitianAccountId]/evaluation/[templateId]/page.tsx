@@ -203,7 +203,7 @@ export default function EvaluationFormEditorPage() {
   const questions = allQuestions.filter((q) => q.active !== false);
 
   const detailsDirty =
-    Boolean(template) &&
+    template != null &&
     (name.trim() !== template.name || (description.trim() || "") !== (template.description ?? ""));
 
   function startEdit(question: AssessmentQuestionView) {

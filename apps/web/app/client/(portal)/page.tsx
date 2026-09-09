@@ -15,6 +15,13 @@ import { PORTAL_FORMS_CHANGED } from "../../../lib/portal-forms";
 import { useMessagingRealtime } from "../../../lib/realtime";
 import { PatientAccents } from "./patient-accents";
 
+type PortalGoal = {
+  id?: string;
+  title: string;
+  targetValue: number | null;
+  targetUnit: string | null;
+};
+
 interface PortalDashboard {
   me: {
     client: { firstName: string; lastName: string; displayName: string | null };
@@ -23,7 +30,7 @@ interface PortalDashboard {
     dietitianDisplayName?: string | null;
     portalPresets?: { messaging: boolean; tracking: boolean; mealPlans: boolean };
     energyUnit?: "kcal" | "kj" | string;
-    goals?: Array<{ id: string; title: string; targetValue: number | null; targetUnit: string | null }>;
+    goals?: PortalGoal[];
   };
   upcomingAppointment: {
     id: string;
@@ -46,7 +53,7 @@ interface PortalDashboard {
     exercise: { totalDurationMinutes: number };
     sleep: { durationMinutes: number | null } | null;
     habits: { completed: number; total: number };
-    goals?: Array<{ title: string; targetValue: number | null; targetUnit: string | null }>;
+    goals?: PortalGoal[];
   };
   mealPlan: { name: string; description: string | null } | null;
   pendingAssessmentsCount?: number;
@@ -234,7 +241,7 @@ export default function ClientHomePage() {
         <Section title="What we’re working on" tone="mint">
           <ul className="ui-portal-goal-list">
             {goals.map((goal, index) => (
-              <li key={"id" in goal && goal.id ? goal.id : `${goal.title}-${index}`}>
+              <li key={goal.id || `${goal.title}-${index}`}>
                 <strong>{goal.title}</strong>
                 {goal.targetValue != null ? (
                   <span className="ui-muted">

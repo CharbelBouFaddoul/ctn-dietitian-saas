@@ -101,7 +101,7 @@ function clientLabel(c?: ClientOption | null, fallbackId?: string): string {
 function eventLayout(startAt: string, endAt: string): { top: number; height: number; visible: boolean; startMin: number; endMin: number } {
   const start = new Date(startAt);
   const end = new Date(endAt);
-  let startMin = (start.getHours() - DAY_START_HOUR) * 60 + start.getMinutes();
+  const startMin = (start.getHours() - DAY_START_HOUR) * 60 + start.getMinutes();
   let endMin = (end.getHours() - DAY_START_HOUR) * 60 + end.getMinutes();
   if (endMin <= startMin) {
     endMin = Math.min(24 * 60, startMin + Math.max(30, (end.getTime() - start.getTime()) / 60000));
