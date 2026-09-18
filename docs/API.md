@@ -510,7 +510,7 @@ Configuration/conditions are validated server-side (no arbitrary code). Template
 
 Requires a session **and** `users.platform_role` of `ADMIN` or `SUPER_ADMIN`. Organization OWNER is not sufficient. Failures return `403` `"Platform administration is not available"`. Extra body fields are rejected (`400`).
 
-`GET /api/v1/admin/me` is the gate used by `/admin` UI. All admin mutations write `audit_logs` through `SecurityEventLogger`.
+`GET /api/v1/admin/me` is the gate used by the platform console UI (default public path `/ns-console`; `/admin` is 404 unless `NEXT_PUBLIC_ADMIN_BASE_PATH=/admin`). All admin mutations write `audit_logs` through `SecurityEventLogger`.
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
@@ -525,9 +525,12 @@ Requires a session **and** `users.platform_role` of `ADMIN` or `SUPER_ADMIN`. Or
 | PUT | `/api/v1/admin/organizations/:organizationId/overrides/:featureKey` | Platform admin | Create/update override |
 | DELETE | `/api/v1/admin/organizations/:organizationId/overrides/:featureKey` | Platform admin | Remove override (plan entitlement restored) |
 | GET | `/api/v1/admin/users` | Platform admin | List/search users |
+| POST | `/api/v1/admin/users` | Platform admin | Create a platform admin login (`email`, `password`, optional name) |
 | GET | `/api/v1/admin/users/:userId` | Platform admin | User + memberships (roles are read-only here) |
+| PATCH | `/api/v1/admin/users/:userId` | Platform admin | Update name, email, or password |
 | PATCH | `/api/v1/admin/users/:userId/status` | Platform admin | `ACTIVE` / `SUSPENDED` / `ARCHIVED` |
-| PATCH | `/api/v1/admin/users/:userId/platform-role` | SUPER_ADMIN | Set `SUPER_ADMIN` / `ADMIN` / `null` |
+| PATCH | `/api/v1/admin/users/:userId/platform-role` | Platform admin | Set `ADMIN` / `null` |
+| DELETE | `/api/v1/admin/users/:userId` | Platform admin | Delete a dedicated admin, or remove console access from a linked account |
 | GET | `/api/v1/admin/plans` | Platform admin | List plans |
 | POST | `/api/v1/admin/plans` | Platform admin | Create plan |
 | GET | `/api/v1/admin/plans/:planId` | Platform admin | Plan + features |

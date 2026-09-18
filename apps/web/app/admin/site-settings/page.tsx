@@ -1,5 +1,6 @@
 "use client";
 
+import { adminPath } from "../../../lib/admin-path";
 import { FormEvent, Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -126,7 +127,7 @@ function AdminSiteSettingsForm() {
 
   useEffect(() => {
     if (initialTab === "admins") {
-      router.replace("/admin/admins");
+      router.replace(adminPath("/admins"));
       return;
     }
     setTab(resolveTab(initialTab));
@@ -572,7 +573,7 @@ function AdminSiteSettingsForm() {
             description="Shown on the website contact page and footer. Incoming form messages go to Inbox."
           >
             <p className="ui-muted" style={{ marginTop: 0 }}>
-              <Link href="/admin/contact" className="ui-link">
+              <Link href={adminPath("/contact")} className="ui-link">
                 Open inbox
               </Link>
             </p>

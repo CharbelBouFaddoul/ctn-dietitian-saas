@@ -1,5 +1,6 @@
 "use client";
 
+import { adminPath } from "../../../../lib/admin-path";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -51,7 +52,7 @@ export default function AdminUserDetailPage() {
     try {
       const data = await api<UserDetail>(`/api/v1/admin/users/${params.id}`);
       if (data.platformRole) {
-        router.replace(`/admin/site-settings/admins/${data.id}`);
+        router.replace(adminPath(`/site-settings/admins/${data.id}`));
         return;
       }
       setUser(data);
@@ -88,7 +89,7 @@ export default function AdminUserDetailPage() {
   if (!user) {
     return (
       <AdminPage title="Account" description="Unable to load this account." error={error}>
-        <Link href="/admin/users" className="ui-link">
+        <Link href={adminPath("/users")} className="ui-link">
           Back to accounts
         </Link>
       </AdminPage>
@@ -106,11 +107,11 @@ export default function AdminUserDetailPage() {
       description={`${user.email} · ${typeLabel}`}
       error={error}
       crumbs={[
-        { href: "/admin/users", label: "Accounts" },
+        { href: adminPath("/users"), label: "Accounts" },
         { label: displayName || user.email },
       ]}
       actions={
-        <Link href="/admin/users" className="ui-btn ui-btn--secondary ui-btn--sm">
+        <Link href={adminPath("/users")} className="ui-btn ui-btn--secondary ui-btn--sm">
           Back to accounts
         </Link>
       }
@@ -145,7 +146,7 @@ export default function AdminUserDetailPage() {
             <tbody>
               <tr>
                 <Td label="Clinic">
-                  <Link href={`/admin/dietitians/${user.dietitianAccount.id}?tab=access`} className="ui-link">
+                  <Link href={adminPath(`/dietitians/${user.dietitianAccount.id}?tab=access`)} className="ui-link">
                     {user.dietitianAccount.displayName}
                   </Link>
                 </Td>
@@ -177,7 +178,7 @@ export default function AdminUserDetailPage() {
                 <tr key={account.id}>
                   <Td label="Client">{account.clientName || "—"}</Td>
                   <Td label="Clinic">
-                    <Link href={`/admin/dietitians/${account.practiceId}`} className="ui-link">
+                    <Link href={adminPath(`/dietitians/${account.practiceId}`)} className="ui-link">
                       {account.practiceName}
                     </Link>
                   </Td>

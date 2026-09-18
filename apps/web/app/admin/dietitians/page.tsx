@@ -1,5 +1,6 @@
 "use client";
 
+import { adminPath } from "../../../lib/admin-path";
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import {
@@ -64,7 +65,7 @@ export default function AdminDietitiansPage() {
       description="Each clinic is a practice: owner login, subscription, and entitlements live here."
       error={error}
       actions={
-        <Link href="/admin/dietitians/new" className="ui-btn ui-btn--primary ui-btn--sm">
+        <Link href={adminPath("/dietitians/new")} className="ui-btn ui-btn--primary ui-btn--sm">
           Add clinic
         </Link>
       }
@@ -105,7 +106,7 @@ export default function AdminDietitiansPage() {
               {visible.map((row) => (
                 <tr key={row.id}>
                   <Td label="Clinic">
-                    <Link href={`/admin/dietitians/${row.id}`} className="ui-link">
+                    <Link href={adminPath(`/dietitians/${row.id}`)} className="ui-link">
                       {row.name}
                     </Link>
                     <div className="ui-muted" style={{ fontSize: 12 }}>
@@ -114,7 +115,7 @@ export default function AdminDietitiansPage() {
                   </Td>
                   <Td label="Owner">{row.ownerEmail || "—"}</Td>
                   <Td label="Patients">
-                    <Link href={`/admin/dietitians/${row.id}?tab=patients`} className="ui-link">
+                    <Link href={adminPath(`/dietitians/${row.id}?tab=patients`)} className="ui-link">
                       {row.patientCount ?? 0}
                     </Link>
                   </Td>

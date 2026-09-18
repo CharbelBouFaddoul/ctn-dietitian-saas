@@ -7,6 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { AppShell, Button, ErrorState, LoadingState, type NavSection } from "@nutrition-saas/ui";
 import { ApiError, api, logout } from "../../lib/api";
 import { loginPathFor, resolveSessionHome } from "../../lib/session-home";
+import { adminPath, publicAdminPathname } from "../../lib/admin-path";
 import { AdminNavIcons } from "./admin-nav-icons";
 
 export function AdminShell({ children }: { children: ReactNode }) {
@@ -82,46 +83,46 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const navSections: NavSection[] = [
     {
       label: "Overview",
-      items: [{ href: "/admin", label: "Dashboard", icon: AdminNavIcons.dashboard, exact: true }],
+      items: [{ href: adminPath(), label: "Dashboard", icon: AdminNavIcons.dashboard, exact: true }],
     },
     {
       label: "People",
       items: [
-        { href: "/admin/dietitians", label: "Clinics", icon: AdminNavIcons.dietitians },
-        { href: "/admin/users", label: "Accounts", icon: AdminNavIcons.users },
+        { href: adminPath("/dietitians"), label: "Clinics", icon: AdminNavIcons.dietitians },
+        { href: adminPath("/users"), label: "Accounts", icon: AdminNavIcons.users },
         {
-          href: "/admin/admins",
+          href: adminPath("/admins"),
           label: "Admins",
           icon: AdminNavIcons.admins,
-          matchPrefixes: ["/admin/site-settings/admins"],
+          matchPrefixes: [adminPath("/site-settings/admins"), adminPath("/admins")],
         },
       ],
     },
     {
       label: "Product",
       items: [
-        { href: "/admin/plans", label: "Plans", icon: AdminNavIcons.plans },
-        { href: "/admin/features", label: "Entitlements", icon: AdminNavIcons.features },
-        { href: "/admin/subscriptions", label: "Subscriptions", icon: AdminNavIcons.subscriptions },
+        { href: adminPath("/plans"), label: "Plans", icon: AdminNavIcons.plans },
+        { href: adminPath("/features"), label: "Entitlements", icon: AdminNavIcons.features },
+        { href: adminPath("/subscriptions"), label: "Subscriptions", icon: AdminNavIcons.subscriptions },
       ],
     },
     {
       label: "Website",
       items: [
-        { href: "/admin/site-settings", label: "Site", icon: AdminNavIcons.site, exact: true },
-        { href: "/admin/contact", label: "Inbox", icon: AdminNavIcons.contact },
+        { href: adminPath("/site-settings"), label: "Site", icon: AdminNavIcons.site, exact: true },
+        { href: adminPath("/contact"), label: "Inbox", icon: AdminNavIcons.contact },
       ],
     },
     {
       label: "Data",
-      items: [{ href: "/admin/food-sources", label: "Food database", icon: AdminNavIcons.foods }],
+      items: [{ href: adminPath("/food-sources"), label: "Food database", icon: AdminNavIcons.foods }],
     },
     {
       label: "System",
       items: [
-        { href: "/admin/audit", label: "Audit", icon: AdminNavIcons.audit },
-        { href: "/admin/ai", label: "AI usage", icon: AdminNavIcons.ai },
-        { href: "/admin/health", label: "Health", icon: AdminNavIcons.health },
+        { href: adminPath("/audit"), label: "Audit", icon: AdminNavIcons.audit },
+        { href: adminPath("/ai"), label: "AI usage", icon: AdminNavIcons.ai },
+        { href: adminPath("/health"), label: "Health", icon: AdminNavIcons.health },
       ],
     },
   ];
@@ -132,7 +133,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
       brand="Nutrition"
       meta="Admin"
       navSections={navSections}
-      pathname={pathname}
+      pathname={publicAdminPathname(pathname)}
       linkComponent={Link}
       collapsible
       footer={

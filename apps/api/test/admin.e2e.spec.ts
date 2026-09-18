@@ -201,6 +201,76 @@ describe("platform admin, entitlements, and audit", () => {
     expect(updated.body.platformRole).toBe("ADMIN");
   });
 
+  it("creates, lists, and deletes dedicated platform admins", async () => {
+    const admin = await makePlatformUser("ADMIN");
+    const createdEmail = email();
+
+    const created = await request(ctx.app.getHttpServer())
+      .post("/api/v1/admin/users")
+      .set("Cookie", admin.cookie)
+      .send({
+        email: createdEmail,
+        password: PASSWORD,
+        firstName: "Pat",
+        lastName: "Admin",
+      })
+      .expect(201);
+    expect(created.body.email).toBe(createdEmail);
+    expect(created.body.platformRole).toBe("ADMIN");
+    expect(created.body.status).toBe("ACTIVE");
+
+    await request(ctx.app.getHttpServer())
+      .post("/api/v1/admin/users")
+      .set("Cookie", admin.cookie)
+      .send({ email: createdEmail, password: PASSWORD })
+      .expect(409);
+
+    const login = await request(ctx.app.getHttpServer())
+      .post("/api/v1/auth/login")
+      .send({ email: createdEmail, password: PASSWORD })
+      .expect(200);
+    const createdCookie = `ns_session=${cookieValue(login.headers["set-cookie"])}`;
+    await request(ctx.app.getHttpServer()).get("/api/v1/admin/me").set("Cookie", createdCookie).expect(200);
+
+    const selfDelete = await request(ctx.app.getHttpServer())
+      .delete(`/api/v1/admin/users/${admin.id}`)
+      .set("Cookie", admin.cookie);
+    expect(selfDelete.status).toBe(400);
+    expect(selfDelete.body.message).toBe(ADMIN_MESSAGES.cannotDeleteSelf);
+
+    const removed = await request(ctx.app.getHttpServer())
+      .delete(`/api/v1/admin/users/${created.body.id}`)
+      .set("Cookie", admin.cookie)
+      .expect(200);
+    expect(removed.body.deleted).toBe(true);
+
+    const after = await ctx.prisma.user.findUnique({ where: { id: created.body.id } });
+    expect(after).toBeNull();
+  });
+
+  it("strips admin access from a clinic owner instead of deleting the login", async () => {
+    const admin = await makePlatformUser("ADMIN");
+    const owner = await registerVerifyLogin();
+    await createOrg(owner.cookie, "Keep Login");
+
+    await request(ctx.app.getHttpServer())
+      .patch(`/api/v1/admin/users/${owner.id}/platform-role`)
+      .set("Cookie", admin.cookie)
+      .send({ platformRole: "ADMIN" })
+      .expect(200);
+
+    const removed = await request(ctx.app.getHttpServer())
+      .delete(`/api/v1/admin/users/${owner.id}`)
+      .set("Cookie", admin.cookie)
+      .expect(200);
+    expect(removed.body.deleted).toBe(false);
+    expect(removed.body.accessRemoved).toBe(true);
+    expect(removed.body.platformRole).toBeNull();
+
+    const stillThere = await ctx.prisma.user.findUniqueOrThrow({ where: { id: owner.id } });
+    expect(stillThere.platformRole).toBeNull();
+  });
+
   it("keeps tenant APIs isolated and does not let org A inspect org B entitlements", async () => {
     const a = await registerVerifyLogin();
     const b = await registerVerifyLogin();

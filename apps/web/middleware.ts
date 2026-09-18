@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { isHiddenPublicAdminPath, rewriteAdminPathname } from "./lib/admin-path";
 
 type PublicSiteSettings = {
   plansPageEnabled?: boolean;
@@ -28,9 +29,23 @@ async function loadPublicSiteSettings(): Promise<PublicSiteSettings | null> {
 /**
  * Hard-block deactivated public routes so direct URLs cannot render them.
  * Fails closed when site-settings cannot be loaded.
+ * The platform console is served from ADMIN_BASE_PATH (default /ns-console);
+ * the guessable /admin URL returns 404 when a custom path is configured.
  */
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  if (isHiddenPublicAdminPath(pathname)) {
+    return new NextResponse(null, { status: 404 });
+  }
+
+  const rewrittenAdminPath = rewriteAdminPathname(pathname);
+  if (rewrittenAdminPath) {
+    const url = request.nextUrl.clone();
+    url.pathname = rewrittenAdminPath;
+    return NextResponse.rewrite(url);
+  }
+
   const isPlansRoute = pathname === "/plans" || pathname === "/pricing";
   const isDietitianRegister =
     pathname === "/auth/dietitian/register" || pathname === "/auth/register";
@@ -71,11 +86,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    "/plans",
-    "/pricing",
-    "/auth/register",
-    "/auth/dietitian/register",
-    "/auth/client/register",
-  ],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\..*).*)"],
 };

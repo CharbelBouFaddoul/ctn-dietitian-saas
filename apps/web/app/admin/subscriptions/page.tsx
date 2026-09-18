@@ -1,5 +1,6 @@
 "use client";
 
+import { adminPath } from "../../../lib/admin-path";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { EmptyState, LoadingState, Section, StatusBadge, Table, Td } from "@nutrition-saas/ui";
@@ -53,7 +54,7 @@ export default function AdminSubscriptionsPage() {
               {rows.map((row) => (
                 <tr key={row.id}>
                   <Td label="Clinic">
-                    <Link href={`/admin/dietitians/${row.dietitianAccount.id}?tab=subscription`} className="ui-link">
+                    <Link href={adminPath(`/dietitians/${row.dietitianAccount.id}?tab=subscription`)} className="ui-link">
                       {row.dietitianAccount.name}
                     </Link>
                   </Td>

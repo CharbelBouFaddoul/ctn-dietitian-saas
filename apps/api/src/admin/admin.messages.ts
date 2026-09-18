@@ -4,6 +4,8 @@ export const ADMIN_MESSAGES = {
   planReferenced: "Plans that are referenced by subscriptions cannot be deleted",
   lastPlatformAdmin: "At least one platform admin must remain",
   lastSuperAdmin: "At least one SUPER_ADMIN must remain",
+  cannotDeleteSelf: "You cannot remove your own admin access",
+  notPlatformAdmin: "This account is not a platform admin",
   noSubscription: "Dietitian account has no subscription",
   featureNotFound: "Feature not found",
   planNotFound: "Plan not found",

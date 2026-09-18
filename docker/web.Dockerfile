@@ -9,7 +9,9 @@ FROM base AS build
 # Coolify may inject NODE_ENV=production as a build ARG. Install must still
 # include devDependencies (typescript). Next build must run as production.
 ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_ADMIN_BASE_PATH=/ns-console
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_ADMIN_BASE_PATH=$NEXT_PUBLIC_ADMIN_BASE_PATH
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc turbo.json tsconfig.base.json ./
 COPY apps ./apps
 COPY packages ./packages

@@ -1,4 +1,5 @@
 import { ApiError, api } from "./api";
+import { adminPath } from "./admin-path";
 
 export type SessionKind = "unauthenticated" | "admin" | "dietitian" | "client";
 export type SessionAudience = "admin" | "dietitian" | "client";
@@ -21,7 +22,7 @@ interface PortalOnboarding {
 }
 
 export function loginPathFor(kind: Exclude<SessionKind, "unauthenticated">): string {
-  if (kind === "admin") return "/admin/login";
+  if (kind === "admin") return adminPath("/login");
   if (kind === "client") return "/auth/client/login";
   return "/auth/dietitian/login";
 }
@@ -33,7 +34,7 @@ export function pickSessionHome(input: {
   audience?: SessionAudience;
 }): SessionHome {
   if (input.platformRole === "ADMIN" || input.platformRole === "SUPER_ADMIN") {
-    return { kind: "admin", path: "/admin" };
+    return { kind: "admin", path: adminPath() };
   }
   if (input.audience === "client") {
     if (input.dietitianAccountIds.length >= 1) {

@@ -1,5 +1,6 @@
 "use client";
 
+import { adminPath } from "../../../../../lib/admin-path";
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -52,7 +53,7 @@ export default function SiteAdminDetailPage() {
     try {
       const data = await api<AdminDetail>(`/api/v1/admin/users/${params.id}`);
       if (!data.platformRole) {
-        router.replace(`/admin/users/${params.id}`);
+        router.replace(adminPath(`/users/${params.id}`));
         return;
       }
       setUser(data);
@@ -116,14 +117,11 @@ export default function SiteAdminDetailPage() {
     setError(null);
     setMessage(null);
     try {
-      await api(`/api/v1/admin/users/${params.id}/platform-role`, {
-        method: "PATCH",
-        body: JSON.stringify({ platformRole: null }),
-      });
+      await api(`/api/v1/admin/users/${params.id}`, { method: "DELETE" });
       setConfirmDelete(false);
-      router.push("/admin/admins");
+      router.push(adminPath("/admins"));
     } catch (err) {
-      setError(errorMessage(err, "Unable to remove admin access"));
+      setError(errorMessage(err, "Unable to remove admin"));
       setBusy(false);
       setConfirmDelete(false);
     }
@@ -141,11 +139,11 @@ export default function SiteAdminDetailPage() {
         description="Unable to load this admin."
         error={error}
         crumbs={[
-          { href: "/admin/admins", label: "Admins" },
+          { href: adminPath("/admins"), label: "Admins" },
           { label: "Admin" },
         ]}
       >
-        <Link href="/admin/admins" className="ui-link">
+        <Link href={adminPath("/admins")} className="ui-link">
           Back to admins
         </Link>
       </AdminPage>
@@ -161,11 +159,11 @@ export default function SiteAdminDetailPage() {
       description={`${user.email} · ${roleLabel(user.platformRole)}`}
       error={error}
       crumbs={[
-        { href: "/admin/admins", label: "Admins" },
+        { href: adminPath("/admins"), label: "Admins" },
         { label: displayName || user.email },
       ]}
       actions={
-        <Link href="/admin/admins" className="ui-btn ui-btn--secondary ui-btn--sm">
+        <Link href={adminPath("/admins")} className="ui-btn ui-btn--secondary ui-btn--sm">
           Back to admins
         </Link>
       }
@@ -268,7 +266,7 @@ export default function SiteAdminDetailPage() {
       <ConfirmDialog
         open={confirmDelete}
         title="Remove platform admin?"
-        description={`Delete removes platform console access for ${user.email}. The user account remains; they will no longer be able to open /admin.`}
+        description={`This removes platform console access for ${user.email}. Dedicated admin logins are deleted; clinic or patient accounts stay and can still sign in elsewhere.`}
         confirmLabel="Delete admin access"
         danger
         pending={busy}

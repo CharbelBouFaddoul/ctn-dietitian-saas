@@ -1,5 +1,6 @@
 "use client";
 
+import { adminPath } from "../../../../lib/admin-path";
 import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -49,7 +50,7 @@ export default function AdminCreatePlanPage() {
           durationDays: Number(durationDays) || 30,
         }),
       });
-      router.push(`/admin/plans/${plan.id}`);
+      router.push(adminPath(`/plans/${plan.id}`));
     } catch (err) {
       setError(errorMessage(err, "Unable to create plan"));
       setBusy(false);
@@ -63,11 +64,11 @@ export default function AdminCreatePlanPage() {
       description="Add a new subscription plan. Configure entitlements after creation."
       error={error}
       crumbs={[
-        { href: "/admin/plans", label: "Plans" },
+        { href: adminPath("/plans"), label: "Plans" },
         { label: "Create plan" },
       ]}
       actions={
-        <Link href="/admin/plans" className="ui-btn ui-btn--secondary ui-btn--sm">
+        <Link href={adminPath("/plans")} className="ui-btn ui-btn--secondary ui-btn--sm">
           Back to plans
         </Link>
       }

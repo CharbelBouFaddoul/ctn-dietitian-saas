@@ -1,5 +1,6 @@
 "use client";
 
+import { adminPath } from "../../../../lib/admin-path";
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -122,7 +123,7 @@ function ClinicDetailBody() {
   function setTab(id: string) {
     const next = new URLSearchParams(searchParams.toString());
     next.set("tab", id);
-    router.replace(`/admin/dietitians/${dietitianAccountId}?${next.toString()}`, { scroll: false });
+    router.replace(adminPath(`/dietitians/${dietitianAccountId}?${next.toString()}`), { scroll: false });
   }
 
   async function load() {
@@ -181,7 +182,7 @@ function ClinicDetailBody() {
   if (!dietitian) {
     return (
       <AdminPage title="Clinic" description="Unable to load this clinic." error={error}>
-        <Link href="/admin/dietitians" className="ui-link">
+        <Link href={adminPath("/dietitians")} className="ui-link">
           Back to clinics
         </Link>
       </AdminPage>
@@ -201,11 +202,11 @@ function ClinicDetailBody() {
       description={`${dietitian.slug} · ${dietitian.subscription?.plan.name ?? "No plan"}`}
       error={error}
       crumbs={[
-        { href: "/admin/dietitians", label: "Clinics" },
+        { href: adminPath("/dietitians"), label: "Clinics" },
         { label: dietitian.name },
       ]}
       actions={
-        <Link href="/admin/dietitians" className="ui-btn ui-btn--secondary ui-btn--sm">
+        <Link href={adminPath("/dietitians")} className="ui-btn ui-btn--secondary ui-btn--sm">
           Back to clinics
         </Link>
       }
@@ -552,7 +553,7 @@ function ClinicDetailBody() {
                   {
                     label: "Email",
                     value: (
-                      <Link href={`/admin/users/${dietitian.owner.id}`} className="ui-link">
+                      <Link href={adminPath(`/users/${dietitian.owner.id}`)} className="ui-link">
                         {dietitian.owner.email}
                       </Link>
                     ),

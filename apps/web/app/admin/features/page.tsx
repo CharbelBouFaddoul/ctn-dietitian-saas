@@ -1,5 +1,6 @@
 "use client";
 
+import { adminPath } from "../../../lib/admin-path";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
@@ -62,7 +63,7 @@ export default function AdminFeaturesPage() {
       description="Global catalog first, then plan defaults, then a clinic override. Turning a key off here denies it everywhere."
       error={error}
       actions={
-        <Link href="/admin/features/new" className="ui-btn ui-btn--primary ui-btn--sm">
+        <Link href={adminPath("/features/new")} className="ui-btn ui-btn--primary ui-btn--sm">
           Add entitlement
         </Link>
       }

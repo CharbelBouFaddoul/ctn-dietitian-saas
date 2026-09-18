@@ -1,5 +1,6 @@
 "use client";
 
+import { adminPath } from "../../../lib/admin-path";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
@@ -146,13 +147,13 @@ export default function AdminContactPage() {
               {rows.map((row) => (
                 <tr key={row.id} className={row.status === "NEW" ? "ui-admin-inbox-row is-new" : "ui-admin-inbox-row"}>
                   <Td>
-                    <Link href={`/admin/contact/${row.id}`} className="ui-link">
+                    <Link href={adminPath(`/contact/${row.id}`)} className="ui-link">
                       {row.name}
                     </Link>
                     <div className="ui-muted">{row.email}</div>
                   </Td>
                   <Td>
-                    <Link href={`/admin/contact/${row.id}`} className="ui-link">
+                    <Link href={adminPath(`/contact/${row.id}`)} className="ui-link">
                       {row.subject}
                     </Link>
                     {row.planName ? <div className="ui-muted">{row.planName}</div> : null}

@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   Alert,
   Button,
+  ConfirmDialog,
   EmptyState,
   Field,
   Input,
@@ -15,6 +16,7 @@ import {
   Td,
 } from "@nutrition-saas/ui";
 import { roleLabel, statusLabel } from "../../../lib/admin-labels";
+import { adminPath } from "../../../lib/admin-path";
 import { api } from "../../../lib/api";
 import { errorMessage } from "../../../lib/humanize-error";
 
@@ -40,6 +42,7 @@ export function SiteSettingsAdminsTab() {
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [grantEmail, setGrantEmail] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<AdminRow | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -57,19 +60,17 @@ export function SiteSettingsAdminsTab() {
     void load();
   }, [load]);
 
-  async function removeAccess(userId: string) {
+  async function removeAdmin(user: AdminRow) {
     setBusy(true);
     setError(null);
     setMessage(null);
     try {
-      await api(`/api/v1/admin/users/${userId}/platform-role`, {
-        method: "PATCH",
-        body: JSON.stringify({ platformRole: null }),
-      });
-      setMessage("Platform admin access removed.");
+      await api(`/api/v1/admin/users/${user.id}`, { method: "DELETE" });
+      setMessage(`Removed admin access for ${user.email}.`);
+      setPendingDelete(null);
       await load();
     } catch (err) {
-      setError(errorMessage(err, "Unable to remove admin access"));
+      setError(errorMessage(err, "Unable to remove admin"));
     } finally {
       setBusy(false);
     }
@@ -87,7 +88,7 @@ export function SiteSettingsAdminsTab() {
       );
       const match = found.items.find((row) => row.email.toLowerCase() === email.toLowerCase());
       if (!match) {
-        throw new Error("No user found with that email. Create the account first, then grant admin access.");
+        throw new Error("No user found with that email. Create a new admin instead, or create the account first.");
       }
       await api(`/api/v1/admin/users/${match.id}/platform-role`, {
         method: "PATCH",
@@ -110,11 +111,11 @@ export function SiteSettingsAdminsTab() {
 
       <Section
         title="Platform admins"
-        description="These accounts can open the platform console. Removing access does not delete the login."
+        description="These accounts can open the platform console. Dedicated admins can be deleted; clinic or patient logins only lose console access."
       >
         {rows === null ? <LoadingState>Loading admins…</LoadingState> : null}
         {rows && rows.length === 0 ? (
-          <EmptyState title="No platform admins">Grant access to an existing user below.</EmptyState>
+          <EmptyState title="No platform admins">Create an admin or grant access to an existing user.</EmptyState>
         ) : null}
         {rows && rows.length > 0 ? (
           <Table>
@@ -130,7 +131,7 @@ export function SiteSettingsAdminsTab() {
               {rows.map((row) => (
                 <tr key={row.id}>
                   <Td>
-                    <Link href={`/admin/site-settings/admins/${row.id}`} className="ui-link">
+                    <Link href={adminPath(`/site-settings/admins/${row.id}`)} className="ui-link">
                       {row.email}
                     </Link>
                   </Td>
@@ -141,7 +142,7 @@ export function SiteSettingsAdminsTab() {
                   <Td>
                     <div className="ui-row" style={{ flexWrap: "wrap", gap: 6 }}>
                       <Link
-                        href={`/admin/site-settings/admins/${row.id}`}
+                        href={adminPath(`/site-settings/admins/${row.id}`)}
                         className="ui-btn ui-btn--secondary ui-btn--sm"
                       >
                         Edit
@@ -150,7 +151,7 @@ export function SiteSettingsAdminsTab() {
                         size="sm"
                         variant="danger"
                         disabled={busy}
-                        onClick={() => void removeAccess(row.id)}
+                        onClick={() => setPendingDelete(row)}
                       >
                         Delete
                       </Button>
@@ -179,6 +180,23 @@ export function SiteSettingsAdminsTab() {
           </Button>
         </form>
       </Section>
+
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        title="Remove this admin?"
+        description={
+          pendingDelete
+            ? `This removes platform console access for ${pendingDelete.email}. Dedicated admin logins are deleted; clinic or patient accounts stay and can still sign in elsewhere.`
+            : undefined
+        }
+        confirmLabel="Delete admin"
+        danger
+        pending={busy}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => {
+          if (pendingDelete) void removeAdmin(pendingDelete);
+        }}
+      />
     </div>
   );
 }

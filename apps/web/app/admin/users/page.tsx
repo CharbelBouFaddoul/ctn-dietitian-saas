@@ -1,5 +1,6 @@
 "use client";
 
+import { adminPath } from "../../../lib/admin-path";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
@@ -91,7 +92,7 @@ export default function AdminUsersPage() {
       description="Dietitian and patient logins. Platform operators are under Admins."
       error={error}
       actions={
-        <Link href="/admin/users/new" className="ui-btn ui-btn--primary ui-btn--sm">
+        <Link href={adminPath("/users/new")} className="ui-btn ui-btn--primary ui-btn--sm">
           Add patient
         </Link>
       }
@@ -150,7 +151,7 @@ export default function AdminUsersPage() {
               {rows.map((row) => (
                 <tr key={row.id}>
                   <Td>
-                    <Link href={`/admin/users/${row.id}`} className="ui-link">
+                    <Link href={adminPath(`/users/${row.id}`)} className="ui-link">
                       {row.email}
                     </Link>
                   </Td>

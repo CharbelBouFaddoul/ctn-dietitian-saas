@@ -1,5 +1,6 @@
 "use client";
 
+import { adminPath } from "../../../lib/admin-path";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { EmptyState, LoadingState, Section, StatusBadge } from "@nutrition-saas/ui";
@@ -46,7 +47,7 @@ export default function AdminPlansPage() {
       description="Plans define price, duration, and default entitlements. Referenced plans cannot be deleted."
       error={error}
       actions={
-        <Link href="/admin/plans/new" className="ui-btn ui-btn--primary ui-btn--sm">
+        <Link href={adminPath("/plans/new")} className="ui-btn ui-btn--primary ui-btn--sm">
           Create plan
         </Link>
       }
@@ -64,7 +65,7 @@ export default function AdminPlansPage() {
               <article key={row.id} className="ui-admin-plan-card">
                 <div className="ui-row" style={{ justifyContent: "space-between", marginBottom: 8 }}>
                   <h3>
-                    <Link href={`/admin/plans/${row.id}`} className="ui-link">
+                    <Link href={adminPath(`/plans/${row.id}`)} className="ui-link">
                       {row.name}
                     </Link>
                   </h3>

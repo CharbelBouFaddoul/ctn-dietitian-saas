@@ -7,7 +7,7 @@ Source of truth: repository code (Prisma, Nest modules, Next routes), not market
 | Feature | API | Frontend | Models | Existing tests | Demo | Acceptance |
 |---------|-----|----------|--------|----------------|------|------------|
 | Auth/sessions | AuthModule | `/auth/*` | User, Session | auth.e2e | All demo users verified | v1-acceptance/auth |
-| Admin | AdminModule | `/admin/*` | platformRole, Plan, Subscription | admin.e2e | SUPER_ADMIN + ADMIN | admin |
+| Admin | AdminModule | `/ns-console/*` | platformRole, Plan, Subscription | admin.e2e | SUPER_ADMIN + ADMIN | admin |
 | Practice | Dietitian* | `/practice/[id]/*` | DietitianAccount | dietitian-account | Alice/Bob/Charlie | isolation |
 | Subscriptions | Entitlements | practice shell | Plan, Subscription, FeatureOverride | phase4 | Standard/Pro/Premium + override | admin |
 | Clients | Clients* | clients | Client, Profile, Goals, Tags | phase6/7 | Rich portfolios | lifecycle |
@@ -42,7 +42,7 @@ Automated coverage: `test/v1-acceptance/isolation.e2e.spec.ts`, `multi-dietitian
 
 ### Admin
 
-1. Login `admin@demo.local` → `/admin`  
+1. Login `admin@demo.local` → `/ns-console`  
 2. Plans, dietitians, subscriptions visible  
 
 ### Dietitian Alice

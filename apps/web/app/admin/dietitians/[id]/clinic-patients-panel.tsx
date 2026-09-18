@@ -1,5 +1,6 @@
 "use client";
 
+import { adminPath } from "../../../../lib/admin-path";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Badge, EmptyState, LoadingState, StatusBadge } from "@nutrition-saas/ui";
@@ -163,7 +164,7 @@ export function ClinicPatientsPanel({
           </p>
         </div>
         <Link
-          href={`/admin/users/new?dietitianAccountId=${dietitianAccountId}`}
+          href={adminPath(`/users/new?dietitianAccountId=${dietitianAccountId}`)}
           className="ui-btn ui-btn--primary ui-btn--sm"
         >
           Add patient
@@ -246,7 +247,7 @@ export function ClinicPatientsPanel({
                 Clear filters
               </button>
             ) : (
-              <Link href={`/admin/users/new?dietitianAccountId=${dietitianAccountId}`} className="ui-btn ui-btn--primary ui-btn--sm">
+              <Link href={adminPath(`/users/new?dietitianAccountId=${dietitianAccountId}`)} className="ui-btn ui-btn--primary ui-btn--sm">
                 Add patient
               </Link>
             )
@@ -263,7 +264,7 @@ export function ClinicPatientsPanel({
           {filtered.map((row) => {
             const name = patientName(row);
             const contact = contactLine(row);
-            const href = row.portalUser ? `/admin/users/${row.portalUser.id}` : null;
+            const href = row.portalUser ? adminPath(`/users/${row.portalUser.id}`) : null;
             const identity = (
               <>
                 <div className="ui-admin-roster__name">
@@ -287,7 +288,7 @@ export function ClinicPatientsPanel({
                   <div className="ui-list-cards__aside">
                     <StatusBadge status={row.status} label={scopedStatusLabel("patient", row.status)} />
                     {row.portalUser ? (
-                      <Link href={`/admin/users/${row.portalUser.id}`} className="ui-link">
+                      <Link href={adminPath(`/users/${row.portalUser.id}`)} className="ui-link">
                         {scopedStatusLabel("login", row.portalUser.status)}
                       </Link>
                     ) : (

@@ -1,5 +1,6 @@
 "use client";
 
+import { adminPath } from "../../../lib/admin-path";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Section, Table, Td, TrendChart, type TrendPoint } from "@nutrition-saas/ui";
@@ -101,7 +102,7 @@ export default function AdminAiUsagePage() {
               {data.items.map((row) => (
                 <tr key={row.dietitianAccountId}>
                   <Td label="Practice">
-                    <Link href={`/admin/dietitians/${row.dietitianAccountId}`} className="ui-link">
+                    <Link href={adminPath(`/dietitians/${row.dietitianAccountId}`)} className="ui-link">
                       {row.name}
                     </Link>
                   </Td>

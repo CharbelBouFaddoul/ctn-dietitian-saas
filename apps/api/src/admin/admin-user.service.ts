@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import type { Prisma, UserStatus } from "@prisma/client";
 import { normalizeEmail } from "@nutrition-saas/utilities";
 import { PasswordService } from "../auth/password.service";
@@ -85,6 +85,46 @@ export class AdminUserService {
       total,
       items: users.map((user) => this.toListItem(user)),
     };
+  }
+
+  async create(
+    input: { email: string; password: string; firstName?: string; lastName?: string },
+    actor: AdminActor,
+  ) {
+    this.passwords.assertPolicy(input.password);
+    const email = input.email.trim();
+    const emailNormalized = normalizeEmail(email);
+    const existing = await this.prisma.user.findUnique({ where: { emailNormalized } });
+    if (existing) {
+      throw new ConflictException(ADMIN_MESSAGES.userAlreadyExists);
+    }
+
+    const user = await this.prisma.user.create({
+      data: {
+        email,
+        emailNormalized,
+        passwordHash: await this.passwords.hash(input.password),
+        status: "ACTIVE",
+        emailVerifiedAt: new Date(),
+        platformRole: "ADMIN",
+        firstName: input.firstName?.trim() || null,
+        lastName: input.lastName?.trim() || null,
+      },
+    });
+
+    await this.security.record({
+      type: "admin_user_created",
+      outcome: "success",
+      userId: actor.userId,
+      ipAddress: actor.ipAddress,
+      userAgent: actor.userAgent,
+      requestId: actor.requestId,
+      targetType: "user",
+      targetId: user.id,
+      metadata: { email: user.email },
+    });
+
+    return this.toPublic(user);
   }
 
   async get(userId: string) {
@@ -238,6 +278,10 @@ export class AdminUserService {
   async setPlatformRole(userId: string, platformRole: "ADMIN" | null, actor: AdminActor) {
     const user = await this.requireUser(userId);
 
+    if (platformRole === null && userId === actor.userId) {
+      throw new BadRequestException(ADMIN_MESSAGES.cannotDeleteSelf);
+    }
+
     if (user.platformRole && platformRole === null) {
       const remaining = await this.prisma.user.count({
         where: {
@@ -268,6 +312,83 @@ export class AdminUserService {
     });
 
     return this.toPublic(updated);
+  }
+
+  async remove(userId: string, actor: AdminActor) {
+    if (userId === actor.userId) {
+      throw new BadRequestException(ADMIN_MESSAGES.cannotDeleteSelf);
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        dietitianAccount: { select: { id: true } },
+        clientAccounts: { take: 1, select: { id: true } },
+      },
+    });
+    if (!user) {
+      throw new NotFoundException(ADMIN_MESSAGES.userNotFound);
+    }
+    if (!user.platformRole) {
+      throw new BadRequestException(ADMIN_MESSAGES.notPlatformAdmin);
+    }
+
+    const remaining = await this.prisma.user.count({
+      where: {
+        platformRole: { in: ["ADMIN", "SUPER_ADMIN"] },
+        id: { not: userId },
+      },
+    });
+    if (remaining === 0) {
+      throw new BadRequestException(ADMIN_MESSAGES.lastPlatformAdmin);
+    }
+
+    if (user.dietitianAccount || user.clientAccounts.length > 0) {
+      const updated = await this.setPlatformRole(userId, null, actor);
+      return { ...updated, deleted: false, accessRemoved: true };
+    }
+
+    await this.prisma.session.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+
+    try {
+      await this.prisma.user.delete({ where: { id: userId } });
+      await this.security.record({
+        type: "admin_user_deleted",
+        outcome: "success",
+        userId: actor.userId,
+        ipAddress: actor.ipAddress,
+        userAgent: actor.userAgent,
+        requestId: actor.requestId,
+        targetType: "user",
+        targetId: userId,
+        metadata: { email: user.email, deleted: true },
+      });
+      return { id: userId, deleted: true, accessRemoved: true };
+    } catch {
+      const archived = await this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          platformRole: null,
+          status: "ARCHIVED",
+          archivedAt: new Date(),
+        },
+      });
+      await this.security.record({
+        type: "admin_user_deleted",
+        outcome: "success",
+        userId: actor.userId,
+        ipAddress: actor.ipAddress,
+        userAgent: actor.userAgent,
+        requestId: actor.requestId,
+        targetType: "user",
+        targetId: userId,
+        metadata: { email: user.email, archived: true },
+      });
+      return { ...this.toPublic(archived), deleted: false, archived: true, accessRemoved: true };
+    }
   }
 
   private async requireUser(userId: string) {

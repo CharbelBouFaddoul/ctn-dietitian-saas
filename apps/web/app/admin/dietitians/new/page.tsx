@@ -1,5 +1,6 @@
 "use client";
 
+import { adminPath } from "../../../../lib/admin-path";
 import Link from "next/link";
 import { Section } from "@nutrition-saas/ui";
 import { AdminPage } from "../../_components/admin-page";
@@ -12,11 +13,11 @@ export default function AdminNewClinicPage() {
       title="Add clinic"
       description="Creates the practice and an owner login. The owner receives an activation email."
       crumbs={[
-        { href: "/admin/dietitians", label: "Clinics" },
+        { href: adminPath("/dietitians"), label: "Clinics" },
         { label: "Add clinic" },
       ]}
       actions={
-        <Link href="/admin/dietitians" className="ui-btn ui-btn--secondary ui-btn--sm">
+        <Link href={adminPath("/dietitians")} className="ui-btn ui-btn--secondary ui-btn--sm">
           Back to clinics
         </Link>
       }

@@ -1,5 +1,6 @@
 "use client";
 
+import { adminPath } from "../../../../lib/admin-path";
 import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -25,7 +26,7 @@ export default function AdminCreateFeaturePage() {
         method: "POST",
         body: JSON.stringify({ key, name, valueType }),
       });
-      router.push("/admin/features");
+      router.push(adminPath("/features"));
     } catch (err) {
       setError(errorMessage(err, "Unable to create entitlement"));
       setBusy(false);
@@ -39,11 +40,11 @@ export default function AdminCreateFeaturePage() {
       description="Define a global catalog key used by subscription plans."
       error={error}
       crumbs={[
-        { href: "/admin/features", label: "Entitlements" },
+        { href: adminPath("/features"), label: "Entitlements" },
         { label: "Add entitlement" },
       ]}
       actions={
-        <Link href="/admin/features" className="ui-btn ui-btn--secondary ui-btn--sm">
+        <Link href={adminPath("/features")} className="ui-btn ui-btn--secondary ui-btn--sm">
           Back to entitlements
         </Link>
       }

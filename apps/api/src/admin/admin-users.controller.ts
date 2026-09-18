@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Query, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
 import { ApiCookieAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 import type { Request } from "express";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
@@ -6,7 +6,13 @@ import { SessionGuard } from "../auth/guards/session.guard";
 import type { AuthenticatedRequestUser } from "../auth/auth.types";
 import { adminActor } from "./admin-actor";
 import { AdminUserService } from "./admin-user.service";
-import { AdminUsersListQueryDto, UpdateAdminUserProfileDto, UpdatePlatformRoleDto, UpdateUserStatusDto } from "./dto/admin.dto";
+import {
+  AdminUsersListQueryDto,
+  CreateAdminUserDto,
+  UpdateAdminUserProfileDto,
+  UpdatePlatformRoleDto,
+  UpdateUserStatusDto,
+} from "./dto/admin.dto";
 import { PlatformRolesGuard } from "./guards/platform-roles.guard";
 
 @ApiTags("admin")
@@ -20,6 +26,16 @@ export class AdminUsersController {
   @ApiOperation({ summary: "List users" })
   list(@Query() query: AdminUsersListQueryDto) {
     return this.users.list(query);
+  }
+
+  @Post()
+  @ApiOperation({ summary: "Create a platform admin login" })
+  create(
+    @CurrentUser() user: AuthenticatedRequestUser,
+    @Req() req: Request,
+    @Body() body: CreateAdminUserDto,
+  ) {
+    return this.users.create(body, adminActor(user, req));
   }
 
   @Get(":userId")
@@ -59,5 +75,15 @@ export class AdminUsersController {
     @Body() body: UpdatePlatformRoleDto,
   ) {
     return this.users.setPlatformRole(userId, body.platformRole ?? null, adminActor(user, req));
+  }
+
+  @Delete(":userId")
+  @ApiOperation({ summary: "Delete a dedicated admin, or remove platform access from a linked account" })
+  remove(
+    @CurrentUser() user: AuthenticatedRequestUser,
+    @Req() req: Request,
+    @Param("userId", ParseUUIDPipe) userId: string,
+  ) {
+    return this.users.remove(userId, adminActor(user, req));
   }
 }

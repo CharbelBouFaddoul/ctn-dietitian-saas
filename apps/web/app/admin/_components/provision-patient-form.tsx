@@ -1,5 +1,6 @@
 "use client";
 
+import { adminPath } from "../../../lib/admin-path";
 import { FormEvent, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Alert, Button, Field, Input, Select } from "@nutrition-saas/ui";
@@ -50,8 +51,8 @@ export function ProvisionPatientForm() {
       });
       router.push(
         patientDietitianId
-          ? `/admin/dietitians/${patientDietitianId}?tab=patients`
-          : "/admin/users",
+          ? adminPath(`/dietitians/${patientDietitianId}?tab=patients`)
+          : adminPath("/users"),
       );
     } catch (err) {
       setError(errorMessage(err, "Unable to add patient"));

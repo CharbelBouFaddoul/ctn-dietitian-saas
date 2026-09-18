@@ -1,5 +1,6 @@
 "use client";
 
+import { adminPath } from "../../../../lib/admin-path";
 import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { LoadingState, Section } from "@nutrition-saas/ui";
@@ -13,7 +14,7 @@ function AddUserBody() {
 
   useEffect(() => {
     if (searchParams.get("type") === "dietitian") {
-      router.replace("/admin/dietitians/new");
+      router.replace(adminPath("/dietitians/new"));
     }
   }, [router, searchParams]);
 
@@ -27,11 +28,11 @@ function AddUserBody() {
       title="Add patient"
       description="Create a patient chart under an existing clinic."
       crumbs={[
-        { href: "/admin/users", label: "Accounts" },
+        { href: adminPath("/users"), label: "Accounts" },
         { label: "Add patient" },
       ]}
       actions={
-        <Link href="/admin/users" className="ui-btn ui-btn--secondary ui-btn--sm">
+        <Link href={adminPath("/users")} className="ui-btn ui-btn--secondary ui-btn--sm">
           Back to accounts
         </Link>
       }

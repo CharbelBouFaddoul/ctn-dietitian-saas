@@ -1,5 +1,6 @@
 "use client";
 
+import { adminPath } from "../../../../lib/admin-path";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -87,7 +88,7 @@ export default function AdminContactDetailPage() {
     setError(null);
     try {
       await api(`/api/v1/admin/contact-messages/${params.id}`, { method: "DELETE" });
-      router.replace("/admin/contact");
+      router.replace(adminPath("/contact"));
     } catch (err) {
       setError(errorMessage(err, "Unable to delete message"));
       setBusy(false);
@@ -111,11 +112,11 @@ export default function AdminContactDetailPage() {
       description={item ? `From ${item.name}` : undefined}
       error={error}
       crumbs={[
-        { href: "/admin/contact", label: "Inbox" },
+        { href: adminPath("/contact"), label: "Inbox" },
         { label: item?.subject || "Message" },
       ]}
       actions={
-        <Link href="/admin/contact" className="ui-btn ui-btn--secondary ui-btn--sm">
+        <Link href={adminPath("/contact")} className="ui-btn ui-btn--secondary ui-btn--sm">
           Back to inbox
         </Link>
       }

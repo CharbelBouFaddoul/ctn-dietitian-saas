@@ -1,5 +1,6 @@
 "use client";
 
+import { adminPath } from "../../../lib/admin-path";
 import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -96,7 +97,7 @@ function FoodDatabaseBody() {
   function setTab(id: string) {
     const next = new URLSearchParams(searchParams.toString());
     next.set("tab", id);
-    router.replace(`/admin/food-sources?${next.toString()}`, { scroll: false });
+    router.replace(adminPath(`/food-sources?${next.toString()}`), { scroll: false });
   }
 
   async function loadSources() {

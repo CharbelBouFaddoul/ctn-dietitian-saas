@@ -69,6 +69,7 @@ Document binaries live under `$FILE_STORAGE_PATH/dietitians/{dietitianAccountId}
 | `CORS_ORIGIN` | Production web origin(s), comma-separated |
 | `APP_URL` | Public web URL for email links |
 | `NEXT_PUBLIC_API_URL` | Public API URL for the web container |
+| `NEXT_PUBLIC_ADMIN_BASE_PATH` | Public path for the platform console (default `/ns-console`). `/admin` returns 404 unless this is exactly `/admin`. Bake at web image build. |
 | `DATABASE_URL` | Production PostgreSQL |
 | `REDIS_URL` | Production Redis |
 | `FILE_STORAGE_PATH` | `/data/storage` with persistent volume |

@@ -1,5 +1,6 @@
 "use client";
 
+import { adminPath } from "../../../lib/admin-path";
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Alert, Button, Field, Input, Select } from "@nutrition-saas/ui";
@@ -58,7 +59,7 @@ export function ProvisionClinicForm({
           clientLimit: Number.isFinite(limit) ? limit : undefined,
         }),
       });
-      router.push(`/admin/dietitians/${result.dietitianAccount.id}`);
+      router.push(adminPath(`/dietitians/${result.dietitianAccount.id}`));
     } catch (err) {
       setError(errorMessage(err, "Unable to create clinic"));
       setBusy(false);

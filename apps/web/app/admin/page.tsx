@@ -1,5 +1,6 @@
 "use client";
 
+import { adminPath } from "../../lib/admin-path";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
@@ -140,28 +141,28 @@ export default function AdminHomePage() {
             <div className="ui-admin-metric">
               <span className="ui-admin-metric__label">Clinics</span>
               <strong className="ui-admin-metric__value">{clinics ?? "—"}</strong>
-              <Link href="/admin/dietitians" className="ui-link" style={{ fontSize: 13 }}>
+              <Link href={adminPath("/dietitians")} className="ui-link" style={{ fontSize: 13 }}>
                 Open clinics
               </Link>
             </div>
             <div className="ui-admin-metric">
               <span className="ui-admin-metric__label">Accounts</span>
               <strong className="ui-admin-metric__value">{accounts ?? "—"}</strong>
-              <Link href="/admin/users" className="ui-link" style={{ fontSize: 13 }}>
+              <Link href={adminPath("/users")} className="ui-link" style={{ fontSize: 13 }}>
                 Open accounts
               </Link>
             </div>
             <div className="ui-admin-metric">
               <span className="ui-admin-metric__label">Subscriptions</span>
               <strong className="ui-admin-metric__value">{subs ?? "—"}</strong>
-              <Link href="/admin/subscriptions" className="ui-link" style={{ fontSize: 13 }}>
+              <Link href={adminPath("/subscriptions")} className="ui-link" style={{ fontSize: 13 }}>
                 Open roster
               </Link>
             </div>
             <div className="ui-admin-metric">
               <span className="ui-admin-metric__label">Inbox</span>
               <strong className="ui-admin-metric__value">{unread ?? "—"}</strong>
-              <Link href="/admin/contact" className="ui-link" style={{ fontSize: 13 }}>
+              <Link href={adminPath("/contact")} className="ui-link" style={{ fontSize: 13 }}>
                 {unread ? "Unread messages" : "Open inbox"}
               </Link>
             </div>
@@ -174,7 +175,7 @@ export default function AdminHomePage() {
           title="Inbox"
           description="New messages from the public contact form."
           actions={
-            <Link href="/admin/contact" className="ui-link">
+            <Link href={adminPath("/contact")} className="ui-link">
               Open inbox
             </Link>
           }
@@ -185,7 +186,7 @@ export default function AdminHomePage() {
             <ul className="ui-admin-queue">
               {inbox.map((row) => (
                 <li key={row.id}>
-                  <Link href={`/admin/contact/${row.id}`} className="ui-link">
+                  <Link href={adminPath(`/contact/${row.id}`)} className="ui-link">
                     {row.subject}
                   </Link>
                   <span className="ui-muted">
@@ -203,7 +204,7 @@ export default function AdminHomePage() {
           title="Trials and renewals"
           description="Trial plans and subscriptions ending in the next 14 days."
           actions={
-            <Link href="/admin/subscriptions" className="ui-link">
+            <Link href={adminPath("/subscriptions")} className="ui-link">
               Open roster
             </Link>
           }
@@ -215,7 +216,7 @@ export default function AdminHomePage() {
               {attention.map((row) => (
                 <li key={row.id}>
                   <Link
-                    href={`/admin/dietitians/${row.dietitianAccount?.id}?tab=subscription`}
+                    href={adminPath(`/dietitians/${row.dietitianAccount?.id}?tab=subscription`)}
                     className="ui-link"
                   >
                     {row.dietitianAccount?.name ?? "Clinic"}
@@ -247,7 +248,7 @@ export default function AdminHomePage() {
               )}
             </div>
             <p className="ui-muted" style={{ margin: 0 }}>
-              <Link href="/admin/health" className="ui-link">
+              <Link href={adminPath("/health")} className="ui-link">
                 Open health details
               </Link>
             </p>
@@ -258,7 +259,7 @@ export default function AdminHomePage() {
           title="Recent activity"
           description="Latest platform audit events."
           actions={
-            <Link href="/admin/audit" className="ui-link">
+            <Link href={adminPath("/audit")} className="ui-link">
               View audit
             </Link>
           }

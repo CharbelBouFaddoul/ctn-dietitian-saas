@@ -160,6 +160,32 @@ export class UpdateUserStatusDto {
   status!: "ACTIVE" | "SUSPENDED" | "ARCHIVED";
 }
 
+export class CreateAdminUserDto {
+  @ApiProperty()
+  @IsString()
+  @MinLength(3)
+  @MaxLength(320)
+  email!: string;
+
+  @ApiProperty()
+  @IsString()
+  @MinLength(10)
+  @MaxLength(128)
+  password!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  firstName?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  lastName?: string;
+}
+
 export class UpdateAdminUserProfileDto {
   @ApiPropertyOptional()
   @IsOptional()

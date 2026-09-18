@@ -1,5 +1,6 @@
 "use client";
 
+import { adminPath } from "../../../../lib/admin-path";
 import { FormEvent, Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -80,7 +81,7 @@ function PlanDetailBody() {
   function setTab(id: string) {
     const next = new URLSearchParams(searchParams.toString());
     next.set("tab", id);
-    router.replace(`/admin/plans/${params.id}?${next.toString()}`, { scroll: false });
+    router.replace(adminPath(`/plans/${params.id}?${next.toString()}`), { scroll: false });
   }
 
   async function load() {
@@ -199,7 +200,7 @@ function PlanDetailBody() {
   if (!plan) {
     return (
       <AdminPage title="Plan" description="Unable to load this plan." error={error}>
-        <Link href="/admin/plans" className="ui-link">
+        <Link href={adminPath("/plans")} className="ui-link">
           Back to plans
         </Link>
       </AdminPage>
@@ -213,11 +214,11 @@ function PlanDetailBody() {
       description={`${plan.slug} · ${plan._count?.subscriptions ?? 0} subscriptions · ${plan.durationDays} day period`}
       error={error}
       crumbs={[
-        { href: "/admin/plans", label: "Plans" },
+        { href: adminPath("/plans"), label: "Plans" },
         { label: plan.name },
       ]}
       actions={
-        <Link href="/admin/plans" className="ui-btn ui-btn--secondary ui-btn--sm">
+        <Link href={adminPath("/plans")} className="ui-btn ui-btn--secondary ui-btn--sm">
           Back to plans
         </Link>
       }
@@ -385,7 +386,7 @@ function PlanDetailBody() {
                       <Td label="Clinic">
                         {row.dietitianAccount ? (
                           <Link
-                            href={`/admin/dietitians/${row.dietitianAccount.id}?tab=subscription`}
+                            href={adminPath(`/dietitians/${row.dietitianAccount.id}?tab=subscription`)}
                             className="ui-link"
                           >
                             {row.dietitianAccount.name}
